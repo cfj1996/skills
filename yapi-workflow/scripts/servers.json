@@ -1,0 +1,9 @@
+[
+  {"name": "订单服务", "serverName": "/micro/order"},
+  {"name": "直播服务-C端", "serverName": "/micro/live-video"},
+  {"name": "直播服务-B端", "serverName": "/micro/live-video"},
+  {"name": "直播管理后台", "serverName": "/micro/live-admin"},
+  {"name": "批发分账", "serverName": "/micro/wholesale"},
+  {"name": "售后服务", "serverName": "/micro/after-sale"},
+  {"name": "售后服务-商家", "serverName": "/micro/after-sale"}
+]

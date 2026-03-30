@@ -1,0 +1,7 @@
+interface:
+  display_name: "TAPD Workflow"
+  short_description: "Orchestrate TAPD bug and story workflow"
+  default_prompt: "Use $tapd-workflow to collect TAPD context via API first, then plan, implement, and review results."
+
+policy:
+  allow_implicit_invocation: true

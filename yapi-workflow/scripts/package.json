@@ -1,0 +1,9 @@
+{
+  "name": "yapi-schema-to-ts",
+  "version": "0.1.0",
+  "description": "JSON Schema to TypeScript type generator for YApi workflow",
+  "main": "schema-to-ts.js",
+  "dependencies": {
+    "json-schema-to-typescript": "^15.0.0"
+  }
+}
