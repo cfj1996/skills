@@ -52,7 +52,7 @@ npx --package=@zan/tapd-cli@canary zan-tapd-cli <type> <id> --json
 - Bug: `docs/bugs/item-{ID}/raw-cli.json`
 - Story: `docs/stories/item-{ID}/raw-cli.json`
 
-从 CLI 输出中提取：
+从 CLI 输出中提取并写入 `item-context.md`：
 - 标题、状态、优先级
 - Bug: 严重程度、所属模块、复现步骤
 - Story: 所属迭代、验收标准
@@ -61,7 +61,28 @@ npx --package=@zan/tapd-cli@canary zan-tapd-cli <type> <id> --json
 - 截图/图片附件
 
 只要出现原型链接，必须使用 `chrome-devtools-mcp` 打开原型文档，读取其中默认展示的需求文档，并将提炼结果写入 `item-context.md`。若存在多个需求文档，只读取默认展示的文档，除非用户另行要求。
-逐条向用户确认原型/截图的上下文，确认后写入 `item-context.md`。
+
+### 3. 需求确认（阻塞环节）
+
+在完成信息收集后，**必须**主动向用户展示解析后的功能概要或问题描述，并等待用户确认。
+
+**展示内容包括**：
+- **标题**：{TAPD 标题}
+- **类型**：Bug 或 Story
+- **功能点/问题复现步骤**：{提炼后的核心内容}
+- **原型分析结果**：{原型中的核心逻辑说明}
+
+**询问话术示例**：
+> 已收集并解析 TAPD 信息：
+> **[Bug/Story 标题]**
+> {核心描述/步骤}
+>
+> **请确认是否继续处理该项？**
+> - 输入 `继续`：开始本轮变更记录与规划。
+> - 输入 `补充需求: xxx`：将补充信息并入 `item-context.md` 后再进行规划。
+> - 输入 `取消`：终止工作流。
+
+**未收到明确的“继续”或“补充”指令前，禁止执行后续步骤。**
 
 #### Bug 模板
 
@@ -135,7 +156,7 @@ npx --package=@zan/tapd-cli@canary zan-tapd-cli <type> <id> --json
 - 0.6: 描述完整，其他字段部分缺失
 - < 0.6: 关键信息缺失，需人工补充
 
-### 3. 记录本轮变更
+### 4. 记录本轮变更
 
 如果是首次处理后的继续修复、补充需求或再次开发，先在当前 `item-{ID}` 目录下创建新的 `iteration-{N}/change-request.md`，记录本轮为什么重启、要补充什么、与上一轮相比变化了什么。
 
@@ -162,7 +183,7 @@ npx --package=@zan/tapd-cli@canary zan-tapd-cli <type> <id> --json
 
 首次处理时可直接创建 `iteration-1/change-request.md` 作为本轮说明。
 
-### 4. 规划任务
+### 5. 规划任务
 
 基于 `item-context.md` 和当前轮次的 `change-request.md` 生成 `task-plan.md`：
 

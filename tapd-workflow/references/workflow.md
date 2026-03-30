@@ -44,7 +44,8 @@
   - Story: `docs/stories/item-<ID>/raw-cli.json`
 - CLI 输出的 `warnings`/`collection_confidence`（如果有）用于后续阶段判断信息完整度。
 - 页面浏览仅在 CLI 无法提供核心信息时才访问。
-- CLI 输出的原型/截图链接应该先通过 `chrome-devtools-mcp` 读取原型文档默认展示的需求文档，再通过 `agents/collector.md` 中的提示词逐条向用户确认，用确认后的上下文填充 `item-context.md`，并为当前轮次准备 `change-request.md`、`task-plan.md` 草稿。
+- CLI 输出的原型/截图链接应该先通过 `chrome-devtools-mcp` 读取原型文档默认展示的需求文档。
+- **主动确认**：在生成 `item-context.md` 后，必须向用户展示解析后的功能概要或问题复现步骤，询问“继续/补充需求/取消”。只有收到确定的指令后，才能为当前轮次准备 `change-request.md`、`task-plan.md`。
 - 采集入口由 `node scripts/context-confirm.mjs` 触发，脚本会展示 CLI 摘要、确认原型/截图上下文，并自动产出 `item-context.md`、`raw-cli.json` 及当前轮次所需的草稿内容。
 - 后续继续修复或补需求时，不重新生成 `raw-cli.json`，而是新增 `iteration-{N}/change-request.md` 作为当前轮次输入。
 - 当用户输入 `/tapd-workflow bug item-id <ITEM_ID>` 或 `/tapd-workflow story item-id <ITEM_ID>` 时，先查找对应类型下的 `item-{ID}` 目录和已有 `item-context.md`，再进入当前轮次流程。
@@ -52,7 +53,7 @@
 ## 处理顺序
 
 1. 收集信息
-2. 确认需求
+2. 需求确认（展示摘要并询问“继续/补充/取消”，收到明确指令后方可进行后续工作）
 3. 记录本轮变更 `iteration-{N}/change-request.md`
 4. 规划任务
 5. 实现修改
