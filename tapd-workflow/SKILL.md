@@ -208,11 +208,12 @@ npx --package=@zan/tapd-cli@canary zan-tapd-cli <type> <id> --json
 {潜在风险}
 
 ## 分支信息
-- **分支名**: fix/{ID}-{slug} 或 feat/{ID}-{slug}
+- **分支名**: {中文描述}-{ID}
 - **Worktree**: ../worktree-{ID}
 ```
 
-**任务拆分要求**：
+**任务拆分与分支要求**：
+- 分支名命名规则：**中文描述-ID**（如：用户列表分页修复-1000123）
 - 每个任务 30 分钟内可完成
 - 任务描述具体、可执行
 - 若根因不明确，首个任务应是验证假设
@@ -357,7 +358,7 @@ git add -f docs/
 git commit -m "fix({ID}): {描述}"
 
 # 推送并创建 PR（如需要）
-git push -u origin fix/{ID}-{slug}
+git push -u origin {中文描述}-{ID}
 
 # 合并后清理 worktree
 git worktree remove ../worktree-{ID}
@@ -373,7 +374,7 @@ git worktree remove ../worktree-{ID}
 - 开发人员：
   - 前端：{开发者}
 - 内容：{commit message 或变更描述}
-- 代码分支名：{fix|feat}/{ID}-{slug}
+- 代码分支名：{中文描述}-{ID}
 - 影响范围：{影响的功能模块或页面}
 - 测试人员：{从 TAPD 获取}
 - 环境：联团 老生产
