@@ -11,6 +11,7 @@
 - 每次修改后运行相关测试
 - 生成当前轮次的 `commit-message.txt`
 - 生成当前轮次的 `impl-summary.md`
+- **提交代码时必须同步提交 `docs/` 下的文档（若被忽略需 `git add -f`）**
 
 ## 实施要求
 

@@ -346,9 +346,14 @@ const fullPath = `${serverName}${path}`; // 如 /micro/order/api/order/list
 
 ### 8. 提交与清理
 
+**提交代码时必须同时提交 `docs/` 下对应的文档**。注意：有些项目可能会将 `docs/` 文件夹忽略，需使用 `-f` 强制添加。
+
 ```bash
-# 提交
+# 提交代码和文档
 git add .
+# 针对可能被 .gitignore 忽略的 docs 目录，执行强制添加
+git add -f docs/
+
 git commit -m "fix({ID}): {描述}"
 
 # 推送并创建 PR（如需要）
@@ -363,7 +368,7 @@ git worktree remove ../worktree-{ID}
 在当前迭代目录下生成 `test-wiki.md`，模板如下：
 
 ```markdown
-1、[{项目名称}]({projectGitAddress}) **!!#ff0000 更新服务!!**
+1、[{项目名称}]({git地址}) **!!#ff0000 更新服务!!**
 - 负责人：{负责人}
 - 开发人员：
   - 前端：{开发者}
@@ -371,17 +376,17 @@ git worktree remove ../worktree-{ID}
 - 代码分支名：{fix|feat}/{ID}-{slug}
 - 影响范围：{影响的功能模块或页面}
 - 测试人员：{从 TAPD 获取}
-- 环境：{测试环境，如：联团 老生产}
+- 环境：联团 老生产
 ```
 
 字段来源：
 - **项目名称**: 当前文件夹名称，如果是monorepo，则去子包名称
+- **git地址**: 当前项目的git地址
 - **负责人/开发人员/前端**: 从 `item-context.md` 获取，或默认使用当前开发者
 - **内容**: 从当前迭代的 `commit-message.txt` 或 `impl-summary.md` 提取
 - **代码分支名**: 从 `task-plan.md` 获取
 - **影响范围**: 从 `task-plan.md` 风险评估或 `impl-summary.md` 变更文件汇总
 - **测试人员**: 从 `item-context.md` 获取
-- **环境**: 根据项目配置或询问用户确定
 
 ### 10. Worktree 收尾
 
@@ -449,7 +454,7 @@ docs/
 
 - 先证据，后判断
 - 范围最小化，不做无关重构
-- 每个阶段保留可追踪的 Markdown 产物
+- 每个阶段保留可追踪的 Markdown 产物，**提交代码时必须同步提交 `docs/` 下的文档（可能需要 `git add -f`）**
 - 代码修改必须在 worktree 中进行
 - 涉及代码修改时，优先运行相关测试
 - 出现原型链接时，原型需求提取必须通过 `chrome-devtools-mcp` 完成，且默认不切换到其他需求文档
