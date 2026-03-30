@@ -275,19 +275,26 @@ Args: search 用户列表
 /yapi-workflow server set "项目名" "正确的服务名"
 ```
 
-### 5. 创建 Worktree
+### 5. 确认并创建 Worktree
 
-**必须**在独立 worktree 中进行代码修改，分支基于 `origin/master`：
+**严禁**直接在主目录修改。必须在独立 worktree 中进行，且**必须先与用户确认基准分支**：
+
+1. **询问用户**：是从 `origin/master` 开始，还是在现有修复分支（如 `fix/xxx`）上继续？
+2. **确认分支名**：是否需要自定义分支名？
 
 ```bash
-# 先拉取最新代码
-git fetch origin master
+# 1. 先拉取最新代码
+git fetch origin
 
-# Bug 修复 - 基于 origin/master 创建
-git worktree add ../worktree-{ID} -b fix/{ID}-{slug} origin/master
+# 2. 根据用户选择创建 (示例)
+# 场景 A: 基于 origin/master 创建新修复分支
+git worktree add ../worktree-{ID} -b {ID}-{slug} origin/master
 
-# Story 开发 - 基于 origin/master 创建
-git worktree add ../worktree-{ID} -b feat/{ID}-{slug} origin/master
+# 场景 B: 基于现有远程分支创建
+git worktree add ../worktree-{ID} -b {existing-branch} origin/{existing-branch}
+
+# 场景 C: 在已有本地分支上继续
+git worktree add ../worktree-{ID} {local-branch}
 ```
 
 ### 6. 实现修改

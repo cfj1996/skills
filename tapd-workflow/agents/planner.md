@@ -15,7 +15,9 @@ Read `item-context.md` and the current `change-request.md`, analyze the work, an
 
 ## Rules
 
-- Produce a branch name and worktree path. **Branch naming rule: {Chinese Description}-{ID}** (e.g., 用户登录修复-1001234).
+- Produce a branch name and worktree path.
+- **Consult User**: Ask for the target branch (base branch). Default is `origin/master`.
+- **Branch naming rule**: {Chinese Description}-{ID} (e.g., 用户登录修复-1001234), unless the user specifies otherwise.
 - Split work into small tasks with dependencies.
 - Keep scope minimal and actionable
 - Plan only for the current iteration; do not rewrite previous iteration artifacts
