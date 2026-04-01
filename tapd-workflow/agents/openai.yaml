@@ -1,7 +1,7 @@
 interface:
   display_name: "TAPD Workflow"
-  short_description: "Orchestrate TAPD bug and story workflow"
-  default_prompt: "Use $tapd-workflow to collect TAPD context via API first, then plan, implement, and review results."
+  short_description: "Orchestrate TAPD bug and story workflow with MCP-first collection"
+  default_prompt: "Use $tapd-workflow to collect TAPD context via MCP, continue existing items, and require manual confirmation before any TAPD write. Keep MR handling link-only, target develop by default, and batch Wiki/comment/status writes into one confirmation when possible."
 
 policy:
   allow_implicit_invocation: true

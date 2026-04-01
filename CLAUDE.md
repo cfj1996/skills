@@ -12,6 +12,10 @@ This is a skills repository for Claude Code. Each skill is a self-contained dire
 
 End-to-end workflow for processing TAPD (project management tool) bugs and stories.
 
+### yapi-workflow
+
+使用 YAPI 查询接口详情、生成 TypeScript 声明，用于 API 对接开发场景。
+
 **Key command:**
 ```bash
 npx --package=@zan/tapd-cli@canary zan-tapd-cli <type> <id> --json
@@ -31,10 +35,6 @@ npx --package=@zan/tapd-cli@canary zan-tapd-cli <type> <id> --json
 
 **Directory conventions:**
 - Work files: `docs/bugs/item-{ID}/`
-- Bug branches: `fix/{ID}-{slug}`
-- Story branches: `feat/{ID}-{slug}`
-- Worktree path: `../worktree-{ID}`
-
-**Environment variables required:**
-- `TAPD_ACCESS_TOKEN` - Required for API access
-- `TAPD_API_BASE` - Optional, defaults to `https://api.tapd.cn`
+- Bug branches: `fixbug/{git-user}.{date},{slug}-{id-7}`
+- Story branches: `feature/{git-user}.{date},{slug}-{id-7}`
+- Worktree path: `../worktree-{id-7}`

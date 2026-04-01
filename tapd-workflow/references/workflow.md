@@ -4,19 +4,44 @@
 
 - 首次处理：`/tapd-workflow <TAPD链接>`
 - 继续处理：`/tapd-workflow bug item-id <ITEM_ID>` 或 `/tapd-workflow story item-id <ITEM_ID>`
-- 使用 `bug|story item-id` 时，默认表示继续修复或补需求，不重新采集 `raw-cli.json`
+- 使用 `bug|story item-id` 时，默认表示继续修复或补需求，不重新采集 `raw-mcp.json`
+
+## 流程图
+
+```mermaid
+flowchart LR
+  A["TAPD Bug / Story"] --> B["MCP 采集 raw-mcp.json"]
+  B --> C["整理 item-context.md"]
+  C --> D["展示摘要给用户确认"]
+  D -->|继续| E["iteration-N / change-request.md"]
+  D -->|补充| C
+  D -->|取消| X["结束"]
+  E --> F["task-plan.md"]
+  F --> G["worktree 中开发"]
+  G --> H["验证 / Review"]
+  H --> I["修复完成"]
+  I --> J["输出 MR 链接（不代建，目标 develop）"]
+  I --> K["生成提测 Wiki 草稿"]
+  K --> L["展示提测内容并确认"]
+  L -->|确认| M["创建 Wiki + 写入 Bug 评论 + 更新 Bug 状态"]
+  L -->|修改| K
+  L -->|取消| X["结束"]
+  M --> N["清理 worktree"]
+```
 
 ## 目录约定
 
 - 工作文件按类型写入：
-  - Bug: `docs/bugs/item-{ID}/`
-  - Story: `docs/stories/item-{ID}/`
-- `raw-cli.json` 和 `item-context.md` 保留在 `item-{ID}` 根目录
-- 每次实际执行使用新的 `iteration-{N}/` 子目录，保存当前轮次的 `change-request.md`、`task-plan.md`、`impl-summary.md`、`commit-message.txt` 和 `review-report.md`
+  - Bug: `docs/bugs/item-{short-id}/`
+  - Story: `docs/stories/item-{short-id}/`
+- `raw-mcp.json` 和 `item-context.md` 保留在 `item-{short-id}` 根目录
+- 每次实际执行使用新的 `iteration-{N}/` 子目录，保存当前轮次的 `change-request.md`、`task-plan.md`、`impl-summary.md` 和 `review-report.md`
+- `item-{short-id}` 中的 `short-id` 由 TAPD MCP 查询得到；TAPD 原始 `id` 只用于查找输入，不进入命名
 - 分支命名：
-  - Bug: `fix/{ID}-{slug}`
-  - Story: `feat/{ID}-{slug}`
-- Worktree 路径：`../worktree-{ID}`
+  - Bug: `fixbug/{git-user}.{YYMMDD}.{slug}-{short-id}`
+  - Story: `feature/{git-user}.{YYMMDD}.{slug}-{short-id}`
+- Worktree 路径：`../worktree-{short-id}`
+- MR 处理只输出链接，不代建、不代合并；默认目标分支固定为 `develop`
 
 ## 输出文件
 
@@ -24,9 +49,7 @@
 - `iteration-{N}/change-request.md`
 - `iteration-{N}/task-plan.md`
 - `iteration-{N}/impl-summary.md`
-- `iteration-{N}/commit-message.txt`
 - `iteration-{N}/review-report.md`
-- `iteration-{N}/test-wiki.md`
 
 ## 原型规则
 
@@ -37,18 +60,24 @@
 - 原型分析结果必须提炼后写入 `item-context.md`
 - 只有链接存在但无法访问时，才允许标记为缺失
 
-## CLI-first 规则
+## MCP-first 规则
 
-- 详情和评论默认走 `npx --package=@zan/tapd-cli@canary zan-tapd-cli <type> <id> --json`，并按类型保存原始输出：
-  - Bug: `docs/bugs/item-<ID>/raw-cli.json`
-  - Story: `docs/stories/item-<ID>/raw-cli.json`
-- CLI 输出的 `warnings`/`collection_confidence`（如果有）用于后续阶段判断信息完整度。
-- 页面浏览仅在 CLI 无法提供核心信息时才访问。
-- CLI 输出的原型/截图链接应该先通过 `chrome-devtools-mcp` 读取原型文档默认展示的需求文档。
+- 依赖 `mcp-server-tapd`；所有 TAPD 读取和写入都必须通过它完成
+- 如果 `mcp-server-tapd` 不可用，停止 workflow 并提示用户，不使用 CLI 兜底
+- 详情和评论直接调用 TAPD MCP 获取：
+  - Bug: `mcp__mcp_server_tapd__get_bug`
+  - Story: `mcp__mcp_server_tapd__get_stories_or_tasks`
+- 采集结果按类型保存：
+  - Bug: `docs/bugs/item-<ID>/raw-mcp.json`
+  - Story: `docs/stories/item-<ID>/raw-mcp.json`
+- `warnings`/`collection_confidence`（如果有）用于后续阶段判断信息完整度。
+- 页面浏览仅在 MCP 无法提供核心信息时才访问。
+- MCP 返回的原型/截图链接应该先通过 `chrome-devtools-mcp` 读取原型文档默认展示的需求文档。
 - **主动确认**：在生成 `item-context.md` 后，必须向用户展示解析后的功能概要或问题复现步骤，询问“继续/补充需求/取消”。只有收到确定的指令后，才能为当前轮次准备 `change-request.md`、`task-plan.md`。
-- 采集入口由 `node scripts/context-confirm.mjs` 触发，脚本会展示 CLI 摘要、确认原型/截图上下文，并自动产出 `item-context.md`、`raw-cli.json` 及当前轮次所需的草稿内容。
-- 后续继续修复或补需求时，不重新生成 `raw-cli.json`，而是新增 `iteration-{N}/change-request.md` 作为当前轮次输入。
-- 当用户输入 `/tapd-workflow bug item-id <ITEM_ID>` 或 `/tapd-workflow story item-id <ITEM_ID>` 时，先查找对应类型下的 `item-{ID}` 目录和已有 `item-context.md`，再进入当前轮次流程。
+- 后续继续修复或补需求时，不重新生成 `raw-mcp.json`，而是新增 `iteration-{N}/change-request.md` 作为当前轮次输入。
+- 当用户输入 `/tapd-workflow bug item-id <ITEM_ID>` 或 `/tapd-workflow story item-id <ITEM_ID>` 时，先查找对应类型下的 `item-{short-id}` 目录和已有 `item-context.md`，再进入当前轮次流程。
+- 任何 TAPD 写操作都必须先让用户手动确认，再调用对应 MCP 接口；包括创建/更新 Bug、Story、Comment、Wiki，以及编辑、移动、补充或改写已有内容。
+- 允许把同一批次的 Wiki 创建、Bug 评论补充、状态更新合并为一次确认，不要求每一步都单独打断用户
 
 ## 处理顺序
 
@@ -58,8 +87,21 @@
 4. 规划任务
 5. 实现修改
 6. Review
-7. 提交与 MR（必须同时提交 `docs/` 下的文档，若被忽略需 `git add -f`）
-8. Worktree 收尾与清理
+7. 修复完成
+   - 仅在 Review 输出 `REVIEW_PASSED` 后执行
+   - 先整理当前轮次的修复结论、MR 链接和提测草稿
+   - 只有进入该阶段后，才允许写入提测 Wiki、Bug 评论和 Bug 状态
+8. 提交与 MR
+   - MR 只输出链接，不代建、不代合并
+   - MR 标题优先使用 `task-plan.md` 的摘要
+   - 目标分支固定为 `develop`，除非用户明确指定其他分支
+   - 必须同时提交 `docs/` 下的文档，若被忽略需 `git add -f`
+9. 生成提测 Wiki
+   - 创建位置固定为 `提测文档`（`1150372234001008260`）下的当月目录 `YYYY-MM`
+   - Wiki 名称格式为 `MM-DD: {简单描述}`
+   - 生成后先展示给用户确认，再写入 TAPD Wiki、Bug 评论和 Bug 状态
+   - 如果月目录里已有按模块分组的提测文档，优先插入到 `前端` 模块中，保持模块内顺序连续；没有 `前端` 模块则先创建该模块
+10. Worktree 收尾与清理
 
 ## 全局约束
 

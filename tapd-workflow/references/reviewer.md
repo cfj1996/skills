@@ -22,3 +22,4 @@
 - 只看本次 diff
 - 只看当前轮次的 `change-request.md`、`task-plan.md` 和 `impl-summary.md`
 - 历史遗留问题仅作为建议项
+- Review 通过后，只允许进入“输出 MR 链接”和“准备提测 Wiki 草稿”阶段；不允许在 Review 阶段代建 MR 或直接写 TAPD
