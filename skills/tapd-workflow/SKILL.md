@@ -13,7 +13,7 @@ tools:
 
 - 首次处理：`/tapd-workflow <TAPD链接>`
 - 继续处理：`/tapd-workflow bug item-id <ITEM_ID>` 或 `/tapd-workflow story item-id <ITEM_ID>`
-- 细节流程、目录约定和产物规范放在 [`references/workflow.md`](./references/workflow.md)
+- 细节流程、目录约定和产物规范放在 [`references/workflow.md`](references/workflow.md)
 
 ## ID 约定
 
@@ -33,7 +33,7 @@ tools:
 - TAPD 操作必须使用 TAPD MCP
 - 只要会直接写入 TAPD 或影响协作结果，就必须先展示内容并等待用户明确确认；包括创建/更新 Bug、Story、Comment、Wiki，以及修改状态、补充内容、移动内容
 - 本地文档产物、代码修改、测试、MR 链接整理不需要逐步确认，但对外写入前必须先展示内容
-- 提测 Wiki 必须严格按 [`references/test-wiki.md`](./references/test-wiki.md) 的模板生成，禁止用摘要模板、简版模板、自由格式替代
+- 提测 Wiki 必须严格按 [`references/test-wiki.md`](references/test-wiki.md) 的模板生成，禁止用摘要模板、简版模板、自由格式替代
 - 首次采集结果保存为 `raw-mcp.json`，后续迭代复用已有 `item-context.md`
 - 代码修改必须在 worktree 中进行
 - 涉及接口对接时，使用 `yapi-workflow`
@@ -43,10 +43,10 @@ tools:
 
 ## 参考
 
-- [`references/collector.md`](./references/collector.md)
-- [`references/gitlab-map.md`](./references/gitlab-map.md)
-- [`references/test-wiki.md`](./references/test-wiki.md)
-- [`references/planner.md`](./references/planner.md)
-- [`references/implementer.md`](./references/implementer.md)
-- [`references/reviewer.md`](./references/reviewer.md)
-- [`references/prototype.md`](./references/prototype.md)
+- [`references/collector.md`](references/collector.md)
+- [`references/gitlab-map.md`](references/gitlab-map.md)
+- [`references/test-wiki.md`](references/test-wiki.md)
+- [`references/planner.md`](references/planner.md)
+- [`references/implementer.md`](references/implementer.md)
+- [`references/reviewer.md`](references/reviewer.md)
+- [`references/prototype.md`](references/prototype.md)

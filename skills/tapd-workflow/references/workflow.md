@@ -67,7 +67,7 @@ flowchart LR
 - 详情和评论直接调用 TAPD MCP 获取：
   - Bug: `mcp__mcp_server_tapd__get_bug`
   - Story: `mcp__mcp_server_tapd__get_stories_or_tasks`
-- 代码提交前与提测前的基线/合并校验统一按 [`references/gitlab-map.md`](./gitlab-map.md) 执行
+- 代码提交前与提测前的基线/合并校验统一按 [`references/gitlab-map.md`](gitlab-map.md) 执行
 - 采集结果按类型保存：
   - Bug: `docs/bugs/item-<ID>/raw-mcp.json`
   - Story: `docs/stories/item-<ID>/raw-mcp.json`
@@ -102,7 +102,7 @@ flowchart LR
 9. 生成提测 Wiki
    - 创建位置固定为 `提测文档`（`1150372234001008260`）下的当月目录 `YYYY-MM`
    - Wiki 名称格式为 `MM-DD: {简单描述}`
-   - 必须先按 [`references/test-wiki.md`](./test-wiki.md) 生成完整 Wiki 正文，正文必须符合模板，不能改成摘要格式或简版格式
+   - 必须先按 [`references/test-wiki.md`](test-wiki.md) 生成完整 Wiki 正文，正文必须符合模板，不能改成摘要格式或简版格式
    - 创建前必须使用 `gitlab-map` 查询当前分支最新提交是否已合并到 `origin/develop`（全量提交需确认已同步到该分支），仅在查询为真时允许创建提测 Wiki
    - 生成后先展示给用户确认，再写入 TAPD Wiki、再将提测wiki地址写入当前 tapd 详细下的评论、最后这个 tapd 若是 bug 再修改 Bug 状态
    - 写入 Bug 评论时，内容必须仅为 `提测wiki：{wiki链接}`，不得额外添加说明文字

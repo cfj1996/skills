@@ -17,7 +17,7 @@
   - 当前工作分支名
   - 基线分支是 `origin/master`
   - 是否可继续提交
-- 结果必须写入 `task-plan.md` 中的“分支与合规检查”小节（见 [`references/gitlab-map.md`](./gitlab-map.md)）
+- 结果必须写入 `task-plan.md` 中的“分支与合规检查”小节（见 [`references/gitlab-map.md`](gitlab-map.md)）
 - 若涉及接口对接，按 `yapi-workflow` 处理
 - 如果后续需要创建 Wiki、更新 Bug 评论或改状态，先把这些写入动作汇总成一个待确认批次
 
