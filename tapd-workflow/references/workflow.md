@@ -37,11 +37,11 @@ flowchart LR
 - `raw-mcp.json` 和 `item-context.md` 保留在 `item-{short-id}` 根目录
 - 每次实际执行使用新的 `iteration-{N}/` 子目录，保存当前轮次的 `change-request.md`、`task-plan.md`、`impl-summary.md` 和 `review-report.md`
 - `item-{short-id}` 中的 `short-id` 由 TAPD MCP 查询得到；TAPD 原始 `id` 只用于查找输入，不进入命名
-- 分支命名：
+- 分支命名：必须基于规划产物中的 `base_branch`（即 `origin/master`）创建。{slug} 使用中文进行简单的描述，不超过10个字
   - Bug: `fixbug/{git-user}.{YYMMDD}.{slug}-{short-id}`
   - Story: `feature/{git-user}.{YYMMDD}.{slug}-{short-id}`
-- Worktree 路径：`../worktree-{short-id}`
-- MR 处理只输出链接，不代建、不代合并；默认目标分支固定为 `develop`
+- Worktree 路径：项目根目录下 `./.worktree/{短的描述}-{short-id}`
+- 创建 MR 合并请求，只能合并到`develop`分支，到输出MR的链接，让用户自己手动合并
 
 ## 输出文件
 
@@ -62,11 +62,12 @@ flowchart LR
 
 ## MCP-first 规则
 
-- 依赖 `mcp-server-tapd`；所有 TAPD 读取和写入都必须通过它完成
-- 如果 `mcp-server-tapd` 不可用，停止 workflow 并提示用户，不使用 CLI 兜底
+- 依赖 `tapd-mcp`；所有 TAPD 读取和写入都必须通过它完成
+- 如果 `tapd-mcp` 不可用，停止 workflow 并提示用户，不使用 CLI 兜底
 - 详情和评论直接调用 TAPD MCP 获取：
   - Bug: `mcp__mcp_server_tapd__get_bug`
   - Story: `mcp__mcp_server_tapd__get_stories_or_tasks`
+- 代码提交前与提测前的基线/合并校验统一按 [`references/gitlab-map.md`](./gitlab-map.md) 执行
 - 采集结果按类型保存：
   - Bug: `docs/bugs/item-<ID>/raw-mcp.json`
   - Story: `docs/stories/item-<ID>/raw-mcp.json`
@@ -92,15 +93,26 @@ flowchart LR
    - 先整理当前轮次的修复结论、MR 链接和提测草稿
    - 只有进入该阶段后，才允许写入提测 Wiki、Bug 评论和 Bug 状态
 8. 提交与 MR
+   - Commit Message 信息使用中文，需要符合 Conventional Commits的提交规范编写描述信息
+   - 提交代码前，必须调用 `gitlab-map` 验证当前分支是从 `origin/master` 创建，并记录校验明细；不通过则立即中止、不要提交，并返回修正建议（重新基于 `origin/master` 重新建分支）
    - MR 只输出链接，不代建、不代合并
+   - MR 链接必须显式带 `target_branch=develop`，默认目标分支固定为 `develop`
    - MR 标题优先使用 `task-plan.md` 的摘要
-   - 目标分支固定为 `develop`，除非用户明确指定其他分支
    - 必须同时提交 `docs/` 下的文档，若被忽略需 `git add -f`
 9. 生成提测 Wiki
    - 创建位置固定为 `提测文档`（`1150372234001008260`）下的当月目录 `YYYY-MM`
    - Wiki 名称格式为 `MM-DD: {简单描述}`
-   - 生成后先展示给用户确认，再写入 TAPD Wiki、Bug 评论和 Bug 状态
+   - 必须先按 [`references/test-wiki.md`](./test-wiki.md) 生成完整 Wiki 正文，正文必须符合模板，不能改成摘要格式或简版格式
+   - 创建前必须使用 `gitlab-map` 查询当前分支最新提交是否已合并到 `origin/develop`（全量提交需确认已同步到该分支），仅在查询为真时允许创建提测 Wiki
+   - 生成后先展示给用户确认，再写入 TAPD Wiki、再将提测wiki地址写入当前 tapd 详细下的评论、最后这个 tapd 若是 bug 再修改 Bug 状态
+   - 写入 Bug 评论时，内容必须仅为 `提测wiki：{wiki链接}`，不得额外添加说明文字
    - 如果月目录里已有按模块分组的提测文档，优先插入到 `前端` 模块中，保持模块内顺序连续；没有 `前端` 模块则先创建该模块
+   - 写入前必须确认：
+     - 月目录存在且已定位到正确目录
+     - `# 前端` 模块的插入位置已确定
+     - 序号已按当前模块内顺序计算
+     - wiki 正文已完整展示给用户并获得明确确认
+   - 如果任何一项无法确认，必须停止，不得自行猜测位置、序号或模板内容后直接写入
 10. Worktree 收尾与清理
 
 ## 全局约束

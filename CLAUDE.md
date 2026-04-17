@@ -37,4 +37,4 @@ npx --package=@zan/tapd-cli@canary zan-tapd-cli <type> <id> --json
 - Work files: `docs/bugs/item-{ID}/`
 - Bug branches: `fixbug/{git-user}.{date},{slug}-{id-7}`
 - Story branches: `feature/{git-user}.{date},{slug}-{id-7}`
-- Worktree path: `../worktree-{id-7}`
+- Worktree path: `./.worktree/{short-desc}-{id-7}`

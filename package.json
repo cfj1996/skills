@@ -1,0 +1,12 @@
+{
+  "name": "skills",
+  "version": "1.0.0",
+  "files": [
+    "tapd-workflow/",
+    "company-project-routing/",
+    "team-identity-map/"
+  ],
+  "scripts": {
+    "build": "node -e \"const pkg = require('./package.json'); const files = pkg.files; const cmd = files.map(f => f.replace(/\\/$/, '')).join(' '); require('child_process').execSync('zip -r skills.zip ' + cmd, {stdio: 'inherit'});\""
+  }
+}

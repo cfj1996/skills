@@ -1,0 +1,7 @@
+interface:
+  display_name: "团队身份映射"
+  short_description: "团队实名、企业微信、GitLab账号映射与成员查找"
+  default_prompt: "Use $team-identity-map to resolve a teammate from real name, enterprise WeChat, GitLab username, email, or phone number."
+
+policy:
+  allow_implicit_invocation: true

@@ -2,7 +2,9 @@
 name: tapd-workflow
 description: Use when working on TAPD Bug/Story items with an MCP-first workflow for collecting context, planning fixes, implementing changes, or preparing提测材料. Use when Codex needs to read TAPD pages, continue an existing TAPD item, or write back to TAPD with manual confirmation.
 tools:
-  - mcp-server-tapd
+  - tapd-mcp: 查询tapd相关信息
+  - yapi-mcp: 查询api, 接口文档, 接口服务相关信息
+  - gitlab-map: 分支基线校验与 merge 状态查询
 ---
 
 # TAPD 工作流
@@ -21,15 +23,17 @@ tools:
 
 ## 依赖
 
-- 必须依赖 `mcp-server-tapd`
-- 所有 TAPD 读写都从 `mcp-server-tapd` 进入，不使用 CLI 兜底
-- 如果 `mcp-server-tapd` 不可用，停止 workflow 并提示用户
+- 必须依赖 `tapd-mcp`
+- 必须依赖 `gitlab-map`
+- 如果 `tapd-mcp` 不可用，停止 workflow 并提示用户
+- 如果 `gitlab-map` 不可用，停止 workflow 并提示用户，暂停执行涉及代码提交/提测的后续步骤
 
 ## 硬规则
 
 - TAPD 操作必须使用 TAPD MCP
 - 只要会直接写入 TAPD 或影响协作结果，就必须先展示内容并等待用户明确确认；包括创建/更新 Bug、Story、Comment、Wiki，以及修改状态、补充内容、移动内容
 - 本地文档产物、代码修改、测试、MR 链接整理不需要逐步确认，但对外写入前必须先展示内容
+- 提测 Wiki 必须严格按 [`references/test-wiki.md`](./references/test-wiki.md) 的模板生成，禁止用摘要模板、简版模板、自由格式替代
 - 首次采集结果保存为 `raw-mcp.json`，后续迭代复用已有 `item-context.md`
 - 代码修改必须在 worktree 中进行
 - 涉及接口对接时，使用 `yapi-workflow`
@@ -40,6 +44,8 @@ tools:
 ## 参考
 
 - [`references/collector.md`](./references/collector.md)
+- [`references/gitlab-map.md`](./references/gitlab-map.md)
+- [`references/test-wiki.md`](./references/test-wiki.md)
 - [`references/planner.md`](./references/planner.md)
 - [`references/implementer.md`](./references/implementer.md)
 - [`references/reviewer.md`](./references/reviewer.md)
