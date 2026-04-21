@@ -1,0 +1,4 @@
+interface:
+  display_name: "Login Token Workflow"
+  short_description: "Fetch merchant and C-end login tokens"
+  default_prompt: "Use $login-token-workflow to fetch merchant admin tokens and C-end user tokens, then build local debug URLs with siteId and token."

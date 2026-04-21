@@ -1,7 +1,7 @@
 interface:
   display_name: "TAPD Workflow"
   short_description: "Orchestrate TAPD bug and story workflow with MCP-first collection"
-  default_prompt: "Use $tapd-workflow to collect TAPD context via MCP, continue existing items, and require manual confirmation before any TAPD write. Keep MR handling link-only, target develop by default, and batch Wiki/comment/status writes into one confirmation when possible. Before commit, verify branch ancestry with gitlab-map (must be from origin/master) and record it in task-plan. Before test wiki creation, verify branch commits are merged into origin/develop via gitlab-map; block wiki creation if false."
+  default_prompt: "Use $tapd-workflow to collect TAPD context via MCP, continue existing items, and require manual confirmation before any TAPD write. Keep MR handling link-only, target develop by default, and batch Wiki/comment/status writes into one confirmation when possible. Before each stage transition, run the regression-checker agent to verify the stage is safe to advance. Before commit, verify branch ancestry with gitlab-map (must be from origin/master) and record it in task-plan. Before test wiki creation, verify branch commits are merged into origin/develop via gitlab-map; block wiki creation if false."
 
 policy:
   allow_implicit_invocation: true
