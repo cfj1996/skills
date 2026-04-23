@@ -41,7 +41,10 @@ tools:
 - 只要会直接写入 TAPD 或影响协作结果，就必须先展示内容并等待用户明确确认；包括创建/更新 Bug、Story、Comment、Wiki，以及修改状态、补充内容、移动内容
 - 本地文档产物、代码修改、测试、MR 链接整理不需要逐步确认，但对外写入前必须先展示内容
 - 提测 Wiki 必须严格按 [`references/test-wiki.md`](references/test-wiki.md) 的模板生成，禁止用摘要模板、简版模板、自由格式替代
+- 提测 Wiki 模板中的 `服务名称` 必须使用 `company-project-routing` 技能按项目线索映射获取，不得直接用项目名称代替
 - 提测 Wiki 写回前必须先读取父级月目录正文，确认当前模块顺序与插入位置，默认采用增量追加，不得整页覆盖
+- 提测 Wiki 写回时，必须先检查当月目录是否已有当前 TAPD 项相关子 Wiki：无则先创建 `MM-DD: {简单描述}` 子 Wiki；有则直接走后续补充流程，禁止重复创建
+- 每轮 `change-request.md` 必须包含 `本轮处理`、`本轮不处理`、`历史内容处理策略` 三个小节；未在 `本轮处理` 中声明的内容禁止进入后续阶段
 - 首次采集结果保存为 `raw-mcp.json`，后续迭代复用已有 `item-context.md`
 - 代码修改必须在 worktree 中进行
 - 当产品补充附件、PRD、需求说明或其他相关文档时，必须纳入信息采集阶段并解析其内容，再写入 `item-context.md`
@@ -60,3 +63,4 @@ tools:
 - [`references/implementer.md`](references/implementer.md)
 - [`references/reviewer.md`](references/reviewer.md)
 - [`references/prototype.md`](references/prototype.md)
+- [`references/regression-scenarios.md`](references/regression-scenarios.md)

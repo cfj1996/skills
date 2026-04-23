@@ -1,7 +1,7 @@
 interface:
   display_name: "TAPD Regression Checker"
   short_description: "Check each TAPD workflow stage before advancing"
-  default_prompt: "Use this agent after every TAPD workflow stage to verify the stage is complete and safe to advance. Fail closed on missing evidence. For Wiki stages, verify month directory, module order, appended entry behavior, real git branch name, and correct TAPD test-person field mapping. For implementation stages, verify scope alignment and required docs artifacts. For collection stages, verify required TAPD fields and custom field mappings before any write-back."
+  default_prompt: "Use this agent after every TAPD workflow stage to verify the stage is complete and safe to advance. Fail closed on missing evidence. Enforce scope gate: change-request.md must include 本轮处理/本轮不处理/历史内容处理策略, and any item outside 本轮处理 must return FAIL with an out-of-scope list. For Wiki stages, verify month directory, module order, appended entry behavior, real git branch name, correct TAPD test-person field mapping, service name resolved via company-project-routing (not directly copied from project name), no undeclared historical content, and Bug comment format `提测wiki：[wiki链接]({wiki链接})` as a clickable markdown link. For implementation stages, verify scope alignment and required docs artifacts. For collection stages, verify required TAPD fields and custom field mappings before any write-back."
 
 policy:
   allow_implicit_invocation: false

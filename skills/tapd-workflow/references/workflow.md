@@ -52,6 +52,15 @@ flowchart LR
 - `iteration-{N}/impl-summary.md`
 - `iteration-{N}/review-report.md`
 
+## 本轮范围声明（`change-request.md` 必填）
+
+- `iteration-{N}/change-request.md` 必须包含以下三个小节，缺一不可：
+  - `本轮处理`：仅列出本轮明确要完成的需求/缺陷点
+  - `本轮不处理`：明确列出本轮排除项
+  - `历史内容处理策略`：固定写明“默认不自动合并历史记录；仅在用户点名后纳入本轮”
+- 未出现在 `本轮处理` 的条目，不得进入 `task-plan.md`、`impl-summary.md`、`review-report.md` 或提测 Wiki 正文。
+- 如果发现候选历史信息，必须在 `change-request.md` 标记为“待用户确认”，不得直接并入执行范围。
+
 ## 原型规则
 
 - 只处理详情页正文、评论正文，以及这两处中的图片/截图信息
@@ -74,8 +83,8 @@ flowchart LR
   - Story: `mcp__mcp_server_tapd__get_stories_or_tasks`
 - 代码提交前与提测前的基线/合并校验统一按 [`references/gitlab-map.md`](gitlab-map.md) 执行
 - 采集结果按类型保存：
-  - Bug: `docs/bugs/item-<ID>/raw-mcp.json`
-  - Story: `docs/stories/item-<ID>/raw-mcp.json`
+  - Bug: `docs/bugs/item-{short-id}/raw-mcp.json`
+  - Story: `docs/stories/item-{short-id}/raw-mcp.json`
 - `warnings`/`collection_confidence`（如果有）用于后续阶段判断信息完整度。
 - 页面浏览仅在 MCP 无法提供核心信息时才访问。
 - MCP 返回的原型/截图/附件/PRD 链接应该先通过对应可用工具读取内容，再提炼到 `item-context.md`。
@@ -91,6 +100,7 @@ flowchart LR
    - 回归检查：`regression-checker` 确认采集字段完整、custom field 映射已解析、item-context 可支持下一阶段
 2. 需求确认（展示摘要并询问“继续/补充/取消”，收到明确指令后方可进行后续工作）
 3. 记录本轮变更 `iteration-{N}/change-request.md`
+   - 回归检查：`regression-checker` 必须确认 `本轮处理/本轮不处理/历史内容处理策略` 三个小节齐全，且无越界条目后方可进入规划
 4. 规划任务
    - 回归检查：`regression-checker` 确认变更范围、任务拆解、测试策略、分支与合规检查可执行
 5. 实现修改
@@ -111,13 +121,17 @@ flowchart LR
 9. 生成提测 Wiki
    - 创建位置固定为 `提测文档`（`1150372234001008260`）下的当月目录 `YYYY-MM`
    - Wiki 名称格式为 `MM-DD: {简单描述}`
+   - 必须先检查当月目录是否已有当前 TAPD 项的相关子 Wiki（按 `short-id`、分支名或既有条目关联信息判定）：
+     - 若不存在：先创建 `MM-DD: {简单描述}` 子 Wiki，再进入后续补充流程
+     - 若已存在：直接进入后续补充流程，不得重复创建同一 TAPD 项子 Wiki
    - 必须先按 [`references/test-wiki.md`](test-wiki.md) 生成完整 Wiki 正文，正文必须符合模板，不能改成摘要格式或简版格式
+   - Wiki 模板中的 `服务名称` 必须先通过 `company-project-routing` 技能按项目线索映射获取，并在当前轮次产物中保留映射依据；不得直接沿用项目名称
    - 创建前必须使用 `gitlab-map` 查询当前分支最新提交是否已合并到 `origin/develop`（全量提交需确认已同步到该分支），仅在查询为真时允许创建提测 Wiki
    - 生成前必须先读取月目录正文，确认模块结构和已有条目顺序；若月目录已有 `# 前端` 模块，则必须在该模块末尾追加，不能整页覆盖
    - `代码分支名` 必须写真实 Git 分支名，不能写 `short-id`
    - `测试人员` 必须优先取 TAPD `custom_field_two`；若为空，才可按模板兜底 `reporter`
    - 生成后先展示给用户确认，再写入 TAPD Wiki、再将提测wiki地址写入当前 tapd 详细下的评论、最后这个 tapd 若是 bug 再修改 Bug 状态
-   - 写入 Bug 评论时，内容必须仅为 `提测wiki：{wiki链接}`，不得额外添加说明文字
+   - 写入 Bug 评论时，内容必须仅为 `提测wiki：[wiki链接]({wiki链接})`（Markdown 可点击链接），不得额外添加说明文字
    - 如果月目录里已有按模块分组的提测文档，优先插入到 `前端` 模块中，保持模块内顺序连续；没有 `前端` 模块则先创建该模块
    - 写入前必须确认：
      - 月目录存在且已定位到正确目录
@@ -132,7 +146,12 @@ flowchart LR
 
 - 先证据，后判断
 - 范围最小化，不做无关重构
+- 不自动合并历史记录；历史信息只有在用户明确点名后才允许纳入本轮
 - 每个阶段都要保留可追踪的 Markdown 产物
 - 涉及代码修改时，优先运行相关测试
 - 同一 TAPD 项继续修复时，必须新开轮次，不覆盖历史轮次产物
 - 任何阶段如无 `regression-checker` 通过，不得进入下一阶段
+
+## 回归用例
+
+- 规则变更后，按 [`references/regression-scenarios.md`](regression-scenarios.md) 执行 RED/GREEN 回归，确保关键门禁未退化。
