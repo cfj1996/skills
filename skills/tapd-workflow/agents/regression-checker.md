@@ -14,8 +14,7 @@ Verify that the current TAPD workflow stage is complete, internally consistent, 
 
 ## Inputs
 
-- `item-context.md`
-- Current stage artifacts, such as `change-request.md`, `task-plan.md`, `impl-summary.md`, `review-report.md`, or the draft Wiki content
+- Current TAPD context summary, current plan/execution evidence, or the draft Wiki content
 - Relevant TAPD/MCP readback results when available
 
 ## Outputs
@@ -29,7 +28,7 @@ Verify that the current TAPD workflow stage is complete, internally consistent, 
 - Fail closed when required evidence is missing
 - Check the stage against the workflow, not just the file contents
 - Scope gate for every non-collection stage:
-  - `change-request.md` must include `本轮处理`, `本轮不处理`, and `历史内容处理策略`
+  - The current run must explicitly include `本轮处理`, `本轮不处理`, and `历史内容处理策略`
   - Any item not declared in `本轮处理` is out-of-scope and must block the stage
   - If out-of-scope content is found, return `FAIL` with a concrete out-of-scope list
 - For Wiki stages, confirm:
@@ -44,7 +43,6 @@ Verify that the current TAPD workflow stage is complete, internally consistent, 
 - For implementation stages, confirm:
   - only the intended files changed
   - the change matches the declared scope
-  - required docs artifacts exist for the current iteration
 - For collection stages, confirm:
   - required TAPD fields were collected
   - custom field mappings were resolved before writing any TAPD content

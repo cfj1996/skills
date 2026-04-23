@@ -2,7 +2,7 @@
 
 ## 目标
 
-核对当前轮次实现是否满足需求，并决定是否可进入提交阶段。
+核对当前实现是否满足需求，并决定是否可进入提交阶段。
 
 ## Review 维度
 
@@ -15,11 +15,11 @@
 
 - `confidence >= 0.8` 通过
 - 通过时输出 `REVIEW_PASSED`
-- 不通过时写入 `review-report.md`
+- 不通过时给出明确的阻断项和修正建议；如需落文档，可复用现有评审或计划产物
 
 ## Review 范围
 
 - 只看本次 diff
-- 只看当前轮次的 `change-request.md`、`task-plan.md` 和 `impl-summary.md`
+- 只看当前本轮声明、当前计划/执行记录和本次 diff
 - 历史遗留问题仅作为建议项
-- Review 通过后，只允许进入“输出 MR 链接”和“准备提测 Wiki 草稿”阶段；不允许在 Review 阶段代建 MR 或直接写 TAPD
+- Review 通过后，只允许进入“提交后验证 / 合并到 develop / 准备提测 Wiki 草稿”阶段；不允许在 Review 阶段直接写 TAPD

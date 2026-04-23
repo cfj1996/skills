@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-This repository stores reusable agent skills. The root currently contains shared docs such as [`CLAUDE.md`](/Users/cfj/projects/skills/CLAUDE.md) and the main skill package [`tapd-workflow/`](/Users/cfj/projects/skills/tapd-workflow). Inside a skill package, keep the entry point in `SKILL.md`, role prompts in `agents/*.md`, and supporting guidance in `references/*.md`. Treat `docs/` as generated working output; in `tapd-workflow`, `docs/bugs/item-{ID}/` holds `raw-cli.json`, `item-context.md`, `task-plan.md`, and review artifacts.
+This repository stores reusable agent skills. The root currently contains shared docs such as [`CLAUDE.md`](/Users/cfj/projects/skills/CLAUDE.md) and the main skill package [`tapd-workflow/`](/Users/cfj/projects/skills/tapd-workflow). Inside a skill package, keep the entry point in `SKILL.md`, role prompts in `agents/*.md`, and supporting guidance in `references/*.md`. Treat `docs/` as generated working output and prefer the owning workflow's current conventions over older artifact examples.
 
 ## Build, Test, and Development Commands
 

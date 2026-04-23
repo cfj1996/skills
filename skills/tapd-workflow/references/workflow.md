@@ -4,74 +4,78 @@
 
 - 首次处理：`/tapd-workflow <TAPD链接>`
 - 继续处理：`/tapd-workflow bug item-id <ITEM_ID>` 或 `/tapd-workflow story item-id <ITEM_ID>`
-- 使用 `bug|story item-id` 时，默认表示继续修复或补需求，不重新采集 `raw-mcp.json`
+- 使用 `bug|story item-id` 时，默认表示继续修复或补需求，并重新按当前对话上下文确认范围
 
 ## 流程图
 
 ```mermaid
 flowchart LR
-  A["TAPD Bug / Story"] --> B["MCP 采集 raw-mcp.json"]
+  A["TAPD Bug / Story"] --> B["MCP 采集并注入上下文"]
   B --> B1["解析附件 / PRD / 相关文档"]
-  B1 --> C["整理 item-context.md"]
-  C --> D["展示摘要给用户确认"]
-  D -->|继续| E["iteration-N / change-request.md"]
-  D -->|补充| C
+  B1 --> C["展示摘要与范围给用户确认"]
+  C -->|继续| D["切到 Superpowers 规划/实现"]
+  C -->|补充| B
+  D --> E["建分支 / worktree 中开发"]
+  E --> F["Review 门禁"]
+  F --> G["提交后验证并合并到 develop"]
+  G --> H["生成提测 Wiki 草稿"]
+  H --> I["展示提测内容并确认"]
+  I -->|确认| J["创建 Wiki + 写入 Bug 评论 + 更新 Bug 状态"]
+  I -->|修改| H
+  I -->|取消| X["结束"]
   D -->|取消| X["结束"]
-  E --> F["task-plan.md"]
-  F --> G["worktree 中开发"]
-  G --> H["验证 / Review"]
-  H --> I["修复完成"]
-  I --> J["输出 MR 链接（不代建，目标 develop）"]
-  I --> K["生成提测 Wiki 草稿"]
-  K --> L["展示提测内容并确认"]
-  L -->|确认| M["创建 Wiki + 写入 Bug 评论 + 更新 Bug 状态"]
-  L -->|修改| K
-  L -->|取消| X["结束"]
-  M --> N["清理 worktree"]
+  J --> K["清理 worktree"]
 ```
 
-## 目录约定
+## 目录与记录约定
 
-- 工作文件按类型写入：
-  - Bug: `docs/bugs/item-{short-id}/`
-  - Story: `docs/stories/item-{short-id}/`
-- `raw-mcp.json` 和 `item-context.md` 保留在 `item-{short-id}` 根目录
-- 每次实际执行使用新的 `iteration-{N}/` 子目录，保存当前轮次的 `change-request.md`、`task-plan.md`、`impl-summary.md` 和 `review-report.md`
-- `item-{short-id}` 中的 `short-id` 由 TAPD MCP 查询得到；TAPD 原始 `id` 只用于查找输入，不进入命名
+- TAPD workflow 以当前对话上下文为主，采集结果优先注入当前对话上下文
+- 规划、实现、验证阶段优先复用已有 Superpowers 产物和记录方式
+- `short-id` 由 TAPD MCP 查询得到；TAPD 原始 `id` 只用于查找输入，不进入分支、worktree 或提测材料命名
 - 分支命名：必须基于规划产物中的 `base_branch`（即 `origin/master`）创建。{slug} 使用中文进行简单的描述，不超过10个字
   - Bug: `fixbug/{git-user}.{YYMMDD}.{slug}-{short-id}`
   - Story: `feature/{git-user}.{YYMMDD}.{slug}-{short-id}`
 - Worktree 路径：项目根目录下 `./.worktree/{短的描述}-{short-id}`
-- 创建 MR 合并请求，只能合并到`develop`分支，到输出MR的链接，让用户自己手动合并
+- 代码通过验证后，必须通过 GitLab 直接合并到 `develop`
 
-## 输出文件
+## Superpowers 集成
 
-- `item-context.md`
-- `iteration-{N}/change-request.md`
-- `iteration-{N}/task-plan.md`
-- `iteration-{N}/impl-summary.md`
-- `iteration-{N}/review-report.md`
+- TAPD workflow 负责读取 TAPD、确认本轮范围、约束写回顺序，以及整理 GitLab 合并、提测 Wiki / TAPD 回写。
+- 代码规划、实现、验证优先接入 Superpowers，不再在 TAPD workflow 内重复定义一套并行的开发流程。
+- 默认映射：
+  - 新功能、需求扩展、交互变更：`superpowers:brainstorming` -> `superpowers:writing-plans`
+  - 缺陷修复、异常排查、根因不清：`superpowers:systematic-debugging`
+  - 需要独立 worktree：`superpowers:using-git-worktrees`
+  - 按计划执行实现：`superpowers:subagent-driven-development`（优先）或 `superpowers:executing-plans`
+  - 实现中的测试节奏：`superpowers:test-driven-development`
+  - 完成前验证：`superpowers:verification-before-completion`
+  - 分支收尾、提交前整理：`superpowers:finishing-a-development-branch`
+- 选择规则：
+  - 如果本轮是明确的 bugfix，先用 `superpowers:systematic-debugging` 固化问题与验证方式，再进入计划或实现。
+  - 如果本轮包含新增功能、需求改动或方案设计，先用 `superpowers:brainstorming`，经用户确认后切到 `superpowers:writing-plans`。
+  - 已经有清晰计划时，直接进入 `superpowers:subagent-driven-development` 或 `superpowers:executing-plans`。
+  - 任一实现阶段结束前，必须走 `superpowers:verification-before-completion`。
 
-## 本轮范围声明（`change-request.md` 必填）
+## 本轮范围声明
 
-- `iteration-{N}/change-request.md` 必须包含以下三个小节，缺一不可：
-  - `本轮处理`：仅列出本轮明确要完成的需求/缺陷点
-  - `本轮不处理`：明确列出本轮排除项
-  - `历史内容处理策略`：固定写明“默认不自动合并历史记录；仅在用户点名后纳入本轮”
-- 未出现在 `本轮处理` 的条目，不得进入 `task-plan.md`、`impl-summary.md`、`review-report.md` 或提测 Wiki 正文。
-- 如果发现候选历史信息，必须在 `change-request.md` 标记为“待用户确认”，不得直接并入执行范围。
+- 进入规划或实现前，必须先在对话中明确三件事：
+  - `本轮处理`：本轮明确要完成的需求或缺陷点
+  - `本轮不处理`：本轮明确排除的内容
+  - `历史内容处理策略`：默认不自动合并历史记录；仅在用户点名后纳入本轮
+- 未出现在 `本轮处理` 的条目，不得进入实现、验证、合并摘要或提测 Wiki 正文。
+- 如果发现候选历史信息，必须先标记为“待用户确认”，不得直接并入执行范围。
 
 ## 原型规则
 
 - 只处理详情页正文、评论正文，以及这两处中的图片/截图信息
-- 如果 TAPD 提供附件、PRD、需求说明或其他补充文档，必须在信息采集阶段一起解析，并将结论写入 `item-context.md`
+- 如果 TAPD 提供附件、PRD、需求说明或其他补充文档，必须在信息采集阶段一起解析，并将结论注入当前上下文
 - 解析补充文档时，优先识别正式需求、范围边界、验收口径、版本信息和文档间差异
 - 如果附件存在但无法访问，要写明文件名、来源和不可访问原因，不能只写“附件存在”
-- 首次采集后、用户确认前，如果 TAPD 又新增了附件、PRD 或补充说明，必须继续补采并更新 `item-context.md`，不能直接进入规划阶段
+- 首次采集后、用户确认前，如果 TAPD 又新增了附件、PRD 或补充说明，必须继续补采并更新当前上下文，不能直接进入规划阶段
 - 默认优先级：蓝湖 > MasterGo > Figma > 其他链接
 - 只要出现原型链接，必须使用 `chrome-devtools-mcp` 打开原型文档
 - 原型中的需求提取默认只读取当前展示的需求文档，不主动切换其他需求文档
-- 原型分析结果必须提炼后写入 `item-context.md`
+- 原型分析结果必须提炼后写入当前上下文
 - 只有链接存在但无法访问时，才允许标记为缺失
 
 ## MCP-first 规则
@@ -82,42 +86,52 @@ flowchart LR
   - Bug: `mcp__mcp_server_tapd__get_bug`
   - Story: `mcp__mcp_server_tapd__get_stories_or_tasks`
 - 代码提交前与提测前的基线/合并校验统一按 [`references/gitlab-map.md`](gitlab-map.md) 执行
-- 采集结果按类型保存：
-  - Bug: `docs/bugs/item-{short-id}/raw-mcp.json`
-  - Story: `docs/stories/item-{short-id}/raw-mcp.json`
 - `warnings`/`collection_confidence`（如果有）用于后续阶段判断信息完整度。
 - 页面浏览仅在 MCP 无法提供核心信息时才访问。
-- MCP 返回的原型/截图/附件/PRD 链接应该先通过对应可用工具读取内容，再提炼到 `item-context.md`。
-- **主动确认**：在生成 `item-context.md` 后，必须向用户展示解析后的功能概要或问题复现步骤，询问“继续/补充需求/取消”。只有收到确定的指令后，才能为当前轮次准备 `change-request.md`、`task-plan.md`。
-- 后续继续修复或补需求时，不重新生成 `raw-mcp.json`，而是新增 `iteration-{N}/change-request.md` 作为当前轮次输入；但若 TAPD 在首轮确认前补了新的附件/PRD，仍应回到信息采集阶段补读并更新 `item-context.md`
-- 当用户输入 `/tapd-workflow bug item-id <ITEM_ID>` 或 `/tapd-workflow story item-id <ITEM_ID>` 时，先查找对应类型下的 `item-{short-id}` 目录和已有 `item-context.md`，再进入当前轮次流程。
+- MCP 返回的原型/截图/附件/PRD 链接应该先通过对应可用工具读取内容，再提炼进当前上下文。
+- **主动确认**：在采集完成后，必须向用户展示解析后的功能概要或问题复现步骤，并明确本轮处理范围，询问“继续/补充需求/取消”。只有收到确定的指令后，才能进入规划和实现。
+- 当用户输入 `/tapd-workflow bug item-id <ITEM_ID>` 或 `/tapd-workflow story item-id <ITEM_ID>` 时，先重新读取当前 TAPD 信息，再进入本轮流程。
 - 任何 TAPD 写操作都必须先让用户手动确认，再调用对应 MCP 接口；包括创建/更新 Bug、Story、Comment、Wiki，以及编辑、移动、补充或改写已有内容。
 - 允许把同一批次的 Wiki 创建、Bug 评论补充、状态更新合并为一次确认，不要求每一步都单独打断用户
 
 ## 处理顺序
 
 1. 收集信息
-   - 回归检查：`regression-checker` 确认采集字段完整、custom field 映射已解析、item-context 可支持下一阶段
+   - 回归检查：`regression-checker` 确认采集字段完整、custom field 映射已解析、上下文足以支持下一阶段
 2. 需求确认（展示摘要并询问“继续/补充/取消”，收到明确指令后方可进行后续工作）
-3. 记录本轮变更 `iteration-{N}/change-request.md`
-   - 回归检查：`regression-checker` 必须确认 `本轮处理/本轮不处理/历史内容处理策略` 三个小节齐全，且无越界条目后方可进入规划
+3. 记录本轮范围
+   - 回归检查：`regression-checker` 必须确认 `本轮处理/本轮不处理/历史内容处理策略` 三项已明确，且无越界条目后方可进入规划
 4. 规划任务
+   - 新功能、需求扩展或方案不清时，先进入 `superpowers:brainstorming`
+   - `superpowers:brainstorming` 经用户确认后，必须切到 `superpowers:writing-plans`
+   - 明确 bugfix 可先进入 `superpowers:systematic-debugging`，在拿到根因与验证方式后再补计划
    - 回归检查：`regression-checker` 确认变更范围、任务拆解、测试策略、分支与合规检查可执行
-5. 实现修改
-   - 回归检查：`regression-checker` 确认仅修改计划内文件、docs 产物齐全、实现未偏离范围
+5. 执行开发
+   - 如需独立 worktree，先接 `superpowers:using-git-worktrees`
+   - 创建 worktree 前必须先确认并记录基准分支，基准分支必须是 `origin/master`
+   - 分支命名使用 `{fixbug|feature}/{当前git用户名}.{日期}.{中文描述}-{short-id}`
+   - worktree 目录名使用 `./.worktree/{短的描述}-{short-id}`
+   - 创建新分支并开始提交前，必须调用 `gitlab-map` 验证当前分支是从 `origin/master` 创建，并记录校验明细；不通过则立即中止，并返回修正建议
+   - 在 worktree 中执行
+   - 有计划文档时，优先进入 `superpowers:subagent-driven-development`
+   - 若不适合子代理并行，则进入 `superpowers:executing-plans`
+   - 每个实现任务内部遵循 `superpowers:test-driven-development`
+   - 代码提交时，Commit Message 信息使用中文，并符合 Conventional Commits 规范
+   - 如果本轮使用了 Superpowers 生成的规划或设计文档，提交代码时必须同步提交对应 `docs/` 产物（若被忽略需 `git add -f`）
+   - 回归检查：`regression-checker` 确认仅修改计划内文件、实现未偏离范围
 6. Review
+   - 实现完成后，必须先跑 `superpowers:verification-before-completion`
+   - 若是 bugfix，验证应覆盖原始问题复现与修复后的回归检查
    - 回归检查：`regression-checker` 确认 Review 结论、风险项、后续动作与当前轮次产物一致
 7. 修复完成
    - 仅在 Review 输出 `REVIEW_PASSED` 后执行
-   - 先整理当前轮次的修复结论、MR 链接和提测草稿
+   - 先整理当前轮次的修复结论、合并说明和提测草稿
    - 只有进入该阶段后，才允许写入提测 Wiki、Bug 评论和 Bug 状态
-8. 提交与 MR
-   - Commit Message 信息使用中文，需要符合 Conventional Commits的提交规范编写描述信息
-   - 提交代码前，必须调用 `gitlab-map` 验证当前分支是从 `origin/master` 创建，并记录校验明细；不通过则立即中止、不要提交，并返回修正建议（重新基于 `origin/master` 重新建分支）
-   - MR 只输出链接，不代建、不代合并
-   - MR 链接必须显式带 `target_branch=develop`，默认目标分支固定为 `develop`
-   - MR 标题优先使用 `task-plan.md` 的摘要
-   - 必须同时提交 `docs/` 下的文档，若被忽略需 `git add -f`
+8. 提交后验证与合并
+   - 提交前可用 `superpowers:finishing-a-development-branch` 做分支收尾检查
+   - 提交完成后，必须再次通过 `gitlab-map` 或等效 GitLab 读接口确认当前变更已满足合并条件
+   - 使用 GitLab 直接合并到 `develop`
+   - 合并完成后，必须明确提示用户合并成功
 9. 生成提测 Wiki
    - 创建位置固定为 `提测文档`（`1150372234001008260`）下的当月目录 `YYYY-MM`
    - Wiki 名称格式为 `MM-DD: {简单描述}`
@@ -125,7 +139,7 @@ flowchart LR
      - 若不存在：先创建 `MM-DD: {简单描述}` 子 Wiki，再进入后续补充流程
      - 若已存在：直接进入后续补充流程，不得重复创建同一 TAPD 项子 Wiki
    - 必须先按 [`references/test-wiki.md`](test-wiki.md) 生成完整 Wiki 正文，正文必须符合模板，不能改成摘要格式或简版格式
-   - Wiki 模板中的 `服务名称` 必须先通过 `company-project-routing` 技能按项目线索映射获取，并在当前轮次产物中保留映射依据；不得直接沿用项目名称
+   - Wiki 模板中的 `服务名称` 必须先通过 `company-project-routing` 技能按项目线索映射获取，并保留映射依据；不得直接沿用项目名称
    - 创建前必须使用 `gitlab-map` 查询当前分支最新提交是否已合并到 `origin/develop`（全量提交需确认已同步到该分支），仅在查询为真时允许创建提测 Wiki
    - 生成前必须先读取月目录正文，确认模块结构和已有条目顺序；若月目录已有 `# 前端` 模块，则必须在该模块末尾追加，不能整页覆盖
    - `代码分支名` 必须写真实 Git 分支名，不能写 `short-id`
@@ -140,16 +154,15 @@ flowchart LR
      - wiki 正文已完整展示给用户并获得明确确认
    - 如果任何一项无法确认，必须停止，不得自行猜测位置、序号或模板内容后直接写入
 10. 收尾与清理
-   - 回归检查：`regression-checker` 确认 TAPD 写回、评论、MR 链接和 worktree 清理结果都已落地，且无遗留未处理阶段
+   - 回归检查：`regression-checker` 确认 TAPD 写回、评论、GitLab 合并结果和 worktree 清理结果都已落地，且无遗留未处理阶段
 
 ## 全局约束
 
 - 先证据，后判断
 - 范围最小化，不做无关重构
 - 不自动合并历史记录；历史信息只有在用户明确点名后才允许纳入本轮
-- 每个阶段都要保留可追踪的 Markdown 产物
+- 上下文和关键门禁必须可追踪，但不强制要求 TAPD workflow 生成独立本地过程文件
 - 涉及代码修改时，优先运行相关测试
-- 同一 TAPD 项继续修复时，必须新开轮次，不覆盖历史轮次产物
 - 任何阶段如无 `regression-checker` 通过，不得进入下一阶段
 
 ## 回归用例

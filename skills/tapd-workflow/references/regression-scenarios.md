@@ -29,8 +29,8 @@
 ## 场景 C：自动合并无关历史（应阻断）
 
 - 输入场景：
-  - `change-request.md` 的 `本轮处理` 未声明历史条目 X
-  - `task-plan.md` 或 Wiki 草稿中出现条目 X
+  - 当前对话里的 `本轮处理` 未声明历史条目 X
+  - 计划摘要或 Wiki 草稿中出现条目 X
 - 期望门禁：
   - `regression-checker` 返回 `FAIL`
   - 输出“越界条目清单”，包含条目 X

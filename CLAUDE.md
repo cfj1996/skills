@@ -22,11 +22,11 @@ npx --package=@zan/tapd-cli@canary zan-tapd-cli <type> <id> --json
 ```
 
 **Workflow phases:**
-1. Collect: Run CLI, extract context to `docs/bugs/item-{ID}/item-context.md`
-2. Plan: Generate `task-plan.md` with branch/worktree details
+1. Collect: Read TAPD context and inject the usable summary into the active workflow context
+2. Plan: Create or update the active plan with branch/worktree details
 3. Create Worktree: Isolate development in separate git worktree
-4. Implement: Execute in worktree, produce `impl-summary.md`
-5. Review: Verify against requirements, output `REVIEW_PASSED` or `review-report.md`
+4. Implement: Execute in worktree and preserve verification evidence in the active workflow
+5. Review: Verify against requirements and block or pass with explicit evidence
 
 **File structure:**
 - `SKILL.md` - Entry point and overview
