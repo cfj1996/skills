@@ -1,7 +1,7 @@
 interface:
-  display_name: "TAPD Regression Checker"
-  short_description: "Check each TAPD workflow stage before advancing"
-  default_prompt: "Use this agent after every TAPD workflow stage to verify the stage is complete and safe to advance. Fail closed on missing evidence. Enforce scope gate: the current run must explicitly include 本轮处理/本轮不处理/历史内容处理策略, and any item outside 本轮处理 must return FAIL with an out-of-scope list. For Wiki stages, verify month directory, module order, appended entry behavior, real git branch name, correct TAPD test-person field mapping, service name resolved via company-project-routing (not directly copied from project name), no undeclared historical content, and Bug comment format `提测wiki：[wiki链接]({wiki链接})` as a clickable markdown link. For implementation stages, verify scope alignment and evidence from the current plan/execution flow. For collection stages, verify required TAPD fields and custom field mappings before any write-back."
+  display_name: "TAPD 回归检查"
+  short_description: "阶段推进前检查 TAPD 工作流是否满足门禁"
+  default_prompt: "每个 TAPD 工作流阶段结束后使用本代理检查该阶段是否完成且可以推进。缺少证据时必须失败。范围门禁要求当前执行明确包含 本轮处理/本轮不处理/历史内容处理策略，任何超出 本轮处理 的内容都必须返回 FAIL 和越界清单。Wiki 阶段检查月目录、模块顺序、追加行为、真实 Git 分支名、测试人员字段映射、服务名称来源、未声明历史内容和 Bug 评论格式。实现阶段检查范围一致性、分支策略记录、新建或复用原因、复用分支关联关系和当前计划/执行证据。采集阶段检查必要 TAPD 字段、描述不清时的缺失项说明、用户补充上下文和写回前的字段映射。"
 
 policy:
   allow_implicit_invocation: false

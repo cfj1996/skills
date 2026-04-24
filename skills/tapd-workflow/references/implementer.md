@@ -7,12 +7,18 @@
 ## 工作内容
 
 - 切换到正确的 worktree
-- 创建 worktree 前必须先确认并记录基准分支，基准分支必须是 `origin/master`
+- 创建或切换 worktree 前必须先确认并记录分支策略
+- 分支策略允许三种：
+  - `新建分支`：首次处理独立线上 Bug 或独立需求
+  - `复用线上 Bug 分支`：同一线上 Bug 再次修复
+  - `复用需求分支`：需求开发后的缺陷修复
+- 分支策略记录必须包含当前 TAPD `short-id`、原关联 TAPD / Story / Bug 线索、分支名、worktree 路径、新建或复用原因
 - 分支命名使用 `{fixbug|feature}/{当前git用户名}.{日期}.{中文描述}-{short-id}`
 - worktree 目录名使用 `./.worktree/{短的描述}-{short-id}`（目录位于目标项目根目录下 `.worktree`）
-- 创建新分支并开始提交前，必须先调用 `gitlab-map` 的分支查询结果确认：
+- 开始提交前，必须先调用 `gitlab-map` 的分支查询结果确认：
   - 当前工作分支名
-  - 基线分支是 `origin/master`
+  - 新建分支的基线分支是 `origin/master`
+  - 复用分支与当前 TAPD/需求仍然匹配
   - 是否可继续提交
 - 如果使用了 Superpowers 计划文档，结果必须写入对应计划文档中的“分支与合规检查”小节（见 [`references/gitlab-map.md`](gitlab-map.md)）
 - 逐项实现修改

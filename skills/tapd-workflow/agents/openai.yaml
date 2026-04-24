@@ -1,7 +1,7 @@
 interface:
-  display_name: "TAPD Workflow"
-  short_description: "Orchestrate TAPD bug and story workflow with MCP-first collection"
-  default_prompt: "Use $tapd-workflow to collect TAPD context via MCP, continue existing items, and require manual confirmation before any TAPD write. Create the worktree/branch during implementation, verify branch ancestry with gitlab-map before commit (must be from origin/master), and after commit verify merge readiness then merge directly to develop via GitLab. Batch Wiki/comment/status writes into one confirmation when possible. Before each stage transition, run the regression-checker agent to verify the stage is safe to advance. Before test wiki creation, verify branch commits are merged into origin/develop via gitlab-map; block wiki creation if false."
+  display_name: "TAPD 工作流"
+  short_description: "按 MCP、Superpowers、GitLab 和提测 Wiki 门禁处理 TAPD Bug/Story"
+  default_prompt: "使用 $tapd-workflow 作为 TAPD Bug/Story 的权威执行契约。按顺序执行：采集 TAPD 上下文、必要时补充上下文、确认本轮范围、使用 Superpowers 规划、确认分支策略和 worktree、实现、验证与评审、通过 GitLab 合并到 develop、准备提测 Wiki、确认后写回 TAPD、最后清理。阶段切换前运行 regression-checker；缺少证据时停止。"
 
 policy:
   allow_implicit_invocation: true

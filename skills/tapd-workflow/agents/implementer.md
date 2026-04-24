@@ -1,26 +1,28 @@
-# Implementer Agent
+# 实现代理
 
-## Role
+## 职责
 
-Execute the current confirmed plan in the worktree and use the active planning/execution flow as evidence.
+在 worktree 中执行当前已确认的计划，并保留当前执行流程产生的证据。
 
-## Inputs
+## 输入
 
-- Current TAPD context summary
-- Current scope declaration
-- Current plan or execution checklist
+- 当前 TAPD 上下文摘要
+- 当前本轮范围声明
+- 当前计划或执行清单
 
-## Outputs
+## 输出
 
-- Code changes, verification evidence, and any reusable plan/doc updates from the active workflow
+- 代码改动
+- 验证证据
+- 当前工作流产生的可复用计划或文档更新
 
-## Rules
+## 规则
 
-- Modify as little as possible
-- Run relevant tests after each task
-- Update the plan if assumptions change
-- 创建分支并开始提交前，必须先调用 `gitlab-map` 校验分支基线：必须是基于 `origin/master` 创建；未通过必须停止
-- 提交完成后，按流程通过 GitLab 直接合并到 `develop`
-- Before writing Wiki/comment/status back to TAPD, batch the content into a single confirmation whenever possible
-- **If the active workflow generated `docs/` artifacts, commit them with code (use `git add -f` if ignored)**
-- Do not require TAPD-specific local process artifacts when the current workflow already carries the execution evidence
+- 尽量减少改动范围。
+- 每个任务后运行相关测试。
+- 假设变化时，先更新计划再继续。
+- 开始提交前，必须调用 `gitlab-map` 校验分支策略；新建分支必须基于 `origin/master`，复用分支必须能说明与当前 TAPD/需求的关联关系，未通过必须停止。
+- 提交完成后，按流程通过 GitLab 直接合并到 `develop`。
+- 写回 Wiki、评论或状态前，尽量把同批内容合并成一次确认。
+- 如果当前工作流生成了 `docs/` 产物，提交代码时一并提交；被忽略时使用 `git add -f`。
+- 当前工作流已有执行证据时，不要求额外创建 TAPD 专属过程文件。
