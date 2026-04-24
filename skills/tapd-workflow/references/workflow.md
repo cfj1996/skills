@@ -13,8 +13,8 @@ flowchart LR
   C -->|上下文足够| E["确认本轮范围"]
   E -->|已确认| F["使用 Superpowers 规划"]
   E -->|需要补充| D
-  F --> G["确认分支策略和 worktree"]
-  G --> H["在 worktree 中实现"]
+  F --> G["确认分支策略和工作区"]
+  G --> H["在确认后的工作区中实现"]
   H --> I["验证与评审"]
   I -->|通过| J["通过 GitLab 合并到 develop"]
   J --> K["准备提测 Wiki 草稿"]
@@ -56,11 +56,14 @@ flowchart LR
 - 已有明确计划时使用 `superpowers:subagent-driven-development` 或 `superpowers:executing-plans`。
 - 计划应包含影响文件、测试策略、分支描述和合并预期。
 
-### 确认分支和 worktree
+### 确认分支和工作区
 
-- 所有代码改动都在 worktree 中进行。
+- 新建分支默认创建新 worktree；切换/复用已有分支默认使用已有工作区，不创建新 worktree。
 - 先判断是新建分支还是复用已有分支；复用是合法路径，常见于线上 Bug 再次修复、需求开发后的缺陷修复。
-- 分支策略必须记录场景类型、当前 TAPD `short-id`、复用分支的原关联 TAPD / Story / Bug 线索、分支名、worktree 路径、原因和 `gitlab-map` 校验结果。
+- 判断结果只能作为建议，必须让用户二次确认选择 `新建分支 + worktree`、`切换/复用已有分支` 或 `切换/复用已有分支 + 新 worktree`。
+- 用户确认前，禁止创建分支、创建 worktree、切换分支或开始代码修改。
+- 复用已有分支时，除非用户明确说明需要隔离工作区，否则不得创建新 worktree。
+- 分支策略必须记录场景类型、用户二次确认结果、当前 TAPD `short-id`、复用分支的原关联 TAPD / Story / Bug 线索、分支名、工作区路径、原因和 `gitlab-map` 校验结果。
 - 新建分支必须基于 `origin/master` 或用户明确指定的功能分支；禁止从 `origin/develop` 切开发分支。
 - 复用分支必须确认仍是当前 TAPD/需求的正确承载分支，并且可继续提交；不得为了合并 `develop` 更方便而改建 develop 基线分支。
 - `gitlab-map` 是分支基线校验的唯一来源。
