@@ -61,7 +61,8 @@ flowchart LR
 - 所有代码改动都在 worktree 中进行。
 - 先判断是新建分支还是复用已有分支；复用是合法路径，常见于线上 Bug 再次修复、需求开发后的缺陷修复。
 - 分支策略必须记录场景类型、当前 TAPD `short-id`、复用分支的原关联 TAPD / Story / Bug 线索、分支名、worktree 路径、原因和 `gitlab-map` 校验结果。
-- 新建分支必须基于 `origin/master`；复用分支必须确认仍是当前 TAPD/需求的正确承载分支，并且可继续提交。
+- 新建分支必须基于 `origin/master` 或用户明确指定的功能分支；禁止从 `origin/develop` 切开发分支。
+- 复用分支必须确认仍是当前 TAPD/需求的正确承载分支，并且可继续提交；不得为了合并 `develop` 更方便而改建 develop 基线分支。
 - `gitlab-map` 是分支基线校验的唯一来源。
 - 基线或复用关系校验失败时，阻断实现和提交流程。
 
@@ -81,6 +82,8 @@ flowchart LR
 ### 合并到 develop
 
 - 提交后确认合并条件。
+- 合并条件只按本轮提交范围判断；合法来源分支相对 `develop` 多出的历史提交属于继承基线差异，应记录但不阻断。
+- 不得因为继承基线差异而 cherry-pick 到 `origin/develop` 基线上另建开发分支。
 - 通过 GitLab 合并到 `develop`。
 - 合并成功是准备提测 Wiki 的前置条件。
 

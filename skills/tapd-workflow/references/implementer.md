@@ -12,14 +12,16 @@
   - `新建分支`：首次处理独立线上 Bug 或独立需求
   - `复用线上 Bug 分支`：同一线上 Bug 再次修复
   - `复用需求分支`：需求开发后的缺陷修复
-- 分支策略记录必须包含当前 TAPD `short-id`、原关联 TAPD / Story / Bug 线索、分支名、worktree 路径、新建或复用原因
+- 开发分支来源只能是 `origin/master` 或用户明确指定的功能分支；禁止从 `origin/develop` 切开发分支
+- 分支策略记录必须包含当前 TAPD `short-id`、原关联 TAPD / Story / Bug 线索、来源分支、分支名、worktree 路径、新建或复用原因
 - 分支命名使用 `{fixbug|feature}/{当前git用户名}.{日期}.{中文描述}-{short-id}`
 - worktree 目录名使用 `./.worktree/{短的描述}-{short-id}`（目录位于目标项目根目录下 `.worktree`）
 - 开始提交前，必须先调用 `gitlab-map` 的分支查询结果确认：
   - 当前工作分支名
-  - 新建分支的基线分支是 `origin/master`
+  - 新建分支的来源分支是 `origin/master` 或用户明确指定的功能分支
   - 复用分支与当前 TAPD/需求仍然匹配
   - 是否可继续提交
+- 如果后续合并到 `develop` 时出现来源分支相对 `develop` 多出的历史提交，只记录为继承基线差异，不得改从 `origin/develop` 派生分支或 cherry-pick 重建
 - 如果使用了 Superpowers 计划文档，结果必须写入对应计划文档中的“分支与合规检查”小节（见 [`references/gitlab-map.md`](gitlab-map.md)）
 - 逐项实现修改
 - 每次修改后运行相关测试

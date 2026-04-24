@@ -27,12 +27,35 @@ allowed-tools:
 - `company-project-routing`：根据项目线索解析提测 Wiki 的 `服务名称`。
 - `superpowers`：规划、实现、验证和分支收尾工作流。
 
+## 分支基线原则
+
+- 开发分支只能来自 `origin/master` 或用户明确指定的功能分支；禁止从 `origin/develop` 切开发分支。
+- 复用已有 Bug / 需求分支时，记录复用关系即可，不得为了贴近 `develop` 另建 develop 基线分支。
+- 合并到 `develop` 时，如果分支合法来源比 `develop` 多出历史提交，将这些提交记录为“继承基线差异”，不得当作本轮阻断，也不得因此 cherry-pick 到 `origin/develop` 基线上重建分支。
+- 阶段 7 / 8 只评审和说明本轮提交范围；提测 Wiki 只写本轮变更，不写继承基线差异。
+
 ## 入口
 
 - 首次处理：`/tapd-workflow <TAPD链接>`
 - 继续处理：`/tapd-workflow bug item-id <ITEM_ID>` 或 `/tapd-workflow story item-id <ITEM_ID>`
 - `id` 只用于入口查询；worktree 和提测材料命名使用 TAPD MCP 返回的 `short-id`。
 - 提测 Wiki 中的 `代码分支名` 必须是真实 Git 分支名，不能用 `short-id` 代替。
+
+## 启动协议
+
+触发本技能后，必须先输出阶段台账，再执行任何代码修改。阶段台账至少包含：
+
+- 当前阶段
+- TAPD 类型和 `short-id`（未知时写“待 MCP 采集”）
+- 当前上下文是否足够
+- 本轮范围状态
+- 分支策略状态
+- 上一阶段 `regression-checker` 结论（首阶段写“尚未执行”）
+- 下一步允许做什么
+
+在第 5 阶段“确认分支”通过前，禁止修改代码。允许进行只读采集、只读代码搜索、需求澄清和规划；不允许改文件、提交、合并、写 Wiki 或写 TAPD。
+
+不得把 TAPD 工作流降级成普通修 bug 路径。只要发现自己已经跳过阶段，必须停止当前动作，汇报已偏离的阶段，并从最近未满足的门禁补齐。
 
 ## 阶段门禁
 
@@ -51,6 +74,16 @@ allowed-tools:
 | 11. 清理 | 写回完成或取消 | worktree 已清理，最终结果已汇报 |
 
 每个关键阶段完成后都要运行 `regression-checker`。如果检查失败，先修正证据或流程状态，再继续。
+
+阶段完成汇报必须包含：
+
+- 阶段名称
+- 本阶段产出
+- 证据来源
+- `regression-checker` 结论
+- 下一阶段和进入条件
+
+如果无法调用独立 `regression-checker`，必须按 [agents/regression-checker.md](agents/regression-checker.md) 做同等自检，并在汇报中标明“按 regression-checker 规则自检”。
 
 ## 阶段流程
 
@@ -109,6 +142,7 @@ allowed-tools:
   - 当前 TAPD `short-id`
   - 复用分支时的原关联 TAPD / Story / Bug 线索
   - 分支名和 worktree 路径
+  - 来源分支：`origin/master` 或用户明确指定的功能分支
   - 新建或复用的原因
   - `gitlab-map` 校验结果
 - 分支命名：
@@ -116,7 +150,7 @@ allowed-tools:
   - Story：`feature/{git-user}.{YYMMDD}.{slug}-{short-id}`
 - Worktree 路径：目标项目根目录下的 `./.worktree/{短描述}-{short-id}`。
 - 提交前必须使用 `gitlab-map` 校验当前分支基线、复用关系和可继续提交状态。
-- 新建分支基线校验失败时，停止流程并从 `origin/master` 重新建分支。
+- 新建分支来源不是 `origin/master` 或用户明确指定功能分支时，停止流程；如果来源是 `origin/develop`，必须废弃该开发分支并回到合法来源重新创建。
 - 复用分支关联关系不清时，停止流程并先确认当前分支是否仍承载该 TAPD/需求。
 
 参考：[gitlab-map.md](references/gitlab-map.md)、[implementer.md](references/implementer.md)
@@ -143,6 +177,7 @@ allowed-tools:
 ### 8. 合并到 develop
 
 - 提交后使用 `gitlab-map` 或等效 GitLab 读接口确认可合并状态。
+- 合并前必须区分“本轮提交范围”和“继承基线差异”；合法来源带来的额外历史提交只记录为继承基线差异，不阻断合并。
 - 使用 GitLab 将已验证变更合并到 `develop`。
 - 合并成功后，明确告知用户已经合并。
 - 如果 `gitlab-mcp` 不可用或合并条件不满足，停止在提测 Wiki 之前。
