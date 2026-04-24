@@ -1,6 +1,6 @@
 ---
 name: tapd-workflow
-description: 处理 TAPD Bug/Story 时使用，适用于 MCP 采集上下文、确认本轮范围、驱动 Superpowers 开发验证、合并到 develop、生成提测 Wiki 或写回 TAPD。
+description: 处理 TAPD Bug/Story/Task 时使用，适用于 MCP 采集上下文、确认本轮范围、驱动 Superpowers 开发验证、合并到 develop、生成提测 Wiki 或写回 TAPD。
 allowed-tools:
   - tapd-mcp
   - yapi-mcp
@@ -14,7 +14,7 @@ allowed-tools:
 
 ## 定位
 
-这个技能是 TAPD Bug/Story 的受控执行流程。它负责 TAPD 上下文、本轮范围、GitLab 合并顺序、提测 Wiki 和 TAPD 写回；代码规划、实现和验证交给 Superpowers 执行。
+这个技能是 TAPD Bug/Story/Task 的受控执行流程。它负责 TAPD 上下文、本轮范围、GitLab 合并顺序、提测 Wiki 和 TAPD 写回；代码规划、实现和验证交给 Superpowers 执行。
 
 这是固定阶段流程。不得跳阶段。任一阶段的退出条件不满足时，必须停下补齐证据或修正状态，再进入下一阶段。
 
@@ -37,9 +37,14 @@ allowed-tools:
 ## 入口
 
 - 首次处理：`/tapd-workflow <TAPD链接>`
-- 继续处理：`/tapd-workflow bug item-id <ITEM_ID>` 或 `/tapd-workflow story item-id <ITEM_ID>`
+- 继续处理：`/tapd-workflow bug item-id <ITEM_ID>`、`/tapd-workflow story item-id <ITEM_ID>` 或 `/tapd-workflow task item-id <ITEM_ID>`
+- 显式出现 `$tapd-workflow`、`/tapd-workflow`、技能卡片或 TAPD 链接并要求修复/开发/处理时，即视为本技能已触发。
+- 技能已触发后，用户说“可以”“继续”“直接修复”“不用日志”“你直接进行修复工作”，只表示继续推进当前 TAPD 工作流，不表示跳过阶段门禁。
+- 禁止用“没有检测到工作流插件/触发关键字”“用户要求快速修复”作为不执行本工作流的理由；除非用户明确说“跳过 TAPD 工作流”。
 - `id` 只用于入口查询；worktree 和提测材料命名使用 TAPD MCP 返回的 `short-id`。
 - 提测 Wiki 中的 `代码分支名` 必须是真实 Git 分支名，不能用 `short-id` 代替。
+- 必须根据 TAPD 链接路径识别条目类型：`/bug/detail/` 是 Bug，`/story/detail/` 是 Story，`/task/detail/` 是 Task；不得拿 Task 链接调用 Bug 查询。
+- 如果某个 MCP 查询返回 `count: 0` 或未找到条目，不能视为采集完成；必须校验条目类型是否用错，改用正确类型重查，仍失败才停在采集阶段说明阻塞。
 
 ## 启动协议
 
@@ -56,6 +61,16 @@ allowed-tools:
 在第 5 阶段“确认分支”通过前，禁止修改代码。允许进行只读采集、只读代码搜索、需求澄清和规划；不允许改文件、提交、合并、写 Wiki 或写 TAPD。
 
 不得把 TAPD 工作流降级成普通修 bug 路径。只要发现自己已经跳过阶段，必须停止当前动作，汇报已偏离的阶段，并从最近未满足的门禁补齐。
+
+任何文件编辑、格式化、提交或合并前，必须先在当前回复中明确 `PRE_EDIT_GATE: PASS`。缺少以下任一证据时必须写 `PRE_EDIT_GATE: BLOCKED` 并停止写操作：
+
+- TAPD 已按正确条目类型采集成功，或已明确停在补充上下文阶段。
+- `本轮处理`、`本轮不处理`、`历史内容处理策略` 已声明。
+- Superpowers 规划路线和测试策略已确定。
+- 用户已在第 5 阶段二次确认分支/工作区策略。
+- `gitlab-map` 已完成分支来源、复用关系和基线校验。
+
+如果已经在 `PRE_EDIT_GATE: PASS` 前发生代码修改，立即停止继续修改和声称已修复，只能汇报违规阶段、已改文件、当前风险，并回到第 5 阶段补门禁。
 
 ## 阶段门禁
 
@@ -220,7 +235,7 @@ allowed-tools:
 
 - TAPD 写操作必须使用 TAPD MCP。
 - 写入前必须展示将要写入的用户可见内容。
-- 本地代码修改、测试、提交和合并准备不需要逐步确认。
+- 第 5 阶段通过且 `PRE_EDIT_GATE: PASS` 后，本地代码修改、测试、提交和合并准备不需要逐步确认。
 - 合并到 `develop` 前，不得准备或写入提测 Wiki。
 
 ## 参考文件加载

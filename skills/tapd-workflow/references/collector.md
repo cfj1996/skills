@@ -2,11 +2,13 @@
 
 ## 目标
 
-通过 TAPD MCP 提取需求/Bug 详情、评论、附件、PRD、原型和图片，并把可执行上下文注入当前会话。
+通过 TAPD MCP 提取需求/Bug/Task 详情、评论、附件、PRD、原型和图片，并把可执行上下文注入当前会话。
 
 ## 采集规则
 
 - 首次处理时读取详情、评论、附件和图片，不强制保存本地采集文件
+- 必须先根据链接路径识别条目类型：`/bug/detail/` 查 Bug，`/story/detail/` 查 Story，`/task/detail/` 查 Task
+- MCP 返回 `count: 0` 或未找到条目时，不得继续进入范围确认；先检查是否用错 Bug/Story/Task 查询，再用正确类型重查
 - 识别附件中的 PRD、需求说明、设计稿说明、测试说明或其他产品文档，并逐一判断是否需要解析
 - 提取标题、状态、优先级、描述、评论摘要、原型链接、截图信息，以及补充文档清单
 - Bug 必须采集字段：id, title, status, priority, severity, current_owner, reporter, te, de, created
