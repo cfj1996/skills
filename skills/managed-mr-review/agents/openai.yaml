@@ -1,0 +1,4 @@
+interface:
+  display_name: "管辖 MR 审核"
+  short_description: "审核管辖项目 master/main 合并请求并按需远程合并"
+  default_prompt: "使用 $managed-mr-review 审核管辖项目中目标分支为 master/main 的 GitLab MR，并在明确要求时自动合并通过项。"
