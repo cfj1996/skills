@@ -1,4 +1,4 @@
 interface:
   display_name: "管辖 MR 审核"
-  short_description: "发现、审核并按需合并管辖项目 master/main MR"
-  default_prompt: "使用 $managed-mr-review 分三步处理管辖项目 MR：先获取待合并 MR，再 code review 输出审核报告，最后按要求合并通过或指定的 MR。"
+  short_description: "发现、并行审核并按需合并管辖项目 MR"
+  default_prompt: "使用 $managed-mr-review 分三步处理管辖项目 MR：先获取待合并 MR，再按 MR 数量自动并行 code review 输出审核报告，最后按要求合并通过或指定的 MR。"
