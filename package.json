@@ -5,7 +5,9 @@
     "skills/tapd-workflow/",
     "skills/company-project-routing/",
     "skills/team-identity-map/",
-    "skills/login-token-workflow/"
+    "skills/login-token-workflow/",
+    "skills/managed-mr-review/",
+    "prompts/mr-code-reviewer.md"
   ],
   "scripts": {
     "build": "node -e \"const pkg = require('./package.json'); const files = pkg.files; const cmd = files.map(f => f.replace(/\\/$/, '')).join(' '); require('child_process').execSync('zip -r skills.zip ' + cmd, {stdio: 'inherit'});\""
