@@ -11,9 +11,9 @@ flowchart LR
   C -->|需要补充| D["用户补充上下文"]
   D --> B
   C -->|上下文足够| E["确认本轮范围"]
-  E -->|已确认| F["使用 Superpowers 规划"]
+  E -->|已确认| F["确认分支策略和工作区"]
   E -->|需要补充| D
-  F --> G["确认分支策略和工作区"]
+  F --> G["使用 Superpowers 规划"]
   G --> H["在确认后的工作区中实现"]
   H --> I["验证与评审"]
   I -->|通过| J["通过 GitLab 合并到 develop"]
@@ -49,36 +49,31 @@ flowchart LR
 - 历史内容默认排除，除非用户明确纳入。
 - 未出现在 `本轮处理` 中的内容，不得进入实现、验证、合并说明或 Wiki 正文。
 
-### 使用 Superpowers 规划
+### 开发执行阶段（内部子流程）
+
+内部顺序固定为：分支确认子流程 -> 规划子流程 -> 实现子流程 -> 验证子流程。
+
+### 分支确认子流程
+
+- 详细规则见：[branch-worktree-strategy.md](branch-worktree-strategy.md)
+
+### 规划子流程（Superpowers 路由）
 
 - 先做场景判定，再选择技能，禁止笼统写“进入 Superpowers”。
 - 需求不清或方案分歧：`superpowers:brainstorming` -> `superpowers:writing-plans`。
 - Bug/异常且根因不清：`superpowers:systematic-debugging` -> `superpowers:writing-plans`。
 - 方案已清晰且任务可拆：`superpowers:subagent-driven-development`；任务串行时使用 `superpowers:executing-plans`。
 - 任一改代码任务都要落实 `superpowers:test-driven-development`；完成前执行 `superpowers:verification-before-completion`。
-- 第 4 阶段产出至少包含：场景判定、技能选择理由、影响范围、测试策略、分支策略建议、合并预期。
+- 规划子流程产出至少包含：场景判定、技能选择理由、影响范围、测试策略、合并预期。
 
-### 确认分支和工作区
-
-- 新建分支默认创建新 worktree；切换/复用已有分支默认使用已有工作区，不创建新 worktree。
-- 先判断是新建分支还是复用已有分支；复用是合法路径，常见于线上 Bug 再次修复、需求开发后的缺陷修复。
-- 判断结果只能作为建议，必须让用户二次确认选择 `新建分支 + worktree`、`切换/复用已有分支` 或 `切换/复用已有分支 + 新 worktree`。
-- 用户确认前，禁止创建分支、创建 worktree、切换分支或开始代码修改。
-- 复用已有分支时，除非用户明确说明需要隔离工作区，否则不得创建新 worktree。
-- 分支策略必须记录场景类型、用户二次确认结果、当前 TAPD `short-id`、复用分支的原关联 TAPD / Story / Bug 线索、分支名、工作区路径、原因和 `gitlab-map` 校验结果。
-- 新建分支必须基于 `origin/master` 或用户明确指定的功能分支；禁止从 `origin/develop` 切开发分支。
-- 复用分支必须确认仍是当前 TAPD/需求的正确承载分支，并且可继续提交；不得为了合并 `develop` 更方便而改建 develop 基线分支。
-- `gitlab-map` 是分支基线校验的唯一来源。
-- 基线或复用关系校验失败时，阻断实现和提交流程。
-
-### 实现
+### 实现子流程
 
 - diff 必须限制在已确认的本轮范围内。
 - 功能和 Bug 修复遵循 `superpowers:test-driven-development`。
 - 如果本轮实际生成了 Superpowers 文档，提交代码时必须一并提交相关文档。
 - 提交信息使用中文 Conventional Commits。
 
-### 验证与评审
+### 验证子流程（评审）
 
 - 声称完成前运行 `superpowers:verification-before-completion`。
 - 按当前范围、当前计划/证据和本次 diff 做评审。

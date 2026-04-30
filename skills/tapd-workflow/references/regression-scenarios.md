@@ -72,7 +72,7 @@
 - 期望门禁：
   - `regression-checker` 返回 `FAIL`
   - 阻断原因包含“确认分支阶段通过前禁止修改代码”
-  - 要求回到第 5 阶段补齐分支策略、worktree 和 `gitlab-map` 校验
+  - 要求回到分支确认子流程补齐分支策略、worktree 和 `gitlab-map` 校验
 
 ## 场景 H：未输出阶段台账直接执行（应阻断）
 

@@ -58,7 +58,7 @@ allowed-tools:
 - 上一阶段 `regression-checker` 结论（首阶段写“尚未执行”）
 - 下一步允许做什么
 
-在第 5 阶段“确认分支”通过前，禁止修改代码。允许进行只读采集、只读代码搜索、需求澄清和规划；不允许改文件、提交、合并、写 Wiki 或写 TAPD。
+在第 4 阶段“分支确认子流程”通过前，禁止修改代码。允许进行只读采集、只读代码搜索、需求澄清；不允许改文件、提交、合并、写 Wiki 或写 TAPD。
 
 不得把 TAPD 工作流降级成普通修 bug 路径。只要发现自己已经跳过阶段，必须停止当前动作，汇报已偏离的阶段，并从最近未满足的门禁补齐。
 
@@ -67,10 +67,10 @@ allowed-tools:
 - TAPD 已按正确条目类型采集成功，或已明确停在补充上下文阶段。
 - `本轮处理`、`本轮不处理`、`历史内容处理策略` 已声明。
 - Superpowers 规划路线和测试策略已确定。
-- 用户已在第 5 阶段二次确认分支/工作区策略。
+- 用户已完成“分支确认子流程”中的二次确认。
 - `gitlab-map` 已完成分支来源、复用关系和基线校验。
 
-如果已经在 `PRE_EDIT_GATE: PASS` 前发生代码修改，立即停止继续修改和声称已修复，只能汇报违规阶段、已改文件、当前风险，并回到第 5 阶段补门禁。
+如果已经在 `PRE_EDIT_GATE: PASS` 前发生代码修改，立即停止继续修改和声称已修复，只能汇报违规阶段、已改文件、当前风险，并回到“分支确认子流程”补门禁。
 
 ## 阶段门禁
 
@@ -79,14 +79,11 @@ allowed-tools:
 | 1. 采集上下文 | 已定位 TAPD 项 | TAPD 摘要、关键字段、评论、附件、原型/PRD 结论 |
 | 2. 补充上下文 | 采集结果不足以判断范围 | 缺失信息已说明，用户补充已纳入上下文 |
 | 3. 确认本轮范围 | 上下文足以判断范围 | `本轮处理`、`本轮不处理`、`历史内容处理策略` |
-| 4. 规划 | 本轮范围已明确 | Superpowers 路由、影响范围、测试策略、分支策略 |
-| 5. 确认分支 | 计划已清晰 | 用户已二次确认新建或复用策略，分支策略已记录、工作区已就绪、分支来源/复用关系和基线校验已记录 |
-| 6. 实现 | 分支门禁已通过 | 计划内改动完成，并有相关测试证据 |
-| 7. 验证与评审 | 实现已完成 | 最新验证证据和 `REVIEW_PASSED` |
-| 8. 合并到 develop | 评审通过且提交可合并 | GitLab 确认变更已合并到 `develop` |
-| 9. 准备提测 Wiki | 合并已完成 | 完整 Wiki 草稿已展示并获得用户确认 |
-| 10. 写回 TAPD | 用户已确认写回内容 | Wiki、评论、状态更新已完成 |
-| 11. 清理 | 写回完成或取消 | worktree 已清理，最终结果已汇报 |
+| 4. 开发执行阶段 | 本轮范围已明确 | 分支确认子流程已通过并完成校验；规划子流程已完成；实现子流程完成且有测试证据；验证子流程达到 `REVIEW_PASSED` |
+| 5. 合并到 develop | 开发执行阶段通过且提交可合并 | GitLab 确认变更已合并到 `develop` |
+| 6. 准备提测 Wiki | 合并已完成 | 完整 Wiki 草稿已展示并获得用户确认 |
+| 7. 写回 TAPD | 用户已确认写回内容 | Wiki、评论、状态更新已完成 |
+| 8. 清理 | 写回完成或取消 | worktree 已清理，最终结果已汇报 |
 
 每个关键阶段完成后都要运行 `regression-checker`。如果检查失败，先修正证据或流程状态，再继续。
 
@@ -132,93 +129,12 @@ allowed-tools:
 
 未声明的内容一律视为本轮范围外，不得进入代码改动、验证、合并说明或提测 Wiki。
 
-### 4. 使用 Superpowers 规划（按场景路由）
+### 4. 开发执行阶段
 
-写代码前必须先做场景判定，再选择 Superpowers 技能，不得只写“进入 Superpowers”。
+这是对外单一主阶段，内部包含“分支确认子流程 -> 规划子流程 -> 实现子流程 -> 验证子流程”。
+内部子流程不在本文件展开，执行细则见：`references/development-execution.md`。
 
-- 场景 A：需求不清、方案存在分歧或需要先对齐验收口径  
-  - 使用 `superpowers:brainstorming`，随后使用 `superpowers:writing-plans`。  
-  - 退出条件：方案取舍和验收口径已经明确，可落地为执行计划。
-- 场景 B：Bug / 异常排查，根因不明确  
-  - 先使用 `superpowers:systematic-debugging`。  
-  - 根因明确后补 `superpowers:writing-plans`。  
-  - 退出条件：复现路径、根因证据、修复假设和验证路径齐全。
-- 场景 C：根因或方案已清晰，进入实现编排  
-  - 任务可拆并且互不阻塞时：`superpowers:subagent-driven-development`。  
-  - 任务不可拆或强串行依赖时：`superpowers:executing-plans`。  
-  - 退出条件：任务清单、执行顺序和责任边界明确。
-- 场景 D：涉及接口联调或外部契约  
-  - 先使用 `yapi-mcp` / `yapi-workflow` 补充接口上下文，再回到上面 A/B/C 路由。  
-  - 退出条件：接口字段、入参出参和错误口径已纳入计划。
-
-第 4 阶段最小产出必须包含：
-
-- 场景判定结果和对应技能选择理由
-- 影响范围（模块/文件/接口）
-- 测试策略（至少覆盖原失败路径与修复后路径）
-- 分支策略建议（只给建议，确认放在第 5 阶段）
-- “验证后合并到 `develop`”的预期
-
-第 6/7 阶段仍需强制执行：
-
-- 实现遵循 `superpowers:test-driven-development`
-- 完成前执行 `superpowers:verification-before-completion`
-
-参考：[planner.md](references/planner.md)
-
-### 5. 确认分支和 worktree
-
-- 代码修改前先确认分支策略，再创建新 worktree 或切换到用户确认的已有分支/工作区。
-- 分支策略必须先记录，不得默认新建分支，也不得默认切换已有分支。
-- 执行者只能给出建议和候选项，必须等待用户明确二次确认后，才允许创建新分支、新 worktree，或切换到已有分支/工作区。
-- 二次确认必须让用户在以下动作中明确选择：
-  - `新建分支 + worktree`：用于用户确认需要独立分支承载本轮工作。
-  - `切换/复用已有分支`：默认用于用户确认本轮应承接已有 Bug 分支、需求分支或用户指定功能分支，不创建新 worktree。
-  - `切换/复用已有分支 + 新 worktree`：仅当用户明确说明需要隔离工作区时使用。
-- 给用户的确认信息必须包含推荐策略、推荐原因、候选分支名、来源分支、工作区路径或拟创建 worktree 路径和风险提示。
-- 分支策略建议口径：
-  - 首次处理独立线上 Bug：通常新建 Bug 分支。
-  - 线上 Bug 再次修复：复用已有 Bug 分支，不重复创建。
-  - 需求开发后的缺陷修复：复用该需求分支，不重复创建。
-- 分支策略记录必须包含：
-  - 场景类型：`新建分支`、`复用线上 Bug 分支` 或 `复用需求分支`
-  - 用户二次确认结果：`新建分支 + worktree`、`切换/复用已有分支` 或 `切换/复用已有分支 + 新 worktree`
-  - 当前 TAPD `short-id`
-  - 复用分支时的原关联 TAPD / Story / Bug 线索
-  - 分支名和工作区路径；如果创建新 worktree，还必须记录 worktree 路径
-  - 来源分支：`origin/master` 或用户明确指定的功能分支
-  - 新建或复用的原因
-  - `gitlab-map` 校验结果
-- 分支命名：
-  - Bug：`fixbug/{git-user}.{YYMMDD}.{slug}-{short-id}`
-  - Story：`feature/{git-user}.{YYMMDD}.{slug}-{short-id}`
-- 新建 worktree 路径：目标项目根目录下的 `./.worktree/{短描述}-{short-id}`。
-- 提交前必须使用 `gitlab-map` 校验当前分支基线、复用关系和可继续提交状态。
-- 新建分支来源不是 `origin/master` 或用户明确指定功能分支时，停止流程；如果来源是 `origin/develop`，必须废弃该开发分支并回到合法来源重新创建。
-- 复用分支关联关系不清时，停止流程并先确认当前分支是否仍承载该 TAPD/需求。
-
-参考：[gitlab-map.md](references/gitlab-map.md)、[implementer.md](references/implementer.md)
-
-### 6. 实现
-
-- 在用户确认的工作区中执行；新建分支使用新 worktree，复用已有分支默认使用已有工作区。
-- 计划可拆成独立任务时，优先使用 `superpowers:subagent-driven-development`。
-- 不适合子代理并行时，使用 `superpowers:executing-plans`。
-- 实现任务内部遵循 `superpowers:test-driven-development`。
-- 改动必须限制在 `本轮处理` 范围内。
-- 如果本轮实际生成了 Superpowers 文档，提交代码时必须一并提交相关文档。
-- 提交信息必须是中文 Conventional Commits。
-
-### 7. 验证与评审
-
-- 声称完成前必须运行 `superpowers:verification-before-completion`。
-- Bug 修复必须覆盖原始失败路径和修复后路径。
-- 只根据当前范围、当前计划/证据和本次 diff 做评审。
-- 只有评审结论达到 `REVIEW_PASSED` 后，才允许进入合并。
-
-参考：[reviewer.md](references/reviewer.md)
-
-### 8. 合并到 develop
+### 5. 合并到 develop
 
 - 提交后使用 `gitlab-map` 或等效 GitLab 读接口确认可合并状态。
 - 合并前必须区分“本轮提交范围”和“继承基线差异”；合法来源带来的额外历史提交只记录为继承基线差异，不阻断合并。
@@ -228,7 +144,7 @@ allowed-tools:
 
 参考：[gitlab-map.md](references/gitlab-map.md)
 
-### 9. 准备提测 Wiki
+### 6. 准备提测 Wiki
 
 - 只有变更已经合并到 `develop` 后，才允许准备提测 Wiki。
 - `服务名称` 必须通过 `company-project-routing` 解析，不能直接复制项目名。
@@ -238,7 +154,7 @@ allowed-tools:
 
 参考：[test-wiki.md](references/test-wiki.md)
 
-### 10. 写回 TAPD
+### 7. 写回 TAPD
 
 仅在用户确认后执行：
 
@@ -247,7 +163,7 @@ allowed-tools:
 - 按需更新 TAPD 状态。
 - Wiki、评论、状态更新尽量合并成一次确认。
 
-### 11. 清理
+### 8. 清理
 
 - 确认 GitLab 合并、TAPD 写回、评论/状态更新和 worktree 清理都已完成。
 - 汇报最终结果、运行过的测试、合并结果和剩余风险。
@@ -256,13 +172,14 @@ allowed-tools:
 
 - TAPD 写操作必须使用 TAPD MCP。
 - 写入前必须展示将要写入的用户可见内容。
-- 第 5 阶段通过且 `PRE_EDIT_GATE: PASS` 后，本地代码修改、测试、提交和合并准备不需要逐步确认。
+- 第 4 阶段“分支确认子流程”通过且 `PRE_EDIT_GATE: PASS` 后，本地代码修改、测试、提交和合并准备不需要逐步确认。
 - 合并到 `develop` 前，不得准备或写入提测 Wiki。
 - 不生成 TAPD 专属过程文件；流程证据以阶段台账和阶段汇报为准。
 
 ## 参考文件加载
 
 - 主流程展开：[workflow.md](references/workflow.md)
+- 开发执行子流程：[development-execution.md](references/development-execution.md)
 - 采集细则：[collector.md](references/collector.md)
 - 规划细则：[planner.md](references/planner.md)
 - 实现细则：[implementer.md](references/implementer.md)
