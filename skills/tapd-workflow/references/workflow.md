@@ -51,10 +51,12 @@ flowchart LR
 
 ### 使用 Superpowers 规划
 
-- 功能或需求类工作使用 `superpowers:brainstorming` 后接 `superpowers:writing-plans`。
-- Bug 修复或根因不清时使用 `superpowers:systematic-debugging`。
-- 已有明确计划时使用 `superpowers:subagent-driven-development` 或 `superpowers:executing-plans`。
-- 计划应包含影响文件、测试策略、分支描述和合并预期。
+- 先做场景判定，再选择技能，禁止笼统写“进入 Superpowers”。
+- 需求不清或方案分歧：`superpowers:brainstorming` -> `superpowers:writing-plans`。
+- Bug/异常且根因不清：`superpowers:systematic-debugging` -> `superpowers:writing-plans`。
+- 方案已清晰且任务可拆：`superpowers:subagent-driven-development`；任务串行时使用 `superpowers:executing-plans`。
+- 任一改代码任务都要落实 `superpowers:test-driven-development`；完成前执行 `superpowers:verification-before-completion`。
+- 第 4 阶段产出至少包含：场景判定、技能选择理由、影响范围、测试策略、分支策略建议、合并预期。
 
 ### 确认分支和工作区
 
@@ -73,7 +75,7 @@ flowchart LR
 
 - diff 必须限制在已确认的本轮范围内。
 - 功能和 Bug 修复遵循 `superpowers:test-driven-development`。
-- 只有本轮产生的 Superpowers 文档才随代码提交。
+- 如果本轮实际生成了 Superpowers 文档，提交代码时必须一并提交相关文档。
 - 提交信息使用中文 Conventional Commits。
 
 ### 验证与评审

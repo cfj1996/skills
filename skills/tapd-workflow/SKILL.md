@@ -132,16 +132,37 @@ allowed-tools:
 
 未声明的内容一律视为本轮范围外，不得进入代码改动、验证、合并说明或提测 Wiki。
 
-### 4. 使用 Superpowers 规划
+### 4. 使用 Superpowers 规划（按场景路由）
 
-写代码前先选择执行路线：
+写代码前必须先做场景判定，再选择 Superpowers 技能，不得只写“进入 Superpowers”。
 
-- 新功能、需求扩展或设计不清：使用 `superpowers:brainstorming`，随后使用 `superpowers:writing-plans`。
-- Bug 修复、异常排查或根因不清：使用 `superpowers:systematic-debugging`；根因和验证路径明确后再补计划。
-- 已有清晰计划：直接进入 `superpowers:subagent-driven-development` 或 `superpowers:executing-plans`。
-- 涉及接口对接：使用 `yapi-mcp` / `yapi-workflow` 补充接口上下文。
+- 场景 A：需求不清、方案存在分歧或需要先对齐验收口径  
+  - 使用 `superpowers:brainstorming`，随后使用 `superpowers:writing-plans`。  
+  - 退出条件：方案取舍和验收口径已经明确，可落地为执行计划。
+- 场景 B：Bug / 异常排查，根因不明确  
+  - 先使用 `superpowers:systematic-debugging`。  
+  - 根因明确后补 `superpowers:writing-plans`。  
+  - 退出条件：复现路径、根因证据、修复假设和验证路径齐全。
+- 场景 C：根因或方案已清晰，进入实现编排  
+  - 任务可拆并且互不阻塞时：`superpowers:subagent-driven-development`。  
+  - 任务不可拆或强串行依赖时：`superpowers:executing-plans`。  
+  - 退出条件：任务清单、执行顺序和责任边界明确。
+- 场景 D：涉及接口联调或外部契约  
+  - 先使用 `yapi-mcp` / `yapi-workflow` 补充接口上下文，再回到上面 A/B/C 路由。  
+  - 退出条件：接口字段、入参出参和错误口径已纳入计划。
 
-计划必须包含影响范围、测试策略、分支描述和“验证后合并到 `develop`”的预期。
+第 4 阶段最小产出必须包含：
+
+- 场景判定结果和对应技能选择理由
+- 影响范围（模块/文件/接口）
+- 测试策略（至少覆盖原失败路径与修复后路径）
+- 分支策略建议（只给建议，确认放在第 5 阶段）
+- “验证后合并到 `develop`”的预期
+
+第 6/7 阶段仍需强制执行：
+
+- 实现遵循 `superpowers:test-driven-development`
+- 完成前执行 `superpowers:verification-before-completion`
 
 参考：[planner.md](references/planner.md)
 
@@ -185,8 +206,8 @@ allowed-tools:
 - 不适合子代理并行时，使用 `superpowers:executing-plans`。
 - 实现任务内部遵循 `superpowers:test-driven-development`。
 - 改动必须限制在 `本轮处理` 范围内。
+- 如果本轮实际生成了 Superpowers 文档，提交代码时必须一并提交相关文档。
 - 提交信息必须是中文 Conventional Commits。
-- 如果 Superpowers 生成了设计或计划文档，随代码一起提交。
 
 ### 7. 验证与评审
 
@@ -237,6 +258,7 @@ allowed-tools:
 - 写入前必须展示将要写入的用户可见内容。
 - 第 5 阶段通过且 `PRE_EDIT_GATE: PASS` 后，本地代码修改、测试、提交和合并准备不需要逐步确认。
 - 合并到 `develop` 前，不得准备或写入提测 Wiki。
+- 不生成 TAPD 专属过程文件；流程证据以阶段台账和阶段汇报为准。
 
 ## 参考文件加载
 

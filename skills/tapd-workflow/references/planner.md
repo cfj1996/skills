@@ -10,7 +10,13 @@
 - 做根因或方案分析
 - 规划可执行任务，单个任务尽量 30 分钟内完成
 - 搜索代码库，定位相关文件和入口
-- 优先复用 Superpowers 的 `writing-plans`、`test-driven-development`、`verification-before-completion` 等现成工作流
+- 先做场景判定，再路由到对应 Superpowers 技能，禁止笼统写“进入 Superpowers”
+  - 需求不清、方案分歧：`superpowers:brainstorming` -> `superpowers:writing-plans`
+  - Bug / 异常且根因不清：`superpowers:systematic-debugging` -> `superpowers:writing-plans`
+  - 方案已清晰且任务可拆：`superpowers:subagent-driven-development`
+  - 方案已清晰但任务串行：`superpowers:executing-plans`
+  - 任一实现任务：`superpowers:test-driven-development`
+  - 声称完成前：`superpowers:verification-before-completion`
 - 规划里需要提前写明后续分支策略建议：首次处理通常新建分支，线上 Bug 再次修复复用已有 Bug 分支，需求开发后的缺陷修复复用需求分支；开发分支来源只能是 `origin/master` 或用户明确指定的功能分支，不能使用 `origin/develop`
 - 规划阶段只能给建议，不能替用户决定；创建或切换分支/工作区前必须在第 5 阶段等待用户二次确认
 - 规划里必须说明：合并到 `develop` 时只评审本轮提交范围，合法来源分支带来的历史差异作为继承基线差异记录，不作为阻断
@@ -21,7 +27,8 @@
 ## 输出要求
 
 - 包含分析、相关文件、任务清单、测试策略和风险评估
+- 明确记录“场景判定 -> 技能选择 -> 退出条件”
 - 任务必须具体可执行
 - 首个任务优先验证根因假设
 - 规划里要明确：分支策略、新建或复用原因、提交完成后通过 GitLab 直接合并到 `develop`，并在合并成功后提示用户
-- 若未生成计划文档，也必须在对话中明确保留同等信息
+- 规划信息可以仅保留在对话中，不要求额外生成本地计划文档
