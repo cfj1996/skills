@@ -9,6 +9,17 @@
 3. 实现子流程
 4. 验证子流程（评审）
 
+## 开发证据产物（Superpowers 审计要求）
+
+阶段 4 开始实现前，必须创建或更新最小 Superpowers 证据包，这是完整的 Superpowers 开发流程的硬性要求：
+
+- 默认路径：目标仓库当前工作区的 `docs/tapd-workflow/{short-id}/`
+- 必需文件：
+  - `plan.md`：场景判定、方案、影响范围、测试策略和退出条件
+  - `tasks.md`：任务清单、执行顺序、每个任务的状态
+  - `verification.md`：验证命令、结果、`REVIEW_PASSED` 结论
+- 这些文件是必要的工程证据。未生成证据包且无明确豁免时，`PRE_EDIT_GATE` 必须为 `BLOCKED`。
+
 ## 分支确认子流程
 
 - 代码修改前必须完成分支策略二次确认、工作区就绪和 `gitlab-map` 校验。
@@ -33,6 +44,7 @@
 - 场景 D：涉及接口联调或外部契约  
   - 先使用 `yapi-mcp` / `yapi-workflow` 补充接口上下文，再回到 A/B/C 路由。  
   - 退出条件：接口字段、入参出参和错误口径纳入计划。
+- 必须将选定的方案、理由和退出条件写入 `docs/tapd-workflow/{short-id}/plan.md`。
 - 最小产出：
   - 场景判定结果和技能选择理由
   - 影响范围（模块/文件/接口）
@@ -43,6 +55,7 @@
 ## 实现子流程
 
 - 在确认后的工作区中执行；新建分支使用新 worktree，复用已有分支默认使用已有工作区。
+- 实现前必须已存在并更新 `docs/tapd-workflow/{short-id}/tasks.md`。
 - 计划可拆成独立任务时，优先 `superpowers:subagent-driven-development`。
 - 不适合并行时，使用 `superpowers:executing-plans`。
 - 实现内部遵循 `superpowers:test-driven-development`。
@@ -54,6 +67,7 @@
 ## 验证子流程（评审）
 
 - 声称完成前必须运行 `superpowers:verification-before-completion`。
+- 必须将验证命令、过程和结果写入 `docs/tapd-workflow/{short-id}/verification.md`。
 - Bug 修复必须覆盖原始失败路径和修复后路径。
 - 只根据当前范围、当前计划/证据和本次 diff 做评审。
 - 只有结论达到 `REVIEW_PASSED` 后，才允许进入下一主阶段。
