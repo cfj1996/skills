@@ -1,6 +1,6 @@
 ---
 name: company-project-routing
-description: Use when a vague request, keyword, or partial clue needs to be mapped to the right company project, module, or owner based on the company project distribution.
+description: Use when a vague request, keyword, or partial clue needs to be mapped to the right company project, module, or owner based on the company project distribution. Also use this to find the exact Jenkins test environment deployment job (e.g., front-*-test, npm-tools-test) when you need to trigger a build or package via Jenkins MCP.
 ---
 
 # 项目地图
@@ -103,7 +103,7 @@ Default rule: use the project name itself as `服务名称` unless the exception
 | 项目 | 子项目 / 模块 | 服务名称 |
 |---|---|---|
 | `order-admin` | - | `order-admin` |
-| `jbz_admin` | - | `jbz_admin` |
+| `jbz_admin` | - | `main_menu` |
 | `kp_admin` | - | `kp_admin` |
 | `store_admin` | - | `store_admin` |
 | `statistics_admin` | - | `statistics_admin` |
@@ -149,6 +149,44 @@ Use these as the first routing layer when the prompt is about a known project ar
 
 If a project name appears in more than one group or serves multiple business lines, do not treat the group as proof. Use project signals to decide.
 
+## 测试环境打包 (Jenkins Job)
+
+在 MCP 中进行测试环境自动化部署时，请根据以下对应关系查找并触发 Jenkins Job：
+
+### 独立项目对应关系
+| 业务领域 | 项目 / 服务 | Jenkins 测试环境 Job |
+|---|---|---|
+| **商家平台** | `order-admin` | `front-orderAdmin-test` |
+| | `jbz_admin` / `main_menu` | `front-main_menu-test` |
+| | `kp_admin` | `front-kpadmin-test` |
+| | `store_admin` | `front-storeAdmin-test` |
+| | `statistics_admin` | `front-statisticsAdmin-test` |
+| | `poster_admin` | `front-posteradmin-test` |
+| | `weixin-live` / `live2` | `front-live2-test` |
+| | `admin_menu` | `front-admin_menu-test` |
+| **中台 / 供应商** | `supplier-admin-web` / `suppliers` | `front-suppliers-test` |
+| | `zan-projects/admin/factory` | `front-factory-test` |
+| | `zan-projects/admin/facilitator` | `front-facilitator-test` |
+| | `provider-mobile` / `supplier-mobile` | `front-provider-mobile-test` |
+| **直播** | `zan-projects/admin/live-monitor` | `front-live-monitor-test` |
+| **C端用户** | `Ucenter` | `front-ucenter-test` |
+| | `jbz_shop` | `front-mall-test` |
+| | `shop_mp` | `shop_mp_test` |
+| | `instant-apps` | `front-instant-apps-test` |
+| **大屏展示** | `report-ui` | `report-ui-test` |
+
+### 公共库打包
+公共的库在测试环境对应的打包发布 Jenkins Job 统一为 `npm-tools-test`。在触发构建时，通过选择具体发布的项目进行打包，包含以下项目：
+- `sim-ui`
+- `von-ui`
+- `common`
+- `zan-lib`
+- `zan-apps`
+- `zan-mini`
+- `zan-cli`
+
+其他常规项目则通常对应 `front-<项目名>-test`、`<项目名>-test` 等独立的 Job。
+
 ## 服务名称输出规则
 
 1. 先定位项目。
@@ -185,7 +223,7 @@ If a project name appears in more than one group or serves multiple business lin
 | Clue | What to do |
 |---|---|
 | `订单管理` | 优先匹配 `order-admin`，输出 `order-admin` |
-| `商家后台` | 先看是 `jbz_admin` 还是 `kp_admin`，默认输出对应项目名称 |
+| `商家后台` | 先看是 `jbz_admin` 还是 `kp_admin`；`jbz_admin` 输出 `main_menu`，`kp_admin` 输出 `kp_admin` |
 | `供应商后台` | 优先匹配 `supplier-admin-web/suppliers`，输出 `供应商` |
 | `中台运营管理系统` | 优先匹配 `supplier-admin-web/middleManage`，输出 `中台运营管理系统` |
 | `服务商后台` | 优先匹配 `zan-projects/facilitator`，输出 `facilitator` |
