@@ -90,8 +90,9 @@ flowchart LR
 ### 准备提测 Wiki
 
 - 严格按 [test-wiki.md](test-wiki.md) 执行。
+- **准备前，必须先查询 TAPD 详情与历史评论，检查是否已存在提测 Wiki 链接。若已存在，则在原页面补充，绝对禁止新建 Wiki。**
 - `服务名称` 必须通过 `company-project-routing` 解析。
-- 写入前必须读取月目录。
+- 写入前必须读取对应的目标页面（月目录或已有子 Wiki）。
 - TAPD 写入前必须向用户展示完整 Wiki 草稿。
 
 ### 写回 TAPD

@@ -1,7 +1,7 @@
 interface:
   display_name: "TAPD 工作流"
   short_description: "按 MCP、Superpowers、GitLab 和提测 Wiki 门禁处理 TAPD Bug/Story/Task"
-  default_prompt: "使用 $tapd-workflow 作为 TAPD Bug/Story/Task 的权威执行契约。显式出现 $tapd-workflow、/tapd-workflow、技能卡片或 TAPD 链接并要求处理时，本技能已触发；用户说直接修复/继续/不用日志不代表跳过门禁。先输出阶段台账，再按顺序执行：按链接类型采集 TAPD 上下文、必要时补充上下文、确认本轮范围、进入开发执行阶段（分支确认子流程 -> 规划子流程 -> 实现子流程 -> 验证子流程）、通过 GitLab 合并到 develop、准备提测 Wiki、确认后写回 TAPD、最后清理。分支确认子流程通过前禁止修改代码；任何编辑前必须有 PRE_EDIT_GATE: PASS；task/detail 不能按 bug 查询，MCP 返回 count: 0 时必须停在采集阶段重查。创建或切换分支/worktree 前必须让用户二次确认是新建还是复用；复用已有分支默认不创建新 worktree，除非用户明确说明；开发分支只能来自 origin/master 或用户指定功能分支，不能来自 origin/develop。阶段切换前运行 regression-checker；缺少证据时停止。"
+  default_prompt: "使用 $tapd-workflow 作为 TAPD Bug/Story/Task 的权威执行契约。显式出现 $tapd-workflow、/tapd-workflow、技能卡片或 TAPD 链接并要求处理时，本技能已触发；用户说直接修复/继续/不用日志不代表跳过门禁。先输出阶段台账，再按顺序执行：按链接类型采集 TAPD 上下文、必要时补充上下文、确认本轮范围、进入开发执行阶段（分支确认子流程 -> 规划子流程 -> 实现子流程 -> 验证子流程）、通过 GitLab 合并到 develop、准备提测 Wiki（须先检查 TAPD 详情是否已存在 Wiki 链接，存在则补充）、确认后写回 TAPD、最后清理。分支确认子流程通过前禁止修改代码；任何编辑前必须有 PRE_EDIT_GATE: PASS；task/detail 不能按 bug 查询，MCP 返回 count: 0 时必须停在采集阶段重查。创建或切换分支/worktree 前必须让用户二次确认是新建还是复用；复用已有分支默认不创建新 worktree，除非用户明确说明；开发分支只能来自 origin/master 或用户指定功能分支，不能来自 origin/develop。阶段切换前运行 regression-checker；缺少证据时停止。"
 
 policy:
   allow_implicit_invocation: true
