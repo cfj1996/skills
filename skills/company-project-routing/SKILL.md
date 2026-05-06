@@ -1,6 +1,6 @@
 ---
 name: company-project-routing
-description: Use when a vague request, keyword, or partial clue needs to be mapped to the right company project, module, or owner based on the company project distribution. Also use this to find the exact Jenkins test environment deployment job (e.g., front-*-test, npm-tools-test) when you need to trigger a build or package via Jenkins MCP.
+description: 当用户的请求、关键字或线索比较模糊时，使用此技能将其映射到正确的公司项目、模块、负责人或服务名称。同时，当需要通过 Jenkins MCP 触发测试环境打包或部署时，也必须使用此技能来查找具体的 Jenkins Job 名称（例如 front-*-test, npm-tools-test 等）。
 ---
 
 # 项目地图
