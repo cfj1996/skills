@@ -9,16 +9,15 @@
 3. 实现子流程
 4. 验证子流程（评审）
 
-## 反伪造执行（Anti-Fake Execution）与平台适配规则
+## 反伪造执行（Anti-Fake Execution）
 
 **禁止伪造执行**：
 - 严禁通过简单地在根目录（或任何非法路径）直接创建 `plan.md`、`tasks.md`、`verification.md` 并自行编造内容来“冒充”已经执行了 Superpowers 工作流。这些文件必须是真实执行过程的留痕。
 - 严禁仅输出“使用 Superpowers”、“进入 Superpowers 阶段”然后直接退化为普通快速 Bug 修复模式。
 - 严禁自行判定代码逻辑并给出 `REVIEW_PASSED`（必须走独立评审机制）。
 
-**工具适配与降级策略**：
-- 技能中提及的 `invoke_agent` 或特定 `superpowers:*` 工具若在当前平台环境下不可用，**严禁以此为借口跳过流程**。
-- **降级等效动作**：当独立工具缺失时，执行者必须主动使用 `read_file` 去读取该 Superpowers 技能对应的 `SKILL.md`（或其定义文档），将该技能的方法论（如 systematic-debugging 的根因排查法、test-driven-development 的先失败后修复法）转化为当前的执行步骤，并显式记录“因工具缺失，已读取并模拟执行对应 SKILL.md”。
+**严禁借口跳过流程**：
+- 技能中提及的 `invoke_agent` 或特定 `superpowers:*` 工具若在当前平台环境下调用报错或未找到，**必须明确报告真实错误并停止流程等待修复，严禁以此为借口跳过该子流程**。
 
 ## 失败恢复与越界回滚协议
 
