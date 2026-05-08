@@ -67,8 +67,9 @@
 ## 验证子流程（评审）
 
 - 声称完成前必须运行 `superpowers:verification-before-completion`。
-- 必须将验证命令、过程和结果写入 `docs/tapd-workflow/{short-id}/verification.md`。
-- Bug 修复必须覆盖原始失败路径和修复后路径。
-- 只根据当前范围、当前计划/证据和本次 diff 做评审。
-- 只有结论达到 `REVIEW_PASSED` 后，才允许进入下一主阶段。
+- 必须将验证命令、真实运行日志/报错对比和独立评审结果写入 `docs/tapd-workflow/{short-id}/verification.md`。禁止仅记录“代码走查通过”而无真实执行证据。
+- Bug 修复必须覆盖原始失败路径和修复后路径的真实测试对比。
+- **强制独立评审**：负责编码的 Agent 不得自行判定通过。必须使用 `invoke_agent` 委托独立的子 Agent（交叉检查）来进行代码评审。
+- 只根据当前范围、当前计划/证据和本次 diff 做独立评审。
+- 只有独立的子 Agent 给出 `REVIEW_PASSED` 结论后，才允许进入下一主阶段。
 - 参考：[reviewer.md](reviewer.md)
