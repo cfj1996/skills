@@ -23,6 +23,7 @@
 ## 3. 实现与验证
 
 - **环境准备**：使用 `superpowers:using-git-worktrees` 进入对应工作区。
+- **目录规范**：在开始编写测试前，确保项目根目录下存在 `__test__` 文件夹。所有本轮生成的测试计划、测试脚本、测试报告及相关证据必须存放于此文件夹内。
 - **任务执行**：有 subagent 能力时用 `superpowers:subagent-driven-development`，否则用 `superpowers:executing-plans`。
 - **TDD 约束**：所有实现必须遵循 `superpowers:test-driven-development`（RED -> GREEN -> REFACTOR），提交时需附带 Superpowers 计划文档。
 - **自动独立评审**：在完成代码实现与验证（Green 阶段）后，主 Agent 必须**自动发起**独立 Agent 评审（见 [reviewer.md](../references/reviewer.md)），无需等待用户针对评审动作的授权。主 Agent 禁止自行判定通过。
@@ -31,6 +32,7 @@
 ## 4. 退出条件（Gate 4）
 
 - [ ] 已按场景使用对应 Superpowers 技能并留有 TDD 运行报告和验证证据包。
+- [ ] 测试相关文件已按规范存放于项目根目录的 `__test__` 文件夹中。
 - [ ] 分支与 Worktree 合规，已通过 `gitlab-map` 校验。
 - [ ] 测试证据中包含失败用例和修复后的通过结果。
 - [ ] 已获独立评审 `REVIEW_PASSED`，评审意见已记录。
