@@ -35,6 +35,7 @@ flowchart LR
 - 采集结果保留在当前上下文，不创建 TAPD 专属过程文件。
 - Bug 必采字段包括 `id`、`title`、`status`、`priority`、`severity`、`current_owner`、`reporter`、`te`、`de` 和 `created`。
 - 测试人员解析规则统一参见 [collector.md](collector.md)；严禁在此处硬编码任何字段映射。
+- **状态流转同步**：每次进入新阶段或遇到门禁阻塞时，必须同步调用 `update_topic` 更新会话状态，确保摘要实时反映当前处理进度。
 
 ### 补充上下文
 

@@ -35,10 +35,11 @@
 
 ## 命名与路径
 
-- Bug 分支：`fixbug/{git-user}.{YYMMDD}.{slug}-{short-id}`
-- Story 分支：`feature/{git-user}.{YYMMDD}.{slug}-{short-id}`
-- 新建 worktree 路径：`./.worktree/{slug}-{short-id}`（必须在当前项目根目录下创建，禁止在用户目录等外部路径创建）。
+- Bug 分支：`fixbug/{git-user}.{YYMMDD}.{slug}-{short-id}`（其中 `{slug}` 必须使用中文简述）
+- Story 分支：`feature/{git-user}.{YYMMDD}.{slug}-{short-id}`（其中 `{slug}` 必须使用中文简述）
+- 新建 worktree 路径：`./.worktree/{slug}-{short-id}`（必须在当前项目根目录下创建，禁止在用户目录等外部路径创建；`{slug}` 必须使用中文简述）。
 - **多任务并行隔离**：在创建 worktree 前，必须检查路径是否已存在。若路径已被其他正在进行的 TAPD 任务占用，必须通过增加后缀（如 `-v2`）来确保路径唯一，严禁在同一个 worktree 中混合处理多个不相关的 TAPD 任务。
+- **脏工作区建议**：处于阶段 4 确认分支策略时，若发现当前工作区有脏改动，应建议用户优先使用 `新建分支 + worktree` 策略以实现物理隔离，避免污染基线或受无关改动干扰。
 
 ## 合规校验
 
