@@ -55,6 +55,8 @@ allowed-tools:
 
 **越界回滚机制**：不得把 TAPD 工作流降级成普通修 bug 路径。只要发现自己已经跳过阶段（例如没做测试就想提交，没独立评审就想合并），必须停止当前动作，汇报已偏离的阶段，撤销越界操作，并从最近未满足的门禁补齐。
 
+**评审子 Agent 只读边界**：阶段 4 调用评审子 Agent 时，必须使用最强隔离（优先 `agent_type: explorer`、默认 `fork_context: false`），并在 prompt 中明文禁止子 Agent 执行 git 提交/推送、创建或合并 MR、写回 TAPD/Wiki。提交、推送、MR、合并只能由主 Agent 在核验 `REVIEW_PASSED` 后执行；详见 [references/reviewer.md](references/reviewer.md) 的“评审子 Agent 只读硬约束”。
+
 ## PRE_EDIT_GATE 硬阻断（肌肉记忆级）
 
 任何文件编辑、代码格式化、git 提交或合并前，**必须**先在当前回复中明确输出 `PRE_EDIT_GATE: PASS`。缺少以下任一证据时必须写 `PRE_EDIT_GATE: BLOCKED` 并停止一切写操作：
