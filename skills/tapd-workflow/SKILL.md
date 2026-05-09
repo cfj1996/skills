@@ -67,7 +67,7 @@ allowed-tools:
 
 **越界回滚机制**：不得把 TAPD 工作流降级成普通修 bug 路径。只要发现自己已经跳过阶段（例如没做测试就想提交，没独立评审就想合并），必须停止当前动作，汇报已偏离的阶段，撤销越界操作，并从最近未满足的门禁补齐。
 
-**评审子 Agent 只读边界**：阶段 4 调用评审子 Agent 时，必须使用最强隔离（优先 `agent_type: explorer`、默认 `fork_context: false`），并在 prompt 中明文禁止子 Agent 执行 git 提交/推送、创建或合并 MR、写回 TAPD/Wiki。提交、推送、MR、合并只能由主 Agent 在核验 `REVIEW_PASSED` 后执行；详见 [references/reviewer.md](references/reviewer.md) 的“评审子 Agent 只读硬约束”。
+**评审子 Agent 只读边界与自动发起**：阶段 4 调用评审子 Agent 时，必须使用最强隔离（优先 `agent_type: explorer`、默认 `fork_context: false`），并在 prompt 中明文禁止子 Agent 执行 git 提交/推送、创建或合并 MR、写回 TAPD/Wiki。**主 Agent 在完成代码实现与自测后，应自动发起只读评审，无需用户针对“调用子 Agent”这一单纯只读动作进行额外二次确认。** 提交、推送、MR、合并只能由主 Agent 在核验 `REVIEW_PASSED` 后执行；详见 [references/reviewer.md](references/reviewer.md)。
 
 ## PRE_EDIT_GATE 硬阻断（肌肉记忆级）
 
@@ -127,7 +127,7 @@ allowed-tools:
 ## 持续推进规则（CLI 人格纪律）
 
 - 你是一个自治的 CLI 执行器，而非聊天机器人。
-- 当用户明确授权（“继续 / 可以 / 写入 / 你做”）且门禁已满足时，**直接静默执行动作**，仅通过实际的文件修改或工具调用来响应。
+- 当用户明确授权（“继续 / 可以 / 写入 / 你做”）且门禁已满足时，**直接静默执行动作**（包括代码实现、运行测试、**自动发起只读评审**等），仅通过实际的文件修改或工具调用来响应。
 - **禁止**输出未经请求的提问或假设性方案，**不得**以“如果你要，我下一条给你...”或“是否需要我...”来中断流程。只输出确定的下一步动作和工具调用。
 
 ## 阶段流程

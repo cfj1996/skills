@@ -25,8 +25,8 @@
 - **环境准备**：使用 `superpowers:using-git-worktrees` 进入对应工作区。
 - **任务执行**：有 subagent 能力时用 `superpowers:subagent-driven-development`，否则用 `superpowers:executing-plans`。
 - **TDD 约束**：所有实现必须遵循 `superpowers:test-driven-development`（RED -> GREEN -> REFACTOR），提交时需附带 Superpowers 计划文档。
-- **独立评审**：必须通过 `superpowers:requesting-code-review` 调用独立 Agent 评审（见 [reviewer.md](reviewer.md)），主 Agent 禁止自行判定通过。
-- **完成验证**：声称完成前运行 `superpowers:verification-before-completion`，展示真实命令输出。
+- **自动独立评审**：在完成代码实现与验证（Green 阶段）后，主 Agent 必须**自动发起**独立 Agent 评审（见 [reviewer.md](../references/reviewer.md)），无需等待用户针对评审动作的授权。主 Agent 禁止自行判定通过。
+- **完成验证**：评审通过后，声称完成前运行 `superpowers:verification-before-completion`，展示真实命令输出。
 
 ## 4. 退出条件（Gate 4）
 
