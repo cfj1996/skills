@@ -12,6 +12,18 @@ allowed-tools:
 
 # TAPD 工作流
 
+## 全局变量/占位符定义
+
+| 变量 | 定义 | 来源 | 示例 |
+| :--- | :--- | :--- | :--- |
+| `{short-id}` | TAPD 任务唯一简短 ID | `tapd-mcp` 的 `short-id` 字段 | `1014292` |
+| `{slug}` | 任务标题的语义化描述短语 | 从 TAPD `title` 提取（推荐使用中文，如“修复分红规则”） | `修复分红规则` |
+| `{git-user}` | 当前 Git 用户名 | `git config user.name` | `cfj` |
+| `{YYMMDD}` | 任务启动时的年月日 | 系统日期 | `260509` |
+| `{te}` | 测试人员 | `tapd-mcp` 的 `te` 字段或自定义字段（见 [collector.md](references/collector.md) 动态解析规则） | `张三` |
+| `{de}` | 开发人员 | `tapd-mcp` 的 `de` 字段或 `current_owner` | `李四` |
+| `{reporter}` | 报告人 | `tapd-mcp` 的 `reporter` 字段 | `王五` |
+
 ## 定位
 
 这个技能是 TAPD Bug/Story/Task 的受控执行流程。它负责 TAPD 上下文、本轮范围、GitLab 合并顺序、提测 Wiki 和 TAPD 写回；代码规划、实现和验证交给 Superpowers 执行。
@@ -37,7 +49,6 @@ allowed-tools:
 ## 入口
 
 - 首次处理：`/tapd-workflow <TAPD链接>`
-- 继续处理：`/tapd-workflow bug item-id <ITEM_ID>`、`/tapd-workflow story item-id <ITEM_ID>` 或 `/tapd-workflow task item-id <ITEM_ID>`
 - 显式出现 `$tapd-workflow`、`/tapd-workflow`、技能卡片或 TAPD 链接并要求修复/开发/处理时，即视为本技能已触发。
 - 技能已触发后，用户说“可以”“继续”“直接修复”“不用日志”“你直接进行修复工作”，只表示继续推进当前 TAPD 工作流，不表示跳过阶段门禁。
 - 禁止用“没有检测到工作流插件/触发关键字”“用户要求快速修复”作为不执行本工作流的理由；除非用户明确说“跳过 TAPD 工作流”。
@@ -65,7 +76,6 @@ allowed-tools:
 2. `本轮处理`、`本轮不处理`、`历史内容处理策略` 已声明。
 3. 用户已完成“分支确认子流程”中的二次确认。
 4. `gitlab-map` 已完成分支来源、复用关系和基线校验。
-5. **Superpowers 强制要求**：目标代码仓库的 `docs/tapd-workflow/{short-id}/` 下已存在真实规划包（`plan.md` 等），并且该计划内包含必须的技能加载检查单与真实测试策略。
 
 如果已经在 `PRE_EDIT_GATE: PASS` 前发生代码修改，立即停止继续修改和声称已修复，只能汇报违规阶段、已改文件、当前风险，并回到“分支确认子流程”或“规划子流程”补门禁。
 
@@ -77,7 +87,7 @@ allowed-tools:
 | 2. 补充上下文 | 采集结果不足以判断范围 | 缺失信息已说明，用户补充已纳入上下文 |
 | 3. 确认本轮范围 | 上下文足以判断范围 | `本轮处理`、`本轮不处理`、`历史内容处理策略` |
 | 4. 开发执行阶段 | 本轮范围已明确 | 分支确认校验通过；Superpowers 规划、实现、证据包真实生成；验证达到 `REVIEW_PASSED` |
-| 5. 合并到 develop | 开发执行阶段通过且提交可合并 | GitLab 确认变更已合并到 `develop` |
+| 5. 合并到 develop | 开发执行阶段通过且提交可合并 | **经用户确认后**，GitLab 确认变更已合并到 `develop` |
 | 6. 准备提测 Wiki | 合并已完成 | 完整 Wiki 草稿已展示并获得用户确认 |
 | 7. 写回 TAPD | 用户已确认写回内容 | Wiki、评论、状态更新已完成 |
 | 8. 清理 | 写回完成或取消 | worktree 已清理，最终结果已汇报 |
@@ -97,6 +107,7 @@ allowed-tools:
 ## 阶段写入屏障
 
 - 阶段 1「采集上下文」和阶段 2「补充上下文」只能执行只读动作：TAPD 读取、附件/PRD/原型读取、YApi 查询、GitLab 只读查询、代码搜索和文件阅读。
+- **防御性自检**：处于阶段 1 / 2 时，主 Agent 必须在 thought 中通过 `git status` 确认当前工作区是否干净。若发现脏改动，必须立即向用户报告并停止流程，不得在只读阶段携带未知改动运行。
 - 阶段 1 / 2 禁止执行任何业务代码和系统状态的写动作：编辑文件、格式化、提交、推送、创建或切换业务分支、创建 worktree、合并、写 Wiki、写评论、修改 TAPD 状态。
 - 用户在阶段 1 / 2 说“继续”“可以”“直接修复”，只表示允许进入下一阶段门禁，绝不表示允许修改代码。
 - 如果阶段 1 / 2 已发生越界写动作，必须立即停止，列出越界动作并在思考中反省，回到应处的只读阶段。
@@ -125,6 +136,7 @@ allowed-tools:
 - 通过 `tapd-mcp` 读取 TAPD，不使用 CLI 或页面抓取作为主来源。
 - 采集详情、评论、附件、截图、PRD 链接和原型链接。
 - 如果 `tapd-mcp` 不可用，停止流程并说明阻塞原因。
+- **凭证安全禁令**：禁止在回复、日志、提测 Wiki 或评论中包含 TAPD/GitLab/YApi 的访问令牌（Token）、密码或敏感环境变量。一旦发现误打印，必须在下一轮回复中要求用户手动清理会话历史或在远端撤销凭证。
 
 ### 2. 补充上下文
 - 采集结果不足以判断范围时，必须先补充上下文，提出具体问题，待用户补充改变理解后更新摘要，再进入范围确认。
@@ -140,7 +152,8 @@ allowed-tools:
 ### 5. 合并到 develop
 - 提交后使用 `gitlab-map` 确认可合并状态。
 - 合并条件只按本轮提交范围判断；合法来源带来的额外历史提交只记录为继承基线差异，不阻断合并。
-- 使用 GitLab 将已验证变更合并到 `develop`。
+- **必须先向用户展示合并影响（源分支、目标分支、本轮提交列表），获得用户明确确认后，方可使用 GitLab 将已验证变更合并到 `develop`。**
+- **严禁在未征得用户同意的情况下自动执行合并动作。**
 
 ### 6. 准备提测 Wiki
 - **必须先检查当前 TAPD 详情中是否已经存在提测 Wiki 链接。若已存在，直接在该 Wiki 页面上补充，不得新建。**
@@ -150,16 +163,21 @@ allowed-tools:
 仅在用户确认后执行：创建或更新提测 Wiki、写 Bug 评论、更新 TAPD 状态。
 
 ### 8. 清理
-确认 GitLab 合并、TAPD 写回和 worktree 清理都已完成。汇报最终结果和剩余风险。
+确认 GitLab 合并、TAPD 写回。
+**工作区清理门禁**：
+- 必须执行 `superpowers:finishing-a-development-branch` 完成分支收尾。
+- 必须清理本轮创建的所有 worktree。
+- 清理后必须运行 `git status` 确认当前工作区已恢复干净（或处于预期的基线状态）。
+- 归档/删除本次处理产生的临时过程文件。
+汇报最终结果和剩余风险。
 
 ## 参考文件加载
 
-- 主流程展开：[workflow.md](references/workflow.md)
-- 开发执行子流程：[development-execution.md](references/development-execution.md)
+- 规划与实现：[development-execution.md](references/development-execution.md)
 - 采集细则：[collector.md](references/collector.md)
-- 规划细则：[planner.md](references/planner.md)
-- 实现细则：[implementer.md](references/implementer.md)
 - 评审细则：[reviewer.md](references/reviewer.md)
 - GitLab 校验：[gitlab-map.md](references/gitlab-map.md)
+- 分支与 Worktree 策略：[branch-worktree-strategy.md](references/branch-worktree-strategy.md)
 - 提测 Wiki 模板：[test-wiki.md](references/test-wiki.md)
 - 回归场景：[regression-scenarios.md](references/regression-scenarios.md)
+- 原型规范：[prototype.md](references/prototype.md)

@@ -16,13 +16,14 @@ flowchart LR
   F --> G["使用 Superpowers 规划"]
   G --> H["在确认后的工作区中实现"]
   H --> I["验证与评审"]
-  I -->|通过| J["通过 GitLab 合并到 develop"]
-  J --> K["准备提测 Wiki 草稿"]
-  K --> L["展示草稿并等待用户确认"]
-  L -->|确认| M["通过 TAPD MCP 写 Wiki / 评论 / 状态"]
-  L -->|修改| K
-  L -->|取消| X["停止"]
-  M --> N["清理并汇报结果"]
+  I -->|通过| J["展示合并影响并请求确认"]
+  J -->|用户确认| K["通过 GitLab 合并到 develop"]
+  K --> L["准备提测 Wiki 草稿"]
+  L --> M["展示草稿并等待用户确认"]
+  M -->|确认| N["通过 TAPD MCP 写 Wiki / 评论 /状态"]
+  M -->|修改| L
+  M -->|取消| X["停止"]
+  N --> O["清理并汇报结果"]
 ```
 
 ## 阶段补充
@@ -33,7 +34,7 @@ flowchart LR
 - 出现原型链接时，读取默认展示的需求文档。
 - 采集结果保留在当前上下文，不创建 TAPD 专属过程文件。
 - Bug 必采字段包括 `id`、`title`、`status`、`priority`、`severity`、`current_owner`、`reporter`、`te`、`de` 和 `created`。
-- Story 的测试人员来自 `custom_field_two`；只有该字段为空时才使用 `reporter` 兜底。
+- 测试人员解析规则统一参见 [collector.md](collector.md)；严禁在此处硬编码任何字段映射。
 
 ### 补充上下文
 
@@ -49,43 +50,17 @@ flowchart LR
 - 历史内容默认排除，除非用户明确纳入。
 - 未出现在 `本轮处理` 中的内容，不得进入实现、验证、合并说明或 Wiki 正文。
 
-### 开发执行阶段（内部子流程）
+### 开发执行阶段（阶段 4）
 
-内部顺序固定为：分支确认子流程 -> 规划子流程 -> 实现子流程 -> 验证子流程。
-
-### 分支确认子流程
-
-- 详细规则见：[branch-worktree-strategy.md](branch-worktree-strategy.md)
-
-### 规划子流程（Superpowers 路由）
-
-- 先做场景判定，再选择技能，禁止笼统写“进入 Superpowers”。
-- 需求不清或方案分歧：`superpowers:brainstorming` -> `superpowers:writing-plans`。
-- Bug/异常且根因不清：`superpowers:systematic-debugging` -> `superpowers:writing-plans`。
-- 方案已清晰且任务可拆：`superpowers:subagent-driven-development`；任务串行时使用 `superpowers:executing-plans`。
-- 任一改代码任务都要落实 `superpowers:test-driven-development`；完成前执行 `superpowers:verification-before-completion`。
-- 规划子流程产出至少包含：场景判定、技能选择理由、影响范围、测试策略、合并预期。
-
-### 实现子流程
-
-- diff 必须限制在已确认的本轮范围内。
-- 功能和 Bug 修复遵循 `superpowers:test-driven-development`。
-- 如果本轮实际生成了 Superpowers 文档，提交代码时必须一并提交相关文档。
-- 提交信息使用中文 Conventional Commits。
-
-### 验证子流程（评审）
-
-- 声称完成前运行 `superpowers:verification-before-completion`。
-- 按当前范围、当前计划/证据和本次 diff 做评审。
-- `REVIEW_PASSED` 是合并前置条件。
+详细规则见：[development-execution.md](development-execution.md)。内部包含分支确认、规划、实现与验证环节。
 
 ### 合并到 develop
-
-- 提交后确认合并条件。
-- 合并条件只按本轮提交范围判断；合法来源分支相对 `develop` 多出的历史提交属于继承基线差异，应记录但不阻断。
-- 不得因为继承基线差异而 cherry-pick 到 `origin/develop` 基线上另建开发分支。
-- 通过 GitLab 合并到 `develop`。
-- 合并成功是准备提测 Wiki 的前置条件。
+ 
+ - 提交后确认合并条件。
+ - 合并条件只按本轮提交范围判断；合法来源分支相对 `develop` 多出的历史提交属于继承基线差异，应记录但不阻断。
+ - 不得因为继承基线差异而 cherry-pick 到 `origin/develop` 基线上另建开发分支。
+ - **必须先展示拟合并的分支详情和提交列表，获得用户明确确认后，再通过 GitLab 合并到 `develop`。**
+ - 合并成功是准备提测 Wiki 的前置条件。
 
 ### 准备提测 Wiki
 
@@ -103,9 +78,11 @@ flowchart LR
 
 ### 清理
 
-- 确认 GitLab 合并、TAPD 写回和 worktree 清理。
-- 汇报最终结果和剩余风险。
+- 严格执行 `SKILL.md` 中的“工作区清理门禁”。
+- 确认 GitLab 合并结果：若合并失败或有冲突，必须停在阶段 5 解决，禁止进入清理。
+- 确认 TAPD 写回结果。
+- 最终汇报必须包含：TAPD 链接、Wiki 链接、合并后的 SHA、清理完成声明。
 
-## 回归
+## 自动化检查与回归
 
 工作流规则调整后，执行 [regression-scenarios.md](regression-scenarios.md) 中的场景，并同步修正偏离 `SKILL.md` 的阶段提示词。

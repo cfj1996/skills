@@ -6,7 +6,11 @@
 
 ## 二次确认动作
 
-执行者只能建议，必须等待用户二次确认后再操作。用户确认结果必须是以下三类之一：
+执行者只能建议，必须等待用户二次确认后再操作。
+
+**强制前置动作**：在给出分支建议前，必须先调用 `gitlab-map` 的 `get_branch_status` 校验目标复用分支或 `origin/master` 的基线状态，确保建议基于最新的仓库事实。
+
+用户确认结果必须是以下三类之一：
 
 - `新建分支 + worktree`
 - `切换/复用已有分支`
@@ -33,7 +37,8 @@
 
 - Bug 分支：`fixbug/{git-user}.{YYMMDD}.{slug}-{short-id}`
 - Story 分支：`feature/{git-user}.{YYMMDD}.{slug}-{short-id}`
-- 新建 worktree 路径：`./.worktree/{短描述}-{short-id}`（目标项目根目录下）
+- 新建 worktree 路径：`./.worktree/{slug}-{short-id}`（必须在当前项目根目录下创建，禁止在用户目录等外部路径创建）。
+- **多任务并行隔离**：在创建 worktree 前，必须检查路径是否已存在。若路径已被其他正在进行的 TAPD 任务占用，必须通过增加后缀（如 `-v2`）来确保路径唯一，严禁在同一个 worktree 中混合处理多个不相关的 TAPD 任务。
 
 ## 合规校验
 
