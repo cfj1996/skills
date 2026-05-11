@@ -111,6 +111,12 @@ allowed-tools:
 
 如果无法调用独立 `regression-checker`，必须按 [agents/regression-checker.md](agents/regression-checker.md) 做同等自检，并在汇报中标明“按 regression-checker 规则自检”。
 
+## 阶段推进前置门禁
+
+- **进入阶段 5 前，必须先把阶段 4 标记为 completed**。阶段 4 的实际产出满足退出条件但右侧面板/状态计划仍显示阶段 4 loading 时，不得创建 MR、合并 MR 或继续写 Wiki。
+- **创建或合并 MR 前，必须确认状态面板不再停留在阶段 4 loading**。若当前会话没有 `update_topic`，必须使用可用的等价状态工具（如 `update_plan`）完成同步后再继续。
+- 如果状态同步失败、工具不可用，或面板状态与实际执行状态不一致，必须停止阶段推进并明确说明：实际完成到哪个阶段、面板停在哪个阶段、需要用户确认或工具恢复后才能继续。
+
 ## 阶段写入屏障
 
 - 阶段 1「采集上下文」和阶段 2「补充上下文」只能执行只读动作：TAPD 读取、附件/PRD/原型读取、YApi 查询、GitLab 只读查询、代码搜索和文件阅读。
@@ -156,6 +162,7 @@ allowed-tools:
 执行细则见：`references/development-execution.md`。
 
 ### 5. 合并到 develop
+- 进入本阶段前必须通过“阶段推进前置门禁”：阶段 4 已标记 completed，且右侧面板/状态计划不再停留在阶段 4 loading。
 - 提交后使用 `gitlab-map` 确认可合并状态。
 - 合并条件只按本轮提交范围判断；合法来源带来的额外历史提交只记录为继承基线差异，不阻断合并。
 - **必须先向用户展示合并影响（源分支、目标分支、本轮提交列表），获得用户明确确认后，方可使用 GitLab 将已验证变更合并到 `develop`。**
