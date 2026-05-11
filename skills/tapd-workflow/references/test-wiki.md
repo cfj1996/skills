@@ -76,6 +76,7 @@
 - `测试人员`：Bug 优先使用 `te` 字段；若 `te` 为空或为 Story，必须先通过 `get_entity_custom_fields` 动态解析出代表“测试人员”的自定义字段获取。解析不到时向用户确认并记录到 MEMORY.md，禁止盲目兜底 `reporter`。
 - `环境`：固定写 `联团 老生产`
 - 提测完成后，Bug 评论正文必须固定为 `提测wiki：[wiki链接]({wiki链接})`（Markdown 可点击链接），不能写成说明段落、总结段落或多行说明
+- 调用 `create_comments` 前必须通过 `TAPD_COMMENT_GATE`：评论正文只能由最终 Wiki 链接自动生成，且必须完全等于上述单行格式；禁止追加 MR、Jenkins、构建结果、实现说明或验证摘要
 
 ## TAPD Bug 字段说明
 
