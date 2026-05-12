@@ -20,13 +20,13 @@ flowchart LR
   F --> G["worktree 中开发"]
   G --> H["验证 / Review"]
   H --> I["修复完成"]
-  I --> J["输出 MR 链接（不代建，目标 develop）"]
+  I --> J["输出 MR 链接（不代建，目标 develop，不删除源分支）"]
   I --> K["生成提测 Wiki 草稿"]
   K --> L["展示提测内容并确认"]
   L -->|确认| M["创建 Wiki + 写入 Bug 评论 + 更新 Bug 状态"]
   L -->|修改| K
   L -->|取消| X["结束"]
-  M --> N["清理 worktree"]
+  M --> N["清理 worktree（保留本地分支）"]
 ```
 
 ## 目录约定
@@ -41,7 +41,8 @@ flowchart LR
   - Bug: `fixbug/{git-user}.{YYMMDD}.{slug}-{short-id}`
   - Story: `feature/{git-user}.{YYMMDD}.{slug}-{short-id}`
 - Worktree 路径：项目根目录下 `./.worktree/{短的描述}-{short-id}`
-- 创建 MR 合并请求，只能合并到`develop`分支，到输出MR的链接，让用户自己手动合并
+- 创建 MR 合并请求，只能合并到 `develop` 分支，只输出 MR 链接，让用户自己手动合并
+- MR 链接或 GitLab 参数必须显式禁止删除源分支：不得带 `remove_source_branch=true`，不得让平台默认勾选“合并后删除源分支”
 
 ## 输出文件
 
@@ -97,6 +98,8 @@ flowchart LR
    - 提交代码前，必须调用 `gitlab-map` 验证当前分支是从 `origin/master` 创建，并记录校验明细；不通过则立即中止、不要提交，并返回修正建议（重新基于 `origin/master` 重新建分支）
    - MR 只输出链接，不代建、不代合并
    - MR 链接必须显式带 `target_branch=develop`，默认目标分支固定为 `develop`
+   - MR 链接必须显式禁止删除源分支；如果使用 GitLab MCP/API 创建或更新 MR，必须设置 `remove_source_branch=false`
+   - 若检查到已有 MR 开启了合并后删除源分支，必须先要求关闭该选项，或使用 GitLab MCP/API 更新为 `remove_source_branch=false` 后再继续
    - MR 标题优先使用 `task-plan.md` 的摘要
    - 必须同时提交 `docs/` 下的文档，若被忽略需 `git add -f`
 9. 生成提测 Wiki
@@ -114,6 +117,9 @@ flowchart LR
      - wiki 正文已完整展示给用户并获得明确确认
    - 如果任何一项无法确认，必须停止，不得自行猜测位置、序号或模板内容后直接写入
 10. Worktree 收尾与清理
+   - 只清理本轮创建的 worktree 目录和临时过程文件
+   - 禁止删除本地开发分支；不得执行 `git branch -d/-D <本轮分支>`、`git branch --delete/--force <本轮分支>` 或任何等价分支删除操作
+   - 清理后必须保留本地分支可追溯性，并运行 `git status` 确认当前工作区干净或处于预期状态
 
 ## 全局约束
 

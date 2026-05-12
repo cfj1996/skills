@@ -40,6 +40,8 @@ tools:
 - 原型链接出现时，必须用 `chrome-devtools-mcp` 读取默认展示的需求文档
 - 入口可使用原始 `id` 定位项目，但流程中的编号、分支、worktree、提测材料统一看 `short-id`
 - 合并请求只提供链接，不代建、不代合并；默认目标分支是 `develop`
+- 合并请求和合并操作不得删除远端源分支：MR 链接、GitLab MCP/API 参数、平台勾选项都必须保持 `remove_source_branch=false` / `should_remove_source_branch=false`
+- Worktree 清理只允许移除本轮创建的 worktree 目录和临时过程文件，禁止删除本地开发分支；不得执行 `git branch -d/-D <本轮分支>` 或等价分支删除操作
 
 ## 参考
 
