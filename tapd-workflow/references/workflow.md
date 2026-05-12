@@ -105,7 +105,7 @@ flowchart LR
    - 必须先按 [`references/test-wiki.md`](./test-wiki.md) 生成完整 Wiki 正文，正文必须符合模板，不能改成摘要格式或简版格式
    - 创建前必须使用 `gitlab-map` 查询当前分支最新提交是否已合并到 `origin/develop`（全量提交需确认已同步到该分支），仅在查询为真时允许创建提测 Wiki
    - 生成后先展示给用户确认，再写入 TAPD Wiki、再将提测wiki地址写入当前 tapd 详细下的评论、最后这个 tapd 若是 bug 再修改 Bug 状态
-   - 写入 Bug 评论时，内容必须仅为 `提测wiki：{wiki链接}`，不得额外添加说明文字
+   - 写入 Bug 评论时，内容必须仅为 `提测wiki：[https://www.tapd.cn/{workspace_id}/markdown_wikis/show/#{wiki_id}](https://www.tapd.cn/{workspace_id}/markdown_wikis/show/#{wiki_id})`，不得额外添加说明文字
    - 如果月目录里已有按模块分组的提测文档，优先插入到 `前端` 模块中，保持模块内顺序连续；没有 `前端` 模块则先创建该模块
    - 写入前必须确认：
      - 月目录存在且已定位到正确目录

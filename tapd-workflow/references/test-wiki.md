@@ -69,7 +69,7 @@
 - `影响范围`：从 `task-plan.md` 风险评估或 `impl-summary.md` 汇总，多条使用序号
 - `测试人员`：从 Bug 的 `te` 字段（测试人员）获取；若 `te` 为空则用 `reporter`（报告人）兜底
 - `环境`：固定写 `联团 老生产`
-- 提测完成后，Bug 评论正文必须固定为 `提测wiki：{wiki链接}`，不能写成说明段落、总结段落或多行说明
+- 提测完成后，Bug 评论正文必须固定为 `提测wiki：[https://www.tapd.cn/{workspace_id}/markdown_wikis/show/#{wiki_id}](https://www.tapd.cn/{workspace_id}/markdown_wikis/show/#{wiki_id})`（Markdown 可点击链接），不能写成说明段落、总结段落或多行说明
 
 ## TAPD Bug 字段说明
 
