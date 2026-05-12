@@ -177,7 +177,7 @@ allowed-tools:
 
 **Bug 评论写入硬门禁**：
 - 调用 `create_comments` 前必须执行 `TAPD_COMMENT_GATE` 自检。
-- Bug 评论正文只能由最终 Wiki 链接生成，且必须完全等于单行：`提测wiki：[wiki链接]({wiki链接})`。
+- Bug 评论正文只能由最终 Wiki 链接生成，且必须完全等于单行：`提测wiki：[https://www.tapd.cn/{workspace_id}/markdown_wikis/show/#{wiki_id}](https://www.tapd.cn/{workspace_id}/markdown_wikis/show/#{wiki_id})`。
 - `{wiki链接}` 必须是 TAPD Wiki 的完整可点击地址，例如 `https://www.tapd.cn/{workspace_id}/markdown_wikis/show/#{wiki_id}`。
 - 评论正文禁止拼接 MR、Jenkins、构建结果、实现说明、验证摘要或多行文本；这些信息只能出现在最终回复中，不能写入 TAPD 评论。
 - 如果评论正文不完全匹配上述格式，必须停止写评论并修正正文，不得调用 `create_comments`。

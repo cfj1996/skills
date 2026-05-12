@@ -74,8 +74,8 @@ flowchart LR
 ### 写回 TAPD
 
 - TAPD 写入必须获得用户明确确认。
-- Bug 评论格式固定为 `提测wiki：[wiki链接]({wiki链接})`。
-- 调用 `create_comments` 前必须通过 `TAPD_COMMENT_GATE`：评论正文只能由最终 Wiki 链接生成，且必须完全等于单行 `提测wiki：[wiki链接]({wiki链接})`。
+- Bug 评论格式固定为 `提测wiki：[https://www.tapd.cn/{workspace_id}/markdown_wikis/show/#{wiki_id}](https://www.tapd.cn/{workspace_id}/markdown_wikis/show/#{wiki_id})`。
+- 调用 `create_comments` 前必须通过 `TAPD_COMMENT_GATE`：评论正文只能由最终 Wiki 链接生成，且必须完全等于单行 `提测wiki：[https://www.tapd.cn/{workspace_id}/markdown_wikis/show/#{wiki_id}](https://www.tapd.cn/{workspace_id}/markdown_wikis/show/#{wiki_id})`。
 - Bug 评论正文禁止追加 MR、Jenkins、构建结果、实现说明、验证摘要或任何多行说明；这些信息只允许出现在最终回复中。
 - Wiki、评论、状态写入尽量合并为一次确认。
 

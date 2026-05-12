@@ -45,7 +45,7 @@
   - 测试人员来自正确 TAPD 字段映射
   - 服务名称通过 `company-project-routing` 获取，不是直接复制项目名
   - Wiki 内容没有包含未声明的历史内容
-  - Bug 评论使用可点击 Markdown 格式：`提测wiki：[wiki链接]({wiki链接})`
+  - Bug 评论使用可点击 Markdown 格式：`提测wiki：[https://www.tapd.cn/{workspace_id}/markdown_wikis/show/#{wiki_id}](https://www.tapd.cn/{workspace_id}/markdown_wikis/show/#{wiki_id})`
 - 实现阶段必须确认：
   - 只修改计划内文件
   - 改动符合已声明范围
