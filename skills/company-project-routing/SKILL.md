@@ -154,26 +154,26 @@ If a project name appears in more than one group or serves multiple business lin
 在 MCP 中进行测试环境自动化部署时，请根据以下对应关系查找并触发 Jenkins Job：
 
 ### 独立项目对应关系
-| 业务领域 | 项目 / 服务 | Jenkins 测试环境 Job |
-|---|---|---|
-| **商家平台** | `order-admin` | `front-orderAdmin-test` |
-| | `jbz_admin` / `main_menu` | `front-main_menu-test` |
-| | `kp_admin` | `front-kpadmin-test` |
-| | `store_admin` | `front-storeAdmin-test` |
-| | `statistics_admin` | `front-statisticsAdmin-test` |
-| | `poster_admin` | `front-posteradmin-test` |
-| | `weixin-live` / `live2` | `front-live2-test` |
-| | `admin_menu` | `front-admin_menu-test` |
+| 业务领域         | 项目 / 服务 | Jenkins 测试环境 Job |
+|--------------|---|---|
+| **商家平台**     | `order-admin` | `front-orderAdmin-test` |
+|              | `jbz_admin` / `main_menu` | `front-main_menu-test` |
+|              | `kp_admin` | `front-kpadmin-test` |
+|              | `store_admin` | `front-storeAdmin-test` |
+|              | `statistics_admin` | `front-statisticsAdmin-test` |
+|              | `poster_admin` | `front-posteradmin-test` |
+|              | `weixin-live` / `live2` | `front-live2-test` |
+|              | `admin_menu` | `front-admin_menu-test` |
 | **中台 / 供应商** | `supplier-admin-web` / `suppliers` | `front-suppliers-test` |
-| | `zan-projects/admin/factory` | `front-factory-test` |
-| | `zan-projects/admin/facilitator` | `front-facilitator-test` |
-| | `provider-mobile` / `supplier-mobile` | `front-provider-mobile-test` |
-| **直播** | `zan-projects/admin/live-monitor` | `front-live-monitor-test` |
-| **C端用户** | `Ucenter` | `front-ucenter-test` |
-| | `jbz_shop` | `front-mall-test` |
-| | `shop_mp` | `shop_mp_test` |
-| | `instant-apps` | `front-instant-apps-test` |
-| **大屏展示** | `report-ui` | `report-ui-test` |
+|              | `zan-projects/admin/factory` | `front-factory-test` |
+|              | `zan-projects/admin/facilitator` | `front-facilitator-test` |
+|              | `provider-mobile` / `supplier-mobile` | `front-provider-mobile-test` |
+| **直播监控平台**   | `zan-projects/admin/live-monitor` | `front-live-monitor-test` |
+| **C端商城用户管理** | `Ucenter` | `front-ucenter-test` |
+|              | `jbz_shop` | `front-mall-test` |
+|              | `shop_mp` | `shop_mp_test` |
+|              | `instant-apps` | `front-instant-apps-test` |
+| **大屏展示**     | `report-ui` | `report-ui-test` |
 
 ### 公共库打包
 公共的库在测试环境对应的打包发布 Jenkins Job 统一为 `npm-tools-test`。在触发构建时，通过选择具体发布的项目进行打包，包含以下项目：
