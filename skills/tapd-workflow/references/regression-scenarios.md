@@ -48,7 +48,7 @@
 
 - 输入场景：
   - Bug 评论正文使用 `提测wiki：{wiki链接}` 或其他纯文本格式
-  - 未使用 `提测wiki：[wiki链接]({wiki链接})`
+  - 未使用 `提测wiki：[https://www.tapd.cn/{workspace_id}/markdown_wikis/show/#{wiki_id}](https://www.tapd.cn/{workspace_id}/markdown_wikis/show/#{wiki_id})`
 - 期望门禁：
   - `regression-checker` 返回 `FAIL`
   - 阻断原因包含“评论必须使用可点击 Markdown 链接格式”
