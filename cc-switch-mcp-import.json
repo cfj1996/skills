@@ -1,0 +1,140 @@
+{
+  "version": 1,
+  "mcpServers": [
+    {
+      "id": "chrome-devtools",
+      "name": "chrome-devtools",
+      "serverConfig": {
+        "type": "stdio",
+        "command": "volta",
+        "args": [
+          "run",
+          "--node",
+          "22.20.0",
+          "npx",
+          "--yes",
+          "chrome-devtools-mcp@latest"
+        ]
+      },
+      "description": null,
+      "homepage": null,
+      "docs": null,
+      "tags": [],
+      "enabled_claude": true,
+      "enabled_codex": true,
+      "enabled_gemini": true,
+      "enabled_opencode": true,
+      "enabled_hermes": false
+    },
+    {
+      "id": "gitlab-mcp",
+      "name": "gitlab-mcp",
+      "serverConfig": {
+        "command": "volta",
+        "args": [
+          "run",
+          "--node",
+          "22.20.0",
+          "npx",
+          "--yes",
+          "@zereight/mcp-gitlab",
+          "--token=xxx",
+          "--api-url=https://git.jubaozan.cn/api/v4",
+          "--toolsets=all",
+          "--tools=create_merge_request,merge_merge_request",
+          "--tool-policy-approve=create_merge_request,merge_merge_request"
+        ]
+      },
+      "description": null,
+      "homepage": null,
+      "docs": null,
+      "tags": [],
+      "enabled_claude": true,
+      "enabled_codex": true,
+      "enabled_gemini": true,
+      "enabled_opencode": true,
+      "enabled_hermes": false
+    },
+    {
+      "id": "jenkins-mcp",
+      "name": "jenkins-mcp",
+      "serverConfig": {
+        "command": "volta",
+        "args": [
+          "run",
+          "--node",
+          "22.20.0",
+          "npx",
+          "--yes",
+          "@kud/mcp-jenkins@latest"
+        ],
+        "env": {
+          "MCP_JENKINS_URL": "http://ops.jubaozan.cn/jenkins",
+          "MCP_JENKINS_USER": "chenfangjie",
+          "MCP_JENKINS_API_TOKEN": "xxx"
+        }
+      },
+      "description": null,
+      "homepage": null,
+      "docs": null,
+      "tags": [],
+      "enabled_claude": true,
+      "enabled_codex": true,
+      "enabled_gemini": true,
+      "enabled_opencode": true,
+      "enabled_hermes": false
+    },
+    {
+      "id": "tapd-mcp",
+      "name": "tapd-mcp",
+      "serverConfig": {
+        "type": "stdio",
+        "command": "uvx",
+        "args": [
+          "mcp-server-tapd"
+        ],
+        "env": {
+          "TAPD_ACCESS_TOKEN": "xxx",
+          "TAPD_API_BASE_URL": "https://api.tapd.cn",
+          "TAPD_BASE_URL": "https://www.tapd.cn"
+        }
+      },
+      "description": null,
+      "homepage": null,
+      "docs": null,
+      "tags": [],
+      "enabled_claude": true,
+      "enabled_codex": true,
+      "enabled_gemini": true,
+      "enabled_opencode": true,
+      "enabled_hermes": false
+    },
+    {
+      "id": "yapi-mcp",
+      "name": "yapi-mcp",
+      "serverConfig": {
+        "type": "stdio",
+        "command": "volta",
+        "args": [
+          "run",
+          "--node",
+          "22.20.0",
+          "npx",
+          "--yes",
+          "--registry=https://npm.jubaozan.cn/",
+          "--package=@zan/yapi-cli@latest",
+          "zan-yapi-cli"
+        ]
+      },
+      "description": null,
+      "homepage": null,
+      "docs": null,
+      "tags": [],
+      "enabled_claude": true,
+      "enabled_codex": true,
+      "enabled_gemini": true,
+      "enabled_opencode": true,
+      "enabled_hermes": false
+    }
+  ]
+}
