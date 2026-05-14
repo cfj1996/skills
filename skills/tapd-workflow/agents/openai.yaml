@@ -1,7 +1,7 @@
 interface:
   display_name: "TAPD 工作流"
   short_description: "按 MCP、Superpowers、GitLab 和提测 Wiki 门禁处理 TAPD Bug/Story/Task"
-  default_prompt: "使用 $tapd-workflow 作为 TAPD Bug/Story/Task 的权威执行契约。显式出现 $tapd-workflow、/tapd-workflow、技能卡片或 TAPD 链接并要求处理时，本技能已触发；用户说直接修复/继续/不用日志不代表跳过门禁。先输出阶段台账，再按顺序执行：按链接类型采集 TAPD 上下文、必要时补充上下文、确认本轮范围、进入开发执行阶段（分支确认子流程 -> 规划子流程 -> 实现子流程 -> 验证子流程）、通过 GitLab 合并到 develop、准备提测 Wiki（须先检查 TAPD 详情是否已存在 Wiki 链接，存在则补充）、确认后写回 TAPD、最后清理。分支确认子流程通过前禁止修改代码；任何编辑前必须有 PRE_EDIT_GATE: PASS；task/detail 不能按 bug 查询，MCP 返回 count: 0 时必须停在采集阶段重查。创建或切换分支/worktree 前必须让用户二次确认是新建还是复用；复用已有分支默认不创建新 worktree，除非用户明确说明；开发分支只能来自 origin/master 或用户指定功能分支，不能来自 origin/develop。阶段切换前运行 regression-checker；缺少证据时停止。"
+  default_prompt: "使用 $tapd-workflow 作为 TAPD Bug/Story/Task 的权威执行契约。显式出现 $tapd-workflow、/tapd-workflow、技能卡片或 TAPD 链接并要求处理时，本技能已触发；用户说直接修复/继续/不用日志不代表跳过门禁。必须用 update_topic 维护阶段状态，不在正文打印冗长阶段台账。按链接类型采集 TAPD 上下文，拿到 short-id 后初始化 docs/{short-id}/raw.md，并先判断是否为二次开发：若存在 __test___/{short-id}/ 或 docs/{short-id}/，必须读取历史测试、计划、验证、评审和 raw.md。开发前必须展示需求描述、Bug 描述、本轮处理、本轮不处理和历史内容处理策略，获得用户确认后才能进入开发阶段；进入开发阶段时先把 Bug 状态改为修复中，或把 Story/Task 状态改为进行中。测试代码只能放在 __test___/{short-id}/xxx.test.(js|ts)，plan、verification、评审、截图和 Superpowers 生成文档必须放在 docs/{short-id}/。分支确认子流程通过前禁止修改代码；除阶段 1/2 维护 raw.md 外，任何编辑前必须有 PRE_EDIT_GATE: PASS；task/detail 不能按 bug 查询，MCP 返回 count: 0 时必须停在采集阶段重查。创建或切换分支/worktree 前必须让用户二次确认是新建还是复用；复用已有分支默认不创建新 worktree，除非用户明确说明；开发分支只能来自 origin/master 或用户指定功能分支，不能来自 origin/develop。阶段切换前运行 regression-checker；缺少证据时停止。最终必须输出本次流程明细。"
 
 policy:
   allow_implicit_invocation: true

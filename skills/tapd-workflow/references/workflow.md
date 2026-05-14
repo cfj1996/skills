@@ -11,7 +11,7 @@ flowchart LR
   C -->|需要补充| D["用户补充上下文"]
   D --> B
   C -->|上下文足够| E["确认本轮范围"]
-  E -->|已确认| F["确认分支策略和工作区"]
+  E -->|用户确认需求/Bug描述与范围| F["更新 TAPD 状态并确认分支策略"]
   E -->|需要补充| D
   F --> G["使用 Superpowers 规划"]
   G --> H["在确认后的工作区中实现"]
@@ -32,7 +32,9 @@ flowchart LR
 
 - 使用 `tapd-mcp` 读取 TAPD 详情、评论、附件、PRD 和补充文档。
 - 出现原型链接时，读取默认展示的需求文档。
-- 采集结果保留在当前上下文，不创建 TAPD 专属过程文件。
+- 采集成功并拿到 `short-id` 后，创建或更新 `docs/{short-id}/raw.md`，记录 TAPD id 与描述、需求/Bug 描述、流程进度和创建时间。
+- 如果发现已有 `__test___/{short-id}/` 或 `docs/{short-id}/`，必须先读取历史测试、计划、验证、评审和 `raw.md`，据此判断是否为二次开发。
+- 除 `docs/{short-id}/raw.md` 外，不创建 TAPD 专属原始数据转储文件。
 - Bug 必采字段包括 `id`、`title`、`status`、`priority`、`severity`、`current_owner`、`reporter`、`te`、`de` 和 `created`。
 - 测试人员解析规则统一参见 [collector.md](collector.md)；严禁在此处硬编码任何字段映射。
 - **状态流转同步**：每次进入新阶段或遇到门禁阻塞时，必须同步调用 `update_topic` 更新会话状态，确保摘要实时反映当前处理进度。
@@ -47,13 +49,15 @@ flowchart LR
 
 ### 确认范围
 
-- 必须明确 `本轮处理`、`本轮不处理` 和 `历史内容处理策略`。
+- 必须明确展示需求描述、Bug 描述、`本轮处理`、`本轮不处理` 和 `历史内容处理策略`。
+- 必须获得用户确认后才能进入开发执行阶段；未确认时只能继续补充上下文或调整范围。
 - 历史内容默认排除，除非用户明确纳入。
 - 未出现在 `本轮处理` 中的内容，不得进入实现、验证、合并说明或 Wiki 正文。
 
 ### 开发执行阶段（阶段 4）
 
 详细规则见：[development-execution.md](development-execution.md)。内部包含分支确认、规划、实现与验证环节。
+进入时必须先写回 TAPD 状态：Bug 改为“修复中”，Story/Task 改为“进行中”。计划、验证、评审和 Superpowers 过程文档必须写入 `docs/{short-id}/`；测试代码必须写入 `__test___/{short-id}/xxx.test.(js|ts)`。
 
 ### 合并到 develop
  
@@ -84,7 +88,7 @@ flowchart LR
 - 严格执行 `SKILL.md` 中的“工作区清理门禁”。
 - 确认 GitLab 合并结果：若合并失败或有冲突，必须停在阶段 5 解决，禁止进入清理。
 - 确认 TAPD 写回结果。
-- 最终汇报必须包含：TAPD 链接、Wiki 链接、合并后的 SHA、清理完成声明。
+- 最终汇报必须包含：TAPD 链接、需求/Bug 描述、处理范围、Wiki 链接、合并后的 SHA、单元测试结果、集成测试结果、`docs/{short-id}/raw.md` 路径、清理完成声明和剩余风险。
 
 ## 自动化检查与回归
 

@@ -8,7 +8,7 @@
 
 - **禁止自我评审（既当裁判又当运动员）**：负责规划和编写代码的 Agent 不得自行出具评审结论。
 - **自动交叉检查**：主 Agent 在完成代码实现、TDD 验证并准备好证据包后，**必须自动（无需用户二次授权）**使用 `invoke_agent` 工具调用独立的子 Agent（例如 `generalist`，或按照环境内 `mr-code-reviewer` 的角色设定）来进行“背靠背”盲审。
-- **调用方式**：在调用独立 Agent 时，必须将**本次变更的 Diff**、`plan.md` 的范围定义以及测试证据作为 prompt 发送。
+- **调用方式**：在调用独立 Agent 时，必须将**本次变更的 Diff**、`docs/{short-id}/plan.md` 的范围定义、`docs/{short-id}/raw.md` 和测试证据作为 prompt 发送。
 - **工具调用失败策略**：如果 `invoke_agent` 或指定的子 Agent 无法使用，**严禁自行判定通过，严禁跳过独立评审流程**。此时必须暂停流程，并将真实错误报告给用户，等待平台工具恢复后重试。
 - 只有独立评审 Agent 明确判断符合所有维度并没有低级错误后，才能认定为 `REVIEW_PASSED`。
 
@@ -30,7 +30,7 @@
 
 - **优先使用最强隔离的 Agent 类型**：能用 `agent_type: explorer`（或同等只读人格）就不要回退到默认 Agent；不得为了“继续推进”降低隔离强度。
 - **`fork_context` 默认为 `false`**：原则上禁止开启 `fork_context`，避免子 Agent 继承“持续推进”倾向、用户授权和后续阶段计划。
-  - 若评审确实需要更多上下文，应通过 prompt 显式投喂 diff、`plan.md`、`本轮处理`声明、证据包路径，而不是 fork 主上下文。
+  - 若评审确实需要更多上下文，应通过 prompt 显式投喂 diff、`docs/{short-id}/plan.md`、`docs/{short-id}/raw.md`、`本轮处理`声明、证据包路径，而不是 fork 主上下文。
   - 若平台拒绝 explorer + fork_context 的组合，**只能放弃 fork**，而不是改成默认 Agent + fork_context。
 - **prompt 必须包含以下硬性禁令清单**（逐条原文写入，不得简写）：
   1. 你只做只读评审。禁止编辑、创建或删除任何文件。
