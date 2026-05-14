@@ -40,6 +40,8 @@ allowed-tools:
 - `company-project-routing`：根据项目线索解析提测 Wiki 的 `服务名称`。
 - `superpowers`：规划、实现、验证和分支收尾工作流。
 
+注意：本节中的 `tapd-mcp`、`gitlab-map`、`gitlab-mcp` 是 MCP 能力/集成职责名，不要求运行时暴露同名可调用 namespace。实际工具名以当前会话暴露为准；只要通过 GitLab MCP 能力完成对应校验职责，即视为满足。
+
 ## 测试文件目录原则
 
 - 所有本轮生成的测试相关文件（如测试计划、测试用例、测试运行报告、证据截图等）必须统一存放在项目根目录下的 `__test__` 文件夹中。
