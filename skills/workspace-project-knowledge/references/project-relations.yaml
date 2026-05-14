@@ -1,0 +1,551 @@
+version: 1
+workspace: /Users/cfj/projects
+description: >
+  Workspace-level project map and routing index for local company projects,
+  AI skills, private packages, Jenkins jobs, and graphify knowledge entrypoints.
+
+entrypoints:
+  workspace_context: /Users/cfj/projects/AI_CONTEXT.md
+  relations_index: /Users/cfj/projects/project-relations.yaml
+  skill: /Users/cfj/projects/skills/skills/workspace-project-knowledge/SKILL.md
+
+defaults:
+  project_context: "{path}/AI_CONTEXT.md"
+  graph_report: "{path}/graphify-out/GRAPH_REPORT.md"
+  graph_json: "{path}/graphify-out/graph.json"
+  service_name_rule: "默认使用项目名；命中特例时使用 service_name。"
+
+runtime_relationships:
+  business_center: 商家
+  summary: >
+    公司主要系统围绕商家服务展开：公司内部大后台管理商家、供应商和财务；
+    中台和供应商系统服务商家管理与供货；商家平台通过 main_menu 宿主和 iframe
+    子系统承载商家侧后台；商城系统服务 C 端交易和直播；服务商体系独立包含
+    服务商后台和移动端。老管理后台多数仍是 Vue2，factory 承载部分老系统页面重构，
+    zan-atlas 是为改善 iframe 嵌入体验而诞生的跨平台基座，目前未上生产。
+  systems:
+    retail_wholesale_agent_admin:
+      display_name: 零售批发代理综合信息系统
+      short_name: 大后台
+      project_ref: admin_menu
+      access_patterns: ["xxx/admin_menu"]
+      users: [公司内部]
+      responsibilities: [商家管理, 供应商管理, 财务信息管理, 公司内部运营管理]
+      technology: Vue2老管理后台体系
+      routing_keywords: [大后台, 零售批发代理综合信息系统, 公司内部管理, 商家管理, 供应商管理, 财务管理]
+    operator_middle_platform:
+      display_name: 运营商管理系统
+      short_name: 中台
+      project_ref: supplier-admin-web
+      service_alias: middleManage
+      access_patterns: ["xxx/middleManage/#/login"]
+      users: [商家管理方, 平台运营方]
+      responsibilities: [商家管理平台, 商家运营管理]
+      technology: Vue2老管理后台体系
+      routing_keywords: [运营商管理系统, 中台, middleManage, 商家管理平台]
+    supplier_system:
+      display_name: 供应商系统
+      project_ref: supplier-admin-web
+      service_alias: suppliers
+      access_patterns: ["xxx/suppliers/#/login"]
+      users: [供应商]
+      responsibilities: [供应商供货, 供应商协作, 商家供货链路]
+      technology: Vue2老管理后台体系
+      routing_keywords: [供应商系统, suppliers, 供应商供货, 供货]
+    merchant_platform:
+      display_name: 商家平台
+      project_ref: jbz_admin
+      service_name: main_menu
+      folder_name: jbz_admin
+      host_access_patterns: ["xxx/main_menu?siteId={商家id}"]
+      child_access_patterns: ["xxx/{storeAdmin|kpadmin|factory|...}/xxx?siteId={商家id}"]
+      embedding: iframe
+      responsibilities: [商家侧主后台宿主, iframe子系统集成, 商家后台入口]
+      technology: Vue2老管理后台体系
+      child_project_refs: [store_admin, kp_admin, order-admin, poster_admin, statistics_admin, ledger_admin, weixin-live, zan-projects.factory]
+      notes:
+        - factory 不只服务商家平台，也服务老系统多个管理系统。
+        - 商家平台通过 siteId 识别商家上下文。
+      routing_keywords: [商家平台, 商家后台, main_menu, siteId, iframe宿主]
+    mall_system:
+      display_name: 商城系统
+      scope_note: 除 provider-mobile 外的大部分 C 端/商城项目都归入商城系统关系。
+      web_h5_project_refs: [jbz_shop, Ucenter, instant-apps]
+      web_h5_access_patterns: ["xxx/{mall|ucenter|plain-app}/xxx?siteId={商家id}"]
+      mini_program_project_refs: [shop_mp, zan-mini]
+      live_mini_program_package: /Users/cfj/projects/zan-mini/plugins/live/miniprogram
+      responsibilities: [商城H5, 用户中心, C端直播, 商城小程序, 小程序直播包]
+      ownership_note: 移动端不是用户当前主要负责范围，但系统关系需要保留。
+      routing_keywords: [商城系统, 商城H5, mall, ucenter, plain-app, 商城小程序, 小程序直播包]
+    provider_system:
+      display_name: 服务商体系
+      admin_project_ref: zan-projects.facilitator
+      mobile_project_ref: provider-mobile
+      admin_access_patterns: ["xxx/facilitator/login"]
+      mobile_access_patterns: ["xxx/provider-mobile/login?tenantId={租户id}"]
+      responsibilities: [服务商后台管理, 服务商移动端]
+      routing_keywords: [服务商, facilitator, provider-mobile, tenantId, 服务商移动端]
+    independent_systems:
+      examples: [zan-projects.live-monitor, fronted]
+      note: 直播审核平台、客服平台等相对独立，除非用户明确提到，不默认并入商家主链路。
+  technology_evolution:
+    legacy_stack_projects: [admin_menu, supplier-admin-web, jbz_admin, kp_admin, store_admin, order-admin, poster_admin, statistics_admin, ledger_admin, weixin-live]
+    legacy_stack: Vue2老管理后台体系
+    refactor_carrier: zan-projects.factory
+    refactor_note: factory 用于重构并嵌入老系统页面，但不只服务商家平台。
+    iframe_limitation: iframe 嵌入体验不够好
+    next_platform: zan-atlas
+    next_platform_status: 未上生产
+
+projects:
+  admin_menu:
+    path: /Users/cfj/projects/admin_menu
+    category: 管理后台
+    domain: [大后台, 零售批发代理综合信息系统, 菜单管理, 公司内部管理, 商家管理, 供应商管理, 财务信息]
+    service_name: admin_menu
+    access_patterns: ["xxx/admin_menu"]
+    ai_context: /Users/cfj/projects/admin_menu/AI_CONTEXT.md
+    graph_report: /Users/cfj/projects/admin_menu/graphify-out/GRAPH_REPORT.md
+  fronted:
+    path: /Users/cfj/projects/fronted
+    category: 管理后台
+    domain: [客服系统, 商城客服, 多端客服]
+    ai_context: /Users/cfj/projects/fronted/AI_CONTEXT.md
+    graph_report: /Users/cfj/projects/fronted/graphify-out/GRAPH_REPORT.md
+  jbz_admin:
+    path: /Users/cfj/projects/jbz_admin
+    category: 管理后台
+    domain: [商家平台, 商家后台, 主后台, main_menu, iframe宿主, 登录, 权限]
+    service_name: main_menu
+    folder_name: jbz_admin
+    access_patterns: ["xxx/main_menu?siteId={商家id}"]
+    embedding: iframe host
+    ai_context: /Users/cfj/projects/jbz_admin/AI_CONTEXT.md
+    graph_report: /Users/cfj/projects/jbz_admin/graphify-out/GRAPH_REPORT.md
+  kp_admin:
+    path: /Users/cfj/projects/kp_admin
+    category: 管理后台
+    domain: [商家后台, KP后台]
+    service_name: kp_admin
+    ai_context: /Users/cfj/projects/kp_admin/AI_CONTEXT.md
+    graph_report: /Users/cfj/projects/kp_admin/graphify-out/GRAPH_REPORT.md
+  ledger_admin:
+    path: /Users/cfj/projects/ledger_admin
+    category: 管理后台
+    domain: [台账, 分账, 账本, 收益]
+    service_name: ledger_admin
+    ai_context: /Users/cfj/projects/ledger_admin/AI_CONTEXT.md
+    graph_report: /Users/cfj/projects/ledger_admin/graphify-out/GRAPH_REPORT.md
+  order-admin:
+    path: /Users/cfj/projects/order-admin
+    category: 管理后台
+    domain: [订单管理, 订单后台, 订单]
+    service_name: order-admin
+    ai_context: /Users/cfj/projects/order-admin/AI_CONTEXT.md
+    graph_report: /Users/cfj/projects/order-admin/graphify-out/GRAPH_REPORT.md
+  poster_admin:
+    path: /Users/cfj/projects/poster_admin
+    category: 管理后台
+    domain: [海报管理, 海报后台, 素材]
+    service_name: poster_admin
+    ai_context: /Users/cfj/projects/poster_admin/AI_CONTEXT.md
+    graph_report: /Users/cfj/projects/poster_admin/graphify-out/GRAPH_REPORT.md
+  report-ui:
+    path: /Users/cfj/projects/report-ui
+    category: 管理后台
+    domain: [数据大屏, 报表, 大屏设计, 报表设计]
+    service_name: report-ui
+    ai_context: /Users/cfj/projects/report-ui/AI_CONTEXT.md
+    graph_report: /Users/cfj/projects/report-ui/graphify-out/GRAPH_REPORT.md
+  statistics_admin:
+    path: /Users/cfj/projects/statistics_admin
+    category: 管理后台
+    domain: [数据统计, 统计后台, 统计分析]
+    service_name: statistics_admin
+    ai_context: /Users/cfj/projects/statistics_admin/AI_CONTEXT.md
+    graph_report: /Users/cfj/projects/statistics_admin/graphify-out/GRAPH_REPORT.md
+  store_admin:
+    path: /Users/cfj/projects/store_admin
+    category: 管理后台
+    domain: [门店管理, 店铺管理, 门店后台]
+    service_name: store_admin
+    ai_context: /Users/cfj/projects/store_admin/AI_CONTEXT.md
+    graph_report: /Users/cfj/projects/store_admin/graphify-out/GRAPH_REPORT.md
+  supplier-admin-web:
+    path: /Users/cfj/projects/supplier-admin-web
+    category: 管理后台
+    domain: [供应商后台, 供应商系统, 供应商管理, 供应商供货, 中台运营管理, 运营商管理系统, 商家管理平台]
+    service_name: suppliers
+    service_aliases:
+      suppliers: 供应商
+      middleManage: 中台运营管理系统
+    access_patterns:
+      suppliers: "xxx/suppliers/#/login"
+      middleManage: "xxx/middleManage/#/login"
+    ai_context: /Users/cfj/projects/supplier-admin-web/AI_CONTEXT.md
+    graph_report: /Users/cfj/projects/supplier-admin-web/graphify-out/GRAPH_REPORT.md
+  weixin-live:
+    path: /Users/cfj/projects/weixin-live
+    category: 管理后台
+    domain: [微信直播, 直播后台, live2]
+    service_name: live2
+    ai_context: /Users/cfj/projects/weixin-live/AI_CONTEXT.md
+    graph_report: /Users/cfj/projects/weixin-live/graphify-out/GRAPH_REPORT.md
+  zan-projects:
+    path: /Users/cfj/projects/zan-projects
+    category: 管理后台Monorepo
+    domain: [工厂系统, 服务商后台, 直播监控, 云订单, 配置管理]
+    ai_context: /Users/cfj/projects/zan-projects/AI_CONTEXT.md
+    subprojects:
+      facilitator:
+        path: /Users/cfj/projects/zan-projects/admin/facilitator
+        domain: [服务商后台, 服务商管理, facilitator]
+        service_name: facilitator
+        ai_context: /Users/cfj/projects/zan-projects/admin/facilitator/AI_CONTEXT.md
+        graph_report: /Users/cfj/projects/zan-projects/admin/facilitator/graphify-out/GRAPH_REPORT.md
+      factory:
+        path: /Users/cfj/projects/zan-projects/admin/factory
+        domain: [工厂系统, 中台, 商户运营, 订单, 直播经营, 支付, 老系统页面重构, iframe嵌入]
+        service_name: factory
+        runtime_note: 不只服务商家平台，也服务老系统多个管理系统，是老系统页面重构的重要承载项目。
+        ai_context: /Users/cfj/projects/zan-projects/admin/factory/AI_CONTEXT.md
+        graph_report: /Users/cfj/projects/zan-projects/admin/factory/graphify-out/GRAPH_REPORT.md
+      insight:
+        path: /Users/cfj/projects/zan-projects/admin/insight
+        domain: [云订单, insight]
+        service_name: insight
+        ai_context: /Users/cfj/projects/zan-projects/admin/insight/AI_CONTEXT.md
+        graph_report: /Users/cfj/projects/zan-projects/admin/insight/graphify-out/GRAPH_REPORT.md
+      live-monitor:
+        path: /Users/cfj/projects/zan-projects/admin/live-monitor
+        domain: [直播监控, 直播审核, live-monitor]
+        service_name: live-monitor
+        ai_context: /Users/cfj/projects/zan-projects/admin/live-monitor/AI_CONTEXT.md
+        graph_report: /Users/cfj/projects/zan-projects/admin/live-monitor/graphify-out/GRAPH_REPORT.md
+      siqian:
+        path: /Users/cfj/projects/zan-projects/admin/siqian
+        domain: [配置管理, siqian]
+        service_name: siqian
+        ai_context: /Users/cfj/projects/zan-projects/admin/siqian/AI_CONTEXT.md
+        graph_report: /Users/cfj/projects/zan-projects/admin/siqian/graphify-out/GRAPH_REPORT.md
+  Ucenter:
+    path: /Users/cfj/projects/Ucenter
+    category: 商城类
+    domain: [用户中心, C端用户中心, Ucenter]
+    service_name: Ucenter
+  jbz_shop:
+    path: /Users/cfj/projects/jbz_shop
+    category: 商城类
+    domain: [商城H5, 商城前端, H5商城]
+    service_name: jbz_shop
+    access_patterns: ["xxx/mall/xxx?siteId={商家id}"]
+  shop_mp:
+    path: /Users/cfj/projects/shop_mp
+    category: 商城类
+    domain: [商城小程序, 小程序商城]
+    service_name: shop_mp
+  zan-mini:
+    path: /Users/cfj/projects/zan-mini
+    category: 商城类
+    domain: [商城小程序, 直播小程序, 小程序插件]
+    service_name: zan-mini
+    notable_paths:
+      live_miniprogram: /Users/cfj/projects/zan-mini/plugins/live/miniprogram
+  instant-apps:
+    path: /Users/cfj/projects/instant-apps
+    category: 商城类
+    domain: [C端项目, Instant Apps, 直播C端]
+    service_name: instant-apps
+    notable_paths:
+      live_app: /Users/cfj/projects/instant-apps/web/live-app
+    access_patterns: ["xxx/plain-app/xxx?siteId={商家id}"]
+  provider-mobile:
+    path: /Users/cfj/projects/provider-mobile
+    category: 服务商
+    domain: [服务商移动端, provider-mobile, tenantId]
+    service_name: supplier-mobile
+    access_patterns: ["xxx/provider-mobile/login?tenantId={租户id}"]
+  common:
+    path: /Users/cfj/projects/common
+    category: 基础库
+    domain: [公共方法库, 后台公共能力, common]
+    service_name: common
+    ai_context: /Users/cfj/projects/common/AI_CONTEXT.md
+    graph_report: /Users/cfj/projects/common/graphify-out/GRAPH_REPORT.md
+  zan-lib:
+    path: /Users/cfj/projects/zan-lib
+    category: 基础库
+    domain: [新版公共库, query, storage, yapi-cli, frame-bridge]
+    service_name: zan-lib
+    ai_context: /Users/cfj/projects/zan-lib/AI_CONTEXT.md
+    graph_report: /Users/cfj/projects/zan-lib/graphify-out/GRAPH_REPORT.md
+  sim-ui:
+    path: /Users/cfj/projects/sim-ui
+    category: 组件库
+    domain: [后台UI库, sim-ui, 业务组件]
+    service_name: sim-ui
+    ai_context: /Users/cfj/projects/sim-ui/AI_CONTEXT.md
+    graph_report: /Users/cfj/projects/sim-ui/graphify-out/GRAPH_REPORT.md
+  von-ui:
+    path: /Users/cfj/projects/von-ui
+    category: 组件库
+    domain: [小程序UI库, von-ui, 移动端UI]
+    service_name: von-ui
+    ai_context: /Users/cfj/projects/von-ui/AI_CONTEXT.md
+    graph_report: /Users/cfj/projects/von-ui/graphify-out/GRAPH_REPORT.md
+  zan-apps:
+    path: /Users/cfj/projects/zan-apps
+    category: 平台库
+    domain: [request, ui-vue3, vue-router, micro-service, schema]
+    service_name: zan-apps
+    ai_context: /Users/cfj/projects/zan-apps/AI_CONTEXT.md
+    graph_report: /Users/cfj/projects/zan-apps/graphify-out/GRAPH_REPORT.md
+  zan-atlas:
+    path: /Users/cfj/projects/zan-atlas
+    category: Atlas跨平台基座
+    domain: [跨平台基座, Atlas, Web Components, runtime, iframe替代方案, 新平台]
+    production_status: 未上生产
+    ai_context: /Users/cfj/projects/zan-atlas/AI_CONTEXT.md
+    graph_report: /Users/cfj/projects/zan-atlas/graphify-out/GRAPH_REPORT.md
+  zan-atlas-modules:
+    path: /Users/cfj/projects/zan-atlas-modules
+    category: Atlas模块
+    domain: [Atlas组件, atlas modules]
+    ai_context: /Users/cfj/projects/zan-atlas-modules/AI_CONTEXT.md
+    graph_report: /Users/cfj/projects/zan-atlas-modules/graphify-out/GRAPH_REPORT.md
+  zan-poster:
+    path: /Users/cfj/projects/zan-poster
+    category: 组件库
+    domain: [海报, canvas, json2canvas, poster]
+    ai_context: /Users/cfj/projects/zan-poster/AI_CONTEXT.md
+    graph_report: /Users/cfj/projects/zan-poster/graphify-out/GRAPH_REPORT.md
+  zan-docs:
+    path: /Users/cfj/projects/zan-docs
+    category: 文档
+    domain: [内部文档站, package docs]
+    ai_context: /Users/cfj/projects/zan-docs/AI_CONTEXT.md
+    graph_report: /Users/cfj/projects/zan-docs/graphify-out/GRAPH_REPORT.md
+  zan-skills:
+    path: /Users/cfj/projects/zan-skills
+    category: 技能库
+    domain: [agent skills, 技能发布]
+    ai_context: /Users/cfj/projects/zan-skills/AI_CONTEXT.md
+    graph_report: /Users/cfj/projects/zan-skills/graphify-out/GRAPH_REPORT.md
+  skills:
+    path: /Users/cfj/projects/skills
+    category: AI技能
+    domain: [Codex skills, Claude skills, workflow skills, TAPD, MR review]
+    ai_context: /Users/cfj/projects/skills/AI_CONTEXT.md
+    graph_report: /Users/cfj/projects/skills/graphify-out/GRAPH_REPORT.md
+  yapi-mcp:
+    path: /Users/cfj/projects/yapi-mcp
+    category: MCP服务
+    domain: [YApi, MCP, 接口查询]
+    ai_context: /Users/cfj/projects/yapi-mcp/AI_CONTEXT.md
+    graph_report: /Users/cfj/projects/yapi-mcp/graphify-out/GRAPH_REPORT.md
+  jenkinsfile:
+    path: /Users/cfj/projects/jenkinsfile
+    category: DevOps
+    domain: [Jenkins, 发布配置, 流水线]
+    ai_context: /Users/cfj/projects/jenkinsfile/AI_CONTEXT.md
+    graph_report: /Users/cfj/projects/jenkinsfile/graphify-out/GRAPH_REPORT.md
+  zan-cli:
+    path: /Users/cfj/projects/zan-cli
+    category: CLI工具
+    domain: [TAPD CLI, YApi CLI, 命令行工具]
+    service_name: zan-cli
+    ai_context: /Users/cfj/projects/zan-cli/AI_CONTEXT.md
+    graph_report: /Users/cfj/projects/zan-cli/graphify-out/GRAPH_REPORT.md
+
+routes:
+  - keywords: [大后台, 零售批发代理综合信息系统, 公司内部管理, 商家供应商财务]
+    project_refs: [admin_menu]
+  - keywords: [运营商管理系统, middleManage, 商家管理平台]
+    project_refs: [supplier-admin-web]
+  - keywords: [供应商系统, suppliers, 供应商供货, 供货]
+    project_refs: [supplier-admin-web]
+  - keywords: [商家平台, main_menu, 商家后台宿主, iframe宿主]
+    project_refs: [jbz_admin]
+  - keywords: [siteId, 商家id]
+    project_refs: [jbz_admin, store_admin, kp_admin, order-admin, zan-projects.factory, jbz_shop, Ucenter, instant-apps, shop_mp, zan-mini]
+  - keywords: [订单管理, 订单后台, 订单]
+    project_refs: [order-admin, zan-projects.factory]
+  - keywords: [商家后台, 商家管理, 主后台, main_menu]
+    project_refs: [jbz_admin, kp_admin, admin_menu]
+  - keywords: [门店管理, 门店后台, 店铺管理]
+    project_refs: [store_admin]
+  - keywords: [统计后台, 数据统计, 统计分析]
+    project_refs: [statistics_admin]
+  - keywords: [海报后台, 海报管理, 海报]
+    project_refs: [poster_admin, zan-poster]
+  - keywords: [微信直播, 直播后台, live2]
+    project_refs: [weixin-live]
+  - keywords: [直播监控, 直播审核, 直播监控平台]
+    project_refs: [zan-projects.live-monitor]
+  - keywords: [直播经营, 直播数据看板, 工厂直播]
+    project_refs: [zan-projects.factory]
+  - keywords: [服务商, 服务商后台, facilitator]
+    project_refs: [zan-projects.facilitator, provider-mobile]
+  - keywords: [供应商后台, 供应商管理, suppliers]
+    project_refs: [supplier-admin-web]
+  - keywords: [中台运营管理, middleManage, 中台]
+    project_refs: [supplier-admin-web, zan-projects.factory]
+  - keywords: [云订单, insight]
+    project_refs: [zan-projects.insight]
+  - keywords: [配置管理, siqian]
+    project_refs: [zan-projects.siqian]
+  - keywords: [商城小程序, 小程序商城]
+    project_refs: [shop_mp, zan-mini]
+  - keywords: [商城H5, 商城前端]
+    project_refs: [jbz_shop, Ucenter, instant-apps]
+  - keywords: [C端用户中心, 用户中心, Ucenter]
+    project_refs: [Ucenter]
+  - keywords: [instant apps, C端项目, Instant Apps]
+    project_refs: [instant-apps]
+  - keywords: [Atlas, iframe体验, iframe替代, 跨平台基座]
+    project_refs: [zan-atlas, zan-atlas-modules]
+  - keywords: [报表, 数据大屏, 大屏设计]
+    project_refs: [report-ui]
+  - keywords: [后台UI库, sim-ui, 业务组件]
+    project_refs: [sim-ui]
+  - keywords: [小程序UI库, von-ui, 移动端UI]
+    project_refs: [von-ui]
+  - keywords: [公共方法库, common]
+    project_refs: [common]
+  - keywords: [新版公共库, query, storage, frame-bridge]
+    project_refs: [zan-lib]
+  - keywords: [request, ui-vue3, vue-router, micro-service]
+    project_refs: [zan-apps]
+  - keywords: [YApi, yapi-mcp, yapi-cli]
+    project_refs: [yapi-mcp, zan-lib, zan-cli]
+  - keywords: [TAPD, tapd-workflow, TAPD工作流]
+    project_refs: [skills, zan-cli]
+  - keywords: [Jenkins, 打包, 发布配置, 流水线]
+    project_refs: [jenkinsfile]
+
+domains:
+  公司内部大后台: [admin_menu]
+  商家平台: [jbz_admin, kp_admin, order-admin, poster_admin, statistics_admin, store_admin, weixin-live, ledger_admin, zan-projects.factory]
+  中台供应商: [supplier-admin-web]
+  服务商: [zan-projects.facilitator, provider-mobile]
+  直播: [weixin-live, zan-projects.live-monitor, zan-projects.factory, zan-mini, instant-apps]
+  商城C端: [Ucenter, jbz_shop, shop_mp, zan-mini, instant-apps]
+  老系统重构: [zan-projects.factory, zan-atlas]
+  基础库: [common, zan-lib, zan-apps]
+  组件库: [sim-ui, von-ui, zan-poster, zan-atlas-modules]
+  AI工具: [skills, yapi-mcp, zan-skills]
+
+dependencies:
+  - from: admin_menu
+    to: common
+    relation: depends_on
+    reason: 使用 @jbz/common 后台公共能力
+  - from: admin_menu
+    to: sim-ui
+    relation: depends_on
+    reason: 使用 @jbz/sim-ui 后台组件
+  - from: jbz_admin
+    to: common
+    relation: depends_on
+    reason: 使用 @jbz/common
+  - from: jbz_admin
+    to: sim-ui
+    relation: depends_on
+    reason: 使用 @jbz/sim-ui
+  - from: kp_admin
+    to: common
+    relation: depends_on
+    reason: 使用 @jbz/common
+  - from: kp_admin
+    to: sim-ui
+    relation: depends_on
+    reason: 使用 @jbz/sim-ui
+  - from: supplier-admin-web
+    to: common
+    relation: depends_on
+    reason: 使用 @jbz/common
+  - from: supplier-admin-web
+    to: sim-ui
+    relation: depends_on
+    reason: 使用 @jbz/sim-ui
+  - from: weixin-live
+    to: common
+    relation: depends_on
+    reason: 使用 @jbz/common
+  - from: weixin-live
+    to: sim-ui
+    relation: depends_on
+    reason: 使用 @jbz/sim-ui
+  - from: zan-projects.factory
+    to: zan-apps
+    relation: depends_on
+    reason: 使用 @zan/request、@zan/ui-vue3、@zan/vue-query 等能力
+  - from: zan-projects.facilitator
+    to: zan-apps
+    relation: depends_on
+    reason: 使用 @zan/request、@zan/ui-vue3、@zan/micro-service 等能力
+  - from: zan-atlas-modules
+    to: zan-atlas
+    relation: serves
+    reason: 为 zan-atlas 提供模块集合
+
+packages:
+  "@jbz/common":
+    repo: common
+    path: /Users/cfj/projects/common
+    consumers: [admin_menu, jbz_admin, kp_admin, ledger_admin, order-admin, poster_admin, statistics_admin, store_admin, supplier-admin-web, weixin-live]
+  "@jbz/sim-ui":
+    repo: sim-ui
+    path: /Users/cfj/projects/sim-ui
+    consumers: [admin_menu, jbz_admin, kp_admin, ledger_admin, order-admin, poster_admin, statistics_admin, store_admin, supplier-admin-web, weixin-live]
+  "@jbz/von-ui":
+    repo: von-ui
+    path: /Users/cfj/projects/von-ui
+    consumers: [商城类, 小程序类]
+  "@zan/request":
+    repo: zan-apps
+    path: /Users/cfj/projects/zan-apps/packages/request
+    consumers: [zan-projects]
+  "@zan/ui-vue3":
+    repo: zan-apps
+    path: /Users/cfj/projects/zan-apps/packages/ui-vue3
+    consumers: [zan-projects]
+  "@zan/vue-router":
+    repo: zan-apps
+    path: /Users/cfj/projects/zan-apps/packages/vue-router
+    consumers: [zan-projects]
+  "@zan/micro-service":
+    repo: zan-apps
+    path: /Users/cfj/projects/zan-apps/packages/micro-service
+    consumers: [zan-projects]
+  yapi-cli:
+    repo: zan-lib
+    path: /Users/cfj/projects/zan-lib/packages/yapi-cli
+    related: [zan-cli, yapi-mcp]
+
+jenkins_jobs:
+  order-admin: front-orderAdmin-test
+  jbz_admin: front-main_menu-test
+  kp_admin: front-kpadmin-test
+  store_admin: front-storeAdmin-test
+  statistics_admin: front-statisticsAdmin-test
+  poster_admin: front-posteradmin-test
+  weixin-live: front-live2-test
+  admin_menu: front-admin_menu-test
+  supplier-admin-web:
+    suppliers: front-suppliers-test
+    middleManage: front-suppliers-test
+  zan-projects.factory: front-factory-test
+  zan-projects.facilitator: front-facilitator-test
+  zan-projects.live-monitor: front-live-monitor-test
+  provider-mobile: front-provider-mobile-test
+  Ucenter: front-ucenter-test
+  jbz_shop: front-mall-test
+  shop_mp: shop_mp_test
+  instant-apps: front-instant-apps-test
+  report-ui: report-ui-test
+  public_libraries: npm-tools-test
+
+excluded_or_secondary:
+  reason: "这些项目可存在于 workspace，但不是当前核心公司业务知识库的默认路由入口；除非用户明确提到，不优先检索。"
+  projects: [zan-devops, post-robot, ai-codereview, pr-agent, ai-session-memory, codex-transcripts, euphony, symphony]
