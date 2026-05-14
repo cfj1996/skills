@@ -7,11 +7,25 @@ description: Use when a request mentions company projects, business domains, ser
 
 ## Overview
 
-This is the workspace-level knowledge entrypoint for `/Users/cfj/projects`.
+This is the workspace-level knowledge entrypoint for a local company projects workspace.
 
 Use it before source search when the user asks where a feature lives, which project owns a business term, what service or Jenkins job maps to a project, which private package is involved, or how multiple local projects relate.
 
 This skill is the successor to `company-project-routing`. It must cover project routing plus knowledge-base entry. Do not depend on `company-project-routing` being available.
+
+## Workspace Root Resolution
+
+`references/project-relations.yaml` uses `${workspace_root}` as a placeholder. Never treat it as a literal directory name.
+
+Resolve `${workspace_root}` before reporting paths or reading project-local files:
+
+1. If the user explicitly provides a workspace path, use that.
+2. If the current working directory is inside a known project workspace, use that workspace root.
+3. If `WORKSPACE_ROOT`, `PROJECTS_ROOT`, or a similar environment variable is set, use it.
+4. If a local mirror exists, use the directory containing local `AI_CONTEXT.md` and `project-relations.yaml`.
+5. For cfj's own machine only, the default workspace root is `/Users/cfj/projects`.
+
+When returning paths, substitute `${workspace_root}` with the resolved real path. If no workspace root can be resolved, return the project name and ask the user for their local workspace root instead of guessing.
 
 ## Company Runtime Relationship Map
 
@@ -62,10 +76,10 @@ This skill is self-contained and shareable. Always start from these bundled file
 
 The files below may exist on the current machine as local mirrors or overrides:
 
-- `/Users/cfj/projects/AI_CONTEXT.md`
-- `/Users/cfj/projects/project-relations.yaml`
+- `${workspace_root}/AI_CONTEXT.md`
+- `${workspace_root}/project-relations.yaml`
 
-When both bundled files and local mirrors exist, treat the bundled `references/` files as the distributable source of truth. Use local mirrors only to confirm machine-specific paths or recent local additions.
+When both bundled files and local mirrors exist, treat the bundled `references/` files as the distributable source of truth. Use local mirrors only to confirm machine-specific paths, current local files, or recent local additions.
 
 ## Source of Truth
 
@@ -90,11 +104,11 @@ After a project is matched, read:
 
 For `zan-projects`, do not stop at the repository root if a subproject can be inferred. Prefer the matched subproject context:
 
-- `/Users/cfj/projects/zan-projects/admin/facilitator/AI_CONTEXT.md`
-- `/Users/cfj/projects/zan-projects/admin/factory/AI_CONTEXT.md`
-- `/Users/cfj/projects/zan-projects/admin/insight/AI_CONTEXT.md`
-- `/Users/cfj/projects/zan-projects/admin/live-monitor/AI_CONTEXT.md`
-- `/Users/cfj/projects/zan-projects/admin/siqian/AI_CONTEXT.md`
+- `${workspace_root}/zan-projects/admin/facilitator/AI_CONTEXT.md`
+- `${workspace_root}/zan-projects/admin/factory/AI_CONTEXT.md`
+- `${workspace_root}/zan-projects/admin/insight/AI_CONTEXT.md`
+- `${workspace_root}/zan-projects/admin/live-monitor/AI_CONTEXT.md`
+- `${workspace_root}/zan-projects/admin/siqian/AI_CONTEXT.md`
 
 ## Function Map
 
@@ -146,20 +160,20 @@ Important routing examples:
 
 | User Signal | Route To |
 |---|---|
-| 大后台, 零售批发代理综合信息系统 | `/Users/cfj/projects/admin_menu` |
-| 中台, 运营商管理系统, middleManage | `/Users/cfj/projects/supplier-admin-web` |
-| 供应商系统, suppliers | `/Users/cfj/projects/supplier-admin-web` |
-| 商家平台, main_menu | `/Users/cfj/projects/jbz_admin` |
-| 服务商后台, facilitator | `/Users/cfj/projects/zan-projects/admin/facilitator` |
-| 服务商移动端, provider-mobile, supplier-mobile | `/Users/cfj/projects/provider-mobile` |
-| 供应商后台, suppliers | `/Users/cfj/projects/supplier-admin-web` |
-| 中台运营管理, middleManage | `/Users/cfj/projects/supplier-admin-web` |
-| 工厂系统, factory, 中台支付 | `/Users/cfj/projects/zan-projects/admin/factory` |
-| 直播后台, live2, 微信直播后台 | `/Users/cfj/projects/weixin-live` |
-| 直播监控, live-monitor | `/Users/cfj/projects/zan-projects/admin/live-monitor` |
-| 商城小程序 | `/Users/cfj/projects/shop_mp` or `/Users/cfj/projects/zan-mini`; require discriminator if both match |
-| C 端直播, instant apps | `/Users/cfj/projects/instant-apps` |
-| 主后台, 商家后台登录/权限 | `/Users/cfj/projects/jbz_admin` unless a more exact project signal exists |
+| 大后台, 零售批发代理综合信息系统 | `${workspace_root}/admin_menu` |
+| 中台, 运营商管理系统, middleManage | `${workspace_root}/supplier-admin-web` |
+| 供应商系统, suppliers | `${workspace_root}/supplier-admin-web` |
+| 商家平台, main_menu | `${workspace_root}/jbz_admin` |
+| 服务商后台, facilitator | `${workspace_root}/zan-projects/admin/facilitator` |
+| 服务商移动端, provider-mobile, supplier-mobile | `${workspace_root}/provider-mobile` |
+| 供应商后台, suppliers | `${workspace_root}/supplier-admin-web` |
+| 中台运营管理, middleManage | `${workspace_root}/supplier-admin-web` |
+| 工厂系统, factory, 中台支付 | `${workspace_root}/zan-projects/admin/factory` |
+| 直播后台, live2, 微信直播后台 | `${workspace_root}/weixin-live` |
+| 直播监控, live-monitor | `${workspace_root}/zan-projects/admin/live-monitor` |
+| 商城小程序 | `${workspace_root}/shop_mp` or `${workspace_root}/zan-mini`; require discriminator if both match |
+| C 端直播, instant apps | `${workspace_root}/instant-apps` |
+| 主后台, 商家后台登录/权限 | `${workspace_root}/jbz_admin` unless a more exact project signal exists |
 
 ## Function 2 - Service Name Resolution
 
