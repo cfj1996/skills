@@ -15,7 +15,7 @@ This skill is the successor to `company-project-routing`. It must cover project 
 
 ## Workspace Root Resolution
 
-`references/project-relations.yaml` uses `${workspace_root}` as a placeholder. Never treat it as a literal directory name.
+The bundled fallback `references/project-relations.yaml` may use `${workspace_root}` as a placeholder. Never treat it as a literal directory name.
 
 Resolve `${workspace_root}` before reporting paths or reading project-local files:
 
@@ -26,6 +26,19 @@ Resolve `${workspace_root}` before reporting paths or reading project-local file
 5. For cfj's own machine only, the default workspace root is `/Users/cfj/projects`.
 
 When returning paths, substitute `${workspace_root}` with the resolved real path. If no workspace root can be resolved, return the project name and ask the user for their local workspace root instead of guessing.
+
+## Project Knowledge Root Resolution
+
+The generated project knowledge has been centralized. Do not assume each business repository still contains its own `AI_CONTEXT.md` or `graphify-out`.
+
+Resolve the project knowledge root before reading generated knowledge:
+
+1. If `PROJECT_KNOWLEDGE_ROOT` is set, use it.
+2. If `${workspace_root}/project-knowledge` exists, use it.
+3. For cfj's own machine only, the default project knowledge root is `/Users/cfj/projects/project-knowledge`.
+4. If no project knowledge root exists, fall back to this skill's bundled `references/` files and then to live source search.
+
+When returning generated knowledge paths, prefer the centralized path under `${project_knowledge_root}`. Return live source paths under `${workspace_root}` only when pointing to actual source code.
 
 ## Company Runtime Relationship Map
 
@@ -67,19 +80,28 @@ Runtime routing shortcuts:
 | 服务商后台, `facilitator` | `zan-projects/admin/facilitator` |
 | 服务商移动端, `provider-mobile`, `tenantId` | `provider-mobile` |
 
-## Bundled Knowledge Files
+## Centralized Knowledge Files
 
-This skill is self-contained and shareable. Always start from these bundled files in this skill package:
+Always start from the centralized project-knowledge repository when it exists:
 
-1. `references/AI_CONTEXT.md`
-2. `references/project-relations.yaml`
+1. `${project_knowledge_root}/data/workspace/AI_CONTEXT.md`
+2. `${project_knowledge_root}/data/workspace/project-relations.yaml`
+3. `${project_knowledge_root}/manifests/latest.tsv`
 
-The files below may exist on the current machine as local mirrors or overrides:
+Project-level generated knowledge lives under:
 
-- `${workspace_root}/AI_CONTEXT.md`
-- `${workspace_root}/project-relations.yaml`
+- `${project_knowledge_root}/data/projects/<project-relative-path>/AI_CONTEXT.md`
+- `${project_knowledge_root}/data/projects/<project-relative-path>/graphify-out/GRAPH_REPORT.md`
+- `${project_knowledge_root}/data/projects/<project-relative-path>/graphify-out/graph.json`
 
-When both bundled files and local mirrors exist, treat the bundled `references/` files as the distributable source of truth. Use local mirrors only to confirm machine-specific paths, current local files, or recent local additions.
+Compatibility fallback order:
+
+1. Centralized project-knowledge files.
+2. This skill's bundled `references/AI_CONTEXT.md` and `references/project-relations.yaml`.
+3. Legacy workspace mirrors: `${workspace_root}/AI_CONTEXT.md` and `${workspace_root}/project-relations.yaml`.
+4. Live source search in the target project.
+
+Do not treat project-local generated files as the primary source. They may have been migrated out of business repositories.
 
 ## Source of Truth
 
@@ -97,18 +119,19 @@ Use these `project-relations.yaml` sections as the routing index:
 | `jenkins_jobs` | Jenkins test job lookup |
 | `excluded_or_secondary` | Projects that are not primary business routing targets |
 
-After a project is matched, read:
+After a project is matched, read centralized generated knowledge first:
 
-1. `<project>/AI_CONTEXT.md`
-2. `<project>/graphify-out/GRAPH_REPORT.md` when the answer needs code structure, module relationship, or entrypoint location
+1. `${project_knowledge_root}/data/projects/<project-relative-path>/AI_CONTEXT.md`
+2. `${project_knowledge_root}/data/projects/<project-relative-path>/graphify-out/GRAPH_REPORT.md` when the answer needs code structure, module relationship, or entrypoint location
+3. The live source project under `${workspace_root}` only after the generated knowledge has narrowed the search
 
 For `zan-projects`, do not stop at the repository root if a subproject can be inferred. Prefer the matched subproject context:
 
-- `${workspace_root}/zan-projects/admin/facilitator/AI_CONTEXT.md`
-- `${workspace_root}/zan-projects/admin/factory/AI_CONTEXT.md`
-- `${workspace_root}/zan-projects/admin/insight/AI_CONTEXT.md`
-- `${workspace_root}/zan-projects/admin/live-monitor/AI_CONTEXT.md`
-- `${workspace_root}/zan-projects/admin/siqian/AI_CONTEXT.md`
+- `${project_knowledge_root}/data/projects/zan-projects/admin/facilitator/AI_CONTEXT.md`
+- `${project_knowledge_root}/data/projects/zan-projects/admin/factory/AI_CONTEXT.md`
+- `${project_knowledge_root}/data/projects/zan-projects/admin/insight/AI_CONTEXT.md`
+- `${project_knowledge_root}/data/projects/zan-projects/admin/live-monitor/AI_CONTEXT.md`
+- `${project_knowledge_root}/data/projects/zan-projects/admin/siqian/AI_CONTEXT.md`
 
 ## Function Map
 
@@ -129,13 +152,14 @@ Use this when the user gives a business term, project name, path fragment, servi
 
 Workflow:
 
-1. Read `references/AI_CONTEXT.md`.
-2. Read `references/project-relations.yaml`.
-3. Match the user input against `routes`, `domains`, `projects`, `projects.*.subprojects`, `service_name`, `service_aliases`, package names, and Jenkins job names.
-4. Prefer exact project names, exact paths, package names, service names, route names, Jenkins jobs, and unique business terms.
-5. If one project has one unique strong signal, route to it.
-6. If one project has two or more strong signals, route to it even if weak words also match other projects.
-7. If candidates are tied, return the candidates and ask for one discriminator: exact path, page route, package name, service name, error text, screenshot, or repository name.
+1. Resolve `${project_knowledge_root}`.
+2. Read `${project_knowledge_root}/data/workspace/AI_CONTEXT.md`, falling back to `references/AI_CONTEXT.md`.
+3. Read `${project_knowledge_root}/data/workspace/project-relations.yaml`, falling back to `references/project-relations.yaml`.
+4. Match the user input against `routes`, `domains`, `projects`, `projects.*.subprojects`, `service_name`, `service_aliases`, package names, and Jenkins job names.
+5. Prefer exact project names, exact paths, package names, service names, route names, Jenkins jobs, and unique business terms.
+6. If one project has one unique strong signal, route to it.
+7. If one project has two or more strong signals, route to it even if weak words also match other projects.
+8. If candidates are tied, return the candidates and ask for one discriminator: exact path, page route, package name, service name, error text, screenshot, or repository name.
 
 Signal ranking:
 
@@ -207,7 +231,7 @@ Use this when the user asks to run, trigger, deploy, package, test environment, 
 Workflow:
 
 1. Route the project with Function 1.
-2. Read `jenkins_jobs` from `references/project-relations.yaml`.
+2. Read `jenkins_jobs` from the centralized `${project_knowledge_root}/data/workspace/project-relations.yaml`, falling back to `references/project-relations.yaml`.
 3. Return the exact job name and the routing evidence.
 4. If a project is not listed in `jenkins_jobs`, say it is not listed in the workspace index; do not guess a `front-*-test` name.
 5. For public libraries and tooling packages, check whether they map to the shared `npm-tools-test` job.
@@ -247,18 +271,18 @@ Use this when the target project is known and the answer needs code/module struc
 
 Rules:
 
-1. Read the project `AI_CONTEXT.md` before source files.
-2. Read `graphify-out/GRAPH_REPORT.md` before raw search if it exists.
-3. If `graphify-out/wiki/index.md` exists, prefer it for conceptual navigation.
+1. Read centralized project `AI_CONTEXT.md` before source files.
+2. Read centralized `graphify-out/GRAPH_REPORT.md` before raw search if it exists.
+3. If centralized `graphify-out/wiki/index.md` exists, prefer it for conceptual navigation.
 4. Use Graphify commands for relationship questions:
    - `graphify query "<question>"`
    - `graphify path "<A>" "<B>"`
    - `graphify explain "<concept>"`
 5. Use raw source search only after project and module scope are narrowed.
 
-Graphify is a code-structure graph, not a business ontology. Business routing comes from `project-relations.yaml`; code relationships come from Graphify and project-local context.
+Graphify is a code-structure graph, not a business ontology. Business routing comes from centralized `project-relations.yaml`; code relationships come from centralized Graphify output and project context.
 
-For `zan-projects`, select the subproject first whenever possible, then read that subproject's `AI_CONTEXT.md` and `graphify-out/GRAPH_REPORT.md`.
+For `zan-projects`, select the subproject first whenever possible, then read that subproject's centralized `AI_CONTEXT.md` and `graphify-out/GRAPH_REPORT.md`.
 
 ## Function 6 - Cross-Project Relationship And Impact Analysis
 
@@ -269,7 +293,7 @@ Workflow:
 1. Route all mentioned projects, packages, service names, or domains.
 2. Read `dependencies` and `packages`.
 3. If a shared package is involved, start from Function 4.
-4. If a business flow spans projects, combine `routes`, `domains`, and project `AI_CONTEXT.md` files.
+4. If a business flow spans projects, combine `routes`, `domains`, and centralized project `AI_CONTEXT.md` files.
 5. Read Graphify reports only for the narrowed projects; do not scan every repository by default.
 
 Output:
@@ -288,8 +312,8 @@ Workflow:
 
 1. Convert business words to candidate projects with Function 1.
 2. Resolve service name and subproject if relevant.
-3. Read candidate `AI_CONTEXT.md`.
-4. Read candidate `graphify-out/GRAPH_REPORT.md`.
+3. Read centralized candidate `AI_CONTEXT.md`.
+4. Read centralized candidate `graphify-out/GRAPH_REPORT.md`.
 5. Try `graphify query` for relationship or module questions.
 6. Search source only inside the narrowed project or subproject.
 7. If the result comes from raw search, report that it is source-search evidence, not graph evidence.
@@ -298,7 +322,7 @@ Example sequence for "移动端直播项目的微信支付模块":
 
 1. "移动端直播项目" may match `zan-mini` or `instant-apps`; route by additional signal. `provider-mobile` is 服务商移动端, not 商城直播.
 2. "微信支付" is a weak business/code word by itself and cannot choose a project alone.
-3. After project selection, read project `AI_CONTEXT.md` and `GRAPH_REPORT.md`.
+3. After project selection, read centralized project `AI_CONTEXT.md` and `GRAPH_REPORT.md`.
 4. Search only inside the selected project for pay-related entrypoints if Graphify does not answer.
 
 ## Function 8 - Modification Preflight
@@ -308,7 +332,7 @@ Use this before modifying code after a routing or knowledge answer.
 Rules:
 
 1. Confirm the target project and subproject are identified with strong enough signals.
-2. Read the target project `AI_CONTEXT.md`.
+2. Read the centralized target project `AI_CONTEXT.md`.
 3. Read project-specific development constraints before editing.
 4. For `zan-projects`, read the root context and the matched subproject context.
 5. Check git status in the target repository and do not revert unrelated user changes.
@@ -366,6 +390,7 @@ Ambiguous routing:
 - Guessing a project from weak words like `支付`, `直播`, `后台`, or `登录`.
 - Treating Graphify as a business-term router.
 - Reading all repositories when `project-relations.yaml` can narrow the scope.
+- Reading generated knowledge from business repositories after it has been migrated into `project-knowledge`.
 - Stopping at `zan-projects` root instead of selecting a subproject.
 - Returning a Jenkins job without checking `jenkins_jobs`.
 - Ignoring `service_name` exceptions such as `jbz_admin -> main_menu` and `weixin-live -> live2`.
