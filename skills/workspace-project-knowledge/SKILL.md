@@ -11,7 +11,56 @@ This is the workspace-level knowledge entrypoint for a local company projects wo
 
 Use it before source search when the user asks where a feature lives, which project owns a business term, what service or Jenkins job maps to a project, which private package is involved, or how multiple local projects relate.
 
+This skill is the company multi-project gateway that sits in front of the centralized `project-knowledge` repository and the per-project Graphify outputs collected inside it.
+
 This skill is the successor to `company-project-routing`. It must cover project routing plus knowledge-base entry. Do not depend on `company-project-routing` being available.
+
+## What You Must Do When Invoked
+
+Use this skill as the first step for company multi-project questions. Do not start with broad source search.
+
+Requests that must invoke this workflow first:
+
+- project routing or repository ownership
+- business term to project mapping
+- service name lookup
+- Jenkins job lookup
+- private package or shared library ownership
+- code entrypoint location
+- cross-project relationship or impact analysis
+- any company workspace question where the target repository is not already explicit
+
+You may skip the routing stage only when the user already gave the exact target repository or exact target file and the task is a local implementation change inside that already-identified repository.
+
+Follow this protocol:
+
+1. Resolve the workspace root.
+2. Resolve the centralized project knowledge root.
+3. Route the target project from centralized workspace knowledge.
+4. Read the matched centralized project `AI_CONTEXT.md`.
+5. If the answer needs code structure, module relationships, call chains, or entrypoint reasoning, query the matched centralized Graphify graph with `--graph`.
+6. Only then read live source files or run source search inside the narrowed project.
+
+Fast path:
+
+- If the user already gave an exact repository path or an exact repository name with strong certainty, skip broad routing and jump straight to that repository's centralized knowledge.
+- If the user already gave an exact file path, treat the repository as resolved and use this skill only to gather surrounding project context if needed.
+
+Graphify usage rule:
+
+- The centralized repository already contains per-project `graphify-out/graph.json`.
+- Do not run plain `graphify query "<question>"` from an arbitrary directory.
+- After the target project is known, always query the matched centralized graph explicitly:
+  - `graphify query "<question>" --graph ${project_knowledge_root}/data/projects/<project-relative-path>/graphify-out/graph.json`
+  - `graphify path "<A>" "<B>" --graph ${project_knowledge_root}/data/projects/<project-relative-path>/graphify-out/graph.json`
+  - `graphify explain "<concept>" --graph ${project_knowledge_root}/data/projects/<project-relative-path>/graphify-out/graph.json`
+
+Decision rule:
+
+- `project-relations.yaml` is the routing index.
+- Centralized `AI_CONTEXT.md` is the project boundary and modification guide.
+- Centralized Graphify output is the code-structure and relationship layer.
+- Live source search is the last step, not the first step.
 
 ## Workspace Root Resolution
 
@@ -39,6 +88,14 @@ Resolve the project knowledge root before reading generated knowledge:
 4. If no project knowledge root exists, fall back to this skill's bundled `references/` files and then to live source search.
 
 When returning generated knowledge paths, prefer the centralized path under `${project_knowledge_root}`. Return live source paths under `${workspace_root}` only when pointing to actual source code.
+
+For cfj's machine, the default centralized layout is:
+
+- workspace routing index: `/Users/cfj/projects/project-knowledge/data/workspace/project-relations.yaml`
+- workspace context: `/Users/cfj/projects/project-knowledge/data/workspace/AI_CONTEXT.md`
+- project context: `/Users/cfj/projects/project-knowledge/data/projects/<project-relative-path>/AI_CONTEXT.md`
+- project graph report: `/Users/cfj/projects/project-knowledge/data/projects/<project-relative-path>/graphify-out/GRAPH_REPORT.md`
+- project graph json: `/Users/cfj/projects/project-knowledge/data/projects/<project-relative-path>/graphify-out/graph.json`
 
 ## Company Runtime Relationship Map
 
@@ -146,6 +203,24 @@ For `zan-projects`, do not stop at the repository root if a subproject can be in
 | Code entrypoint location | Business term plus code keyword, route, page, API, pay/live/order/etc. | Global index, project context, Graphify | Narrowed module/files and search plan |
 | Modification preflight | User asks to change code after routing | Project context and local rules | Scope, constraints, verification hints |
 
+## Standard Execution Sequence
+
+Use this sequence unless a narrower function below says otherwise:
+
+1. Read centralized workspace `AI_CONTEXT.md`.
+2. Read centralized workspace `project-relations.yaml`.
+3. Route to the target project or subproject.
+4. Read centralized target project `AI_CONTEXT.md`.
+5. If the question is about code structure, call chain, module boundaries, or feature entrypoints, query centralized Graphify with `--graph`.
+6. Only then search live source code inside the narrowed project.
+
+When reporting results, distinguish:
+
+- routing evidence from workspace knowledge
+- project guidance from centralized `AI_CONTEXT.md`
+- code-relationship evidence from centralized Graphify
+- raw-source evidence from live source search
+
 ## Function 1 - Project Routing
 
 Use this when the user gives a business term, project name, path fragment, service name, or vague workspace question.
@@ -160,6 +235,11 @@ Workflow:
 6. If one project has one unique strong signal, route to it.
 7. If one project has two or more strong signals, route to it even if weak words also match other projects.
 8. If candidates are tied, return the candidates and ask for one discriminator: exact path, page route, package name, service name, error text, screenshot, or repository name.
+
+After routing:
+
+9. Return the centralized project knowledge paths that should be read next.
+10. If the routed target is a `zan-projects` subproject, return the subproject path rather than stopping at the monorepo root.
 
 Signal ranking:
 
@@ -274,15 +354,18 @@ Rules:
 1. Read centralized project `AI_CONTEXT.md` before source files.
 2. Read centralized `graphify-out/GRAPH_REPORT.md` before raw search if it exists.
 3. If centralized `graphify-out/wiki/index.md` exists, prefer it for conceptual navigation.
-4. Use Graphify commands for relationship questions:
-   - `graphify query "<question>"`
-   - `graphify path "<A>" "<B>"`
-   - `graphify explain "<concept>"`
-5. Use raw source search only after project and module scope are narrowed.
+4. Use centralized Graphify commands with explicit `--graph` for relationship questions:
+   - `graphify query "<question>" --graph ${project_knowledge_root}/data/projects/<project-relative-path>/graphify-out/graph.json`
+   - `graphify path "<A>" "<B>" --graph ${project_knowledge_root}/data/projects/<project-relative-path>/graphify-out/graph.json`
+   - `graphify explain "<concept>" --graph ${project_knowledge_root}/data/projects/<project-relative-path>/graphify-out/graph.json`
+5. Do not query an arbitrary local `graphify-out/graph.json` when the centralized project graph is available.
+6. Use raw source search only after project and module scope are narrowed.
 
 Graphify is a code-structure graph, not a business ontology. Business routing comes from centralized `project-relations.yaml`; code relationships come from centralized Graphify output and project context.
 
 For `zan-projects`, select the subproject first whenever possible, then read that subproject's centralized `AI_CONTEXT.md` and `graphify-out/GRAPH_REPORT.md`.
+
+When the answer depends on Graphify, report which centralized graph path was queried.
 
 ## Function 6 - Cross-Project Relationship And Impact Analysis
 
@@ -314,7 +397,7 @@ Workflow:
 2. Resolve service name and subproject if relevant.
 3. Read centralized candidate `AI_CONTEXT.md`.
 4. Read centralized candidate `graphify-out/GRAPH_REPORT.md`.
-5. Try `graphify query` for relationship or module questions.
+5. Try centralized `graphify query --graph ...` for relationship or module questions.
 6. Search source only inside the narrowed project or subproject.
 7. If the result comes from raw search, report that it is source-search evidence, not graph evidence.
 
@@ -340,6 +423,8 @@ Rules:
 7. Use the target project's own test/build/lint commands from its context; do not assume one workspace-wide command.
 
 If the user only asks for routing or explanation, do not modify files.
+
+For this workspace, do not modify centralized `project-knowledge` snapshots as part of ordinary business-project edits unless the task explicitly targets the knowledge repository itself.
 
 ## Output Formats
 
@@ -389,6 +474,8 @@ Ambiguous routing:
 - Calling `company-project-routing` after this skill has enough information.
 - Guessing a project from weak words like `支付`, `直播`, `后台`, or `登录`.
 - Treating Graphify as a business-term router.
+- Running broad `rg` or source-file reads before routing the project.
+- Querying Graphify without pinning `--graph` to the matched centralized project graph.
 - Reading all repositories when `project-relations.yaml` can narrow the scope.
 - Reading generated knowledge from business repositories after it has been migrated into `project-knowledge`.
 - Stopping at `zan-projects` root instead of selecting a subproject.
