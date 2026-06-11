@@ -59,6 +59,14 @@ allowed-tools:
 - 合并到 `develop` 时，如果分支合法来源比 `develop` 多出历史提交，将这些提交记录为“继承基线差异”，不得当作本轮阻断，也不得因此 cherry-pick 到 `origin/develop` 基线上重建分支。
 - 阶段 7 / 8 只评审和说明本轮提交范围；提测 Wiki 只写本轮变更，不写继承基线差异。
 
+## 执行偏移门禁
+
+- 对会产生外部状态的动作，必须把规则从“说明文字”变成可校验记录：先计算 `expected`，执行后采集 `actual`，再记录 `PASS`、`FAIL` 或 `REUSE`。
+- 新建分支和新建 worktree 必须执行 expected/actual 校验；实际分支名或路径与预期不一致时，必须停止在分支确认子流程，不得继续开发、提交、合并或写回。
+- 复用已有分支时不按当前命名模板要求重命名，但必须记录复用分支、复用来源、复用原因，并将命名校验结果写为 `REUSE`。
+- `docs/{short-id}/raw.md` 禁止只记录最终实际值；涉及分支、worktree、验证命令、合并授权、Wiki、TAPD 评论格式等硬规则时，必须记录规则来源、预期值、实际值和校验结果。
+- 必须执行并记录四个固定门禁：`VerificationGate`、`MergeConfirmationGate`、`WikiWriteGate`、`TAPD_COMMENT_GATE`；任一门禁缺少 expected/actual 或读回结果时，不得推进下一阶段。
+
 ## 入口
 
 - 首次处理：`/tapd-workflow <TAPD链接>`
@@ -70,11 +78,49 @@ allowed-tools:
 - 必须根据 TAPD 链接路径识别条目类型：`/bug/detail/` 是 Bug，`/story/detail/` 是 Story，`/task/detail/` 是 Task；不得拿 Task 链接调用 Bug 查询。
 - 如果某个 MCP 查询返回 `count: 0` 或未找到条目，不能视为采集完成；必须校验条目类型是否用错，改用正确类型重查，仍失败才停在采集阶段说明阻塞。
 
+## 阶段 0：二次接入恢复门禁
+
+在进入阶段 1 完整采集前，必须先完成最小 TAPD 读取和项目路由，拿到 `short-id` 与 `target_project` 后，再在目标项目仓库执行 `LocalGitResumeGate` 判断是否应恢复既有分支和上下文。禁止仅因为当前工作区没有 `docs/{short-id}` 或 `__test___/{short-id}` 就判定为首次开发。
+
+如果尚未解析出目标项目仓库，`LocalGitResumeGate` 必须记录为 `PENDING_PROJECT` 或 `BLOCKED`，不得在当前 shell CWD、workspace 根目录或猜测项目中搜索分支。
+
+`LocalGitResumeGate` 搜索顺序：
+
+1. 用户手动提供的分支：先用目标项目本地 git 验证 `refs/heads/<branch>`，再验证 `refs/remotes/origin/<branch>`；必须尝试读取 `<ref>:docs/{short-id}/raw.md`。
+2. TAPD 描述/评论中的提测 Wiki：从 Wiki 提取真实分支名、MR、commit 后，再用本地 git 验证分支并读取 raw。
+3. 本地 git 搜索：先搜索本地已有 refs；未命中或需要刷新时，允许在 `LocalGitResumeGate` 内执行 `git fetch origin --prune` 作为只读同步动作，然后搜索本地/远端分支名包含 `short-id` 的 `feature/*`、`fixbug/*` 分支，并搜索 commit message trailer：`--story=<short-id>`、`--bug=<short-id>`、`--task=<short-id>`。
+4. 对候选 ref 读取远端/本地分支内容：`git show <ref>:docs/{short-id}/raw.md`，并检查 `git ls-tree <ref> -- __test___/{short-id}`。
+5. 当前工作区 `docs/{short-id}` 和本地 worktree 只作为最后的加速路径，不得作为首次/二次判断的唯一依据。
+
+`LocalGitResumeGate` 必须记录：
+
+- `user_provided_branch`
+- `target_project`
+- `target_repo_path`
+- `candidate_refs`
+- `selected_resume_ref`
+- `raw_exists_on_ref`
+- `test_artifacts_exist_on_ref`
+- `branch_contains_tapd_commit`
+- `resume_decision`：`RESUME`、`FRESH`、`NEED_CONFIRMATION`、`PENDING_PROJECT` 或 `BLOCKED`
+- `resume_context_source`
+
+找到候选分支且 raw 存在时必须进入 `RESUME`；用户手动提供的分支存在但 raw 缺失时进入 `NEED_CONFIRMATION`；未手动提供分支时，必须遍历所有候选 ref，只有所有候选分支都缺少 raw 才进入 `NEED_CONFIRMATION`，不得因为第一个候选缺 raw 就阻断；完全找不到 Wiki、分支、MR、commit trailer 或 raw 时，才允许 `FRESH`。
+
+二次接入时必须合成 `ResumeContext`：
+
+- `PreviousContext`：从 `<selected_resume_ref>:docs/{short-id}/raw.md` 读取需求/Bug 描述、历史处理范围、历史不处理范围、历史内容处理策略、接口/附件证据、分支、Wiki、MR、验证结果。
+- `LatestTapdRefresh`：重新读取 TAPD 当前状态、最新评论、附件变化和字段变化；只记录变化，不覆盖 `PreviousContext`。
+- `UserIncrement`：用户本轮明确反馈、测试打回、新增需求或手动指定分支。
+- `ResumeScope`：只确认本轮增量处理范围；禁止重建完整需求上下文、重新初始化 raw 或默认新建分支。
+
 ## 启动协议
 
 本技能必须维护单一阶段状态机。为了保持界面整洁并明确状态，**禁止在文本回复中打印冗长的阶段台账**。相反，**每次阶段变更、进入新状态或遇到门禁阻塞时，必须强制调用 `update_topic` 工具**，在 `summary` 中记录：当前阶段、已完成阶段、TAPD 属性、阻塞项、下一动作等状态流转信息。
 
-阶段 1 采集成功并拿到 `short-id` 后，必须创建或更新 `docs/{short-id}/raw.md`。此文件是流程总账，后续每个阶段完成、阻塞、测试执行、集成验证、状态写回和最终清理都必须追加或更新对应条目。
+阶段 1 采集成功并拿到 `short-id` 后，必须创建或更新 `docs/{short-id}/raw.md`。二次接入时必须先从 `selected_resume_ref` 恢复旧 raw，再在复用分支中追加本轮增量记录；禁止在主工作区重新初始化一个新的 raw。此文件是流程总账，后续每个阶段完成、阻塞、测试执行、集成验证、状态写回和最终清理都必须追加或更新对应条目。
+
+`LocalGitResumeGate` 的结果在 raw 可写前必须先记录到 `update_topic`。进入 `FRESH` 后写入新 raw；进入 `RESUME` 后追加到恢复出的旧 raw；进入 `NEED_CONFIRMATION`、`PENDING_PROJECT` 或 `BLOCKED` 时不得为了记录 Gate 而在主工作区创建 raw。
 
 在执行任何写操作（特别是 `replace`、`write_file`、包含 `git` 等命令的 `run_shell_command`，或 TAPD/Wiki 写入）前，**必须在 thought 思考过程中进行显式自检**：“当前所处阶段为 X，是否满足写入前提？”。
 如果门禁未满足，必须停在当前阶段并通过 `update_topic` 和简短回复说明阻塞项，不得以普通修 Bug 的方式绕过。
@@ -88,9 +134,11 @@ allowed-tools:
 除阶段 1/2 维护 `docs/{short-id}/raw.md` 这一流程总账外，任何文件编辑、代码格式化、git 提交或合并前，**必须**先在当前回复中明确输出 `PRE_EDIT_GATE: PASS`。缺少以下任一证据时必须写 `PRE_EDIT_GATE: BLOCKED` 并停止一切写操作：
 
 1. TAPD 已按正确条目类型采集成功，且阶段 1 / 2 已完成；停在补充上下文阶段时不得通过编辑门禁。
-2. `本轮处理`、`本轮不处理`、`历史内容处理策略` 已声明。
-3. 用户已完成“分支确认子流程”中的二次确认。
-4. `gitlab-map` 已完成分支来源、复用关系和基线校验。
+2. `LocalGitResumeGate` 已执行并记录 `resume_decision`；只有 `RESUME` 或 `FRESH` 可以继续，其中 `RESUME` 必须已从 `selected_resume_ref` 恢复旧 raw；若为 `NEED_CONFIRMATION`、`PENDING_PROJECT` 或 `BLOCKED`，不得通过编辑门禁。
+3. `本轮处理`、`本轮不处理`、`历史内容处理策略` 已声明。
+4. 用户已完成“分支确认子流程”中的二次确认。
+5. 新建分支或新建 worktree 时，已展示并确认 `expected_branch_name` 和 `expected_worktree_path`；创建后 actual 与 expected 一致，或复用场景已记录 `REUSE`。
+6. `gitlab-map` 已完成分支来源、复用关系和基线校验。
 
 如果已经在 `PRE_EDIT_GATE: PASS` 前发生代码修改，立即停止继续修改和声称已修复，只能汇报违规阶段、已改文件、当前风险，并回到“分支确认子流程”或“规划子流程”补门禁。
 
@@ -98,6 +146,7 @@ allowed-tools:
 
 | 阶段 | 进入条件 | 退出前必须产出 |
 | --- | --- | --- |
+| 0. 二次接入恢复 | 已拿到 TAPD 链接或 short-id 线索，且已解析目标项目 | `LocalGitResumeGate` 结果；`RESUME` 时已恢复 `PreviousContext`，`FRESH` 时已证明没有恢复锚点，未解析目标项目时停在 `PENDING_PROJECT` |
 | 1. 采集上下文 | 已定位 TAPD 项 | TAPD 摘要、关键字段、评论、附件、原型/PRD 结论；`docs/{short-id}/raw.md` 已初始化 |
 | 2. 补充上下文 | 采集结果不足以判断范围 | 缺失信息已说明，用户补充已纳入上下文 |
 | 3. 确认本轮范围 | 上下文足以判断范围 | 已明确展示需求描述、Bug 描述、`本轮处理`、`本轮不处理`、`历史内容处理策略`，并获得用户确认 |
@@ -141,9 +190,10 @@ allowed-tools:
 ## 二次进入与增量开发（打回重修/隔天继续/需求补充）
 
 - 遇到测试打回、需求补充或隔天继续处理同一条目（Bug/Story/Task）时，必须判定为“增量开发/修复”。
-- 流程启动时必须先根据 TAPD 信息判断是否为二次开发：检查该 `short-id` 是否已有 `__test___/{short-id}/` 和 `docs/{short-id}/`，并读取其中的测试、计划、验证、评审和 `raw.md` 历史记录。
+- 流程启动时必须先执行 `LocalGitResumeGate` 判断是否为二次开发；不得仅检查当前工作区 `__test___/{short-id}/` 和 `docs/{short-id}/`。
 - 必须优先复用原有业务分支、工作区和既有 Wiki，禁止默认从头拉取新分支或推翻重建全量流程。
 - 必须将用户反馈的最新失败表现、新增需求或未完成项作为「本轮处理范围」，保留前一轮的有效产物。
+- 二次接入时，需求/Bug 上下文必须来自 `PreviousContext + LatestTapdRefresh + UserIncrement`；旧 raw 是历史上下文主来源，TAPD 刷新只用于补最新状态和新增变化。
 
 ## 持续推进规则（CLI 人格纪律）
 
@@ -177,12 +227,13 @@ allowed-tools:
 - 进入本阶段前必须通过“阶段推进前置门禁”：阶段 4 已标记 completed，且右侧面板/状态计划不再停留在阶段 4 loading。
 - 提交后使用 `gitlab-map` 确认可合并状态。
 - 合并条件只按本轮提交范围判断；合法来源带来的额外历史提交只记录为继承基线差异，不阻断合并。
-- **必须先向用户展示合并影响（源分支、目标分支、本轮提交列表），获得用户明确确认后，方可使用 GitLab 将已验证变更合并到 `develop`。**
+- **必须先执行 `MergeConfirmationGate`**：向用户展示源分支、目标分支、本轮提交列表、继承基线差异和合并目的，记录 `expected_source_branch`、`expected_target_branch`、`expected_commit_list`、`actual_source_branch`、`actual_target_branch`、`actual_commit_list`、`user_confirmation_text`；获得用户明确确认后，方可使用 GitLab 将已验证变更合并到 `develop`。
 - **严禁在未征得用户同意的情况下自动执行合并动作。**
 
 ### 6. 准备提测 Wiki
 - **必须先检查当前 TAPD 详情中是否已经存在提测 Wiki 链接。若已存在，直接在该 Wiki 页面上补充，不得新建。**
 - `服务名称` 必须通过 `company-project-routing` 解析。必须按模板生成完整 Wiki 正文。
+- 写入 Wiki 时必须执行 `WikiWriteGate`：记录目标 Wiki、写入前正文摘要或 hash、预期补丁、写入后读回结果；读回内容未包含预期补丁时必须停止。
 
 ### 7. 写回 TAPD
 仅在用户确认后执行：创建或更新提测 Wiki、写 Bug 评论、更新 TAPD 状态。
@@ -192,7 +243,7 @@ allowed-tools:
 - Bug 评论正文只能由最终 Wiki 链接生成，且必须完全等于单行：`提测wiki：[https://www.tapd.cn/{workspace_id}/markdown_wikis/show/#{wiki_id}](https://www.tapd.cn/{workspace_id}/markdown_wikis/show/#{wiki_id})`。
 - `{wiki链接}` 必须是 TAPD Wiki 的完整可点击地址，例如 `https://www.tapd.cn/{workspace_id}/markdown_wikis/show/#{wiki_id}`。
 - 评论正文禁止拼接 MR、Jenkins、构建结果、实现说明、验证摘要或多行文本；这些信息只能出现在最终回复中，不能写入 TAPD 评论。
-- 如果评论正文不完全匹配上述格式，必须停止写评论并修正正文，不得调用 `create_comments`。
+- 必须记录 `expected_comment_body`、`actual_comment_body` 和格式校验结果；如果评论正文不完全匹配上述格式，必须停止写评论并修正正文，不得调用 `create_comments`。
 
 ### 8. 清理
 确认 GitLab 合并、TAPD 写回。

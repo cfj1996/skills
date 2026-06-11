@@ -27,6 +27,16 @@
   - 本轮提交范围
   - 继承基线差异：合法来源分支相对 `develop` 多出的历史提交，允许存在但不得进入本轮说明
   - 是否满足合并条件
+- 合并授权必须记录 `MergeConfirmationGate`：
+  - `expected_source_branch`
+  - `expected_target_branch`
+  - `expected_commit_list`
+  - `actual_source_branch`
+  - `actual_target_branch`
+  - `actual_commit_list`
+  - `user_confirmation_text`
+  - `merge_confirmation_result`
+  若实际分支或提交列表与预期不一致，必须重新展示合并影响并重新获得用户确认。
 - 提测前校验必须记录：
   - 当前分支最新提交
   - `origin/develop` 是否已包含该提交

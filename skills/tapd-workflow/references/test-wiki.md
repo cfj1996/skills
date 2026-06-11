@@ -99,3 +99,28 @@
 - 如果正文中已经存在模块，必须采用增量追加，不得整页替换。
 - **影子备份风险控制**：在执行任何 Wiki `update_wiki` 操作前，必须先将读取到的原正文（若存在）缓存到 thought 思考过程中。若写入后用户反馈内容异常或发现逻辑错误，必须能够根据缓存的原正文进行手动回滚。
 - 当处理二次进入（测试打回、继续开发、需求补充）时，找到该条目现有的 Wiki 记录，在已有条目下方增量追加提测说明（如 `**[追加提测/二次提测 MM-DD]**：补充了 xxx 功能 / 修复了 xxx 问题`），严禁覆盖或删除历史提测内容。
+
+## WikiWriteGate
+
+调用 `create_wiki` 或 `update_wiki` 前后必须记录并校验：
+
+- `target_wiki_id`：将写入的 Wiki 页面；新建时先记录父级和预期标题，创建后记录实际 ID。
+- `write_mode`：`create`、`update` 或 `append_existing`。
+- `before_content_hash`：写入前正文 hash；新建页面时记录为 `NEW_PAGE`。
+- `expected_patch`：本轮预期新增或变更的最小正文片段。
+- `after_content_hash`：写入后重新读取目标 Wiki 得到的正文 hash。
+- `readback_contains_expected_patch`：写入后读回正文是否包含 `expected_patch`。
+- `write_result`：`PASS` 或 `FAIL`。
+
+`readback_contains_expected_patch` 不是 `true` 时必须停止，不得写 TAPD 评论或更新状态。二次提测或增量开发时，`write_mode` 必须为 `append_existing`，并且 `before_content_hash` 不能等于 `NEW_PAGE`。
+
+## TAPD_COMMENT_GATE
+
+调用 `create_comments` 前必须记录并校验：
+
+- `wiki_url`：最终 Wiki 完整 URL。
+- `expected_comment_body`：由 `wiki_url` 生成的固定单行 Markdown。
+- `actual_comment_body`：即将传给 `create_comments` 的真实字符串。
+- `comment_format_result`：`PASS` 或 `FAIL`。
+
+`actual_comment_body` 必须完全等于 `expected_comment_body`。如果不相等，或包含 MR、Jenkins、构建结果、实现说明、验证摘要、多行说明，必须停止写评论。

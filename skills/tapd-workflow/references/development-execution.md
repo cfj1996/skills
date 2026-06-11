@@ -10,6 +10,8 @@
 
 进入本阶段时必须已完成范围确认，并通过 TAPD MCP 写回状态：Bug 为“修复中”，Story/Task 为“进行中”。写回失败时不得继续创建/切换分支或修改代码。
 
+分支确认必须包含执行偏移校验：新建分支或新建 worktree 时，先展示并获得用户确认 `expected_branch_name` 与 `expected_worktree_path`，创建后立即校验实际值；复用分支时记录命名校验结果为 `REUSE`。
+
 ## 2. 规划（Superpowers 路由）
 
 根据阶段 1-3 采集的上下文和本轮范围，做场景判定并路由到对应 Superpowers 技能。
@@ -31,6 +33,7 @@
 - **流程总账**：`docs/{short-id}/raw.md` 必须在阶段 1 初始化，并在阶段 4 持续更新 TAPD id 与描述、需求/Bug 描述、单元测试、集成测试、流程进度和创建时间；修复时间在未完成前可记为“未完成/待填写”，阶段 8 清理前必须补成真实结果或明确阻塞原因。
 - **任务执行**：有 subagent 能力时用 `superpowers:subagent-driven-development`，否则用 `superpowers:executing-plans`。
 - **TDD 约束**：所有实现必须遵循 `superpowers:test-driven-development`（RED -> GREEN -> REFACTOR），提交时需附带 Superpowers 计划文档。
+- **VerificationGate**：实现后必须在 `docs/{short-id}/verification.md` 和 `docs/{short-id}/raw.md` 记录 `expected_commands`、`actual_commands`、每条命令的退出码、关键输出、结果和阻断原因。声称“通过”的命令必须实际出现在 `actual_commands` 中；失败或无法执行的命令必须记录 `blocker_reason`，不得改写成通过。
 - **自动独立评审**：在完成代码实现与验证（Green 阶段）后，主 Agent 必须**自动发起**独立 Agent 评审（见 [reviewer.md](../references/reviewer.md)），无需等待用户针对评审动作的授权。主 Agent 禁止自行判定通过。
 - **完成验证**：评审通过后，声称完成前运行 `superpowers:verification-before-completion`，展示真实命令输出。
 
@@ -40,8 +43,9 @@
 - [ ] 测试代码文件已按规范存放于项目根目录的 `__test___/{short-id}/xxx.test.(js|ts)`。
 - [ ] 计划、验证、评审和 Superpowers 过程文档已按规范存放于 `docs/{short-id}/`。
 - [ ] `docs/{short-id}/raw.md` 已记录流程进度、单元测试、集成测试和创建时间；修复时间已记录真实结果，或在未进入清理前明确标记为“未完成/待填写”。
-- [ ] 分支与 Worktree 合规，已通过 `gitlab-map` 校验。
+- [ ] 分支与 Worktree 合规，已记录 expected/actual 与命名校验结果，并通过 `gitlab-map` 校验。
 - [ ] 测试证据中包含失败用例和修复后的通过结果。
+- [ ] `VerificationGate` 已记录 expected/actual 命令对应关系；所有通过/失败/阻断结论均有真实命令证据。
 - [ ] 已获独立评审 `REVIEW_PASSED`，评审意见已记录。
 - [ ] 任务收尾：执行 `superpowers:finishing-a-development-branch`。
 

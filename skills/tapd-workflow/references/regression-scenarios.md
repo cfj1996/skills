@@ -119,6 +119,118 @@
   - 阻断原因包含“复用已有分支默认不创建新 worktree”
   - 要求切换到已有工作区，或重新向用户确认是否需要 `切换/复用已有分支 + 新 worktree`
 
+## 场景 K2：新建分支名与命名模板不一致（应阻断）
+
+- 输入场景：
+  - TAPD 类型为 Story，`git-user=cfj`，`YYMMDD=260611`，`slug=大后台新增中台管理模块`，`short-id=1073229`
+  - 规则计算出的 `expected_branch_name` 为 `feature/cfj.260611.大后台新增中台管理模块-1073229`
+  - 执行者实际创建了 `feature/1073229-大后台新增中台管理模块-260611-cfj`
+  - `docs/{short-id}/raw.md` 只记录实际分支名，没有记录 expected/actual 校验结果
+- 期望门禁：
+  - `regression-checker` 返回 `FAIL`
+  - 阻断原因包含“实际分支名与 expected_branch_name 不一致”
+  - 要求停在分支确认子流程；不得继续开发、提交、合并或写回
+
+## 场景 K3：Wiki 写入后未读回确认（应阻断）
+
+- 输入场景：
+  - 执行者调用了 `update_wiki`
+  - 未记录 `before_content_hash`、`expected_patch`、`after_content_hash`
+  - 未重新读取目标 Wiki，或 `readback_contains_expected_patch` 不是 `true`
+- 期望门禁：
+  - `regression-checker` 返回 `FAIL`
+  - 阻断原因包含“WikiWriteGate 缺少写入后读回确认”
+  - 禁止继续写 TAPD 评论或更新状态
+
+## 场景 K4：TAPD 评论正文夹带合并信息（应阻断）
+
+- 输入场景：
+  - `expected_comment_body` 是固定单行 Wiki Markdown 链接
+  - `actual_comment_body` 在链接后追加了 MR、Jenkins、构建结果、实现说明或验证摘要
+- 期望门禁：
+  - `regression-checker` 返回 `FAIL`
+  - 阻断原因包含“actual_comment_body 必须完全等于 expected_comment_body”
+  - 不得调用 `create_comments`
+
+## 场景 K5：合并前未确认实际提交列表（应阻断）
+
+- 输入场景：
+  - 用户确认了 `expected_source_branch`、`expected_target_branch` 和 `expected_commit_list`
+  - 合并前实际分支或 `actual_commit_list` 与 expected 不一致
+  - 执行者准备继续合并到 `develop`
+- 期望门禁：
+  - `regression-checker` 返回 `FAIL`
+  - 阻断原因包含“MergeConfirmationGate actual 与 expected 不一致”
+  - 必须重新展示合并影响并重新获得用户确认
+
+## 场景 K6：验证命令未实际执行却写成通过（应阻断）
+
+- 输入场景：
+  - `expected_commands` 包含专项测试和构建命令
+  - `actual_commands` 缺少构建命令，或构建命令失败
+  - `verification.md` 或 `raw.md` 写成“构建通过”
+- 期望门禁：
+  - `regression-checker` 返回 `FAIL`
+  - 阻断原因包含“VerificationGate 中声称通过的命令必须实际执行且成功”
+  - 失败或无法执行的命令必须记录 `blocker_reason`
+
+## 场景 K7：worktree 已删但远端/本地分支有 raw 却 Fresh（应阻断）
+
+- 输入场景：
+  - 当前工作区不存在 `docs/{short-id}` 和 `__test___/{short-id}`
+  - 本地或远端 git ref 中存在包含 `short-id` 的 `feature/*` 或 `fixbug/*` 分支
+  - `git show <ref>:docs/{short-id}/raw.md` 可以读取旧 raw
+  - 执行者仍判定为首次开发并初始化新的 raw
+- 期望门禁：
+  - `regression-checker` 返回 `FAIL`
+  - 阻断原因包含“禁止仅因当前工作区不存在 docs 判定 FRESH”
+  - 必须进入 `RESUME`，从 `<ref>:docs/{short-id}/raw.md` 恢复 `PreviousContext`
+
+## 场景 K8：用户提供分支但未验证就从头采集（应阻断）
+
+- 输入场景：
+  - 用户明确提供分支 `feature/xxx`
+  - 执行者没有验证 `refs/heads/feature/xxx` 或 `refs/remotes/origin/feature/xxx`
+  - 执行者没有尝试 `git show <ref>:docs/{short-id}/raw.md`
+  - 执行者开始按首次开发重新采集、确认范围或新建分支
+- 期望门禁：
+  - `regression-checker` 返回 `FAIL`
+  - 阻断原因包含“用户提供分支必须先通过 LocalGitResumeGate 验证”
+  - 分支存在但 raw 缺失时必须进入 `NEED_CONFIRMATION`，不得直接 Fresh
+
+## 场景 K9：RESUME 后覆盖历史上下文（应阻断）
+
+- 输入场景：
+  - `LocalGitResumeGate` 已找到旧 raw 并进入 `RESUME`
+  - 执行者重新完整采集 TAPD，并用新摘要覆盖 `PreviousContext`
+  - 本轮处理范围包含旧 raw 已完成或旧 raw 明确不处理的内容
+- 期望门禁：
+  - `regression-checker` 返回 `FAIL`
+  - 阻断原因包含“二次接入必须由 PreviousContext + LatestTapdRefresh + UserIncrement 合成本轮增量范围”
+  - 旧 raw 的历史处理范围、历史不处理范围和历史内容处理策略必须保留
+
+## 场景 K10：未解析目标项目就在当前目录搜分支（应阻断）
+
+- 输入场景：
+  - 已拿到 TAPD 链接或 short-id，但尚未完成项目路由
+  - 执行者直接在当前 shell CWD 或 workspace 根目录执行 `git for-each-ref`、`git log --all` 或 `git show <ref>:docs/{short-id}/raw.md`
+- 期望门禁：
+  - `regression-checker` 返回 `FAIL`
+  - 阻断原因包含“LocalGitResumeGate 必须先解析 target_project 和 target_repo_path”
+  - `resume_decision` 必须是 `PENDING_PROJECT` 或 `BLOCKED`
+
+## 场景 K11：多候选分支第一个缺 raw 就阻断（应阻断）
+
+- 输入场景：
+  - 搜索到多个候选 ref：A 和 B
+  - A 不存在 `docs/{short-id}/raw.md`
+  - B 存在 `docs/{short-id}/raw.md`
+  - 执行者因为 A 缺 raw 进入 `NEED_CONFIRMATION`
+- 期望门禁：
+  - `regression-checker` 返回 `FAIL`
+  - 阻断原因包含“必须遍历所有候选 ref”
+  - 应选择 B 并进入 `RESUME`
+
 ## 场景 L：Task 链接误按 Bug 查询后继续执行（应阻断）
 
 - 输入场景：
