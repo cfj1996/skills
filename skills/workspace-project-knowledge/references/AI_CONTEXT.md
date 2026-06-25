@@ -2,7 +2,7 @@
 
 # 系统定位
 
-`/Users/cfj/projects` 是本机公司项目和工具项目的工作区入口。这里不是单个代码仓库，而是多个业务系统、基础库、工具链、AI 技能和参考项目的集合。
+`${workspace_root}` 是本机公司项目和工具项目的工作区入口。这里不是单个代码仓库，而是多个业务系统、基础库、工具链、AI 技能和参考项目的集合。
 
 本文件用于给 AI 建立 workspace 级上下文：先理解项目版图，再进入具体项目的 `AI_CONTEXT.md` 和 `graphify-out/GRAPH_REPORT.md`，最后才读源码。
 
@@ -173,30 +173,30 @@
 
 结构化索引：
 
-- `/Users/cfj/projects/project-relations.yaml`
+- `${project_knowledge_root}/data/workspace/project-relations.yaml`
 
 每个项目的标准入口：
 
-- `/Users/cfj/projects/<repo>/AI_CONTEXT.md`
-- `/Users/cfj/projects/<repo>/graphify-out/GRAPH_REPORT.md`
+- `${project_knowledge_root}/data/projects/<repo>/AI_CONTEXT.md`
+- `${project_knowledge_root}/data/projects/<repo>/graphify-out/GRAPH_REPORT.md`
 
 特殊 Monorepo：
 
-- `zan-projects` 的根入口是 `/Users/cfj/projects/zan-projects/AI_CONTEXT.md`
+- `zan-projects` 的根入口是 `${project_knowledge_root}/data/projects/zan-projects/AI_CONTEXT.md`
 - `zan-projects` 的子项目入口包括：
-  - `/Users/cfj/projects/zan-projects/admin/facilitator/AI_CONTEXT.md`
-  - `/Users/cfj/projects/zan-projects/admin/factory/AI_CONTEXT.md`
-  - `/Users/cfj/projects/zan-projects/admin/insight/AI_CONTEXT.md`
-  - `/Users/cfj/projects/zan-projects/admin/live-monitor/AI_CONTEXT.md`
-  - `/Users/cfj/projects/zan-projects/admin/siqian/AI_CONTEXT.md`
-  - `/Users/cfj/projects/zan-projects/example/school/AI_CONTEXT.md`
+  - `${project_knowledge_root}/data/projects/zan-projects/admin/facilitator/AI_CONTEXT.md`
+  - `${project_knowledge_root}/data/projects/zan-projects/admin/factory/AI_CONTEXT.md`
+  - `${project_knowledge_root}/data/projects/zan-projects/admin/insight/AI_CONTEXT.md`
+  - `${project_knowledge_root}/data/projects/zan-projects/admin/live-monitor/AI_CONTEXT.md`
+  - `${project_knowledge_root}/data/projects/zan-projects/admin/siqian/AI_CONTEXT.md`
+  - `${project_knowledge_root}/data/projects/zan-projects/example/school/AI_CONTEXT.md`
 
 # AI 使用规则
 
 当用户的问题涉及项目、业务、功能、服务名、Jenkins Job、私有包、代码入口或跨项目影响范围时，必须按这个顺序工作：
 
 1. 读取本文件。
-2. 读取 `/Users/cfj/projects/project-relations.yaml`。
+2. 读取 `${project_knowledge_root}/data/workspace/project-relations.yaml`。
 3. 通过 `routes`、`domains`、`projects`、`packages`、`jenkins_jobs` 定位候选项目。
 4. 读取命中项目的 `AI_CONTEXT.md`。
 5. 读取命中项目的 `graphify-out/GRAPH_REPORT.md`。

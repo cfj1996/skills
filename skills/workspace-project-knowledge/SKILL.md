@@ -69,10 +69,10 @@ The bundled fallback `references/project-relations.yaml` may use `${workspace_ro
 Resolve `${workspace_root}` before reporting paths or reading project-local files:
 
 1. If the user explicitly provides a workspace path, use that.
-2. If the current working directory is inside a known project workspace, use that workspace root.
+2. Read the current tool entry file (`AGENTS.md`, `CLAUDE.md`, or `GEMINI.md`) and use its `WORKSPACE_ROOT` value.
 3. If `WORKSPACE_ROOT`, `PROJECTS_ROOT`, or a similar environment variable is set, use it.
-4. If a local mirror exists, use the directory containing local `AI_CONTEXT.md` and `project-relations.yaml`.
-5. For cfj's own machine only, the default workspace root is `/Users/cfj/projects`.
+4. If the current working directory is inside a workspace that has a current-tool entry file with a `workspace-ai-rules` section, use that entry file's `WORKSPACE_ROOT`.
+5. If a local mirror exists, use the directory containing `project-knowledge/data/workspace/project-relations.yaml`.
 
 When returning paths, substitute `${workspace_root}` with the resolved real path. If no workspace root can be resolved, return the project name and ask the user for their local workspace root instead of guessing.
 
@@ -82,20 +82,20 @@ The generated project knowledge has been centralized. Do not assume each busines
 
 Resolve the project knowledge root before reading generated knowledge:
 
-1. If `PROJECT_KNOWLEDGE_ROOT` is set, use it.
-2. If `${workspace_root}/project-knowledge` exists, use it.
-3. For cfj's own machine only, the default project knowledge root is `/Users/cfj/projects/project-knowledge`.
+1. Read the current tool entry file and use its `PROJECT_KNOWLEDGE_ROOT` value when present.
+2. If `PROJECT_KNOWLEDGE_ROOT` is set in the environment, use it.
+3. If `${workspace_root}/project-knowledge` exists, use it.
 4. If no project knowledge root exists, fall back to this skill's bundled `references/` files and then to live source search.
 
 When returning generated knowledge paths, prefer the centralized path under `${project_knowledge_root}`. Return live source paths under `${workspace_root}` only when pointing to actual source code.
 
-For cfj's machine, the default centralized layout is:
+The default centralized layout is:
 
-- workspace routing index: `/Users/cfj/projects/project-knowledge/data/workspace/project-relations.yaml`
-- workspace context: `/Users/cfj/projects/project-knowledge/data/workspace/AI_CONTEXT.md`
-- project context: `/Users/cfj/projects/project-knowledge/data/projects/<project-relative-path>/AI_CONTEXT.md`
-- project graph report: `/Users/cfj/projects/project-knowledge/data/projects/<project-relative-path>/graphify-out/GRAPH_REPORT.md`
-- project graph json: `/Users/cfj/projects/project-knowledge/data/projects/<project-relative-path>/graphify-out/graph.json`
+- workspace routing index: `${project_knowledge_root}/data/workspace/project-relations.yaml`
+- workspace context: `${project_knowledge_root}/data/workspace/AI_CONTEXT.md`
+- project context: `${project_knowledge_root}/data/projects/<project-relative-path>/AI_CONTEXT.md`
+- project graph report: `${project_knowledge_root}/data/projects/<project-relative-path>/graphify-out/GRAPH_REPORT.md`
+- project graph json: `${project_knowledge_root}/data/projects/<project-relative-path>/graphify-out/graph.json`
 
 ## Company Runtime Relationship Map
 
