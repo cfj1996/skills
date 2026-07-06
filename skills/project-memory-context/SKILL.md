@@ -7,11 +7,11 @@ description: Use before working on a local project when prior AI session memory 
 
 Use this skill before source search or implementation when the task mentions a local project, prior AI work, historical decisions, repeated errors, previous attempts, project memory, confidence of remembered context, context-window pressure, or asks whether something has been done before.
 
-This skill consumes `ai-session-memory` output. That output is useful evidence, not a guaranteed fact source.
+This skill consumes `ai-session-memory` output. That output is fuzzy memory evidence, not a truth database.
 
 ## Core Rule
 
-Never inject raw sessions. Retrieve a small context pack, inspect its trust signals, and use it as scoped evidence.
+Never inject raw sessions. Retrieve a small context pack, inspect its score and trust signals, and use it as scoped evidence.
 
 Run:
 
@@ -21,22 +21,30 @@ skills/project-memory-context/scripts/context-pack.sh <project-name> "<task quer
 
 The script calls `ai-session-memory context-pack`. Treat command failure as a real failure; do not silently continue with remembered context.
 
-## Trust Levels
+## Memory Semantics
 
-Use memory according to status and validity:
+Use memory as leads for attention, not as final proof. Current user intent, current source code, tests, and durable `project-knowledge` outrank memory.
+
+Primary context-pack signals:
 
 | Signal | Meaning | How to use |
 |---|---|---|
+| `memory_kind=reviewed_memory` | Reviewed local memory, usually from `approved` or `promoted` items | Treat as strong working context, still verify against current source |
+| `memory_kind=memory_hint` | High-relevance fuzzy memory, often from `candidate` items | Treat as a useful clue to verify, not a fact |
+| `score` | Retrieval strength for the current task query | Prefer higher score items when deciding what to inspect first |
+| `selected_reason` / `selection_notes` | Why the item entered the pack | Use this to understand whether it matched query text, entity, or review status |
 | `promoted` | Reviewed and written to durable project knowledge | Treat as strong context, still verify against current source |
 | `approved` | Human-reviewed local memory | Treat as reliable working context |
-| `candidate` | Auto-extracted, unreviewed memory | Treat as a clue only |
+| `candidate` | Auto-extracted, unreviewed memory | Treat as fuzzy memory; use only with source/code verification |
 | `rejected` | Explicitly rejected | Ignore |
 | `superseded` / `retracted` | Old or withdrawn conclusion | Ignore unless user asks for history |
 | `validity=current` | Currently usable | Prefer |
 | `validity=outdated/contradicted/failed` | Known stale, wrong, or failed | Do not use as guidance |
 
-Higher confidence comes from:
+Higher usefulness comes from:
 
+- High `score` for the current query.
+- `memory_kind=reviewed_memory`.
 - `approved` or `promoted` status.
 - `validity=current`.
 - Evidence points to a concrete source session and source file.
@@ -44,8 +52,10 @@ Higher confidence comes from:
 - Multiple independent sessions support the same conclusion.
 - It records a verified command/test result rather than an inferred summary.
 
-Lower confidence comes from:
+Lower usefulness comes from:
 
+- Low score or weak query match.
+- `memory_kind=memory_hint`.
 - `candidate` status.
 - `confidence=inferred`.
 - Missing source references.
@@ -60,10 +70,10 @@ Lower confidence comes from:
    - Prefer the resolved project name over guessing from the shell cwd.
 2. Build a focused query from the user's actual task. Include file names, commands, errors, APIs, or business terms when present.
 3. Retrieve the context pack with the helper script.
-4. Read `selection_notes` before using selected memories; they explain why items were included.
+4. Read `selection_notes`, `selected_reason`, `memory_kind`, and `score` before using selected memories.
 5. Read `excluded_memory` before acting on memory; excluded items may show superseded, retracted, contradicted, or failed directions to avoid.
-6. Use `selected_memory` with `approved/promoted/current` as working context.
-7. Use `candidate` memory only as leads to verify in code.
+6. Use `reviewed_memory` as working context after quick verification.
+7. Use `memory_hint` and `candidate` memory as leads for source search, test selection, or questions to verify.
 8. Ignore `rejected`, `superseded`, `retracted`, `outdated`, `contradicted`, and `failed` memory by default.
 9. If memory conflicts with current source code, prefer current source code and mention that the memory appears stale.
 10. Preserve source references when memory affects a decision.
@@ -74,6 +84,9 @@ Lower confidence comes from:
 - `selected_memory`: bounded memories selected for this task.
 - `excluded_memory`: memories deliberately excluded, with reasons.
 - `selection_notes`: evidence for why the selected memories were included.
+- `memory_kind`: `reviewed_memory` for stronger context or `memory_hint` for fuzzy leads.
+- `score`: task-specific retrieval strength.
+- `selected_reason`: short explanation for why one memory was selected.
 - `status`: review state such as `candidate`, `approved`, or `promoted`.
 - `validity`: currentness state such as `current`, `contradicted`, or `failed`.
 - `confidence`: extraction confidence such as `extracted` or `inferred`.
