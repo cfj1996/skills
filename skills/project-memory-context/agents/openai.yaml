@@ -1,0 +1,7 @@
+interface:
+  display_name: "项目记忆上下文"
+  short_description: "检索带可信度边界的项目 AI 记忆上下文"
+  default_prompt: "Use $project-memory-context before project work to retrieve a bounded ai-session-memory context pack, inspect selected/excluded memories, and apply confidence, validity, and source-reference rules."
+
+policy:
+  allow_implicit_invocation: true
