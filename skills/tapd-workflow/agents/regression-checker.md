@@ -45,6 +45,10 @@
   - 已执行 `WikiWriteGate`：记录 `target_wiki_id`、`write_mode`、`before_content_hash`、`expected_patch`、`after_content_hash`、`readback_contains_expected_patch` 和 `write_result`
   - Wiki 写入后已重新读取目标页面；`readback_contains_expected_patch` 必须为 `true`
   - 分支名是真实 Git 分支，不是 `short-id`
+  - 已记录 `effective_wiki_branch_name`、`wiki_branch_candidates`、`source_development_branch` 和 `wiki_branch_selection_result`
+  - `effective_wiki_branch_name` 必须等于原开发源分支；若冲突流程使用 `A -> C -> develop`，则必须等于原 `feature/*` 或 `fixbug/*` 分支 `A`
+  - 同一个 Wiki 条目只能有一行 `代码分支名`，且只能包含一个分支名；不得同时写“中间分支”和“修复分支”，也不得只写或重复写 `merge/*` 中间分支
+  - Wiki 的 `代码分支名` 行必须完全等于 `effective_wiki_branch_name`；不得写入 `merge/*` 中间分支
   - 测试人员来自正确 TAPD 字段映射
   - 服务名称通过 `company-project-routing` 获取，不是直接复制项目名
   - Wiki 内容没有包含未声明的历史内容

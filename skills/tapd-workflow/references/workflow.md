@@ -89,6 +89,7 @@ flowchart LR
 - **准备前，必须先查询 TAPD 详情与历史评论，检查是否已存在提测 Wiki 链接。若已存在，则在原页面补充，绝对禁止新建 Wiki。**
 - `服务名称` 必须通过 `company-project-routing` 解析。
 - 写入前必须读取对应的目标页面（月目录或已有子 Wiki）。
+- 必须先确认原开发源分支并记录 `effective_wiki_branch_name`；Wiki 的 `代码分支名` 只能写这一条 `feature/*` 或 `fixbug/*` 分支。若冲突流程通过 `merge/* -> develop` 合并，禁止把 `merge/*` 中间分支写入 Wiki。
 - TAPD 写入前必须向用户展示完整 Wiki 草稿。
 - Wiki 写入必须执行 `WikiWriteGate` 并在写入后读回目标页面；读回内容不包含预期补丁时不得继续写 TAPD 评论或状态。
 
