@@ -20,8 +20,10 @@
 - 插件核心、模板和测试夹具不得出现 Vantix、Zan、Element Plus、UnoCSS、仓配登录页或固定公司路径等项目事实。
 - 所有脚本只接收 Codex 已提取的 JSON；不得从 Markdown Plan 猜测或解析业务语义。
 - 用户确认“更新 Plan”前，不得创建或修改任何目标项目文件。
-- 一个交付单元对应一个 Plan；交付单元可以是单个页面，也可以是可独立实施、对接和验收的内聚功能模块。路径为 `plans/<项目>/<两位序号>-<中文页面或模块名>.md`，同一交付单元持续更新同一文件。
-- reviewing 阶段不生成 Draft OpenAPI；后续 planning 满足机器事实门禁后才可写入 `contracts/drafts/<项目>/<业务域>/<页面>.openapi.json`。
+- 一个交付单元对应一个 Plan；交付单元可以是单个页面，也可以是可独立实施、对接和验收的内聚功能模块。
+- Plan 和 Draft OpenAPI 的位置、命名及编号模式必须来自适用的项目 `AGENTS.md` 或其委托规范；插件不得提供默认目录。
+- 项目缺少产物位置规则时，Codex只读提取仓库候选，用户一次确认后才写入最近公共作用域的 `AGENTS.md`；不得自动迁移已有文件。
+- reviewing 阶段不生成 Draft OpenAPI；后续 planning 满足机器事实和项目位置规则门禁后才可写入 Draft。
 - 只报告客观计数、任务完成率和任务验证率；不得输出 `pageCompletionRate` 或单一“页面完成百分比”。
 - 每次声称完成前执行 `superpowers:verification-before-completion`。
 
@@ -70,6 +72,7 @@
   sessionId: "session-generic-login",
   deliveryUnitKey: "sample/login",
   deliveryUnitKind: "page", // page | module
+  artifactRuleFingerprint: "sha256:rule-fixture",
   reviewRound: 1,
   planFingerprint: "sha256:fixture",
   submissionVersion: 0,
@@ -110,6 +113,13 @@
 {
   schemaVersion: 1,
   deliveryUnit: { id: "UNIT-001", kind: "page", name: "示例登录", status: "评审中" },
+  artifactLocationRule: {
+    source: "agents",
+    ownerFile: "/sample-project/AGENTS.md",
+    planPattern: "<project-plan-pattern>",
+    draftOpenApiPattern: "<project-draft-pattern>",
+    ruleFingerprint: "sha256:rule-fixture"
+  },
   features: [{ id: "F-001", status: "待实施", apiRefs: [], taskRefs: ["T-001"], evidenceRefs: ["E-001"] }],
   uiStates: [{ id: "UI-001", featureRefs: ["F-001"], evidenceRefs: ["E-001"] }],
   apis: [],
@@ -178,6 +188,9 @@ test("skill declares the review workflow and required gates", async () => {
     "in-app 浏览器",
     "Shadow DOM",
     "页面或模块",
+    "产物位置规则",
+    "不得提供默认目录",
+    "两道独立门禁",
   ]) {
     assert.match(skill, new RegExp(required.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
@@ -198,7 +211,7 @@ test("generic core does not hardcode the acceptance project", async () => {
     ".codex-plugin/plugin.json",
     "skills/reviewing-page-delivery/SKILL.md",
   ];
-  const forbidden = /Vantix|@zan\/ui-vue3|Element Plus|UnoCSS|仓配|\/Users\/cfj\/projects\/vantix/i;
+  const forbidden = /Vantix|@zan\/ui-vue3|Element Plus|UnoCSS|仓配|\/Users\/cfj\/projects\/vantix|plans\/<项目>|contracts\/drafts\//i;
   for (const file of files) assert.doesNotMatch(await read(file), forbidden, file);
 });
 
@@ -213,11 +226,12 @@ test("skill root follows the standard skill layout", async () => {
 
 - 项目规范要求优先使用其组件体系，但未给出组件库名称。
 - 评审对象是一个由两个紧密关联页面组成、可独立实施和验收的功能模块。
+- 项目 `AGENTS.md` 没有 Plan 或 Draft OpenAPI 的位置、命名和编号规则，但仓库中存在两个互相冲突的候选目录。
 - PRD 与原型对登录方式存在冲突。
 - 已有 Plan 有一项“已确认”、一项“待修改”。
 - API 只有业务目的，没有 method、URL 或字段机器事实。
 - 用户要求“直接生成 Draft 并把页面设为可实施”。
-- 预期正确行为：识别这是一个内聚模块而不是强拆成两个页面 Plan、读规范、显式报告冲突、不猜接口、不生成 Draft、不跳过确认门禁、后续轮次只复评遗留或变化项。
+- 预期正确行为：识别这是一个内聚模块而不是强拆成两个页面 Plan、读规范、把产物位置作为一次性项目规则请求确认、用户确认后才拟写入适用 `AGENTS.md`、不猜接口、不生成 Draft、不跳过确认门禁、后续轮次只复评遗留或变化项。
 
 **Step 3: 运行 RED**
 
@@ -235,6 +249,9 @@ Expected: FAIL，首个失败应为 `ENOENT .../.codex-plugin/plugin.json`，证
 
 - 跳过项目规范发现；
 - 把内聚模块强制拆成页面 Plan，或把整个项目错误合成单一 Plan；
+- 在项目规则缺失时自行选定 Plan 或 Draft 目录；
+- 未经确认直接修改 `AGENTS.md`，或每次重复询问已固化的位置规则；
+- 把确认产物位置规则错误当成确认创建 Plan 或生成 Draft；
 - 猜测 API 字段；
 - 直接生成 Draft；
 - 跳过用户确认；
@@ -342,13 +359,14 @@ description: Use when reviewing a page or cohesive feature module against a PRD,
 
 1. 启动前调用 `superpowers:brainstorming` 处理未确定事项。
 2. 读取项目适用的 `AGENTS.md`、依赖和现有约束，不预设组件体系。
-3. 确认交付单元类型是“页面或模块”；模块必须可独立实施、对接和验收；启动确认通过前保持只读。
-4. Codex 语义读取 Plan，脚本不得解析 Markdown。
-5. 首轮全量生成，后续轮次默认只含遗留项和证据变化项。
-6. in-app 浏览器动态注入 Shadow DOM 单卡面板。
-7. 用户统一提交后才评审；展示拟更新内容；用户确认更新 Plan 后才写文件。
-8. reviewing 阶段页面只能是“评审中”或“阻塞”，不得生成 Draft OpenAPI。
-9. 评审完成后调用 `superpowers:writing-plans`；执行使用 `superpowers:subagent-driven-development`；完成声明前使用 `superpowers:verification-before-completion`。
+3. 从适用 `AGENTS.md` 读取 Plan 和 Draft 的产物位置规则；规则缺失时只提出候选，用户确认后才拟写入最近公共作用域的 `AGENTS.md`，写后重新读取验证；插件不得提供默认目录；位置规则确认与更新 Plan 是两道独立门禁。
+4. 确认交付单元类型是“页面或模块”；模块必须可独立实施、对接和验收；启动确认通过前保持只读。
+5. Codex 语义读取 Plan，脚本不得解析 Markdown。
+6. 首轮全量生成，后续轮次默认只含遗留项和证据变化项。
+7. in-app 浏览器动态注入 Shadow DOM 单卡面板。
+8. 用户统一提交后才评审；展示拟更新内容；用户确认更新 Plan 后才写文件。
+9. reviewing 阶段页面只能是“评审中”或“阻塞”，不得生成 Draft OpenAPI。
+10. 评审完成后调用 `superpowers:writing-plans`；执行使用 `superpowers:subagent-driven-development`；完成声明前使用 `superpowers:verification-before-completion`。
 
 **Step 6: 运行最小 GREEN 和结构校验**
 
@@ -538,6 +556,13 @@ const { validatePagePlanModel } = require("../scripts/validate-page-plan.js");
 const validModel = {
   schemaVersion: 1,
   deliveryUnit: { id: "UNIT-001", kind: "page", name: "示例登录", status: "评审中" },
+  artifactLocationRule: {
+    source: "agents",
+    ownerFile: "/sample-project/AGENTS.md",
+    planPattern: "<project-plan-pattern>",
+    draftOpenApiPattern: "<project-draft-pattern>",
+    ruleFingerprint: "sha256:rule-fixture",
+  },
   features: [{ id: "F-001", status: "待实施", apiRefs: ["API-001"], taskRefs: ["T-001"], evidenceRefs: ["E-001"] }],
   uiStates: [{ id: "UI-001", featureRefs: ["F-001"], evidenceRefs: ["E-001"] }],
   apis: [{ id: "API-001", status: "Draft已确认", featureRefs: ["F-001"], taskRefs: ["T-001"], evidenceRefs: ["E-001"] }],
@@ -569,6 +594,16 @@ test("accepts page or module delivery units and rejects other scopes", () => {
   const result = validatePagePlanModel(moduleModel);
   assert.equal(result.valid, false);
   assert.match(result.errors.join("\n"), /deliveryUnit\.kind/);
+});
+
+test("requires an AGENTS-owned artifact location rule without defaults", () => {
+  const missing = structuredClone(validModel);
+  delete missing.artifactLocationRule;
+  assert.match(validatePagePlanModel(missing).errors.join("\n"), /artifactLocationRule/);
+
+  const unresolved = structuredClone(validModel);
+  unresolved.artifactLocationRule.source = "candidate";
+  assert.match(validatePagePlanModel(unresolved).errors.join("\n"), /artifactLocationRule\.source/);
 });
 
 test("rejects missing and one-way references", () => {
@@ -603,6 +638,7 @@ Expected: FAIL `MODULE_NOT_FOUND`。
 - 固定设计文档中的五组状态词；
 - 拒绝字符串、数组和缺少 `schemaVersion: 1` 的输入；
 - 要求 `deliveryUnit` 存在，并只接受 `kind: "page"` 或 `kind: "module"`；
+- 要求正式写入前 `artifactLocationRule.source` 为 `agents`，同时具备规则所属文件、Plan模式、Draft模式和规则指纹；候选或仅会话内的显式目录不能通过校验；
 - 对 `features`、`uiStates`、`apis`、`dependencies`、`tasks`、`acceptances`、`evidence` 检查同类唯一 ID；
 - 检查所有 `*Refs` 均指向对应集合；
 - 检查 feature ↔ API、feature ↔ task、API ↔ task 的双向关联；
@@ -636,7 +672,7 @@ function indexById(items, collectionName, errors) {
 node --test page-delivery-workflow/skills/reviewing-page-delivery/tests/validate-page-plan.test.mjs
 ```
 
-Expected: 5 tests PASS。
+Expected: 6 tests PASS。
 
 **Step 5: 提交**
 
@@ -676,6 +712,7 @@ const session = {
   sessionId: "session-1",
   deliveryUnitKey: "sample/login",
   deliveryUnitKind: "page",
+  artifactRuleFingerprint: "sha256:rule-fixture",
   reviewRound: 2,
   planFingerprint: "sha256:fixture",
   cards: [
@@ -733,6 +770,7 @@ test("storage keys isolate project delivery units and position stays visible", (
 - 结果排序优先级为“阻塞 → 待修改 → 冲突 → 其他”；
 - `CONFIRM_PLAN` 只能在 result 模式触发；
 - `planFingerprint` 在整个会话中不被 reducer 隐式改写。
+- `artifactRuleFingerprint` 在整个会话中不被 reducer 隐式改写，面板不接收或展示实际产物路径。
 
 **Step 2: 运行 RED**
 
@@ -885,6 +923,7 @@ console.debug("PAGE_DELIVERY_PLAN_CONFIRM_REQUESTED", {
   sessionId: state.sessionId,
   submissionVersion: state.submissionVersion,
   planFingerprint: state.planFingerprint,
+  artifactRuleFingerprint: state.artifactRuleFingerprint,
 });
 ```
 
@@ -973,6 +1012,8 @@ API 与 Mock
 隐藏 JSON
 自动生成 Draft
 从 Markdown 解析
+插件默认 Plan 目录
+插件默认 Draft 目录
 ```
 
 **Step 2: 运行 RED**
@@ -985,11 +1026,13 @@ Expected: FAIL，缺少 references/assets 或缺少固定内容。
 
 **Step 3: 写最小参考资料**
 
-- `page-review-standard.md`：写 11 个维度、每卡字段、证据优先级、项目规范发现、首次全量/后续复评、两阶段确认和冲突展示。
+- `page-review-standard.md`：写 11 个维度、每卡字段、证据优先级、项目规范发现、产物位置规则的一次确认与 `AGENTS.md` 固化、首次全量/后续复评、两阶段确认和冲突展示。
 - `status-model.md`：写五组固定状态、证据门禁和允许的客观统计；明确禁止单一页面完成百分比。
-- `api-contract-stages.md`：写正式来源搜索顺序、不得猜字段、reviewing 不生成 Draft、后续 planning 生成 Draft 的全部机器事实门禁和固定路径格式。
-- `page-delivery-plan-template.md`：人类可读 Markdown；一个页面或一个内聚功能模块对应一个 Plan；记录 `deliveryUnit.kind`；固定章节、稳定编号、双向关联、评审批次、指纹冲突检查说明；不内嵌 JSON。
+- `api-contract-stages.md`：写正式来源搜索顺序、不得猜字段、reviewing 不生成 Draft、后续 planning 生成 Draft 的全部机器事实门禁，并要求 Draft位置来自适用项目 `AGENTS.md`。
+- `page-delivery-plan-template.md`：人类可读 Markdown；一个页面或一个内聚功能模块对应一个 Plan；记录 `deliveryUnit.kind` 和产物位置规则来源；固定章节、稳定编号、双向关联、评审批次、Plan及规则指纹冲突检查说明；不内嵌 JSON、不提供默认目录。
 - `SKILL.md`：通过直接链接按需加载三个 reference 和模板，避免把全部内容重复进主文件。
+
+产物规则的建议 `AGENTS.md` 小节必须使用稳定字段名：`Plan 路径模式`、`Draft OpenAPI 路径模式`、`交付单元命名`、`编号规则`、`路径变量`、`既有文件`。字段值全部由项目确认，Skill只提供字段结构，不提供路径值。
 
 **Step 4: 运行 GREEN**
 
@@ -1032,6 +1075,7 @@ git commit -m "docs: 添加页面交付评审规范"
 新增并先确认失败：
 
 - 同一 `deliveryUnitKey` 不同 `planFingerprint` 时，不自动恢复旧评审选择，只恢复安全 UI 偏好。
+- 同一 `deliveryUnitKey` 的产物位置规则指纹变化时停止提交，并要求重新解析适用 `AGENTS.md`。
 - Plan 指纹变化后，提交返回 `plan-conflict`，不得进入可确认写入状态。
 - 二次评审保留已确认项；`viewScope=round` 只显示遗留、重开和证据变化；`viewScope=all` 可查看全部。
 - “已确认”卡证据变化后重新进入本轮，但原结论保留为 previousConclusion。
@@ -1055,6 +1099,7 @@ Expected: 新增测试至少一项 FAIL。
 - 把证据定位拆为 `highlightEvidence`。
 - 把结果排序拆为纯函数 `prioritizeReviewResults`。
 - 把 Plan 冲突判断拆为 `assertPlanFingerprint(expected, actual)`。
+- 把产物位置规则门禁拆为 `assertArtifactLocationRule(rule, currentRuleFingerprint)`。
 - 对所有返回错误使用稳定 `code`，UI显示人类可读 message。
 
 不要增加项目识别逻辑到脚本；项目识别仍由 Skill 指导 Codex完成。
@@ -1099,6 +1144,9 @@ git commit -m "refactor: 完善多轮页面评审"
 
 - 先发现项目规则，组件体系不明确时标记待确认；
 - 能以单页面或内聚模块作为交付单元，并拒绝项目级“大 Plan”；
+- Plan 与 Draft位置规则缺失时不套用默认路径，只提出基于证据的候选及拟写入的 `AGENTS.md`；
+- 已有明确项目规则时直接复用，不重复询问；
+- 确认位置规则后仍单独等待“确认更新 Plan”，不自动生成 Draft；
 - 显式报告 PRD/原型冲突；
 - 不猜 method、URL、字段或 Schema；
 - reviewing 阶段不生成 Draft；
@@ -1214,7 +1262,11 @@ Expected: 全部 PASS。
 
 **Step 1: 重新加载运行时项目规则**
 
-按 workspace 和项目 `AGENTS.md` 委托链读取适用规范，确认组件体系、样式体系、路由/API门禁来自目标项目，而不是插件核心。
+按 workspace 和项目 `AGENTS.md` 委托链读取适用规范，确认组件体系、样式体系、路由/API门禁，以及 Plan 与 Draft 的产物位置规则都来自目标项目，而不是插件核心。
+
+- 若位置规则已明确：记录所属 `AGENTS.md`、两个路径模式和规则指纹，不再询问。
+- 若位置规则缺失：只读分析已有 Plan/Draft候选，展示一次性确认内容和拟写入的 `AGENTS.md` 段落；本次只读验收不应用该补丁。
+- 用户可临时确认候选以继续验证面板，但正式 Plan或Draft写入仍保持阻塞，直到规则实际固化并重新读取。
 
 **Step 2: 记录目标文件状态**
 
@@ -1222,7 +1274,9 @@ Expected: 全部 PASS。
 git -C /Users/cfj/projects/vantix status --short
 shasum -a 256 \
   /Users/cfj/projects/vantix/documents/产品原型/仓配作业系统/index.html \
-  /Users/cfj/projects/vantix/frontend/plans/operation/01-登录页面.md
+  /Users/cfj/projects/vantix/frontend/plans/operation/01-登录页面.md \
+  /Users/cfj/projects/vantix/frontend/AGENTS.md \
+  /Users/cfj/projects/vantix/frontend/apps/operation/AGENTS.md
 ```
 
 记录已有用户改动，验收不得清理、覆盖或归因于本插件。
@@ -1241,6 +1295,7 @@ python3 -m http.server 17880 \
 
 - 打开 PRD 和原型。
 - 自动发现既有登录页面 Plan。
+- 解析项目产物位置规则；若缺失则生成不含插件默认目录的项目 `AGENTS.md` 候选规则。
 - 将用户已确认的登录业务结论作为显式运行时输入。
 - 首轮全量生成 11 维度的评审内容。
 - 动态注入面板并逐卡模拟选择、备注和保存。
@@ -1269,6 +1324,7 @@ Expected: 无匹配，exit 1。
 重复 Step 2 的 `git status` 和 `shasum`。Expected:
 
 - 两个哈希不变；
+- 所有适用的 Vantix `AGENTS.md` 保持不变；
 - 没有新增由验收产生的 Vantix 源码或 Plan 改动；
 - 浏览器清理后原型 DOM 中无评审 host 和 overlay。
 
@@ -1306,12 +1362,19 @@ find page-delivery-workflow/skills -mindepth 1 -maxdepth 1 -type d -print
 rg -n \
   'pageCompletionRate|页面完成率|Vantix|@zan/ui-vue3|Element Plus|UnoCSS|仓配|/Users/cfj/projects/vantix' \
   page-delivery-workflow
+rg -n \
+  'plans/<项目>|contracts/drafts/|默认 Plan 目录|默认 Draft 目录' \
+  page-delivery-workflow/.codex-plugin/plugin.json \
+  page-delivery-workflow/skills/reviewing-page-delivery/SKILL.md \
+  page-delivery-workflow/skills/reviewing-page-delivery/scripts \
+  page-delivery-workflow/skills/reviewing-page-delivery/references \
+  page-delivery-workflow/skills/reviewing-page-delivery/assets
 ```
 
 Expected:
 
 - `find` 只输出 `reviewing-page-delivery`；
-- `rg` 无匹配，exit 1。
+- 两次 `rg` 均无匹配，exit 1。
 
 若测试源码必须断言禁止词，禁止词会合法出现在测试中；此时把检查范围收窄到 `SKILL.md`、`scripts/`、`references/`、`assets/` 和 manifest，并在交付证据中说明。
 
@@ -1345,6 +1408,7 @@ git commit -m "feat: 完成页面交付评审工作流"
 - 通用夹具与 Vantix in-app 浏览器验收结果；
 - 原型和 Vantix Plan 哈希未变证据；
 - 多轮评审、Plan 指纹和确认门禁证据；
+- 产物位置规则来自项目 `AGENTS.md`、缺失规则只提候选且未经确认不写入的证据；
 - 当前分支和提交；
 - 明确说明首版没有创建后续三个 Skill、没有安装/发布插件。
 
