@@ -20,7 +20,7 @@
 - 插件核心、模板和测试夹具不得出现 Vantix、Zan、Element Plus、UnoCSS、仓配登录页或固定公司路径等项目事实。
 - 所有脚本只接收 Codex 已提取的 JSON；不得从 Markdown Plan 猜测或解析业务语义。
 - 用户确认“更新 Plan”前，不得创建或修改任何目标项目文件。
-- 页面 Plan 固定遵循“一页一 Plan”，路径为 `plans/<项目>/<两位序号>-<中文页面名>.md`；同一页面持续更新同一文件。
+- 一个交付单元对应一个 Plan；交付单元可以是单个页面，也可以是可独立实施、对接和验收的内聚功能模块。路径为 `plans/<项目>/<两位序号>-<中文页面或模块名>.md`，同一交付单元持续更新同一文件。
 - reviewing 阶段不生成 Draft OpenAPI；后续 planning 满足机器事实门禁后才可写入 `contracts/drafts/<项目>/<业务域>/<页面>.openapi.json`。
 - 只报告客观计数、任务完成率和任务验证率；不得输出 `pageCompletionRate` 或单一“页面完成百分比”。
 - 每次声称完成前执行 `superpowers:verification-before-completion`。
@@ -68,7 +68,8 @@
 {
   schemaVersion: 1,
   sessionId: "session-generic-login",
-  pageKey: "sample/login",
+  deliveryUnitKey: "sample/login",
+  deliveryUnitKind: "page", // page | module
   reviewRound: 1,
   planFingerprint: "sha256:fixture",
   submissionVersion: 0,
@@ -103,12 +104,12 @@
 }
 ```
 
-结构化页面 Plan 模型使用稳定编号和显式双向关联：
+结构化交付 Plan 模型使用稳定编号和显式双向关联：
 
 ```js
 {
   schemaVersion: 1,
-  page: { id: "PAGE-001", name: "示例登录", status: "评审中" },
+  deliveryUnit: { id: "UNIT-001", kind: "page", name: "示例登录", status: "评审中" },
   features: [{ id: "F-001", status: "待实施", apiRefs: [], taskRefs: ["T-001"], evidenceRefs: ["E-001"] }],
   uiStates: [{ id: "UI-001", featureRefs: ["F-001"], evidenceRefs: ["E-001"] }],
   apis: [],
@@ -176,6 +177,7 @@ test("skill declares the review workflow and required gates", async () => {
     "Plan 内容指纹",
     "in-app 浏览器",
     "Shadow DOM",
+    "页面或模块",
   ]) {
     assert.match(skill, new RegExp(required.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
@@ -210,11 +212,12 @@ test("skill root follows the standard skill layout", async () => {
 场景 `review-conflicted-login.md` 必须是通用虚构项目，包含：
 
 - 项目规范要求优先使用其组件体系，但未给出组件库名称。
+- 评审对象是一个由两个紧密关联页面组成、可独立实施和验收的功能模块。
 - PRD 与原型对登录方式存在冲突。
 - 已有 Plan 有一项“已确认”、一项“待修改”。
 - API 只有业务目的，没有 method、URL 或字段机器事实。
 - 用户要求“直接生成 Draft 并把页面设为可实施”。
-- 预期正确行为：读规范、显式报告冲突、不猜接口、不生成 Draft、不跳过确认门禁、后续轮次只复评遗留或变化项。
+- 预期正确行为：识别这是一个内聚模块而不是强拆成两个页面 Plan、读规范、显式报告冲突、不猜接口、不生成 Draft、不跳过确认门禁、后续轮次只复评遗留或变化项。
 
 **Step 3: 运行 RED**
 
@@ -231,6 +234,7 @@ Expected: FAIL，首个失败应为 `ENOENT .../.codex-plugin/plugin.json`，证
 使用一个全新子代理，只提供场景文件内容，不提供设计文档、未来 Skill 或正确答案；要求其输出评审决策和下一步。记录它是否：
 
 - 跳过项目规范发现；
+- 把内聚模块强制拆成页面 Plan，或把整个项目错误合成单一 Plan；
 - 猜测 API 字段；
 - 直接生成 Draft；
 - 跳过用户确认；
@@ -279,8 +283,8 @@ python3 /Users/cfj/.codex/skills/.system/skill-creator/scripts/init_skill.py \
   --path /Users/cfj/projects/skills/page-delivery-workflow/skills \
   --resources scripts,references,assets \
   --interface display_name="Reviewing Page Delivery" \
-  --interface short_description="Review pages and maintain delivery Plans" \
-  --interface default_prompt='Use $reviewing-page-delivery to review this page against its PRD, prototype, project rules, and Plan.'
+  --interface short_description="Review pages or modules and maintain Plans" \
+  --interface default_prompt='Use $reviewing-page-delivery to review this page or module against its PRD, prototype, project rules, and Plan.'
 ```
 
 Expected: 创建标准 `SKILL.md`、`agents/openai.yaml`、`scripts/`、`references/` 和 `assets/`。
@@ -303,22 +307,22 @@ rmdir tests/page-delivery-workflow
 {
   "name": "page-delivery-workflow",
   "version": "0.1.0",
-  "description": "Reusable page review and delivery-plan workflow for Codex.",
+  "description": "Reusable page-or-module review and delivery-plan workflow for Codex.",
   "author": {
     "name": "Local developer"
   },
   "skills": "./skills/",
   "interface": {
     "displayName": "Page Delivery Workflow",
-    "shortDescription": "Review pages and maintain delivery Plans.",
-    "longDescription": "Adds a reusable, project-aware page review workflow with an in-app browser review panel and structured Plan handoff.",
+    "shortDescription": "Review pages or modules and maintain Plans.",
+    "longDescription": "Adds a reusable, project-aware page or module review workflow with an in-app browser review panel and structured Plan handoff.",
     "developerName": "Local developer",
     "category": "Productivity",
     "capabilities": [
       "Interactive",
       "Write"
     ],
-    "defaultPrompt": "Review this page against its PRD, prototype, project rules, and existing delivery Plan."
+    "defaultPrompt": "Review this page or module against its PRD, prototype, project rules, and existing delivery Plan."
   }
 }
 ```
@@ -330,7 +334,7 @@ rmdir tests/page-delivery-workflow
 ```yaml
 ---
 name: reviewing-page-delivery
-description: Use when reviewing a page against a PRD, prototype, project rules, API evidence, dependencies, or an existing page delivery Plan, especially when Codex must collect decisions through the in-app browser and preserve multi-round review state.
+description: Use when reviewing a page or cohesive feature module against a PRD, prototype, project rules, API evidence, dependencies, or an existing delivery Plan, especially when Codex must collect decisions through the in-app browser and preserve multi-round review state.
 ---
 ```
 
@@ -338,7 +342,7 @@ description: Use when reviewing a page against a PRD, prototype, project rules, 
 
 1. 启动前调用 `superpowers:brainstorming` 处理未确定事项。
 2. 读取项目适用的 `AGENTS.md`、依赖和现有约束，不预设组件体系。
-3. 启动确认通过前保持只读。
+3. 确认交付单元类型是“页面或模块”；模块必须可独立实施、对接和验收；启动确认通过前保持只读。
 4. Codex 语义读取 Plan，脚本不得解析 Markdown。
 5. 首轮全量生成，后续轮次默认只含遗留项和证据变化项。
 6. in-app 浏览器动态注入 Shadow DOM 单卡面板。
@@ -533,7 +537,7 @@ const { validatePagePlanModel } = require("../scripts/validate-page-plan.js");
 
 const validModel = {
   schemaVersion: 1,
-  page: { id: "PAGE-001", name: "示例登录", status: "评审中" },
+  deliveryUnit: { id: "UNIT-001", kind: "page", name: "示例登录", status: "评审中" },
   features: [{ id: "F-001", status: "待实施", apiRefs: ["API-001"], taskRefs: ["T-001"], evidenceRefs: ["E-001"] }],
   uiStates: [{ id: "UI-001", featureRefs: ["F-001"], evidenceRefs: ["E-001"] }],
   apis: [{ id: "API-001", status: "Draft已确认", featureRefs: ["F-001"], taskRefs: ["T-001"], evidenceRefs: ["E-001"] }],
@@ -550,10 +554,21 @@ test("accepts a normalized model with reciprocal links", () => {
 
 test("rejects an unsupported status", () => {
   const model = structuredClone(validModel);
-  model.page.status = "快完成了";
+  model.deliveryUnit.status = "快完成了";
   const result = validatePagePlanModel(model);
   assert.equal(result.valid, false);
-  assert.match(result.errors.join("\n"), /page\.status/);
+  assert.match(result.errors.join("\n"), /deliveryUnit\.status/);
+});
+
+test("accepts page or module delivery units and rejects other scopes", () => {
+  const moduleModel = structuredClone(validModel);
+  moduleModel.deliveryUnit.kind = "module";
+  assert.equal(validatePagePlanModel(moduleModel).valid, true);
+
+  moduleModel.deliveryUnit.kind = "project";
+  const result = validatePagePlanModel(moduleModel);
+  assert.equal(result.valid, false);
+  assert.match(result.errors.join("\n"), /deliveryUnit\.kind/);
 });
 
 test("rejects missing and one-way references", () => {
@@ -587,6 +602,7 @@ Expected: FAIL `MODULE_NOT_FOUND`。
 - 导出 `STATUS_MODEL` 与 `validatePagePlanModel`；
 - 固定设计文档中的五组状态词；
 - 拒绝字符串、数组和缺少 `schemaVersion: 1` 的输入；
+- 要求 `deliveryUnit` 存在，并只接受 `kind: "page"` 或 `kind: "module"`；
 - 对 `features`、`uiStates`、`apis`、`dependencies`、`tasks`、`acceptances`、`evidence` 检查同类唯一 ID；
 - 检查所有 `*Refs` 均指向对应集合；
 - 检查 feature ↔ API、feature ↔ task、API ↔ task 的双向关联；
@@ -620,7 +636,7 @@ function indexById(items, collectionName, errors) {
 node --test page-delivery-workflow/skills/reviewing-page-delivery/tests/validate-page-plan.test.mjs
 ```
 
-Expected: 4 tests PASS。
+Expected: 5 tests PASS。
 
 **Step 5: 提交**
 
@@ -658,7 +674,8 @@ const {
 const session = {
   schemaVersion: 1,
   sessionId: "session-1",
-  pageKey: "sample/login",
+  deliveryUnitKey: "sample/login",
+  deliveryUnitKind: "page",
   reviewRound: 2,
   planFingerprint: "sha256:fixture",
   cards: [
@@ -700,7 +717,7 @@ test("submission versions increase and stale results are rejected", () => {
   assert.match(state.lastError, /stale/i);
 });
 
-test("storage keys isolate project pages and position stays visible", () => {
+test("storage keys isolate project delivery units and position stays visible", () => {
   assert.equal(buildStorageKey("project-a/login"), "page-delivery-review:v1:project-a/login");
   assert.deepEqual(clampPanelPosition({ x: 999, y: -10 }, { width: 320, height: 500 }, { width: 800, height: 600 }), {
     x: 480,
@@ -949,7 +966,7 @@ API 与 Mock
 遗留问题
 ```
 
-断言每个实体示例都有稳定 ID 和显式 `关联` 字段，并禁止：
+断言模板包含“交付单元类型：页面/模块”，每个实体示例都有稳定 ID 和显式 `关联` 字段，并禁止：
 
 ```text
 页面完成率
@@ -971,7 +988,7 @@ Expected: FAIL，缺少 references/assets 或缺少固定内容。
 - `page-review-standard.md`：写 11 个维度、每卡字段、证据优先级、项目规范发现、首次全量/后续复评、两阶段确认和冲突展示。
 - `status-model.md`：写五组固定状态、证据门禁和允许的客观统计；明确禁止单一页面完成百分比。
 - `api-contract-stages.md`：写正式来源搜索顺序、不得猜字段、reviewing 不生成 Draft、后续 planning 生成 Draft 的全部机器事实门禁和固定路径格式。
-- `page-delivery-plan-template.md`：人类可读 Markdown；一页一 Plan；固定章节、稳定编号、双向关联、评审批次、指纹冲突检查说明；不内嵌 JSON。
+- `page-delivery-plan-template.md`：人类可读 Markdown；一个页面或一个内聚功能模块对应一个 Plan；记录 `deliveryUnit.kind`；固定章节、稳定编号、双向关联、评审批次、指纹冲突检查说明；不内嵌 JSON。
 - `SKILL.md`：通过直接链接按需加载三个 reference 和模板，避免把全部内容重复进主文件。
 
 **Step 4: 运行 GREEN**
@@ -1014,7 +1031,7 @@ git commit -m "docs: 添加页面交付评审规范"
 
 新增并先确认失败：
 
-- 同一 `pageKey` 不同 `planFingerprint` 时，不自动恢复旧评审选择，只恢复安全 UI 偏好。
+- 同一 `deliveryUnitKey` 不同 `planFingerprint` 时，不自动恢复旧评审选择，只恢复安全 UI 偏好。
 - Plan 指纹变化后，提交返回 `plan-conflict`，不得进入可确认写入状态。
 - 二次评审保留已确认项；`viewScope=round` 只显示遗留、重开和证据变化；`viewScope=all` 可查看全部。
 - “已确认”卡证据变化后重新进入本轮，但原结论保留为 previousConclusion。
@@ -1081,6 +1098,7 @@ git commit -m "refactor: 完善多轮页面评审"
 必须确认新输出：
 
 - 先发现项目规则，组件体系不明确时标记待确认；
+- 能以单页面或内聚模块作为交付单元，并拒绝项目级“大 Plan”；
 - 显式报告 PRD/原型冲突；
 - 不猜 method、URL、字段或 Schema；
 - reviewing 阶段不生成 Draft；
