@@ -4,8 +4,8 @@
 
 - 插件名称：`page-delivery-workflow`
 - 首个 Skill：`reviewing-page-delivery`
-- 设计状态：已完成对话评审，待书面规格复审
-- 实施状态：未开始
+- 设计状态：已批准
+- 实施状态：实施 Plan 已完成，未开始编码
 - 插件源码目录：`/Users/cfj/projects/skills/page-delivery-workflow`
 - 首个验收项目：`/Users/cfj/projects/vantix/frontend/apps/operation`
 
@@ -56,6 +56,8 @@ page-delivery-workflow/
 └── skills/
     └── reviewing-page-delivery/
         ├── SKILL.md
+        ├── agents/
+        │   └── openai.yaml
         ├── scripts/
         ├── references/
         ├── assets/
@@ -439,6 +441,8 @@ page-delivery-workflow/
 └── skills/
     └── reviewing-page-delivery/
         ├── SKILL.md
+        ├── agents/
+        │   └── openai.yaml
         ├── scripts/
         │   ├── inject-review-panel.js
         │   ├── calculate-progress.js
