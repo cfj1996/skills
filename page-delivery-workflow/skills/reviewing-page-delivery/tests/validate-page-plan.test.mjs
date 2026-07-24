@@ -4,7 +4,11 @@ import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
 
 const require = createRequire(import.meta.url);
-const { STATUS_MODEL, validatePagePlanModel } = require("../scripts/validate-page-plan.js");
+const {
+  STATUS_MODEL,
+  assertArtifactLocationRule,
+  validatePagePlanModel,
+} = require("../scripts/validate-page-plan.js");
 const validModel = JSON.parse(readFileSync(new URL("./fixtures/page-plan-model.json", import.meta.url), "utf8"));
 
 function deepFreeze(value) {
@@ -166,4 +170,32 @@ test("does not mutate deeply frozen input and returns stable error order", () =>
   invalid.features[0].id = " ";
   invalid.apis[0].featureRefs = ["F-404"];
   assert.deepEqual(validatePagePlanModel(invalid).errors, validatePagePlanModel(invalid).errors);
+});
+
+test("reports asymmetric API and task links in deterministic sorted order", () => {
+  const model = structuredClone(validModel);
+  model.apis[0].taskRefs = [];
+  model.tasks[0].featureRefs = [];
+  model.features[0].status = "坏状态";
+
+  const first = validatePagePlanModel(model).errors;
+  const second = validatePagePlanModel(model).errors;
+  assert.deepEqual(first, second);
+  assert.deepEqual(first, [...first].sort((left, right) => left.localeCompare(right, "zh-Hans-CN")));
+  assert.match(first.join("\n"), /reciprocal API\/task/);
+  assert.match(first.join("\n"), /reciprocal feature\/task/);
+});
+
+test("artifact location rule guard uses a stable code and actionable AGENTS message", () => {
+  assert.deepEqual(
+    assertArtifactLocationRule(validModel.artifactLocationRule, "sha256:changed-rule"),
+    {
+      code: "artifact-rule-conflict",
+      message: "产物位置规则已变化，请重新解析适用的 AGENTS.md 后再提交。",
+    },
+  );
+  assert.equal(
+    assertArtifactLocationRule(validModel.artifactLocationRule, validModel.artifactLocationRule.ruleFingerprint),
+    null,
+  );
 });

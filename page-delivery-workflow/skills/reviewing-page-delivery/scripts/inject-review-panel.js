@@ -21,6 +21,7 @@
   const SNAP_THRESHOLD = 48;
   const FALLBACK_PANEL_SIZE = { width: 320, height: 360 };
   const DRAFT_TTL_MS = 24 * 60 * 60 * 1000;
+  const memoryDrafts = new Map();
   let activeRuntime = null;
 
   function buildStorageKey(deliveryUnitKey) {
@@ -50,7 +51,7 @@
       throw new TypeError("Review session must include valid cards");
     }
 
-    const cards = selectRoundCards(session.cards, session.reviewRound).map(sanitizePanelItem);
+    const cards = selectReviewCards(session.cards, session.reviewRound, session.viewScope).map(sanitizePanelItem);
 
     return {
       schemaVersion: session.schemaVersion,
@@ -59,6 +60,7 @@
       deliveryUnitKind: session.deliveryUnitKind,
       artifactRuleFingerprint: session.artifactRuleFingerprint,
       reviewRound: session.reviewRound,
+      viewScope: session.viewScope === "all" ? "all" : "round",
       sessionCount: session.sessionCount,
       objectiveCount: session.objectiveCount,
       planFingerprint: session.planFingerprint,
@@ -105,6 +107,13 @@
         state.results.length > 0 &&
         state.currentResultIndex === state.results.length - 1
       ) {
+        const planError = assertPlanFingerprint(state.planFingerprint, action.planFingerprint ?? state.planFingerprint);
+        if (planError) return { ...state, lastError: planError };
+        const artifactRuleError = assertArtifactLocationRule(
+          { source: "agents", ruleFingerprint: state.artifactRuleFingerprint },
+          action.artifactRuleFingerprint ?? state.artifactRuleFingerprint,
+        );
+        if (artifactRuleError) return { ...state, lastError: artifactRuleError };
         return { ...state, mode: "confirmed" };
       }
     }
@@ -123,6 +132,17 @@
     );
   }
 
+  function selectReviewCards(cards, reviewRound, viewScope) {
+    const selected = viewScope === "all"
+      ? (Array.isArray(cards) ? cards.filter(isCard) : [])
+      : selectRoundCards(cards, reviewRound);
+    return selected.map((card) => (
+      card.evidenceChanged === true && RESOLVED_CONCLUSIONS.has(card.conclusion)
+        ? { ...deepClone(card), previousConclusion: card.previousConclusion || card.conclusion }
+        : card
+    ));
+  }
+
   function mountReviewPanel(session, options = {}) {
     if (typeof document === "undefined" || !document?.body) {
       throw new Error("Review panel requires a browser document");
@@ -134,8 +154,9 @@
     let state = createReviewState(session);
     const storageKey = buildStorageKey(state.deliveryUnitKey);
     const now = Date.now();
-    const rawDraft = readDraft(storageKey);
+    const rawDraft = loadDraft(storageKey);
     const validatedDraft = isFreshMatchingDraft(state, rawDraft, now) ? rawDraft : null;
+    const safeUiDraft = isFreshSafeUiDraft(state, rawDraft, now) ? rawDraft : validatedDraft;
     state = restoreDraft(state, validatedDraft, now);
 
     if (activeRuntime) activeRuntime.destroy({ removeHost: false });
@@ -147,22 +168,18 @@
     if (!host.parentNode) document.body.append(host);
 
     const shadowRoot = host.shadowRoot || host.attachShadow({ mode: "open" });
-    const cleanups = [];
-    const renderCleanups = [];
+    const cleanups = createCleanupRegistry();
+    const renderCleanups = createCleanupRegistry();
     let destroyed = false;
-    let collapsed = validatedDraft?.collapsed === true;
-    let panelPosition = initialPanelPosition(host, validatedDraft?.panelPosition);
+    let collapsed = safeUiDraft?.collapsed === true;
+    let panelPosition = initialPanelPosition(host, safeUiDraft?.panelPosition);
     let drag = null;
+    let evidenceStatus = null;
 
     setHostPosition(host, panelPosition);
 
-    const addListener = (target, type, listener, cleanupGroup = cleanups) => {
-      target.addEventListener(type, listener);
-      cleanupGroup.push(() => target.removeEventListener(type, listener));
-    };
-    const removeRenderListeners = () => {
-      while (renderCleanups.length) renderCleanups.pop()();
-    };
+    const addListener = (target, type, listener, cleanupGroup = cleanups) => cleanupGroup.add(target, type, listener);
+    const removeRenderListeners = () => renderCleanups.cleanup();
     const currentViewport = () => ({
       width: Math.max(0, window.innerWidth || document.documentElement.clientWidth || 0),
       height: Math.max(0, window.innerHeight || document.documentElement.clientHeight || 0),
@@ -174,26 +191,18 @@
         height: rect.height || FALLBACK_PANEL_SIZE.height,
       };
     };
-    const saveDraft = () => {
-      try {
-        localStorage.setItem(
-          storageKey,
-          JSON.stringify({
-            sessionId: state.sessionId,
-            reviewRound: state.reviewRound,
-            planFingerprint: state.planFingerprint,
-            artifactRuleFingerprint: state.artifactRuleFingerprint,
-            savedAt: Date.now(),
-            cards: state.cards.map(({ id, conclusion, userNote }) => ({ id, conclusion, userNote })),
-            currentCardIndex: state.currentCardIndex,
-            collapsed,
-            panelPosition,
-          }),
-        );
-      } catch {
-        // Storage may be unavailable or disabled; the panel remains usable.
-      }
-    };
+    const persistDraft = () => saveDraft(storageKey, {
+      deliveryUnitKey: state.deliveryUnitKey,
+      sessionId: state.sessionId,
+      reviewRound: state.reviewRound,
+      planFingerprint: state.planFingerprint,
+      artifactRuleFingerprint: state.artifactRuleFingerprint,
+      savedAt: Date.now(),
+      cards: state.cards.map(({ id, conclusion, userNote }) => ({ id, conclusion, userNote })),
+      currentCardIndex: state.currentCardIndex,
+      collapsed,
+      panelPosition,
+    });
     const updatePanelPosition = (position, snap = false) => {
       const size = panelSize();
       const viewport = currentViewport();
@@ -202,7 +211,7 @@
       if (snap && panelPosition.x <= SNAP_THRESHOLD) panelPosition.x = 0;
       if (snap && maximumX - panelPosition.x <= SNAP_THRESHOLD) panelPosition.x = maximumX;
       setHostPosition(host, panelPosition);
-      saveDraft();
+      persistDraft();
     };
     const runtimeState = () => ({
       ...deepClone(state),
@@ -215,38 +224,14 @@
     const showEvidence = () => {
       removeOverlay();
       const card = state.cards[state.currentCardIndex];
-      const selector = card?.evidence?.selector || options.evidenceSelector || "#login-form";
-      let target;
-      try {
-        target = document.querySelector(selector);
-      } catch {
-        return;
-      }
-      if (!target) return;
-      const rect = target.getBoundingClientRect();
-      const overlay = document.createElement("button");
-      overlay.type = "button";
-      overlay.setAttribute("data-review-evidence-overlay", "");
-      overlay.setAttribute("aria-label", "关闭证据高亮");
-      overlay.style.cssText = [
-        "position:fixed",
-        `left:${Math.max(0, rect.left)}px`,
-        `top:${Math.max(0, rect.top)}px`,
-        `width:${Math.max(1, rect.width)}px`,
-        `height:${Math.max(1, rect.height)}px`,
-        "z-index:2147483646",
-        "border:3px solid #2563eb",
-        "background:rgba(37,99,235,.12)",
-        "cursor:pointer",
-      ].join(";");
-      addListener(overlay, "click", removeOverlay);
-      document.body.append(overlay);
+      evidenceStatus = highlightEvidence(document, card?.evidence || { selector: options.evidenceSelector }, addListener, removeOverlay);
+      if (evidenceStatus) render();
     };
     const dispatch = (action) => {
       const nextState = reduceReviewState(state, action);
       if (nextState === state) return state;
       state = nextState;
-      saveDraft();
+      persistDraft();
       render();
       return state;
     };
@@ -266,7 +251,7 @@
       if (destroyed) return;
       destroyed = true;
       removeRenderListeners();
-      while (cleanups.length) cleanups.pop()();
+      cleanups.cleanup();
       removeOverlay();
       if (removeHost) host.remove();
       if (globalThis.__PAGE_DELIVERY_REVIEW__ === pageApi) {
@@ -287,7 +272,7 @@
       style.textContent = panelCss();
       const shell = document.createElement("section");
       shell.setAttribute("data-review-panel", "");
-      shell.innerHTML = panelMarkup(state, collapsed);
+      shell.innerHTML = panelMarkup(state, collapsed, evidenceStatus);
       shadowRoot.append(style, shell);
 
       const listen = (selector, type, listener) => {
@@ -296,7 +281,7 @@
       };
       listen('[data-action="toggle-collapse"]', "click", () => {
         collapsed = !collapsed;
-        saveDraft();
+        persistDraft();
         render();
       });
       listen('[data-action="previous"]', "click", () => dispatch({ type: "PREVIOUS" }));
@@ -375,13 +360,70 @@
     host.style.setProperty("max-height", "calc(100vh - 16px)", "important");
   }
 
-  function readDraft(storageKey) {
+  function sanitizeDraft(draft) {
+    if (!isNormalizedObject(draft)) return null;
+    const cards = Array.isArray(draft.cards)
+      ? draft.cards
+        .filter((card) => isNormalizedObject(card) && isNonEmptyString(card.id))
+        .map((card) => ({
+          id: card.id,
+          ...(USER_CONCLUSIONS.has(card.conclusion) ? { conclusion: card.conclusion } : {}),
+          ...(typeof card.userNote === "string" ? { userNote: card.userNote } : {}),
+        }))
+      : [];
+    return {
+      ...(isNonEmptyString(draft.deliveryUnitKey) ? { deliveryUnitKey: draft.deliveryUnitKey } : {}),
+      ...(isNonEmptyString(draft.sessionId) ? { sessionId: draft.sessionId } : {}),
+      ...(Number.isInteger(draft.reviewRound) ? { reviewRound: draft.reviewRound } : {}),
+      ...(isNonEmptyString(draft.planFingerprint) ? { planFingerprint: draft.planFingerprint } : {}),
+      ...(isNonEmptyString(draft.artifactRuleFingerprint) ? { artifactRuleFingerprint: draft.artifactRuleFingerprint } : {}),
+      ...(Number.isFinite(draft.savedAt) ? { savedAt: draft.savedAt } : {}),
+      cards,
+      ...(Number.isInteger(draft.currentCardIndex) ? { currentCardIndex: draft.currentCardIndex } : {}),
+      ...(draft.collapsed === true ? { collapsed: true } : {}),
+      ...(isNormalizedObject(draft.panelPosition) ? {
+        panelPosition: {
+          x: nonNegativeFinite(draft.panelPosition.x),
+          y: nonNegativeFinite(draft.panelPosition.y),
+        },
+      } : {}),
+    };
+  }
+
+  function resolveStorage(storage) {
+    if (storage) return storage;
     try {
-      const parsed = JSON.parse(localStorage.getItem(storageKey));
-      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
+      return globalThis.localStorage;
     } catch {
       return null;
     }
+  }
+
+  function loadDraft(storageKey, storage) {
+    const resolvedStorage = resolveStorage(storage);
+    try {
+      const raw = resolvedStorage?.getItem(storageKey);
+      const draft = typeof raw === "string" ? sanitizeDraft(JSON.parse(raw)) : null;
+      if (draft) {
+        memoryDrafts.set(storageKey, deepClone(draft));
+        return draft;
+      }
+    } catch {
+      // The in-memory draft is the safe fallback when storage is unavailable.
+    }
+    return memoryDrafts.has(storageKey) ? deepClone(memoryDrafts.get(storageKey)) : null;
+  }
+
+  function saveDraft(storageKey, draft, storage) {
+    const sanitized = sanitizeDraft(draft);
+    if (!sanitized) return null;
+    memoryDrafts.set(storageKey, deepClone(sanitized));
+    try {
+      resolveStorage(storage)?.setItem(storageKey, JSON.stringify(sanitized));
+    } catch {
+      // The panel can continue using the in-memory copy.
+    }
+    return sanitized;
   }
 
   function restoreDraft(state, draft, now = Date.now()) {
@@ -419,6 +461,66 @@
     );
   }
 
+  function isFreshSafeUiDraft(state, draft, now) {
+    return Boolean(
+      draft &&
+      Number.isFinite(draft.savedAt) &&
+      draft.savedAt <= now &&
+      now - draft.savedAt <= DRAFT_TTL_MS &&
+      draft.deliveryUnitKey === state.deliveryUnitKey &&
+      draft.planFingerprint !== state.planFingerprint,
+    );
+  }
+
+  function createCleanupRegistry() {
+    const cleanups = [];
+    return {
+      add(target, type, listener) {
+        target.addEventListener(type, listener);
+        cleanups.push(() => target.removeEventListener(type, listener));
+        return listener;
+      },
+      cleanup() {
+        while (cleanups.length) cleanups.pop()();
+      },
+    };
+  }
+
+  function highlightEvidence(documentObject, evidence, addListener, removeOverlay) {
+    const unavailable = () => reviewError("evidence-unavailable", "无法定位证据，请检查选择器或跨域 frame 访问权限。");
+    if (!isNormalizedObject(evidence) || !isNonEmptyString(evidence.selector)) return unavailable();
+    let root = documentObject;
+    try {
+      if (isNonEmptyString(evidence.frameSelector)) {
+        const frame = documentObject.querySelector(evidence.frameSelector);
+        root = frame?.contentDocument;
+      }
+      const target = root?.querySelector(evidence.selector);
+      if (!target) return unavailable();
+      const rect = target.getBoundingClientRect();
+      const overlay = documentObject.createElement("button");
+      overlay.type = "button";
+      overlay.setAttribute("data-review-evidence-overlay", "");
+      overlay.setAttribute("aria-label", "关闭证据高亮");
+      overlay.style.cssText = [
+        "position:fixed",
+        `left:${Math.max(0, rect.left)}px`,
+        `top:${Math.max(0, rect.top)}px`,
+        `width:${Math.max(1, rect.width)}px`,
+        `height:${Math.max(1, rect.height)}px`,
+        "z-index:2147483646",
+        "border:3px solid #2563eb",
+        "background:rgba(37,99,235,.12)",
+        "cursor:pointer",
+      ].join(";");
+      addListener(overlay, "click", removeOverlay);
+      documentObject.body.append(overlay);
+      return null;
+    } catch {
+      return unavailable();
+    }
+  }
+
   function panelCss() {
     return `
       :host { all: initial; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #172033; }
@@ -439,7 +541,7 @@
     `;
   }
 
-  function panelMarkup(state, collapsed) {
+  function panelMarkup(state, collapsed, evidenceStatus) {
     const currentCard = state.cards[state.currentCardIndex];
     const isResultMode = state.mode === "result" || state.mode === "confirmed";
     const currentResult = isResultMode ? state.results[state.currentResultIndex] : null;
@@ -453,8 +555,10 @@
     const displayIndex = contextLength === 0 ? 0 : contextIndex;
     const header = `<header data-review-panel-titlebar><span data-review-context>${escape(reviewDomain)} · ${displayIndex}/${contextLength} · 会话 ${sessionCount} · 目标 ${objectiveCount}</span><button type="button" data-action="toggle-collapse">${collapsed ? "展开" : "收起"}</button></header>`;
     if (collapsed) return header;
+    const errorMarkup = state.lastError ? `<p data-review-error>${escape(state.lastError.message)}</p>` : "";
+    const evidenceMarkup = evidenceStatus ? `<p data-review-evidence-status>${escape(evidenceStatus.message)}</p>` : "";
     if (!isResultMode && state.cards.length === 0) {
-      return `${header}<div data-review-body><p data-review-empty>本轮没有需要评审的卡片</p></div>`;
+      return `${header}<div data-review-body>${errorMarkup}${evidenceMarkup}<p data-review-empty>本轮没有需要评审的卡片</p></div>`;
     }
     if (state.mode === "result" || state.mode === "confirmed") {
       const result = currentResult;
@@ -462,11 +566,11 @@
       const resultMarkup = result
         ? `<article data-review-result data-result-id="${escape(result.id)}"><strong>${escape(result.conclusion)}</strong> ${escape(result.id)}${result.summary ? `<p data-result-summary>${escape(result.summary)}</p>` : ""}${result.planChangeSummary ? `<p data-result-plan-change-summary>${escape(result.planChangeSummary)}</p>` : ""}</article>`
         : "<p>没有返回项</p>";
-      return `${header}<div data-review-body>${resultMarkup}<div data-review-navigation><button type="button" data-action="previous"${state.currentResultIndex === 0 ? " disabled" : ""}>上一个</button><button type="button" data-action="next"${lastResult ? " disabled" : ""}>下一个</button></div>${lastResult ? `<div data-review-actions><button type="button" data-action="confirm-plan"${state.mode === "confirmed" ? " disabled" : ""}>确认更新 Plan</button></div>` : ""}</div>`;
+      return `${header}<div data-review-body>${errorMarkup}${evidenceMarkup}${resultMarkup}<div data-review-navigation><button type="button" data-action="previous"${state.currentResultIndex === 0 ? " disabled" : ""}>上一个</button><button type="button" data-action="next"${lastResult ? " disabled" : ""}>下一个</button></div>${lastResult ? `<div data-review-actions><button type="button" data-action="confirm-plan"${state.mode === "confirmed" ? " disabled" : ""}>确认更新 Plan</button></div>` : ""}</div>`;
     }
     const card = currentCard || { id: "", conclusion: "", userNote: "" };
     const lastCard = state.currentCardIndex >= state.cards.length - 1;
-    return `${header}<div data-review-body><article data-review-card data-card-id="${escape(card.id)}"><strong>${escape(card.id)}</strong>${cardFieldsMarkup(card)}<label>结论<select data-field="conclusion"${disabled}>${conclusionOptions(card.conclusion)}</select></label><label>备注<textarea data-field="userNote"${disabled}>${escape(card.userNote || "")}</textarea></label></article><div data-review-navigation><button type="button" data-action="previous"${disabled || state.currentCardIndex === 0 ? " disabled" : ""}>上一个</button><button type="button" data-action="next"${disabled || lastCard ? " disabled" : ""}>下一个</button></div><div data-review-actions><button type="button" data-action="highlight-evidence"${disabled}>查看证据</button>${lastCard ? `<button type="button" data-action="submit"${disabled}>统一提交评审</button>` : ""}</div>${state.mode === "reviewing" ? "<p>评审提交中</p>" : ""}</div>`;
+    return `${header}<div data-review-body>${errorMarkup}${evidenceMarkup}<article data-review-card data-card-id="${escape(card.id)}"><strong>${escape(card.id)}</strong>${cardFieldsMarkup(card)}<label>结论<select data-field="conclusion"${disabled}>${conclusionOptions(card.conclusion)}</select></label><label>备注<textarea data-field="userNote"${disabled}>${escape(card.userNote || "")}</textarea></label></article><div data-review-navigation><button type="button" data-action="previous"${disabled || state.currentCardIndex === 0 ? " disabled" : ""}>上一个</button><button type="button" data-action="next"${disabled || lastCard ? " disabled" : ""}>下一个</button></div><div data-review-actions><button type="button" data-action="highlight-evidence"${disabled}>查看证据</button>${lastCard ? `<button type="button" data-action="submit"${disabled}>统一提交评审</button>` : ""}</div>${state.mode === "reviewing" ? "<p>评审提交中</p>" : ""}</div>`;
   }
 
   function conclusionOptions(selected) {
@@ -554,7 +658,7 @@
 
   function submit(state) {
     if (state.cards.length === 0) {
-      return { ...state, lastError: "No active review cards to submit" };
+      return { ...state, lastError: reviewError("no-active-cards", "没有可提交的本轮评审卡。") };
     }
     const submissionVersion = state.submissionVersion + 1;
     const snapshot = deepFreeze({
@@ -581,34 +685,66 @@
       action.sessionId !== state.sessionId ||
       action.submissionVersion !== state.submissionVersion
     ) {
-      return { ...state, lastError: "Stale review result ignored" };
+      return { ...state, lastError: reviewError("stale-result", "已忽略过期的评审结果。") };
     }
 
+    const planError = assertPlanFingerprint(state.planFingerprint, action.planFingerprint ?? state.planFingerprint);
+    if (planError) return { ...state, lastError: planError };
+    const artifactRuleError = assertArtifactLocationRule(
+      { source: "agents", ruleFingerprint: state.artifactRuleFingerprint },
+      action.artifactRuleFingerprint ?? state.artifactRuleFingerprint,
+    );
+    if (artifactRuleError) return { ...state, lastError: artifactRuleError };
+
     if (!Array.isArray(action.results)) {
-      return { ...state, lastError: "Invalid review results" };
+      return { ...state, lastError: reviewError("invalid-results", "评审结果格式无效。") };
     }
     if (action.results.length === 0) {
-      return { ...state, lastError: "Empty review results cannot be confirmed" };
+      return { ...state, lastError: reviewError("empty-results", "空评审结果不能确认更新 Plan。") };
     }
     if (!action.results.every(isResult)) {
-      return { ...state, lastError: "Invalid review results" };
+      return { ...state, lastError: reviewError("invalid-results", "评审结果格式无效。") };
     }
 
     return {
       ...state,
       mode: "result",
-      results: action.results.map(sanitizePanelItem).sort(compareResults),
+      results: prioritizeReviewResults(action.results.map(sanitizePanelItem)),
       currentResultIndex: 0,
       lastError: null,
     };
   }
 
-  function compareResults(left, right) {
-    return resultPriority(left) - resultPriority(right);
+  function prioritizeReviewResults(results) {
+    return [...results].sort((left, right) => {
+      const priority = resultPriority(left) - resultPriority(right);
+      return priority || String(left.id).localeCompare(String(right.id), "en");
+    });
   }
 
   function resultPriority(result) {
     return RESULT_PRIORITIES.get(result.conclusion) ?? 3;
+  }
+
+  function reviewError(code, message) {
+    return { code, message };
+  }
+
+  function assertPlanFingerprint(expected, actual) {
+    return expected === actual
+      ? null
+      : reviewError("plan-conflict", "Plan 已变化，请重新解析后再确认更新。");
+  }
+
+  function assertArtifactLocationRule(rule, currentRuleFingerprint) {
+    return (
+      !isNormalizedObject(rule) ||
+      rule.source !== "agents" ||
+      !isNonEmptyString(rule.ruleFingerprint) ||
+      rule.ruleFingerprint !== currentRuleFingerprint
+    )
+      ? reviewError("artifact-rule-conflict", "产物位置规则已变化，请重新解析适用的 AGENTS.md 后再提交。")
+      : null;
   }
 
   function deepClone(value) {
@@ -685,11 +821,19 @@
 
   return {
     buildStorageKey,
+    assertArtifactLocationRule,
+    assertPlanFingerprint,
     clampPanelPosition,
+    createCleanupRegistry,
     createReviewState,
     DRAFT_TTL_MS,
+    highlightEvidence,
+    loadDraft,
+    prioritizeReviewResults,
     reduceReviewState,
     restoreDraft,
+    sanitizeDraft,
+    saveDraft,
     sanitizePanelItem,
     selectRoundCards,
     mountReviewPanel,

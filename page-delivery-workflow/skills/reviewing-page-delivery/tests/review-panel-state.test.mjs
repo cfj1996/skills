@@ -9,8 +9,14 @@ const {
   clampPanelPosition,
   createReviewState,
   DRAFT_TTL_MS,
+  assertArtifactLocationRule,
+  assertPlanFingerprint,
+  loadDraft,
+  prioritizeReviewResults,
   reduceReviewState,
   restoreDraft,
+  sanitizeDraft,
+  saveDraft,
   sanitizePanelItem,
   selectRoundCards,
 } = require("../scripts/inject-review-panel.js");
@@ -61,7 +67,7 @@ test("submission versions increase and stale results are rejected", () => {
     results: [],
   });
   assert.equal(state.mode, "reviewing");
-  assert.match(state.lastError, /stale/i);
+  assert.match(state.lastError.message, /过期/i);
 });
 
 test("submit stores a deeply frozen copy that later edits cannot change", () => {
@@ -98,7 +104,7 @@ test("apply result requires both matching session and submission version", () =>
     results: [],
   });
   assert.equal(state.mode, "reviewing");
-  assert.match(state.lastError, /stale/i);
+  assert.match(state.lastError.message, /过期/i);
 
   state = reduceReviewState(state, {
     type: "APPLY_RESULT",
@@ -159,7 +165,7 @@ test("active-card submission and empty results stay out of confirmable result mo
   });
   const blockedSubmit = reduceReviewState(emptyRound, { type: "SUBMIT" });
   assert.equal(blockedSubmit.mode, "input");
-  assert.match(blockedSubmit.lastError, /active/i);
+  assert.match(blockedSubmit.lastError.message, /可提交/i);
 
   const reviewing = reduceReviewState(createReviewState(session), { type: "SUBMIT" });
   const emptyResults = reduceReviewState(reviewing, {
@@ -169,7 +175,7 @@ test("active-card submission and empty results stay out of confirmable result mo
     results: [],
   });
   assert.equal(emptyResults.mode, "reviewing");
-  assert.match(emptyResults.lastError, /empty/i);
+  assert.match(emptyResults.lastError.message, /空评审结果/i);
 });
 
 test("draft restore requires matching fresh metadata and clamps only valid editable fields", () => {
@@ -428,7 +434,7 @@ test("reviewing results require a non-empty matching session id", () => {
       results: [],
     });
     assert.equal(stale.mode, "reviewing");
-    assert.match(stale.lastError, /stale/i);
+    assert.match(stale.lastError.message, /过期/i);
   }
 });
 
@@ -450,7 +456,7 @@ test("apply result reports invalid results only for the active submission", () =
       results,
     });
     assert.equal(invalid.mode, "reviewing");
-    assert.match(invalid.lastError, /invalid.*results/i);
+    assert.match(invalid.lastError.message, /结果格式无效/i);
   }
 });
 
@@ -486,5 +492,125 @@ test("clamp safely handles missing, negative, and non-finite geometry", () => {
       { width: -1, height: NaN },
     ),
     { x: 0, y: 0 },
+  );
+});
+
+test("plan fingerprint changes preserve only safe draft UI preferences", () => {
+  const state = createReviewState(session);
+  const draft = {
+    deliveryUnitKey: state.deliveryUnitKey,
+    sessionId: "session-new",
+    reviewRound: state.reviewRound,
+    planFingerprint: "sha256:changed-plan",
+    artifactRuleFingerprint: state.artifactRuleFingerprint,
+    savedAt: 1_000,
+    cards: [{ id: "REV-002", conclusion: "阻塞", userNote: "旧结论" }],
+    currentCardIndex: 2,
+    collapsed: true,
+    panelPosition: { x: 12, y: 24 },
+  };
+
+  const sanitized = sanitizeDraft(draft);
+  assert.deepEqual(sanitized.panelPosition, { x: 12, y: 24 });
+  assert.equal(sanitized.collapsed, true);
+  assert.equal(restoreDraft(state, sanitized, 1_001).cards[0].conclusion, "待修改");
+  assert.equal(restoreDraft(state, sanitized, 1_001).cards[0].userNote, state.cards[0].userNote);
+});
+
+test("draft helpers fall back to memory when localStorage is unavailable", () => {
+  const storageKey = buildStorageKey("sample/memory-only");
+  const unavailableStorage = {
+    getItem() { throw new Error("storage unavailable"); },
+    setItem() { throw new Error("storage unavailable"); },
+  };
+  const saved = saveDraft(storageKey, {
+    deliveryUnitKey: "sample/memory-only",
+    sessionId: "memory-session",
+    reviewRound: 1,
+    planFingerprint: "sha256:memory",
+    artifactRuleFingerprint: "sha256:rule",
+    savedAt: 10,
+    cards: [{ id: "REV-memory", conclusion: "待修改", userNote: "内存草稿" }],
+  }, unavailableStorage);
+
+  assert.equal(saved.cards[0].userNote, "内存草稿");
+  assert.deepEqual(loadDraft(storageKey, unavailableStorage), saved);
+});
+
+test("view scopes retain confirmed cards and mark changed evidence with its previous conclusion", () => {
+  const cards = [
+    { id: "confirmed", conclusion: "已确认" },
+    { id: "changed", conclusion: "已确认", evidenceChanged: true },
+    { id: "open", conclusion: "待修改" },
+  ];
+  const round = createReviewState({ ...session, cards, reviewRound: 2, viewScope: "round" });
+  const all = createReviewState({ ...session, cards, reviewRound: 2, viewScope: "all" });
+
+  assert.deepEqual(round.cards.map((card) => card.id), ["changed", "open"]);
+  assert.equal(round.cards[0].previousConclusion, "已确认");
+  assert.deepEqual(all.cards.map((card) => card.id), ["confirmed", "changed", "open"]);
+  assert.equal(all.cards[0].conclusion, "已确认");
+});
+
+test("fingerprint guards block conflicting results before they can be confirmed", () => {
+  const reviewing = reduceReviewState(createReviewState(session), { type: "SUBMIT" });
+  const conflict = reduceReviewState(reviewing, {
+    type: "APPLY_RESULT",
+    sessionId: session.sessionId,
+    submissionVersion: 1,
+    planFingerprint: "sha256:changed",
+    artifactRuleFingerprint: session.artifactRuleFingerprint,
+    results: [{ id: "result", conclusion: "已确认" }],
+  });
+
+  assert.equal(conflict.mode, "reviewing");
+  assert.deepEqual(conflict.lastError, {
+    code: "plan-conflict",
+    message: "Plan 已变化，请重新解析后再确认更新。",
+  });
+  assert.deepEqual(assertPlanFingerprint("a", "b"), conflict.lastError);
+  assert.equal(assertPlanFingerprint("a", "a"), null);
+});
+
+test("artifact rule guard returns a stable AGENTS reparse error", () => {
+  assert.deepEqual(
+    assertArtifactLocationRule({ source: "agents", ruleFingerprint: "sha256:old" }, "sha256:new"),
+    {
+      code: "artifact-rule-conflict",
+      message: "产物位置规则已变化，请重新解析适用的 AGENTS.md 后再提交。",
+    },
+  );
+  assert.equal(assertArtifactLocationRule({ source: "agents", ruleFingerprint: "sha256:same" }, "sha256:same"), null);
+});
+
+test("confirmation gate blocks changed artifact rules even after a matching result", () => {
+  let state = reduceReviewState(createReviewState(session), { type: "SUBMIT" });
+  state = reduceReviewState(state, {
+    type: "APPLY_RESULT",
+    sessionId: session.sessionId,
+    submissionVersion: 1,
+    planFingerprint: session.planFingerprint,
+    artifactRuleFingerprint: session.artifactRuleFingerprint,
+    results: [{ id: "result", conclusion: "已确认" }],
+  });
+  const blocked = reduceReviewState(state, {
+    type: "CONFIRM_PLAN",
+    planFingerprint: session.planFingerprint,
+    artifactRuleFingerprint: "sha256:changed-rule",
+  });
+
+  assert.equal(blocked.mode, "result");
+  assert.equal(blocked.lastError.code, "artifact-rule-conflict");
+  assert.match(blocked.lastError.message, /AGENTS\.md/);
+});
+
+test("result prioritization is deterministic for equal-priority results", () => {
+  assert.deepEqual(
+    prioritizeReviewResults([
+      { id: "z-pending", conclusion: "待修改" },
+      { id: "a-pending", conclusion: "待修改" },
+      { id: "other", conclusion: "已确认" },
+    ]).map((result) => result.id),
+    ["a-pending", "z-pending", "other"],
   );
 });

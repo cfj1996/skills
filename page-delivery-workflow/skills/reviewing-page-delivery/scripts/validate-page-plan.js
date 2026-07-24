@@ -64,6 +64,20 @@ function validateArtifactLocationRule(rule, errors) {
   addError(errors, hasText(rule.ruleFingerprint), "artifactLocationRule.ruleFingerprint is required");
 }
 
+function assertArtifactLocationRule(rule, currentRuleFingerprint) {
+  return (
+    !isNormalizedObject(rule) ||
+    rule.source !== "agents" ||
+    !hasText(rule.ruleFingerprint) ||
+    rule.ruleFingerprint !== currentRuleFingerprint
+  )
+    ? {
+      code: "artifact-rule-conflict",
+      message: "产物位置规则已变化，请重新解析适用的 AGENTS.md 后再提交。",
+    }
+    : null;
+}
+
 function validateReferences(itemsByCollection, indexes, errors) {
   for (const collectionName of COLLECTIONS) {
     for (const item of itemsByCollection[collectionName]) {
@@ -190,7 +204,10 @@ function validatePagePlanModel(model) {
   validateReferences(itemsByCollection, indexes, errors);
   validateReciprocalLinks(itemsByCollection, indexes, errors);
 
-  return { valid: errors.length === 0, errors };
+  return {
+    valid: errors.length === 0,
+    errors: errors.sort((left, right) => left.localeCompare(right, "zh-Hans-CN")),
+  };
 }
 
-module.exports = { STATUS_MODEL, validatePagePlanModel };
+module.exports = { STATUS_MODEL, assertArtifactLocationRule, validatePagePlanModel };

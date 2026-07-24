@@ -117,6 +117,8 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
     click(panel()?.querySelector('[data-action="toggle-collapse"]'));
     check(panel()?.querySelector('[data-field="userNote"]')?.value === "恢复这条草稿", "note draft should be restored after remount");
 
+    click(panel()?.querySelector('[data-action="previous"]'));
+    check(panel()?.querySelector("[data-review-card]")?.getAttribute("data-card-id") === "REV-002", "evidence verification should use the card with an explicit selector");
     const evidenceTarget = document.querySelector("#login-form");
     const originalStyle = evidenceTarget.getAttribute("style");
     click(panel()?.querySelector('[data-action="highlight-evidence"]'));
@@ -125,6 +127,7 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
     click(document.querySelector("[data-review-evidence-overlay]"));
     check(!document.querySelector("[data-review-evidence-overlay]"), "evidence overlay should be removable");
 
+    click(panel()?.querySelector('[data-action="next"]'));
     click(panel()?.querySelector('[data-action="next"]'));
     check(Boolean(panel()?.querySelector('[data-action="submit"]')), "last restored input card should expose submission");
     click(panel()?.querySelector('[data-action="submit"]'));
@@ -192,6 +195,80 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
     check(!panel()?.querySelector('[data-field="conclusion"], [data-field="userNote"], [data-action="highlight-evidence"], [data-action="next"], [data-action="previous"], [data-action="submit"]'), "empty state must hide review controls");
     globalThis.__PAGE_DELIVERY_REVIEW__.destroy();
     check(trackedListeners.every((entry) => entry.removed), "empty panel destroy should also remove its tracked runtime listeners");
+
+    const allScopeSession = { ...globalThis.reviewSession, viewScope: "all" };
+    globalThis.PageDeliveryReviewPanel.mountReviewPanel(allScopeSession);
+    check(state()?.cards?.length === 4, "viewScope=all should retain every review card, including confirmed cards");
+    globalThis.__PAGE_DELIVERY_REVIEW__.destroy();
+
+    const changedPlanSession = {
+      ...globalThis.reviewSession,
+      sessionId: "changed-plan-session",
+      planFingerprint: "sha256:changed-plan",
+    };
+    localStorage.setItem(storageKey, JSON.stringify({
+      deliveryUnitKey: changedPlanSession.deliveryUnitKey,
+      sessionId: "old-plan-session",
+      reviewRound: changedPlanSession.reviewRound,
+      planFingerprint: "sha256:fixture",
+      artifactRuleFingerprint: changedPlanSession.artifactRuleFingerprint,
+      savedAt: Date.now(),
+      collapsed: true,
+      panelPosition: { x: 111, y: 123 },
+      cards: [{ id: "REV-002", conclusion: "阻塞", userNote: "不能恢复" }],
+    }));
+    globalThis.PageDeliveryReviewPanel.mountReviewPanel(changedPlanSession);
+    check(state()?.collapsed === true && state()?.panelPosition?.y === 123, "a changed plan may restore safe panel preferences for the same delivery unit");
+    check(state()?.cards?.[0]?.conclusion !== "阻塞" && state()?.cards?.[0]?.userNote !== "不能恢复", "a changed plan must not restore prior review conclusions or notes");
+    globalThis.__PAGE_DELIVERY_REVIEW__.destroy();
+    localStorage.removeItem(storageKey);
+
+    const unavailableEvidenceSession = {
+      ...globalThis.reviewSession,
+      reviewRound: 1,
+      cards: [{ id: "bad-evidence", conclusion: "待修改", evidence: { selector: "[" } }],
+    };
+    globalThis.PageDeliveryReviewPanel.mountReviewPanel(unavailableEvidenceSession);
+    click(panel()?.querySelector('[data-action="highlight-evidence"]'));
+    check(panel()?.querySelector("[data-review-evidence-status]")?.textContent.includes("无法定位"), "invalid evidence selectors should show a visible unavailable message");
+    check(!document.querySelector("[data-review-evidence-overlay]"), "invalid evidence selectors should not create an overlay");
+    globalThis.__PAGE_DELIVERY_REVIEW__.destroy();
+
+    const conflictSession = {
+      ...globalThis.reviewSession,
+      reviewRound: 1,
+      cards: [{ id: "conflict-card", conclusion: "待修改" }],
+    };
+    globalThis.PageDeliveryReviewPanel.mountReviewPanel(conflictSession);
+    click(panel()?.querySelector('[data-action="submit"]'));
+    const conflictSubmission = globalThis.__PAGE_DELIVERY_REVIEW__.exportSubmission();
+    globalThis.__PAGE_DELIVERY_REVIEW__.applyResult({
+      sessionId: conflictSubmission.sessionId,
+      submissionVersion: conflictSubmission.submissionVersion,
+      planFingerprint: "sha256:changed-plan",
+      artifactRuleFingerprint: conflictSubmission.artifactRuleFingerprint,
+      results: [{ id: "conflict-result", conclusion: "已确认" }],
+    });
+    check(state()?.mode === "reviewing" && state()?.lastError?.code === "plan-conflict", "plan fingerprint conflicts must stay out of result mode");
+    check(panel()?.querySelector("[data-review-error]")?.textContent.includes("Plan 已变化"), "plan conflicts should show an actionable visible message");
+    globalThis.__PAGE_DELIVERY_REVIEW__.destroy();
+
+    const storagePrototype = Object.getPrototypeOf(localStorage);
+    const originalGetItem = storagePrototype.getItem;
+    const originalSetItem = storagePrototype.setItem;
+    try {
+      storagePrototype.getItem = () => { throw new Error("storage disabled"); };
+      storagePrototype.setItem = () => { throw new Error("storage disabled"); };
+      globalThis.PageDeliveryReviewPanel.mountReviewPanel(conflictSession);
+      const unavailableStorageNote = panel()?.querySelector('[data-field="userNote"]');
+      unavailableStorageNote.value = "仍可编辑";
+      unavailableStorageNote.dispatchEvent(new Event("input", { bubbles: true }));
+      check(state()?.cards?.[0]?.userNote === "仍可编辑", "the panel should remain usable when localStorage is unavailable");
+      globalThis.__PAGE_DELIVERY_REVIEW__.destroy();
+    } finally {
+      storagePrototype.getItem = originalGetItem;
+      storagePrototype.setItem = originalSetItem;
+    }
   } catch (error) {
     failures.push(`assertion execution failed: ${error?.message || error}`);
   } finally {
