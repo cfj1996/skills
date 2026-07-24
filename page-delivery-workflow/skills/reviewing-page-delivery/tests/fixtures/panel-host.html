@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Page delivery review panel fixture</title>
+    <style>
+      /* This intentionally hostile host-page rule must not leak into the panel. */
+      [data-page-delivery-review-host] {
+        all: unset !important;
+        background: fuchsia !important;
+        color: lime !important;
+      }
+
+      #login-form {
+        display: grid;
+        gap: 8px;
+        width: 280px;
+        padding: 20px;
+        border: 1px solid #bbb;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>登录</h1>
+      <form id="login-form">
+        <label>账号 <input name="account" value="reviewer@example.test" /></label>
+        <label>密码 <input name="password" type="password" value="not-a-secret" /></label>
+        <button type="submit">登录</button>
+      </form>
+    </main>
+  </body>
+</html>
