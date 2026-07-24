@@ -131,6 +131,24 @@ test("review references define all dimensions, status groups, and artifact gates
   ]) assert.match(apiStages, new RegExp(rule));
 });
 
+test("artifact-location candidates must be confirmed, solidified, reread, and uniquely resolved before review continues", async () => {
+  const skill = visibleMarkdown(await read("skills/reviewing-page-delivery/SKILL.md"));
+  const standard = await read("skills/reviewing-page-delivery/references/page-review-standard.md");
+
+  for (const document of [skill, standard]) {
+    const confirm = document.indexOf("用户确认完整候选");
+    const solidify = document.indexOf("固化至最近适用公共作用域");
+    const reread = document.indexOf("重新读取");
+    const resolve = document.indexOf("唯一解析");
+    const continueReview = document.indexOf("才能继续");
+    assert.ok(
+      confirm < solidify && solidify < reread && reread < resolve && resolve < continueReview,
+      "确认 → 固化 → 重新读取 → 唯一解析 → 才能继续 必须按顺序出现",
+    );
+    assert.match(document, /未经用户确认不得固化/);
+  }
+});
+
 test("plan template keeps stable human-readable sections and prohibits unsafe defaults", async () => {
   const template = await read("skills/reviewing-page-delivery/assets/page-delivery-plan-template.md");
   for (const section of [
