@@ -1357,26 +1357,36 @@ Expected: tests 全部 PASS；两个 validator PASS；`git diff --check` 无输�
 
 **Step 3: 运行范围和硬编码验证**
 
+用户已确认采用语义化 allowlist：保留 Task 7 要求的显式禁止声明，只允许
+中文禁止词出现在测试锁定的文件、次数和完整否定语境中；旧字段名、真实固定
+目录模式、验收项目事实和绝对路径仍为零容忍。不得用 `rg -v` 或其他简单
+排除否定行的方式代替语义检查。
+
 ```bash
 find page-delivery-workflow/skills -mindepth 1 -maxdepth 1 -type d -print
 rg -n \
-  'pageCompletionRate|页面完成率|Vantix|@zan/ui-vue3|Element Plus|UnoCSS|仓配|/Users/cfj/projects/vantix' \
-  page-delivery-workflow
-rg -n \
-  'plans/<项目>|contracts/drafts/|默认 Plan 目录|默认 Draft 目录' \
+  'pageCompletionRate|plans/<项目>|contracts/drafts/|Vantix|@zan/ui-vue3|Element Plus|UnoCSS|仓配|/Users/cfj/projects/vantix' \
   page-delivery-workflow/.codex-plugin/plugin.json \
   page-delivery-workflow/skills/reviewing-page-delivery/SKILL.md \
   page-delivery-workflow/skills/reviewing-page-delivery/scripts \
   page-delivery-workflow/skills/reviewing-page-delivery/references \
   page-delivery-workflow/skills/reviewing-page-delivery/assets
+node --test \
+  --test-name-pattern='semantic resource policy' \
+  page-delivery-workflow/skills/reviewing-page-delivery/tests/skill-contract.test.mjs
 ```
 
 Expected:
 
 - `find` 只输出 `reviewing-page-delivery`；
-- 两次 `rg` 均无匹配，exit 1。
+- `rg` 无匹配，exit 1；
+- 语义策略测试通过：`pageCompletionRate`、固定 Plan/Draft 目录模式和项目
+  硬编码零匹配；“页面完成率”“默认 Plan 目录”“默认 Draft 目录”仅允许
+  出现在测试精确锁定的否定声明文件、次数和完整行语境中，任何字段定义、
+  模板值、默认路径配置或额外未批准位置均失败。
 
-若测试源码必须断言禁止词，禁止词会合法出现在测试中；此时把检查范围收窄到 `SKILL.md`、`scripts/`、`references/`、`assets/` 和 manifest，并在交付证据中说明。
+测试源码包含策略模式和反例是合法的；通用资源检查范围固定为 `SKILL.md`、
+`scripts/`、`references/`、`assets/` 和 manifest，并在交付证据中说明。
 
 **Step 4: 检查 Git 范围**
 

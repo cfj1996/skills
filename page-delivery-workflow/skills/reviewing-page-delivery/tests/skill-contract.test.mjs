@@ -4,6 +4,7 @@ import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
+import { inspectGenericResourcePolicy } from "./helpers/generic-resource-policy.mjs";
 
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 const isStagingLayout = (directory) =>
@@ -75,6 +76,70 @@ const genericResourcePaths = [
   "skills/reviewing-page-delivery/tests/fixtures/page-plan-model.json",
   "skills/reviewing-page-delivery/tests/fixtures/review-session.json",
 ];
+
+const listFiles = async (relativeDirectory) => {
+  const entries = await readdir(path.join(pluginRoot, relativeDirectory), {
+    withFileTypes: true,
+  });
+  const nested = await Promise.all(entries.map((entry) => {
+    const relativePath = path.join(relativeDirectory, entry.name);
+    return entry.isDirectory() ? listFiles(relativePath) : [relativePath];
+  }));
+  return nested.flat();
+};
+
+const listDistributableResourcePaths = async () => [
+  ".codex-plugin/plugin.json",
+  "skills/reviewing-page-delivery/SKILL.md",
+  ...await listFiles("skills/reviewing-page-delivery/scripts"),
+  ...await listFiles("skills/reviewing-page-delivery/references"),
+  ...await listFiles("skills/reviewing-page-delivery/assets"),
+];
+
+const semanticGenericResourcePolicy = {
+  forbiddenPatterns: [
+    { id: "legacy-page-completion-field", pattern: /pageCompletionRate/g },
+    { id: "fixed-plan-directory-pattern", pattern: /plans\/<项目>/g },
+    { id: "fixed-draft-directory", pattern: /contracts\/drafts\//g },
+    {
+      id: "acceptance-project-hardcoding",
+      pattern: /Vantix|@zan\/ui-vue3|Element Plus|UnoCSS|仓配|\/Users\/cfj\/projects\/vantix/gi,
+    },
+  ],
+  literalAllowlists: [
+    {
+      literal: "页面完成率",
+      occurrences: [
+        {
+          path: "skills/reviewing-page-delivery/references/status-model.md",
+          line: "允许报告本轮评审总数及各结论数量、待复评数量、功能/接口/页面依赖/验收状态数量、任务总数/完成数/验证数和 Draft operation 数量。禁止使用单一页面完成百分比，也不得将不同性质状态折算为页面完成率。",
+        },
+        {
+          path: "skills/reviewing-page-delivery/assets/page-delivery-plan-template.md",
+          line: "不得使用页面完成率；不得把不同性质状态折算为单一百分比。",
+        },
+      ],
+    },
+    {
+      literal: "默认 Plan 目录",
+      occurrences: [
+        {
+          path: "skills/reviewing-page-delivery/assets/page-delivery-plan-template.md",
+          line: "不得使用隐藏 JSON、自动生成 Draft、从 Markdown 解析、插件默认 Plan 目录或插件默认 Draft 目录。",
+        },
+      ],
+    },
+    {
+      literal: "默认 Draft 目录",
+      occurrences: [
+        {
+          path: "skills/reviewing-page-delivery/assets/page-delivery-plan-template.md",
+          line: "不得使用隐藏 JSON、自动生成 Draft、从 Markdown 解析、插件默认 Plan 目录或插件默认 Draft 目录。",
+        },
+      ],
+    },
+  ],
+};
 
 test("plugin manifest and the only first-version skill exist", async () => {
   const manifest = JSON.parse(await read(".codex-plugin/plugin.json"));
@@ -239,6 +304,44 @@ test("documentation status terms match the validator and generic assets contain 
     content,
     /Vantix|@zan\/ui-vue3|Element Plus|UnoCSS|仓配|\/Users\/cfj\/projects\/vantix|product\/plans\/|engineering\/implementation-plans\/|api\/drafts\/|contracts\/openapi\//i,
   );
+});
+
+test("semantic resource policy allows only approved prohibition statements", async () => {
+  const distributableResourcePaths = await listDistributableResourcePaths();
+  const resources = await Promise.all(distributableResourcePaths.map(async (relativePath) => ({
+    path: relativePath,
+    content: await read(relativePath),
+  })));
+  const violations = inspectGenericResourcePolicy(resources, semanticGenericResourcePolicy);
+
+  assert.deepEqual(violations, []);
+});
+
+test("semantic resource policy rejects extra wording and operational defaults", async () => {
+  const distributableResourcePaths = await listDistributableResourcePaths();
+  const resources = await Promise.all(distributableResourcePaths.map(async (relativePath) => ({
+    path: relativePath,
+    content: await read(relativePath),
+  })));
+  resources.push({
+    path: "skills/reviewing-page-delivery/assets/unapproved-example.md",
+    content: [
+      "字段：pageCompletionRate",
+      "Plan 路径模式：plans/<项目>",
+      "Draft OpenAPI 路径模式：contracts/drafts/",
+      "模板值：页面完成率",
+    ].join("\n"),
+  });
+
+  const violationCodes = inspectGenericResourcePolicy(
+    resources,
+    semanticGenericResourcePolicy,
+  ).map(({ code }) => code);
+
+  assert.ok(violationCodes.includes("legacy-page-completion-field"));
+  assert.ok(violationCodes.includes("fixed-plan-directory-pattern"));
+  assert.ok(violationCodes.includes("fixed-draft-directory"));
+  assert.ok(violationCodes.includes("literal-not-allowlisted"));
 });
 
 test("generic resource scanner covers distributable resources and excludes test code and pressure scenarios", () => {
