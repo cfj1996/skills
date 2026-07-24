@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "sessionId": "session-1",
+  "deliveryUnitKey": "sample/login",
+  "deliveryUnitKind": "page",
+  "artifactRuleFingerprint": "sha256:rule-fixture",
+  "reviewRound": 2,
+  "planFingerprint": "sha256:fixture",
+  "artifactPath": "/private/artifacts/sample/login.html",
+  "cards": [
+    { "id": "REV-001", "conclusion": "已确认", "reopened": false, "evidenceChanged": false },
+    { "id": "REV-002", "conclusion": "待修改", "reopened": false, "evidenceChanged": false },
+    { "id": "REV-003", "conclusion": "已确认", "reopened": true, "evidenceChanged": false },
+    { "id": "REV-004", "conclusion": "不适用", "reopened": false, "evidenceChanged": true }
+  ]
+}
