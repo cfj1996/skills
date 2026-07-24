@@ -5,6 +5,8 @@
   "deliveryUnitKind": "page",
   "artifactRuleFingerprint": "sha256:rule-fixture",
   "reviewRound": 2,
+  "sessionCount": 4,
+  "objectiveCount": 2,
   "planFingerprint": "sha256:fixture",
   "artifactPath": "/private/artifacts/sample/login.html",
   "artifactUrl": "https://artifacts.example.test/sample/login.html",
@@ -16,10 +18,18 @@
       "reopened": false,
       "evidenceChanged": false,
       "telepath": "reviewer-visible evidence marker",
+      "reviewDomain": "交互验收",
+      "reviewTarget": "登录表单",
+      "design": "输入与提交状态应清晰可见",
       "evidence": {
         "locator": "figma://file/login-node",
-        "path": "/evidence/login.png"
-      }
+        "path": "/evidence/login.png",
+        "selector": "#login-form"
+      },
+      "relatedApis": ["POST /login"],
+      "mockScenarios": ["账号为空", "密码错误"],
+      "acceptanceCriteria": ["错误提示可见", "提交可重试"],
+      "relatedRefs": [{ "kind": "design", "value": "figma://file/login-node" }]
     },
     { "id": "REV-003", "conclusion": "已确认", "reopened": true, "evidenceChanged": false },
     { "id": "REV-004", "conclusion": "不适用", "reopened": false, "evidenceChanged": true }

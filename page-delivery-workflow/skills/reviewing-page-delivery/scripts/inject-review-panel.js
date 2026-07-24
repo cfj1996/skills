@@ -10,6 +10,7 @@
     ["冲突", 2],
   ]);
   const PANEL_ITEM_ARTIFACT_FIELDS = new Set(["artifactPath", "artifactUrl"]);
+  const USER_CONCLUSIONS = new Set(["未评审", "已确认", "待修改", "阻塞", "不适用"]);
   const SNAP_THRESHOLD = 48;
   const FALLBACK_PANEL_SIZE = { width: 320, height: 360 };
   let activeRuntime = null;
@@ -50,9 +51,12 @@
       deliveryUnitKind: session.deliveryUnitKind,
       artifactRuleFingerprint: session.artifactRuleFingerprint,
       reviewRound: session.reviewRound,
+      sessionCount: session.sessionCount,
+      objectiveCount: session.objectiveCount,
       planFingerprint: session.planFingerprint,
       cards,
       currentCardIndex: 0,
+      currentResultIndex: 0,
       mode: "input",
       submissionVersion: 0,
       lastSubmission: null,
@@ -85,8 +89,10 @@
       return applyResult(state, action);
     }
 
-    if (state.mode === "result" && action.type === "CONFIRM_PLAN") {
-      return { ...state, mode: "confirmed" };
+    if (state.mode === "result") {
+      if (action.type === "NEXT") return moveCurrentResult(state, 1);
+      if (action.type === "PREVIOUS") return moveCurrentResult(state, -1);
+      if (action.type === "CONFIRM_PLAN") return { ...state, mode: "confirmed" };
     }
 
     return state;
@@ -155,6 +161,7 @@
           storageKey,
           JSON.stringify({
             cards: state.cards.map(({ id, conclusion, userNote }) => ({ id, conclusion, userNote })),
+            currentCardIndex: state.currentCardIndex,
             collapsed,
             panelPosition,
           }),
@@ -359,8 +366,12 @@
         .filter((card) => card && typeof card === "object" && isNonEmptyString(card.id))
         .map((card) => [card.id, card]),
     );
+    const currentCardIndex = Number.isInteger(draft.currentCardIndex)
+      ? clamp(draft.currentCardIndex, 0, Math.max(0, state.cards.length - 1))
+      : state.currentCardIndex;
     return {
       ...state,
+      currentCardIndex,
       cards: state.cards.map((card) => {
         const saved = edits.get(card.id);
         if (!saved) return card;
@@ -376,7 +387,7 @@
     return `
       :host { all: initial; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #172033; }
       * { box-sizing: border-box; }
-      [data-review-panel] { background: #fff; border: 1px solid #cbd5e1; border-radius: 10px; box-shadow: 0 12px 28px rgba(15, 23, 42, .22); overflow: hidden; }
+      [data-review-panel] { background: #fff !important; border: 1px solid #cbd5e1; border-radius: 10px; box-shadow: 0 12px 28px rgba(15, 23, 42, .22); color: #172033 !important; overflow: hidden; }
       [data-review-panel-titlebar] { align-items: center; background: #0f172a; color: #fff; cursor: grab; display: flex; font-size: 14px; font-weight: 600; justify-content: space-between; min-height: 40px; padding: 0 10px; touch-action: none; }
       [data-review-panel-titlebar] button { cursor: pointer; }
       [data-review-body] { display: grid; gap: 10px; padding: 12px; }
@@ -396,20 +407,57 @@
     const currentCard = state.cards[state.currentCardIndex];
     const disabled = state.mode !== "input" ? " disabled" : "";
     const escape = escapeHtml;
-    const header = `<header data-review-panel-titlebar><span>页面交付评审 ${state.currentCardIndex + 1}/${state.cards.length}</span><button type="button" data-action="toggle-collapse">${collapsed ? "展开" : "收起"}</button></header>`;
+    const reviewDomain = currentCard?.reviewDomain || "未分类";
+    const sessionCount = Number.isFinite(state.sessionCount) ? state.sessionCount : state.cards.length;
+    const objectiveCount = Number.isFinite(state.objectiveCount) ? state.objectiveCount : state.cards.length;
+    const header = `<header data-review-panel-titlebar><span data-review-context>${escape(reviewDomain)} · ${state.currentCardIndex + 1}/${state.cards.length} · 会话 ${sessionCount} · 目标 ${objectiveCount}</span><button type="button" data-action="toggle-collapse">${collapsed ? "展开" : "收起"}</button></header>`;
     if (collapsed) return header;
     if (state.mode === "result" || state.mode === "confirmed") {
-      const results = state.results.map((result) => `<article data-review-result data-result-id="${escape(result.id)}"><strong>${escape(result.conclusion)}</strong> ${escape(result.id)}</article>`).join("");
-      return `${header}<div data-review-body>${results || "<p>没有返回项</p>"}<div data-review-actions><button type="button" data-action="confirm-plan"${state.mode === "confirmed" ? " disabled" : ""}>确认更新 Plan</button></div></div>`;
+      const result = state.results[state.currentResultIndex];
+      const lastResult = state.currentResultIndex >= state.results.length - 1;
+      const resultMarkup = result
+        ? `<article data-review-result data-result-id="${escape(result.id)}"><strong>${escape(result.conclusion)}</strong> ${escape(result.id)}${result.summary ? `<p data-result-summary>${escape(result.summary)}</p>` : ""}${result.planChangeSummary ? `<p data-result-plan-change-summary>${escape(result.planChangeSummary)}</p>` : ""}</article>`
+        : "<p>没有返回项</p>";
+      return `${header}<div data-review-body>${resultMarkup}<div data-review-navigation><button type="button" data-action="previous"${state.currentResultIndex === 0 ? " disabled" : ""}>上一个</button><button type="button" data-action="next"${lastResult ? " disabled" : ""}>下一个</button></div>${lastResult ? `<div data-review-actions><button type="button" data-action="confirm-plan"${state.mode === "confirmed" ? " disabled" : ""}>确认更新 Plan</button></div>` : ""}</div>`;
     }
     const card = currentCard || { id: "", conclusion: "", userNote: "" };
-    return `${header}<div data-review-body><article data-review-card data-card-id="${escape(card.id)}"><strong>${escape(card.id)}</strong><label>结论<select data-field="conclusion"${disabled}>${conclusionOptions(card.conclusion)}</select></label><label>备注<textarea data-field="userNote"${disabled}>${escape(card.userNote || "")}</textarea></label></article><div data-review-navigation><button type="button" data-action="previous"${disabled || state.currentCardIndex === 0 ? " disabled" : ""}>上一个</button><button type="button" data-action="next"${disabled || state.currentCardIndex >= state.cards.length - 1 ? " disabled" : ""}>下一个</button></div><div data-review-actions><button type="button" data-action="highlight-evidence"${disabled}>查看证据</button><button type="button" data-action="submit"${disabled}>统一提交</button></div>${state.mode === "reviewing" ? "<p>评审提交中</p>" : ""}</div>`;
+    const lastCard = state.currentCardIndex >= state.cards.length - 1;
+    return `${header}<div data-review-body><article data-review-card data-card-id="${escape(card.id)}"><strong>${escape(card.id)}</strong>${cardFieldsMarkup(card)}<label>结论<select data-field="conclusion"${disabled}>${conclusionOptions(card.conclusion)}</select></label><label>备注<textarea data-field="userNote"${disabled}>${escape(card.userNote || "")}</textarea></label></article><div data-review-navigation><button type="button" data-action="previous"${disabled || state.currentCardIndex === 0 ? " disabled" : ""}>上一个</button><button type="button" data-action="next"${disabled || lastCard ? " disabled" : ""}>下一个</button></div><div data-review-actions><button type="button" data-action="highlight-evidence"${disabled}>查看证据</button>${lastCard ? `<button type="button" data-action="submit"${disabled}>统一提交评审</button>` : ""}</div>${state.mode === "reviewing" ? "<p>评审提交中</p>" : ""}</div>`;
   }
 
   function conclusionOptions(selected) {
-    return ["已确认", "待修改", "阻塞", "冲突", "不适用"]
+    return ["未评审", "已确认", "待修改", "阻塞", "不适用"]
       .map((value) => `<option value="${value}"${value === selected ? " selected" : ""}>${value}</option>`)
       .join("");
+  }
+
+  function cardFieldsMarkup(card) {
+    const fields = [
+      ["reviewDomain", "评审域"],
+      ["reviewTarget", "评审目标"],
+      ["design", "设计"],
+      ["evidence", "证据"],
+      ["relatedApis", "关联接口"],
+      ["mockScenarios", "模拟场景"],
+      ["acceptanceCriteria", "验收标准"],
+    ];
+    const markup = fields
+      .filter(([field]) => card[field] !== undefined && card[field] !== null)
+      .map(([field, label]) => `<p data-card-field="${field}"><strong>${label}</strong> ${escapeHtml(formatFieldValue(card[field]))}</p>`)
+      .join("");
+    const relatedRefs = Array.isArray(card.relatedRefs) && card.relatedRefs.length
+      ? `<p data-card-related-refs><strong>关联引用</strong> ${escapeHtml(formatFieldValue(card.relatedRefs))}</p>`
+      : "";
+    return `${markup}${relatedRefs}`;
+  }
+
+  function formatFieldValue(value) {
+    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value);
+    if (Array.isArray(value)) return value.map(formatFieldValue).join("；");
+    if (value && typeof value === "object") {
+      return Object.entries(value).map(([key, item]) => `${key}: ${formatFieldValue(item)}`).join("；");
+    }
+    return "";
   }
 
   function escapeHtml(value) {
@@ -427,7 +475,7 @@
     if (!currentCard || !patch || typeof patch !== "object") return state;
 
     const editablePatch = {};
-    if (Object.hasOwn(patch, "conclusion") && isNonEmptyString(patch.conclusion)) {
+    if (Object.hasOwn(patch, "conclusion") && USER_CONCLUSIONS.has(patch.conclusion)) {
       editablePatch.conclusion = patch.conclusion;
     }
     if (Object.hasOwn(patch, "userNote") && typeof patch.userNote === "string") {
@@ -451,6 +499,13 @@
       ...state,
       currentCardIndex,
     };
+  }
+
+  function moveCurrentResult(state, direction) {
+    const lastResultIndex = Math.max(0, state.results.length - 1);
+    const currentResultIndex = clamp(state.currentResultIndex + direction, 0, lastResultIndex);
+    if (currentResultIndex === state.currentResultIndex) return state;
+    return { ...state, currentResultIndex };
   }
 
   function submit(state) {
@@ -493,6 +548,7 @@
       ...state,
       mode: "result",
       results: action.results.map(sanitizePanelItem).sort(compareResults),
+      currentResultIndex: 0,
       lastError: null,
     };
   }
@@ -530,7 +586,8 @@
       typeof state === "object" &&
       ["input", "reviewing", "result", "confirmed"].includes(state.mode) &&
       Array.isArray(state.cards) &&
-      Number.isInteger(state.currentCardIndex)
+      Number.isInteger(state.currentCardIndex) &&
+      Number.isInteger(state.currentResultIndex)
     );
   }
 

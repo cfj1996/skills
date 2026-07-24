@@ -155,6 +155,7 @@ test("reducer preserves fingerprints and excludes actual artifact paths", () => 
   assert.deepEqual(state.cards[0].evidence, {
     locator: "figma://file/login-node",
     path: "/evidence/login.png",
+    selector: "#login-form",
   });
 
   for (const action of [
@@ -287,6 +288,16 @@ test("input edits only the user-controlled conclusion and note", () => {
     }),
     input,
   );
+});
+
+test("input reducer rejects conclusions outside the fixed reviewer set", () => {
+  const input = createReviewState(session);
+  for (const conclusion of ["冲突", "任意状态", "", "  "]) {
+    assert.equal(
+      reduceReviewState(input, { type: "EDIT_CARD", patch: { conclusion } }),
+      input,
+    );
+  }
 });
 
 test("editing a card does not share nested evidence with the previous state", () => {
