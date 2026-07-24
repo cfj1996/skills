@@ -212,6 +212,31 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
     check(state()?.cards?.length === 4, "viewScope=all should retain every review card, including confirmed cards");
     globalThis.__PAGE_DELIVERY_REVIEW__.destroy();
 
+    const taintedResolutionSession = {
+      ...globalThis.reviewSession,
+      sessionId: "tainted-resolution-session",
+      deliveryUnitKey: "sample/tainted-resolution",
+      artifactRuleResolution: {
+        status: "resolved",
+        source: "agents",
+        absolutePath: "/secret/AGENTS.md",
+        artifactPath: "/private/rule",
+      },
+      cards: [{ id: "tainted-resolution-card", conclusion: "待修改" }],
+    };
+    const taintedStorageKey = `page-delivery-review:v1:${taintedResolutionSession.deliveryUnitKey}`;
+    globalThis.PageDeliveryReviewPanel.mountReviewPanel(taintedResolutionSession);
+    check(!JSON.stringify(state()).includes("/secret/AGENTS.md") && !JSON.stringify(state()).includes("/private/rule"), "state must canonicalize artifact-rule resolution metadata");
+    const taintedNote = panel()?.querySelector('[data-field="userNote"]');
+    taintedNote.value = "触发安全草稿";
+    taintedNote.dispatchEvent(new Event("input", { bubbles: true }));
+    check(!localStorage.getItem(taintedStorageKey).includes("/secret/AGENTS.md") && !localStorage.getItem(taintedStorageKey).includes("/private/rule"), "localStorage draft must canonicalize artifact-rule resolution metadata");
+    click(panel()?.querySelector('[data-action="submit"]'));
+    const taintedSubmission = globalThis.__PAGE_DELIVERY_REVIEW__.exportSubmission();
+    check(!JSON.stringify(taintedSubmission).includes("/secret/AGENTS.md") && !JSON.stringify(taintedSubmission).includes("/private/rule"), "exportSubmission must canonicalize artifact-rule resolution metadata");
+    globalThis.__PAGE_DELIVERY_REVIEW__.destroy();
+    localStorage.removeItem(taintedStorageKey);
+
     const changedPlanSession = {
       ...globalThis.reviewSession,
       sessionId: "changed-plan-session",

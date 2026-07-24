@@ -38,6 +38,56 @@ test("review state preserves an explicitly resolved AGENTS artifact rule", () =>
   });
 });
 
+test("artifact rule resolution is canonical across state, persisted drafts, and submissions", () => {
+  const taintedResolution = {
+    status: "resolved",
+    source: "agents",
+    absolutePath: "/secret/AGENTS.md",
+    artifactPath: "/private/rule",
+  };
+  let state = createReviewState({
+    ...session,
+    artifactRuleResolution: taintedResolution,
+  });
+
+  assert.deepEqual(state.artifactRuleResolution, {
+    status: "resolved",
+    source: "agents",
+  });
+  assert.doesNotMatch(JSON.stringify(state), /secret|private/);
+
+  const values = new Map();
+  const storage = {
+    getItem(key) { return values.get(key) || null; },
+    setItem(key, value) { values.set(key, value); },
+    removeItem(key) { values.delete(key); },
+  };
+  const storageKey = buildStorageKey("sample/tainted-resolution");
+  saveDraft(storageKey, {
+    deliveryUnitKey: "sample/tainted-resolution",
+    sessionId: state.sessionId,
+    reviewRound: state.reviewRound,
+    planFingerprint: state.planFingerprint,
+    artifactRuleFingerprint: state.artifactRuleFingerprint,
+    artifactRuleResolution: taintedResolution,
+    savedAt: Date.now(),
+    cards: [],
+  }, storage);
+  const persistedDraft = JSON.parse(values.get(storageKey));
+  assert.deepEqual(persistedDraft.artifactRuleResolution, {
+    status: "resolved",
+    source: "agents",
+  });
+  assert.doesNotMatch(JSON.stringify(persistedDraft), /secret|private/);
+
+  state = reduceReviewState(state, { type: "SUBMIT" });
+  assert.deepEqual(state.lastSubmission.artifactRuleResolution, {
+    status: "resolved",
+    source: "agents",
+  });
+  assert.doesNotMatch(JSON.stringify(state.lastSubmission), /secret|private/);
+});
+
 test("unresolved artifact rule candidates can be reviewed but cannot confirm a Plan", () => {
   const unresolvedSession = {
     ...session,
@@ -260,6 +310,27 @@ test("draft restore requires matching fresh metadata and clamps only valid edita
   const restored = restoreDraft(state, validDraft, savedAt + DRAFT_TTL_MS);
   assert.equal(restored.currentCardIndex, state.cards.length - 1);
   assert.equal(restored.cards[0].conclusion, "阻塞");
+
+  const unresolvedDraft = {
+    ...validDraft,
+    artifactRuleResolution: {
+      status: "unresolved-candidate",
+      source: "candidate",
+    },
+  };
+  const resolvedStateFromUnresolvedDraft = restoreDraft(state, unresolvedDraft, savedAt + 1);
+  assert.equal(resolvedStateFromUnresolvedDraft.currentCardIndex, state.currentCardIndex);
+  assert.equal(resolvedStateFromUnresolvedDraft.cards[0].conclusion, state.cards[0].conclusion);
+  assert.equal(resolvedStateFromUnresolvedDraft.cards[0].userNote, state.cards[0].userNote);
+
+  const unresolvedState = createReviewState({
+    ...session,
+    artifactRuleResolution: unresolvedDraft.artifactRuleResolution,
+  });
+  const unresolvedStateFromResolvedDraft = restoreDraft(unresolvedState, validDraft, savedAt + 1);
+  assert.equal(unresolvedStateFromResolvedDraft.currentCardIndex, unresolvedState.currentCardIndex);
+  assert.equal(unresolvedStateFromResolvedDraft.cards[0].conclusion, unresolvedState.cards[0].conclusion);
+  assert.equal(unresolvedStateFromResolvedDraft.cards[0].userNote, unresolvedState.cards[0].userNote);
 
   for (const [draft, now] of [
     [{ ...validDraft, sessionId: "other" }, savedAt + DRAFT_TTL_MS],

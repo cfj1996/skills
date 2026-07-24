@@ -50,7 +50,8 @@
     if (!session.cards.every(isCard)) {
       throw createCodedError(TypeError, "invalid-review-session", "Review session must include valid cards");
     }
-    if (!isArtifactRuleResolution(session.artifactRuleResolution)) {
+    const artifactRuleResolution = canonicalizeArtifactRuleResolution(session.artifactRuleResolution);
+    if (!artifactRuleResolution) {
       throw createCodedError(
         TypeError,
         "invalid-artifact-rule-resolution",
@@ -66,7 +67,7 @@
       deliveryUnitKey: session.deliveryUnitKey,
       deliveryUnitKind: session.deliveryUnitKind,
       artifactRuleFingerprint: session.artifactRuleFingerprint,
-      artifactRuleResolution: deepClone(session.artifactRuleResolution),
+      artifactRuleResolution,
       reviewRound: session.reviewRound,
       viewScope: session.viewScope === "all" ? "all" : "round",
       sessionCount: session.sessionCount,
@@ -390,6 +391,7 @@
 
   function sanitizeDraft(draft) {
     if (!isNormalizedObject(draft)) return null;
+    const artifactRuleResolution = canonicalizeArtifactRuleResolution(draft.artifactRuleResolution);
     const cards = Array.isArray(draft.cards)
       ? draft.cards
         .filter((card) => isNormalizedObject(card) && isNonEmptyString(card.id))
@@ -405,9 +407,7 @@
       ...(Number.isInteger(draft.reviewRound) ? { reviewRound: draft.reviewRound } : {}),
       ...(isNonEmptyString(draft.planFingerprint) ? { planFingerprint: draft.planFingerprint } : {}),
       ...(isNonEmptyString(draft.artifactRuleFingerprint) ? { artifactRuleFingerprint: draft.artifactRuleFingerprint } : {}),
-      ...(isArtifactRuleResolution(draft.artifactRuleResolution)
-        ? { artifactRuleResolution: deepClone(draft.artifactRuleResolution) }
-        : {}),
+      ...(artifactRuleResolution ? { artifactRuleResolution } : {}),
       ...(Number.isFinite(draft.savedAt) ? { savedAt: draft.savedAt } : {}),
       cards,
       ...(Number.isInteger(draft.currentCardIndex) ? { currentCardIndex: draft.currentCardIndex } : {}),
@@ -872,13 +872,18 @@
   }
 
   function isArtifactRuleResolution(value) {
-    return (
-      isNormalizedObject(value) &&
-      (
-        (value.status === "resolved" && value.source === "agents") ||
-        (value.status === "unresolved-candidate" && value.source === "candidate")
-      )
-    );
+    return canonicalizeArtifactRuleResolution(value) !== null;
+  }
+
+  function canonicalizeArtifactRuleResolution(value) {
+    if (!isNormalizedObject(value)) return null;
+    if (value.status === "resolved" && value.source === "agents") {
+      return { status: "resolved", source: "agents" };
+    }
+    if (value.status === "unresolved-candidate" && value.source === "candidate") {
+      return { status: "unresolved-candidate", source: "candidate" };
+    }
+    return null;
   }
 
   function isNonEmptyString(value) {
