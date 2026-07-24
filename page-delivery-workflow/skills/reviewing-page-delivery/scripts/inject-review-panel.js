@@ -133,8 +133,10 @@
 
     let state = createReviewState(session);
     const storageKey = buildStorageKey(state.deliveryUnitKey);
-    const draft = readDraft(storageKey);
-    state = restoreDraft(state, draft, Date.now());
+    const now = Date.now();
+    const rawDraft = readDraft(storageKey);
+    const validatedDraft = isFreshMatchingDraft(state, rawDraft, now) ? rawDraft : null;
+    state = restoreDraft(state, validatedDraft, now);
 
     if (activeRuntime) activeRuntime.destroy({ removeHost: false });
 
@@ -148,8 +150,8 @@
     const cleanups = [];
     const renderCleanups = [];
     let destroyed = false;
-    let collapsed = draft?.collapsed === true;
-    let panelPosition = initialPanelPosition(host, draft?.panelPosition);
+    let collapsed = validatedDraft?.collapsed === true;
+    let panelPosition = initialPanelPosition(host, validatedDraft?.panelPosition);
     let drag = null;
 
     setHostPosition(host, panelPosition);
@@ -448,8 +450,12 @@
     const objectiveCount = Number.isFinite(state.objectiveCount) ? state.objectiveCount : state.cards.length;
     const contextIndex = isResultMode ? state.currentResultIndex + 1 : state.currentCardIndex + 1;
     const contextLength = isResultMode ? state.results.length : state.cards.length;
-    const header = `<header data-review-panel-titlebar><span data-review-context>${escape(reviewDomain)} · ${contextIndex}/${contextLength} · 会话 ${sessionCount} · 目标 ${objectiveCount}</span><button type="button" data-action="toggle-collapse">${collapsed ? "展开" : "收起"}</button></header>`;
+    const displayIndex = contextLength === 0 ? 0 : contextIndex;
+    const header = `<header data-review-panel-titlebar><span data-review-context>${escape(reviewDomain)} · ${displayIndex}/${contextLength} · 会话 ${sessionCount} · 目标 ${objectiveCount}</span><button type="button" data-action="toggle-collapse">${collapsed ? "展开" : "收起"}</button></header>`;
     if (collapsed) return header;
+    if (!isResultMode && state.cards.length === 0) {
+      return `${header}<div data-review-body><p data-review-empty>本轮没有需要评审的卡片</p></div>`;
+    }
     if (state.mode === "result" || state.mode === "confirmed") {
       const result = currentResult;
       const lastResult = state.currentResultIndex >= state.results.length - 1;

@@ -13,6 +13,26 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
   const originalConsole = Object.fromEntries(consoleMethods.map((method) => [method, console[method]]));
   for (const method of consoleMethods) console[method] = (...args) => consoleEvents.push({ method, args });
   const submittedEvents = () => consoleEvents.filter(({ args }) => args[0] === "PAGE_DELIVERY_REVIEW_SUBMITTED" || args[0] === "PAGE_DELIVERY_PLAN_CONFIRM_REQUESTED");
+  const trackedListeners = [];
+  const originalDocumentAdd = document.addEventListener;
+  const originalDocumentRemove = document.removeEventListener;
+  const originalWindowAdd = window.addEventListener;
+  const originalWindowRemove = window.removeEventListener;
+  const trackAdd = (target, original, type, listener, rest) => {
+    if ((target === document && ["pointermove", "pointerup"].includes(type)) || (target === window && type === "resize")) {
+      trackedListeners.push({ target, type, listener, removed: false });
+    }
+    return original.call(target, type, listener, ...rest);
+  };
+  const trackRemove = (target, original, type, listener, rest) => {
+    const tracked = [...trackedListeners].reverse().find((entry) => entry.target === target && entry.type === type && entry.listener === listener && !entry.removed);
+    if (tracked) tracked.removed = true;
+    return original.call(target, type, listener, ...rest);
+  };
+  document.addEventListener = function (type, listener, ...rest) { return trackAdd(document, originalDocumentAdd, type, listener, rest); };
+  document.removeEventListener = function (type, listener, ...rest) { return trackRemove(document, originalDocumentRemove, type, listener, rest); };
+  window.addEventListener = function (type, listener, ...rest) { return trackAdd(window, originalWindowAdd, type, listener, rest); };
+  window.removeEventListener = function (type, listener, ...rest) { return trackRemove(window, originalWindowRemove, type, listener, rest); };
 
   try {
     const host = document.querySelector("[data-page-delivery-review-host]");
@@ -30,6 +50,29 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
     }
     check(Boolean(panel()?.querySelector("[data-card-related-refs]")), "card should render related refs when present");
     check([...panel()?.querySelectorAll('[data-field="conclusion"] option') || []].map((option) => option.value).join(",") === "未评审,已确认,待修改,阻塞,不适用", "input conclusions should use the fixed allowed set");
+
+    const storageKey = `page-delivery-review:v1:${globalThis.reviewSession.deliveryUnitKey}`;
+    const baseDraft = {
+      sessionId: globalThis.reviewSession.sessionId,
+      reviewRound: globalThis.reviewSession.reviewRound,
+      planFingerprint: globalThis.reviewSession.planFingerprint,
+      artifactRuleFingerprint: globalThis.reviewSession.artifactRuleFingerprint,
+      currentCardIndex: 2,
+      collapsed: true,
+      panelPosition: { x: 111, y: 123 },
+      cards: [{ id: "REV-002", conclusion: "阻塞", userNote: "不应恢复" }],
+    };
+    globalThis.__PAGE_DELIVERY_REVIEW__.destroy();
+    localStorage.setItem(storageKey, JSON.stringify({ ...baseDraft, sessionId: "stale-session", savedAt: Date.now() }));
+    globalThis.PageDeliveryReviewPanel.mountReviewPanel(globalThis.reviewSession);
+    check(state()?.collapsed === false && state()?.currentCardIndex === 0 && state()?.panelPosition?.y !== 123, "mismatched draft metadata must not affect any panel UI state");
+    globalThis.__PAGE_DELIVERY_REVIEW__.destroy();
+    localStorage.setItem(storageKey, JSON.stringify({ ...baseDraft, savedAt: Date.now() + 60_000 }));
+    globalThis.PageDeliveryReviewPanel.mountReviewPanel(globalThis.reviewSession);
+    check(state()?.collapsed === false && state()?.currentCardIndex === 0 && state()?.panelPosition?.y !== 123, "future draft timestamps must not affect any panel UI state");
+    globalThis.__PAGE_DELIVERY_REVIEW__.destroy();
+    localStorage.removeItem(storageKey);
+    globalThis.PageDeliveryReviewPanel.mountReviewPanel(globalThis.reviewSession);
 
     let legacyDestroyCalls = 0;
     globalThis.__PAGE_DELIVERY_REVIEW__ = { destroy: () => { legacyDestroyCalls += 1; } };
@@ -57,8 +100,8 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
     pointer(document, "pointermove", innerWidth + 240, innerHeight + 240);
     pointer(document, "pointerup", innerWidth + 240, innerHeight + 240);
     const saved = state();
-    check(Boolean(localStorage.getItem(`page-delivery-review:v1:${globalThis.reviewSession.deliveryUnitKey}`)), "editable draft should be persisted");
-    const persistedDraft = JSON.parse(localStorage.getItem(`page-delivery-review:v1:${globalThis.reviewSession.deliveryUnitKey}`));
+    check(Boolean(localStorage.getItem(storageKey)), "editable draft should be persisted");
+    const persistedDraft = JSON.parse(localStorage.getItem(storageKey));
     check(persistedDraft.currentCardIndex === 1, "draft should persist the current input card index");
     check(persistedDraft.sessionId === "session-1" && persistedDraft.reviewRound === 2 && persistedDraft.planFingerprint === "sha256:fixture" && persistedDraft.artifactRuleFingerprint === "sha256:rule-fixture" && Number.isFinite(persistedDraft.savedAt), "draft should persist matching metadata and a saved timestamp");
     check(!JSON.stringify(persistedDraft).includes("evidence") && !JSON.stringify(persistedDraft).includes("results"), "draft must exclude evidence and results");
@@ -126,7 +169,7 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
     check(panelRect.bottom <= innerHeight + 1, "panel bottom should remain reachable after resize");
     check(["auto", "scroll"].includes(getComputedStyle(panel()?.querySelector("[data-review-body]")).overflowY), "long panel body should scroll within a viewport bound");
 
-    const destroyedStorage = localStorage.getItem(`page-delivery-review:v1:${globalThis.reviewSession.deliveryUnitKey}`);
+    const destroyedStorage = localStorage.getItem(storageKey);
     const destroyedState = state();
     globalThis.__PAGE_DELIVERY_REVIEW__.destroy();
     pointer(document, "pointermove", 1, 1);
@@ -135,11 +178,28 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
     check(!document.querySelector("[data-page-delivery-review-host]"), "destroy should remove the host");
     check(!document.querySelector("[data-review-evidence-overlay]"), "destroy should remove evidence overlays");
     check(!globalThis.__PAGE_DELIVERY_REVIEW__, "destroy should remove the temporary global API");
-    check(localStorage.getItem(`page-delivery-review:v1:${globalThis.reviewSession.deliveryUnitKey}`) === destroyedStorage && destroyedState?.mode === "confirmed", "destroy should remove listeners so pointer and resize events cannot mutate state or storage");
+    check(localStorage.getItem(storageKey) === destroyedStorage && destroyedState?.mode === "confirmed", "destroy should remove listeners so pointer and resize events cannot mutate state or storage");
+    check(trackedListeners.length > 0 && trackedListeners.every((entry) => entry.removed), "destroy should pair every runtime pointermove/pointerup/resize listener with the same removeEventListener identity");
+
+    localStorage.removeItem(storageKey);
+    const allResolvedSession = {
+      ...globalThis.reviewSession,
+      cards: [{ id: "resolved", conclusion: "已确认", reopened: false, evidenceChanged: false }],
+    };
+    globalThis.PageDeliveryReviewPanel.mountReviewPanel(allResolvedSession);
+    check(Boolean(panel()?.querySelector("[data-review-empty]")), "an empty active round should render an explicit empty state");
+    check(!panel()?.querySelector("[data-review-context]")?.textContent.includes("1/0"), "empty round header must not display 1/0");
+    check(!panel()?.querySelector('[data-field="conclusion"], [data-field="userNote"], [data-action="highlight-evidence"], [data-action="next"], [data-action="previous"], [data-action="submit"]'), "empty state must hide review controls");
+    globalThis.__PAGE_DELIVERY_REVIEW__.destroy();
+    check(trackedListeners.every((entry) => entry.removed), "empty panel destroy should also remove its tracked runtime listeners");
   } catch (error) {
     failures.push(`assertion execution failed: ${error?.message || error}`);
   } finally {
     for (const method of consoleMethods) console[method] = originalConsole[method];
+    document.addEventListener = originalDocumentAdd;
+    document.removeEventListener = originalDocumentRemove;
+    window.addEventListener = originalWindowAdd;
+    window.removeEventListener = originalWindowRemove;
   }
 
   return { valid: failures.length === 0, failures };
