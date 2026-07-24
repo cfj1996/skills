@@ -4,6 +4,10 @@
   "deliveryUnitKey": "sample/login",
   "deliveryUnitKind": "page",
   "artifactRuleFingerprint": "sha256:rule-fixture",
+  "artifactRuleResolution": {
+    "status": "resolved",
+    "source": "agents"
+  },
   "reviewRound": 2,
   "sessionCount": 4,
   "objectiveCount": 2,

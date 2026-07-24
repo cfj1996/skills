@@ -31,6 +31,62 @@ const matchedFingerprints = {
   artifactRuleFingerprint: session.artifactRuleFingerprint,
 };
 
+test("review state preserves an explicitly resolved AGENTS artifact rule", () => {
+  assert.deepEqual(createReviewState(session).artifactRuleResolution, {
+    status: "resolved",
+    source: "agents",
+  });
+});
+
+test("unresolved artifact rule candidates can be reviewed but cannot confirm a Plan", () => {
+  const unresolvedSession = {
+    ...session,
+    artifactRuleResolution: {
+      status: "unresolved-candidate",
+      source: "candidate",
+    },
+  };
+  let state = createReviewState(unresolvedSession);
+  assert.deepEqual(state.artifactRuleResolution, unresolvedSession.artifactRuleResolution);
+
+  state = reduceReviewState(state, { type: "SUBMIT" });
+  state = reduceReviewState(state, {
+    type: "APPLY_RESULT",
+    sessionId: session.sessionId,
+    submissionVersion: 1,
+    ...matchedFingerprints,
+    results: [{ id: "result", conclusion: "阻塞" }],
+  });
+  assert.equal(state.mode, "result");
+
+  state = reduceReviewState(state, { type: "REQUEST_PLAN_CONFIRMATION" });
+  assert.equal(state.mode, "result");
+  assert.deepEqual(state.lastError, {
+    code: "artifact-rule-unresolved",
+    message: "产物位置规则尚未由适用的 AGENTS.md 确认并固化，无法确认更新 Plan。",
+  });
+
+  state = reduceReviewState(state, { type: "CONFIRM_PLAN", ...matchedFingerprints });
+  assert.equal(state.mode, "result");
+  assert.deepEqual(state.lastError, {
+    code: "artifact-rule-unresolved",
+    message: "产物位置规则尚未由适用的 AGENTS.md 确认并固化，无法确认更新 Plan。",
+  });
+});
+
+test("artifact rule resolution rejects invalid status and source combinations", () => {
+  for (const artifactRuleResolution of [
+    undefined,
+    { status: "resolved", source: "candidate" },
+    { status: "unresolved-candidate", source: "agents" },
+  ]) {
+    assert.throws(
+      () => createReviewState({ ...session, artifactRuleResolution }),
+      (error) => error?.code === "invalid-artifact-rule-resolution",
+    );
+  }
+});
+
 test("later rounds include only unresolved, reopened, or changed cards", () => {
   assert.deepEqual(selectRoundCards(session.cards, 2).map((card) => card.id), [
     "REV-002",
@@ -196,6 +252,7 @@ test("draft restore requires matching fresh metadata and clamps only valid edita
     reviewRound: state.reviewRound,
     planFingerprint: state.planFingerprint,
     artifactRuleFingerprint: state.artifactRuleFingerprint,
+    artifactRuleResolution: state.artifactRuleResolution,
     savedAt,
     currentCardIndex: 999,
     cards: [{ id: "REV-002", conclusion: "阻塞", userNote: "可恢复" }],
@@ -241,6 +298,10 @@ test("reducer preserves fingerprints and excludes actual artifact paths", () => 
   let state = createReviewState(session);
   assert.equal(state.planFingerprint, "sha256:fixture");
   assert.equal(state.artifactRuleFingerprint, "sha256:rule-fixture");
+  assert.deepEqual(state.artifactRuleResolution, {
+    status: "resolved",
+    source: "agents",
+  });
   assert.equal(Object.hasOwn(state, "artifactPath"), false);
   assert.equal(Object.hasOwn(state, "artifactUrl"), false);
   assert.doesNotMatch(JSON.stringify(state), /private\/artifacts/);
@@ -273,6 +334,7 @@ test("reducer preserves fingerprints and excludes actual artifact paths", () => 
   assert.equal(Object.hasOwn(state.lastSubmission, "artifactPath"), false);
   assert.equal(Object.hasOwn(state.lastSubmission, "artifactUrl"), false);
   assert.equal(state.lastSubmission.cards[0].evidence.path, "/evidence/login.png");
+  assert.deepEqual(state.lastSubmission.artifactRuleResolution, state.artifactRuleResolution);
 });
 
 test("panel items exclude only top-level artifact locations", () => {
@@ -671,13 +733,22 @@ test("fingerprint guards block conflicting results before they can be confirmed"
 
 test("artifact rule guard returns a stable AGENTS reparse error", () => {
   assert.deepEqual(
-    assertArtifactLocationRule({ source: "agents", ruleFingerprint: "sha256:old" }, "sha256:new"),
+    assertArtifactLocationRule(
+      { status: "resolved", source: "agents", ruleFingerprint: "sha256:old" },
+      "sha256:new",
+    ),
     {
       code: "artifact-rule-conflict",
       message: "产物位置规则已变化，请重新解析适用的 AGENTS.md 后再提交。",
     },
   );
-  assert.equal(assertArtifactLocationRule({ source: "agents", ruleFingerprint: "sha256:same" }, "sha256:same"), null);
+  assert.equal(
+    assertArtifactLocationRule(
+      { status: "resolved", source: "agents", ruleFingerprint: "sha256:same" },
+      "sha256:same",
+    ),
+    null,
+  );
 });
 
 test("confirmation gate blocks changed artifact rules even after a matching result", () => {

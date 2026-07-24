@@ -57,6 +57,7 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
       reviewRound: globalThis.reviewSession.reviewRound,
       planFingerprint: globalThis.reviewSession.planFingerprint,
       artifactRuleFingerprint: globalThis.reviewSession.artifactRuleFingerprint,
+      artifactRuleResolution: globalThis.reviewSession.artifactRuleResolution,
       currentCardIndex: 2,
       collapsed: true,
       panelPosition: { x: 111, y: 123 },
@@ -222,6 +223,7 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
       reviewRound: changedPlanSession.reviewRound,
       planFingerprint: "sha256:fixture",
       artifactRuleFingerprint: changedPlanSession.artifactRuleFingerprint,
+      artifactRuleResolution: changedPlanSession.artifactRuleResolution,
       savedAt: Date.now(),
       collapsed: true,
       panelPosition: { x: 111, y: 123 },
@@ -232,6 +234,40 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
     check(state()?.cards?.[0]?.conclusion !== "阻塞" && state()?.cards?.[0]?.userNote !== "不能恢复", "a changed plan must not restore prior review conclusions or notes");
     globalThis.__PAGE_DELIVERY_REVIEW__.destroy();
     localStorage.removeItem(storageKey);
+
+    const unresolvedSession = {
+      ...globalThis.reviewSession,
+      sessionId: "unresolved-rule-session",
+      deliveryUnitKey: "sample/unresolved-rule",
+      reviewRound: 1,
+      artifactRuleResolution: {
+        status: "unresolved-candidate",
+        source: "candidate",
+      },
+      cards: [{ id: "unresolved-rule-card", conclusion: "阻塞" }],
+    };
+    globalThis.PageDeliveryReviewPanel.mountReviewPanel(unresolvedSession);
+    click(panel()?.querySelector('[data-action="submit"]'));
+    const unresolvedSubmission = globalThis.__PAGE_DELIVERY_REVIEW__.exportSubmission();
+    globalThis.__PAGE_DELIVERY_REVIEW__.applyResult({
+      sessionId: unresolvedSubmission.sessionId,
+      submissionVersion: unresolvedSubmission.submissionVersion,
+      planFingerprint: unresolvedSubmission.planFingerprint,
+      artifactRuleFingerprint: unresolvedSubmission.artifactRuleFingerprint,
+      results: [{ id: "unresolved-rule-result", conclusion: "阻塞" }],
+    });
+    const unresolvedConfirm = panel()?.querySelector('[data-action="confirm-plan"]');
+    check(unresolvedConfirm?.disabled === true, "unresolved artifact rules should disable Plan confirmation");
+    check(panel()?.querySelector("[data-review-confirm-blocked]")?.textContent.includes("AGENTS.md"), "unresolved artifact rules should show a visible AGENTS gate");
+    const eventsBeforeUnresolvedClick = submittedEvents().length;
+    click(unresolvedConfirm);
+    check(submittedEvents().length === eventsBeforeUnresolvedClick, "unresolved artifact rules must not emit a Plan confirmation request");
+    globalThis.__PAGE_DELIVERY_REVIEW__.confirmPlan({
+      planFingerprint: unresolvedSubmission.planFingerprint,
+      artifactRuleFingerprint: unresolvedSubmission.artifactRuleFingerprint,
+    });
+    check(state()?.mode === "result" && state()?.lastError?.code === "artifact-rule-unresolved", "the public API must reject unresolved artifact rules");
+    globalThis.__PAGE_DELIVERY_REVIEW__.destroy();
 
     const frame = document.createElement("iframe");
     frame.setAttribute("data-review-evidence-frame", "");

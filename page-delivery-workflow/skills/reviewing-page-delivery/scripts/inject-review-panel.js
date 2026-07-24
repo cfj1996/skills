@@ -50,6 +50,13 @@
     if (!session.cards.every(isCard)) {
       throw createCodedError(TypeError, "invalid-review-session", "Review session must include valid cards");
     }
+    if (!isArtifactRuleResolution(session.artifactRuleResolution)) {
+      throw createCodedError(
+        TypeError,
+        "invalid-artifact-rule-resolution",
+        "Artifact rule resolution must be explicitly resolved from AGENTS or marked as an unresolved candidate",
+      );
+    }
 
     const cards = selectReviewCards(session.cards, session.reviewRound, session.viewScope).map(sanitizePanelItem);
 
@@ -59,6 +66,7 @@
       deliveryUnitKey: session.deliveryUnitKey,
       deliveryUnitKind: session.deliveryUnitKind,
       artifactRuleFingerprint: session.artifactRuleFingerprint,
+      artifactRuleResolution: deepClone(session.artifactRuleResolution),
       reviewRound: session.reviewRound,
       viewScope: session.viewScope === "all" ? "all" : "round",
       sessionCount: session.sessionCount,
@@ -103,12 +111,34 @@
       if (action.type === "NEXT") return moveCurrentResult(state, 1);
       if (action.type === "PREVIOUS") return moveCurrentResult(state, -1);
       if (
+        action.type === "REQUEST_PLAN_CONFIRMATION" &&
+        state.results.length > 0 &&
+        state.currentResultIndex === state.results.length - 1
+      ) {
+        const resolutionError = assertArtifactLocationRule(
+          {
+            ...state.artifactRuleResolution,
+            ruleFingerprint: state.artifactRuleFingerprint,
+          },
+          state.artifactRuleFingerprint,
+        );
+        return { ...state, lastError: resolutionError };
+      }
+      if (
         action.type === "CONFIRM_PLAN" &&
         state.results.length > 0 &&
         state.currentResultIndex === state.results.length - 1
       ) {
         const fingerprintError = assertCurrentFingerprints(state, action);
         if (fingerprintError) return { ...state, lastError: fingerprintError };
+        const resolutionError = assertArtifactLocationRule(
+          {
+            ...state.artifactRuleResolution,
+            ruleFingerprint: state.artifactRuleFingerprint,
+          },
+          action.artifactRuleFingerprint,
+        );
+        if (resolutionError) return { ...state, lastError: resolutionError };
         return { ...state, mode: "confirmed" };
       }
     }
@@ -192,6 +222,7 @@
       reviewRound: state.reviewRound,
       planFingerprint: state.planFingerprint,
       artifactRuleFingerprint: state.artifactRuleFingerprint,
+      artifactRuleResolution: state.artifactRuleResolution,
       savedAt: Date.now(),
       cards: state.cards.map(({ id, conclusion, userNote }) => ({ id, conclusion, userNote })),
       currentCardIndex: state.currentCardIndex,
@@ -234,6 +265,8 @@
     const confirmPlan = (fingerprints) => dispatch({ type: "CONFIRM_PLAN", ...fingerprints });
     const requestPlanConfirmation = () => {
       if (state.mode !== "result" || state.results.length === 0 || state.currentResultIndex !== state.results.length - 1) return;
+      const nextState = dispatch({ type: "REQUEST_PLAN_CONFIRMATION" });
+      if (nextState.lastError) return;
       console.debug("PAGE_DELIVERY_PLAN_CONFIRM_REQUESTED", {
         sessionId: state.sessionId,
         submissionVersion: state.submissionVersion,
@@ -372,6 +405,9 @@
       ...(Number.isInteger(draft.reviewRound) ? { reviewRound: draft.reviewRound } : {}),
       ...(isNonEmptyString(draft.planFingerprint) ? { planFingerprint: draft.planFingerprint } : {}),
       ...(isNonEmptyString(draft.artifactRuleFingerprint) ? { artifactRuleFingerprint: draft.artifactRuleFingerprint } : {}),
+      ...(isArtifactRuleResolution(draft.artifactRuleResolution)
+        ? { artifactRuleResolution: deepClone(draft.artifactRuleResolution) }
+        : {}),
       ...(Number.isFinite(draft.savedAt) ? { savedAt: draft.savedAt } : {}),
       cards,
       ...(Number.isInteger(draft.currentCardIndex) ? { currentCardIndex: draft.currentCardIndex } : {}),
@@ -462,7 +498,9 @@
       draft.sessionId === state.sessionId &&
       draft.reviewRound === state.reviewRound &&
       draft.planFingerprint === state.planFingerprint &&
-      draft.artifactRuleFingerprint === state.artifactRuleFingerprint
+      draft.artifactRuleFingerprint === state.artifactRuleFingerprint &&
+      draft.artifactRuleResolution?.status === state.artifactRuleResolution.status &&
+      draft.artifactRuleResolution?.source === state.artifactRuleResolution.source
     );
   }
 
@@ -578,10 +616,20 @@
     if (state.mode === "result" || state.mode === "confirmed") {
       const result = currentResult;
       const lastResult = state.currentResultIndex >= state.results.length - 1;
+      const confirmationError = assertArtifactLocationRule(
+        {
+          ...state.artifactRuleResolution,
+          ruleFingerprint: state.artifactRuleFingerprint,
+        },
+        state.artifactRuleFingerprint,
+      );
       const resultMarkup = result
         ? `<article data-review-result data-result-id="${escape(result.id)}"><strong>${escape(result.conclusion)}</strong> ${escape(result.id)}${result.summary ? `<p data-result-summary>${escape(result.summary)}</p>` : ""}${result.planChangeSummary ? `<p data-result-plan-change-summary>${escape(result.planChangeSummary)}</p>` : ""}</article>`
         : "<p>没有返回项</p>";
-      return `${header}<div data-review-body>${errorMarkup}${evidenceMarkup}${resultMarkup}<div data-review-navigation><button type="button" data-action="previous"${state.currentResultIndex === 0 ? " disabled" : ""}>上一个</button><button type="button" data-action="next"${lastResult ? " disabled" : ""}>下一个</button></div>${lastResult ? `<div data-review-actions><button type="button" data-action="confirm-plan"${state.mode === "confirmed" ? " disabled" : ""}>确认更新 Plan</button></div>` : ""}</div>`;
+      const confirmationMarkup = lastResult
+        ? `<div data-review-actions><button type="button" data-action="confirm-plan"${state.mode === "confirmed" || confirmationError ? " disabled" : ""}>确认更新 Plan</button>${confirmationError ? `<p data-review-confirm-blocked>${escape(confirmationError.message)}</p>` : ""}</div>`
+        : "";
+      return `${header}<div data-review-body>${errorMarkup}${evidenceMarkup}${resultMarkup}<div data-review-navigation><button type="button" data-action="previous"${state.currentResultIndex === 0 ? " disabled" : ""}>上一个</button><button type="button" data-action="next"${lastResult ? " disabled" : ""}>下一个</button></div>${confirmationMarkup}</div>`;
     }
     const card = currentCard || { id: "", conclusion: "", userNote: "" };
     const lastCard = state.currentCardIndex >= state.cards.length - 1;
@@ -681,6 +729,7 @@
       submissionVersion,
       planFingerprint: state.planFingerprint,
       artifactRuleFingerprint: state.artifactRuleFingerprint,
+      artifactRuleResolution: deepClone(state.artifactRuleResolution),
       cards: state.cards.map(sanitizePanelItem),
     });
 
@@ -759,16 +808,25 @@
     if (!isNonEmptyString(action.artifactRuleFingerprint)) {
       return reviewError("missing-artifact-rule-fingerprint", "缺少当前产物位置规则指纹，无法继续确认。");
     }
-    return assertPlanFingerprint(state.planFingerprint, action.planFingerprint) || assertArtifactLocationRule(
-      { source: "agents", ruleFingerprint: state.artifactRuleFingerprint },
-      action.artifactRuleFingerprint,
+    return assertPlanFingerprint(state.planFingerprint, action.planFingerprint) || (
+      state.artifactRuleFingerprint === action.artifactRuleFingerprint
+        ? null
+        : reviewError("artifact-rule-conflict", "产物位置规则已变化，请重新解析适用的 AGENTS.md 后再提交。")
     );
   }
 
   function assertArtifactLocationRule(rule, currentRuleFingerprint) {
-    return (
+    if (
       !isNormalizedObject(rule) ||
-      rule.source !== "agents" ||
+      rule.status !== "resolved" ||
+      rule.source !== "agents"
+    ) {
+      return reviewError(
+        "artifact-rule-unresolved",
+        "产物位置规则尚未由适用的 AGENTS.md 确认并固化，无法确认更新 Plan。",
+      );
+    }
+    return (
       !isNonEmptyString(rule.ruleFingerprint) ||
       rule.ruleFingerprint !== currentRuleFingerprint
     )
@@ -802,6 +860,7 @@
       state &&
       typeof state === "object" &&
       ["input", "reviewing", "result", "confirmed"].includes(state.mode) &&
+      isArtifactRuleResolution(state.artifactRuleResolution) &&
       Array.isArray(state.cards) &&
       Number.isInteger(state.currentCardIndex) &&
       Number.isInteger(state.currentResultIndex)
@@ -810,6 +869,16 @@
 
   function isNormalizedObject(value) {
     return value !== null && typeof value === "object" && !Array.isArray(value);
+  }
+
+  function isArtifactRuleResolution(value) {
+    return (
+      isNormalizedObject(value) &&
+      (
+        (value.status === "resolved" && value.source === "agents") ||
+        (value.status === "unresolved-candidate" && value.source === "candidate")
+      )
+    );
   }
 
   function isNonEmptyString(value) {
