@@ -25,7 +25,12 @@
   }
 
   function createReviewState(session) {
-    if (!session || typeof session !== "object" || !Array.isArray(session.cards)) {
+    if (
+      !session ||
+      typeof session !== "object" ||
+      !isNonEmptyString(session.sessionId) ||
+      !Array.isArray(session.cards)
+    ) {
       throw new TypeError("Review session must include a cards array");
     }
     if (!session.cards.every(isCard)) {
@@ -151,6 +156,7 @@
   function applyResult(state, action) {
     if (
       state.submissionVersion === 0 ||
+      !isNonEmptyString(action.sessionId) ||
       action.sessionId !== state.sessionId ||
       action.submissionVersion !== state.submissionVersion
     ) {

@@ -258,6 +258,12 @@ test("invalid sessions and reducer inputs are safe", () => {
   assert.throws(() => createReviewState(null), /review session/i);
   assert.throws(() => createReviewState({}), /review session/i);
   assert.throws(() => createReviewState({ cards: {} }), /review session/i);
+  for (const sessionId of [undefined, "", "   "]) {
+    assert.throws(
+      () => createReviewState({ ...session, sessionId }),
+      /review session/i,
+    );
+  }
   for (const cards of [
     [null],
     [1],
@@ -274,6 +280,20 @@ test("invalid sessions and reducer inputs are safe", () => {
   }
   assert.equal(reduceReviewState(null, { type: "SUBMIT" }), null);
   assert.equal(reduceReviewState("invalid", { type: "SUBMIT" }), "invalid");
+});
+
+test("reviewing results require a non-empty matching session id", () => {
+  const reviewing = reduceReviewState(createReviewState(session), { type: "SUBMIT" });
+  for (const sessionId of [undefined, "", "   "]) {
+    const stale = reduceReviewState(reviewing, {
+      type: "APPLY_RESULT",
+      sessionId,
+      submissionVersion: 1,
+      results: [],
+    });
+    assert.equal(stale.mode, "reviewing");
+    assert.match(stale.lastError, /stale/i);
+  }
 });
 
 test("apply result reports invalid results only for the active submission", () => {
