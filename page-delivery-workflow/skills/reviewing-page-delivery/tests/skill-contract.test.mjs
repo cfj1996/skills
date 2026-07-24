@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 const isStagingLayout = (directory) =>
@@ -15,6 +16,8 @@ const resolvePluginRoot = (directory) =>
 const pluginRoot = resolvePluginRoot(testDir);
 const skillRoot = path.join(pluginRoot, "skills", "reviewing-page-delivery");
 const scenarioPath = path.join(testDir, "scenarios", "review-conflicted-login.md");
+const require = createRequire(import.meta.url);
+const { STATUS_MODEL } = require(path.join(skillRoot, "scripts", "validate-page-plan.js"));
 
 const read = (relativePath) => readFile(path.join(pluginRoot, relativePath), "utf8");
 const visibleMarkdown = (markdown) => markdown.replace(/<!--[\s\S]*?-->/g, "");
@@ -163,6 +166,58 @@ test("plan template keeps stable human-readable sections and prohibits unsafe de
   for (const forbidden of [
     "页面完成率", "隐藏 JSON", "自动生成 Draft", "从 Markdown 解析", "插件默认 Plan 目录", "插件默认 Draft 目录",
   ]) assert.match(template, new RegExp(`不得.*${forbidden}`));
+});
+
+test("plan template limits validated bidirectional links to feature, API, and task triples", async () => {
+  const template = await read("skills/reviewing-page-delivery/assets/page-delivery-plan-template.md");
+  const lineWith = (id) => template.split(/\r?\n/).find((line) => line.startsWith(`- \`${id}\``));
+
+  for (const [id, expected] of [
+    ["F-001", "双向关联：`<API-001, T-001>`"],
+    ["API-001", "双向关联：`<F-001, T-001>`"],
+    ["T-001", "双向关联：`<F-001, API-001>`"],
+  ]) assert.match(lineWith(id), new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+
+  for (const id of [
+    "PAGE-001", "ROUTE-001", "DESIGN-001", "UI-001", "MOCK-001", "SEC-001",
+    "DEP-001", "AC-001", "E-001", "RR-001", "ISSUE-001",
+  ]) {
+    const line = lineWith(id);
+    assert.match(line, /关联：/);
+    assert.doesNotMatch(line, /双向关联：/);
+  }
+  assert.match(template, /功能点↔API、功能点↔任务、API↔任务/);
+  assert.match(template, /其他关联只校验目标存在或一致性/);
+});
+
+test("template uses evidence-selected exemption statuses instead of inventing API or dependency facts", async () => {
+  const template = await read("skills/reviewing-page-delivery/assets/page-delivery-plan-template.md");
+  assert.match(template, /API-001.*状态：`<证据确认后从接口固定状态集合选择>`/);
+  assert.match(template, /DEP-001.*状态：`<证据确认后从页面依赖固定状态集合选择>`/);
+  assert.match(template, /“不涉及接口”状态必须有不适用证据/);
+  assert.match(template, /“不涉及”状态必须有不适用证据/);
+  assert.doesNotMatch(template, /API-001.*状态：`不涉及接口`/);
+  assert.doesNotMatch(template, /DEP-001.*状态：`不涉及`/);
+});
+
+test("documentation status terms match the validator and generic assets contain no project defaults", async () => {
+  const files = [
+    ".codex-plugin/plugin.json",
+    "skills/reviewing-page-delivery/SKILL.md",
+    "skills/reviewing-page-delivery/agents/openai.yaml",
+    "skills/reviewing-page-delivery/references/page-review-standard.md",
+    "skills/reviewing-page-delivery/references/status-model.md",
+    "skills/reviewing-page-delivery/references/api-contract-stages.md",
+    "skills/reviewing-page-delivery/assets/page-delivery-plan-template.md",
+  ];
+  const content = (await Promise.all(files.map(read))).join("\n");
+  const statusTerms = Object.values(STATUS_MODEL).flat();
+  for (const status of statusTerms) assert.match(content, new RegExp(status));
+  assert.match(content, /不得提供默认目录|不得使用插件默认目录/);
+  assert.doesNotMatch(
+    content,
+    /Vantix|@zan\/ui-vue3|Element Plus|UnoCSS|仓配|\/Users\/cfj\/projects\/vantix|product\/plans\/|engineering\/implementation-plans\/|api\/drafts\/|contracts\/openapi\//i,
+  );
 });
 
 test("skill links its detailed references without duplicating them", async () => {
