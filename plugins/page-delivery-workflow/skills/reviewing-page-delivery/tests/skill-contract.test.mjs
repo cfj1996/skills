@@ -12,9 +12,13 @@ const isStagingLayout = (directory) =>
   path.basename(path.dirname(directory)) === "tests";
 const resolvePluginRoot = (directory) =>
   isStagingLayout(directory)
-    ? path.resolve(directory, "..", "..", "page-delivery-workflow")
+    ? path.resolve(directory, "..", "..", "plugins", "page-delivery-workflow")
     : path.resolve(directory, "..", "..", "..");
 const pluginRoot = resolvePluginRoot(testDir);
+const repositoryRoot =
+  path.basename(path.dirname(pluginRoot)) === "plugins"
+    ? path.resolve(pluginRoot, "..", "..")
+    : path.dirname(pluginRoot);
 const skillRoot = path.join(pluginRoot, "skills", "reviewing-page-delivery");
 const scenarioPath = path.join(testDir, "scenarios", "review-conflicted-login.md");
 const require = createRequire(import.meta.url);
@@ -147,6 +151,35 @@ test("plugin manifest and the only first-version skill exist", async () => {
   assert.equal(manifest.version, "0.1.0");
   assert.equal(manifest.skills, "./skills/");
   assert.equal(manifest.interface.displayName, "Page Delivery Workflow");
+});
+
+test("repository exposes the plugin through the canonical marketplace layout", async () => {
+  assert.equal(
+    pluginRoot,
+    path.join(repositoryRoot, "plugins", "page-delivery-workflow"),
+  );
+
+  const marketplace = JSON.parse(
+    await readFile(
+      path.join(repositoryRoot, ".agents", "plugins", "marketplace.json"),
+      "utf8",
+    ),
+  );
+  assert.equal(marketplace.name, "cfj-skills");
+  assert.deepEqual(marketplace.plugins, [
+    {
+      name: "page-delivery-workflow",
+      source: {
+        source: "local",
+        path: "./plugins/page-delivery-workflow",
+      },
+      policy: {
+        installation: "AVAILABLE",
+        authentication: "ON_INSTALL",
+      },
+      category: "Productivity",
+    },
+  ]);
 });
 
 test("skill declares the review workflow and required gates", async () => {
@@ -418,8 +451,7 @@ test("skill root follows the standard skill layout", async () => {
 });
 
 test("test location resolves the plugin root without the current working directory", () => {
-  const repoRoot = path.dirname(pluginRoot);
-  const stagingPath = path.join(repoRoot, "tests", "page-delivery-workflow");
+  const stagingPath = path.join(repositoryRoot, "tests", "page-delivery-workflow");
   const movedTestPath = path.join(
     pluginRoot,
     "skills",
@@ -428,7 +460,7 @@ test("test location resolves the plugin root without the current working directo
   );
 
   assert.equal(path.basename(pluginRoot), "page-delivery-workflow");
-  assert.equal(path.basename(path.dirname(pluginRoot)), "skills");
+  assert.equal(path.basename(path.dirname(pluginRoot)), "plugins");
   assert.equal(isStagingLayout(stagingPath), true);
   assert.equal(resolvePluginRoot(stagingPath), pluginRoot);
   assert.equal(isStagingLayout(movedTestPath), false);

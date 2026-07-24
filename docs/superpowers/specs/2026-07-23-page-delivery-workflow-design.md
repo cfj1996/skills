@@ -5,8 +5,8 @@
 - 插件名称：`page-delivery-workflow`
 - 首个 Skill：`reviewing-page-delivery`
 - 设计状态：已批准
-- 实施状态：实施 Plan 已完成，未开始编码
-- 插件源码目录：`/Users/cfj/projects/skills/page-delivery-workflow`
+- 实施状态：首版已完成
+- 插件源码目录：`/Users/cfj/projects/skills/plugins/page-delivery-workflow`
 - 首个验收项目：`/Users/cfj/projects/vantix/frontend/apps/operation`
 
 ## 2. 背景与目标
@@ -35,7 +35,7 @@
 - 不用脚本从 Markdown Plan 中提取业务语义。
 - 不生成独立评审结果 Markdown、sidecar JSON 或第二份交付计划。
 - 不制造单一的“页面完成百分比”。
-- 不在首版自动安装、发布或更新 marketplace；首版只交付插件源码、manifest 和验证证据。
+- 不自动安装或发布插件；仓库提供远程 marketplace 清单，发布仍由明确的 Git push 操作触发。
 
 ### 3.1 已评审的方案取舍
 
@@ -47,10 +47,10 @@ Plan结构化输入考虑过固定 Markdown 表格、Markdown 内嵌 JSON 和当
 
 ## 4. 产品形态与 Superpowers 边界
 
-Skill 是工作流的编写单元，Plugin 是安装和分发单元。首版采用最小插件包装，内部只包含一个自包含 Skill：
+Skill 是工作流的编写单元，Plugin 是安装和分发单元。仓库统一将完整插件放在 `plugins/`，独立 Skill 保留在根级 `skills/`；远程 marketplace 清单位于 `.agents/plugins/marketplace.json`。首版插件内部只包含一个自包含 Skill：
 
 ```text
-page-delivery-workflow/
+plugins/page-delivery-workflow/
 ├── .codex-plugin/
 │   └── plugin.json
 └── skills/
@@ -487,7 +487,7 @@ Plan 使用固定的人类可读章节、稳定编号、固定状态词和明确
 ## 16. 首版 Skill 文件
 
 ```text
-page-delivery-workflow/
+plugins/page-delivery-workflow/
 ├── .codex-plugin/
 │   └── plugin.json
 └── skills/

@@ -30,7 +30,7 @@
 ## 目标文件
 
 ```text
-/Users/cfj/projects/skills/page-delivery-workflow/
+/Users/cfj/projects/skills/plugins/page-delivery-workflow/
 ├── .codex-plugin/
 │   └── plugin.json
 └── skills/
@@ -144,7 +144,7 @@
 Run:
 
 ```bash
-test ! -e page-delivery-workflow
+test ! -e plugins/page-delivery-workflow
 ```
 
 Expected: exit 0。若目录已存在，先检查是否为本计划未完成产物；不得直接删除用户文件。
@@ -160,7 +160,7 @@ import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 
 const repoRoot = process.cwd();
-const pluginRoot = path.join(repoRoot, "page-delivery-workflow");
+const pluginRoot = path.join(repoRoot, "plugins", "page-delivery-workflow");
 const skillRoot = path.join(pluginRoot, "skills", "reviewing-page-delivery");
 
 const read = (relativePath) => readFile(path.join(pluginRoot, relativePath), "utf8");
@@ -271,11 +271,11 @@ git commit -m "test: 建立页面交付评审基线"
 
 **Files:**
 
-- Create: `/Users/cfj/projects/skills/page-delivery-workflow/.codex-plugin/plugin.json`
-- Create: `/Users/cfj/projects/skills/page-delivery-workflow/skills/reviewing-page-delivery/SKILL.md`
-- Create: `/Users/cfj/projects/skills/page-delivery-workflow/skills/reviewing-page-delivery/agents/openai.yaml`
+- Create: `/Users/cfj/projects/skills/plugins/page-delivery-workflow/.codex-plugin/plugin.json`
+- Create: `/Users/cfj/projects/skills/plugins/page-delivery-workflow/skills/reviewing-page-delivery/SKILL.md`
+- Create: `/Users/cfj/projects/skills/plugins/page-delivery-workflow/skills/reviewing-page-delivery/agents/openai.yaml`
 - Move: `/Users/cfj/projects/skills/tests/page-delivery-workflow/**`
-- To: `/Users/cfj/projects/skills/page-delivery-workflow/skills/reviewing-page-delivery/tests/**`
+- To: `/Users/cfj/projects/skills/plugins/page-delivery-workflow/skills/reviewing-page-delivery/tests/**`
 
 **Step 1: 创建插件容器**
 
@@ -284,7 +284,7 @@ Run:
 ```bash
 python3 /Users/cfj/.codex/skills/.system/plugin-creator/scripts/create_basic_plugin.py \
   page-delivery-workflow \
-  --path /Users/cfj/projects/skills \
+  --path /Users/cfj/projects/skills/plugins \
   --with-skills
 ```
 
@@ -297,7 +297,7 @@ Run:
 ```bash
 python3 /Users/cfj/.codex/skills/.system/skill-creator/scripts/init_skill.py \
   reviewing-page-delivery \
-  --path /Users/cfj/projects/skills/page-delivery-workflow/skills \
+  --path /Users/cfj/projects/skills/plugins/page-delivery-workflow/skills \
   --resources scripts,references,assets \
   --interface display_name="Reviewing Page Delivery" \
   --interface short_description="Review pages or modules and maintain Plans" \
@@ -309,8 +309,8 @@ Expected: 创建标准 `SKILL.md`、`agents/openai.yaml`、`scripts/`、`referen
 **Step 3: 移动 RED 测试**
 
 ```bash
-mkdir -p page-delivery-workflow/skills/reviewing-page-delivery/tests
-git mv tests/page-delivery-workflow/* page-delivery-workflow/skills/reviewing-page-delivery/tests/
+mkdir -p plugins/page-delivery-workflow/skills/reviewing-page-delivery/tests
+git mv tests/page-delivery-workflow/* plugins/page-delivery-workflow/skills/reviewing-page-delivery/tests/
 rmdir tests/page-delivery-workflow
 ```
 
@@ -373,11 +373,11 @@ description: Use when reviewing a page or cohesive feature module against a PRD,
 Run:
 
 ```bash
-node --test page-delivery-workflow/skills/reviewing-page-delivery/tests/skill-contract.test.mjs
+node --test plugins/page-delivery-workflow/skills/reviewing-page-delivery/tests/skill-contract.test.mjs
 python3 /Users/cfj/.codex/skills/.system/skill-creator/scripts/quick_validate.py \
-  page-delivery-workflow/skills/reviewing-page-delivery
+  plugins/page-delivery-workflow/skills/reviewing-page-delivery
 python3 /Users/cfj/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py \
-  page-delivery-workflow
+  plugins/page-delivery-workflow
 ```
 
 Expected: contract tests、两个官方 validator 全部 PASS。这里的 GREEN 只证明插件骨架、唯一 Skill 和强制门禁成立，不代表脚本、reference 或浏览器能力已经实现。
@@ -385,7 +385,7 @@ Expected: contract tests、两个官方 validator 全部 PASS。这里的 GREEN 
 **Step 7: 提交骨架**
 
 ```bash
-git add page-delivery-workflow
+git add plugins/page-delivery-workflow
 git commit -m "feat: 初始化页面交付工作流插件"
 ```
 
@@ -393,8 +393,8 @@ git commit -m "feat: 初始化页面交付工作流插件"
 
 **Files:**
 
-- Create: `/Users/cfj/projects/skills/page-delivery-workflow/skills/reviewing-page-delivery/tests/calculate-progress.test.mjs`
-- Create: `/Users/cfj/projects/skills/page-delivery-workflow/skills/reviewing-page-delivery/scripts/calculate-progress.js`
+- Create: `/Users/cfj/projects/skills/plugins/page-delivery-workflow/skills/reviewing-page-delivery/tests/calculate-progress.test.mjs`
+- Create: `/Users/cfj/projects/skills/plugins/page-delivery-workflow/skills/reviewing-page-delivery/scripts/calculate-progress.js`
 
 **Step 1: 写统计 RED**
 
@@ -459,7 +459,7 @@ test("countByStatus does not mutate input", () => {
 **Step 2: 运行 RED**
 
 ```bash
-node --test page-delivery-workflow/skills/reviewing-page-delivery/tests/calculate-progress.test.mjs
+node --test plugins/page-delivery-workflow/skills/reviewing-page-delivery/tests/calculate-progress.test.mjs
 ```
 
 Expected: FAIL `MODULE_NOT_FOUND ../scripts/calculate-progress.js`。
@@ -521,7 +521,7 @@ module.exports = { calculateObjectiveMetrics, countByStatus };
 **Step 4: 运行 GREEN**
 
 ```bash
-node --test page-delivery-workflow/skills/reviewing-page-delivery/tests/calculate-progress.test.mjs
+node --test plugins/page-delivery-workflow/skills/reviewing-page-delivery/tests/calculate-progress.test.mjs
 ```
 
 Expected: 3 tests PASS。
@@ -529,7 +529,7 @@ Expected: 3 tests PASS。
 **Step 5: 提交**
 
 ```bash
-git add page-delivery-workflow/skills/reviewing-page-delivery
+git add plugins/page-delivery-workflow/skills/reviewing-page-delivery
 git commit -m "feat: 添加页面交付客观统计"
 ```
 
@@ -537,9 +537,9 @@ git commit -m "feat: 添加页面交付客观统计"
 
 **Files:**
 
-- Create: `/Users/cfj/projects/skills/page-delivery-workflow/skills/reviewing-page-delivery/tests/fixtures/page-plan-model.json`
-- Create: `/Users/cfj/projects/skills/page-delivery-workflow/skills/reviewing-page-delivery/tests/validate-page-plan.test.mjs`
-- Create: `/Users/cfj/projects/skills/page-delivery-workflow/skills/reviewing-page-delivery/scripts/validate-page-plan.js`
+- Create: `/Users/cfj/projects/skills/plugins/page-delivery-workflow/skills/reviewing-page-delivery/tests/fixtures/page-plan-model.json`
+- Create: `/Users/cfj/projects/skills/plugins/page-delivery-workflow/skills/reviewing-page-delivery/tests/validate-page-plan.test.mjs`
+- Create: `/Users/cfj/projects/skills/plugins/page-delivery-workflow/skills/reviewing-page-delivery/scripts/validate-page-plan.js`
 
 **Step 1: 写校验 RED**
 
@@ -625,7 +625,7 @@ test("does not accept markdown as input", () => {
 **Step 2: 运行 RED**
 
 ```bash
-node --test page-delivery-workflow/skills/reviewing-page-delivery/tests/validate-page-plan.test.mjs
+node --test plugins/page-delivery-workflow/skills/reviewing-page-delivery/tests/validate-page-plan.test.mjs
 ```
 
 Expected: FAIL `MODULE_NOT_FOUND`。
@@ -669,7 +669,7 @@ function indexById(items, collectionName, errors) {
 **Step 4: 运行 GREEN**
 
 ```bash
-node --test page-delivery-workflow/skills/reviewing-page-delivery/tests/validate-page-plan.test.mjs
+node --test plugins/page-delivery-workflow/skills/reviewing-page-delivery/tests/validate-page-plan.test.mjs
 ```
 
 Expected: 6 tests PASS。
@@ -677,7 +677,7 @@ Expected: 6 tests PASS。
 **Step 5: 提交**
 
 ```bash
-git add page-delivery-workflow/skills/reviewing-page-delivery
+git add plugins/page-delivery-workflow/skills/reviewing-page-delivery
 git commit -m "feat: 校验页面交付计划模型"
 ```
 
@@ -685,9 +685,9 @@ git commit -m "feat: 校验页面交付计划模型"
 
 **Files:**
 
-- Create: `/Users/cfj/projects/skills/page-delivery-workflow/skills/reviewing-page-delivery/tests/fixtures/review-session.json`
-- Create: `/Users/cfj/projects/skills/page-delivery-workflow/skills/reviewing-page-delivery/tests/review-panel-state.test.mjs`
-- Create: `/Users/cfj/projects/skills/page-delivery-workflow/skills/reviewing-page-delivery/scripts/inject-review-panel.js`
+- Create: `/Users/cfj/projects/skills/plugins/page-delivery-workflow/skills/reviewing-page-delivery/tests/fixtures/review-session.json`
+- Create: `/Users/cfj/projects/skills/plugins/page-delivery-workflow/skills/reviewing-page-delivery/tests/review-panel-state.test.mjs`
+- Create: `/Users/cfj/projects/skills/plugins/page-delivery-workflow/skills/reviewing-page-delivery/scripts/inject-review-panel.js`
 
 **Step 1: 写纯状态 RED**
 
@@ -775,7 +775,7 @@ test("storage keys isolate project delivery units and position stays visible", (
 **Step 2: 运行 RED**
 
 ```bash
-node --test page-delivery-workflow/skills/reviewing-page-delivery/tests/review-panel-state.test.mjs
+node --test plugins/page-delivery-workflow/skills/reviewing-page-delivery/tests/review-panel-state.test.mjs
 ```
 
 Expected: FAIL `MODULE_NOT_FOUND`。
@@ -807,7 +807,7 @@ Expected: FAIL `MODULE_NOT_FOUND`。
 **Step 4: 运行 GREEN**
 
 ```bash
-node --test page-delivery-workflow/skills/reviewing-page-delivery/tests/review-panel-state.test.mjs
+node --test plugins/page-delivery-workflow/skills/reviewing-page-delivery/tests/review-panel-state.test.mjs
 ```
 
 Expected: 所有状态测试 PASS。
@@ -815,7 +815,7 @@ Expected: 所有状态测试 PASS。
 **Step 5: 提交**
 
 ```bash
-git add page-delivery-workflow/skills/reviewing-page-delivery
+git add plugins/page-delivery-workflow/skills/reviewing-page-delivery
 git commit -m "feat: 添加多轮评审状态机"
 ```
 
@@ -823,9 +823,9 @@ git commit -m "feat: 添加多轮评审状态机"
 
 **Files:**
 
-- Create: `/Users/cfj/projects/skills/page-delivery-workflow/skills/reviewing-page-delivery/tests/fixtures/panel-host.html`
-- Create: `/Users/cfj/projects/skills/page-delivery-workflow/skills/reviewing-page-delivery/tests/review-panel-browser.assertions.js`
-- Modify: `/Users/cfj/projects/skills/page-delivery-workflow/skills/reviewing-page-delivery/scripts/inject-review-panel.js`
+- Create: `/Users/cfj/projects/skills/plugins/page-delivery-workflow/skills/reviewing-page-delivery/tests/fixtures/panel-host.html`
+- Create: `/Users/cfj/projects/skills/plugins/page-delivery-workflow/skills/reviewing-page-delivery/tests/review-panel-browser.assertions.js`
+- Modify: `/Users/cfj/projects/skills/plugins/page-delivery-workflow/skills/reviewing-page-delivery/scripts/inject-review-panel.js`
 
 **Step 1: 写浏览器 RED**
 
@@ -874,7 +874,7 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
 ```bash
 python3 -m http.server 17881 \
   --bind 127.0.0.1 \
-  --directory page-delivery-workflow/skills/reviewing-page-delivery/tests/fixtures
+  --directory plugins/page-delivery-workflow/skills/reviewing-page-delivery/tests/fixtures
 ```
 
 2. 在 in-app 浏览器打开 `http://127.0.0.1:17881/panel-host.html`。
@@ -934,7 +934,7 @@ console.debug("PAGE_DELIVERY_PLAN_CONFIRM_REQUESTED", {
 先运行：
 
 ```bash
-node --test page-delivery-workflow/skills/reviewing-page-delivery/tests/review-panel-state.test.mjs
+node --test plugins/page-delivery-workflow/skills/reviewing-page-delivery/tests/review-panel-state.test.mjs
 ```
 
 再重复 Step 2 的 in-app Browser CDP 流程。
@@ -944,7 +944,7 @@ Expected: 状态测试 PASS，`runPageDeliveryBrowserAssertions()` 返回 `{ val
 **Step 5: 提交**
 
 ```bash
-git add page-delivery-workflow/skills/reviewing-page-delivery
+git add plugins/page-delivery-workflow/skills/reviewing-page-delivery
 git commit -m "feat: 注入页面交付评审面板"
 ```
 
@@ -952,12 +952,12 @@ git commit -m "feat: 注入页面交付评审面板"
 
 **Files:**
 
-- Modify: `/Users/cfj/projects/skills/page-delivery-workflow/skills/reviewing-page-delivery/tests/skill-contract.test.mjs`
-- Create: `/Users/cfj/projects/skills/page-delivery-workflow/skills/reviewing-page-delivery/references/page-review-standard.md`
-- Create: `/Users/cfj/projects/skills/page-delivery-workflow/skills/reviewing-page-delivery/references/status-model.md`
-- Create: `/Users/cfj/projects/skills/page-delivery-workflow/skills/reviewing-page-delivery/references/api-contract-stages.md`
-- Create: `/Users/cfj/projects/skills/page-delivery-workflow/skills/reviewing-page-delivery/assets/page-delivery-plan-template.md`
-- Modify: `/Users/cfj/projects/skills/page-delivery-workflow/skills/reviewing-page-delivery/SKILL.md`
+- Modify: `/Users/cfj/projects/skills/plugins/page-delivery-workflow/skills/reviewing-page-delivery/tests/skill-contract.test.mjs`
+- Create: `/Users/cfj/projects/skills/plugins/page-delivery-workflow/skills/reviewing-page-delivery/references/page-review-standard.md`
+- Create: `/Users/cfj/projects/skills/plugins/page-delivery-workflow/skills/reviewing-page-delivery/references/status-model.md`
+- Create: `/Users/cfj/projects/skills/plugins/page-delivery-workflow/skills/reviewing-page-delivery/references/api-contract-stages.md`
+- Create: `/Users/cfj/projects/skills/plugins/page-delivery-workflow/skills/reviewing-page-delivery/assets/page-delivery-plan-template.md`
+- Modify: `/Users/cfj/projects/skills/plugins/page-delivery-workflow/skills/reviewing-page-delivery/SKILL.md`
 
 **Step 1: 扩充文档契约 RED**
 
@@ -1019,7 +1019,7 @@ API 与 Mock
 **Step 2: 运行 RED**
 
 ```bash
-node --test page-delivery-workflow/skills/reviewing-page-delivery/tests/skill-contract.test.mjs
+node --test plugins/page-delivery-workflow/skills/reviewing-page-delivery/tests/skill-contract.test.mjs
 ```
 
 Expected: FAIL，缺少 references/assets 或缺少固定内容。
@@ -1037,7 +1037,7 @@ Expected: FAIL，缺少 references/assets 或缺少固定内容。
 **Step 4: 运行 GREEN**
 
 ```bash
-node --test page-delivery-workflow/skills/reviewing-page-delivery/tests/skill-contract.test.mjs
+node --test plugins/page-delivery-workflow/skills/reviewing-page-delivery/tests/skill-contract.test.mjs
 ```
 
 Expected: 所有 contract tests PASS。
@@ -1046,9 +1046,9 @@ Expected: 所有 contract tests PASS。
 
 ```bash
 python3 /Users/cfj/.codex/skills/.system/skill-creator/scripts/quick_validate.py \
-  page-delivery-workflow/skills/reviewing-page-delivery
+  plugins/page-delivery-workflow/skills/reviewing-page-delivery
 python3 /Users/cfj/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py \
-  page-delivery-workflow
+  plugins/page-delivery-workflow
 ```
 
 Expected: 两者 PASS。
@@ -1056,7 +1056,7 @@ Expected: 两者 PASS。
 **Step 6: 提交**
 
 ```bash
-git add page-delivery-workflow/skills/reviewing-page-delivery
+git add plugins/page-delivery-workflow/skills/reviewing-page-delivery
 git commit -m "docs: 添加页面交付评审规范"
 ```
 
@@ -1064,11 +1064,11 @@ git commit -m "docs: 添加页面交付评审规范"
 
 **Files:**
 
-- Modify: `/Users/cfj/projects/skills/page-delivery-workflow/skills/reviewing-page-delivery/tests/review-panel-state.test.mjs`
-- Modify: `/Users/cfj/projects/skills/page-delivery-workflow/skills/reviewing-page-delivery/tests/review-panel-browser.assertions.js`
-- Modify: `/Users/cfj/projects/skills/page-delivery-workflow/skills/reviewing-page-delivery/scripts/inject-review-panel.js`
-- Modify: `/Users/cfj/projects/skills/page-delivery-workflow/skills/reviewing-page-delivery/tests/validate-page-plan.test.mjs`
-- Modify: `/Users/cfj/projects/skills/page-delivery-workflow/skills/reviewing-page-delivery/scripts/validate-page-plan.js`
+- Modify: `/Users/cfj/projects/skills/plugins/page-delivery-workflow/skills/reviewing-page-delivery/tests/review-panel-state.test.mjs`
+- Modify: `/Users/cfj/projects/skills/plugins/page-delivery-workflow/skills/reviewing-page-delivery/tests/review-panel-browser.assertions.js`
+- Modify: `/Users/cfj/projects/skills/plugins/page-delivery-workflow/skills/reviewing-page-delivery/scripts/inject-review-panel.js`
+- Modify: `/Users/cfj/projects/skills/plugins/page-delivery-workflow/skills/reviewing-page-delivery/tests/validate-page-plan.test.mjs`
+- Modify: `/Users/cfj/projects/skills/plugins/page-delivery-workflow/skills/reviewing-page-delivery/scripts/validate-page-plan.js`
 
 **Step 1: 先增加遗漏测试**
 
@@ -1087,7 +1087,7 @@ git commit -m "docs: 添加页面交付评审规范"
 Run:
 
 ```bash
-node --test page-delivery-workflow/skills/reviewing-page-delivery/tests/*.test.mjs
+node --test plugins/page-delivery-workflow/skills/reviewing-page-delivery/tests/*.test.mjs
 ```
 
 Expected: 新增测试至少一项 FAIL。
@@ -1107,7 +1107,7 @@ Expected: 新增测试至少一项 FAIL。
 **Step 3: 全量复测**
 
 ```bash
-node --test page-delivery-workflow/skills/reviewing-page-delivery/tests/*.test.mjs
+node --test plugins/page-delivery-workflow/skills/reviewing-page-delivery/tests/*.test.mjs
 ```
 
 Expected: 全部 PASS。
@@ -1115,7 +1115,7 @@ Expected: 全部 PASS。
 **Step 4: 提交**
 
 ```bash
-git add page-delivery-workflow/skills/reviewing-page-delivery
+git add plugins/page-delivery-workflow/skills/reviewing-page-delivery
 git commit -m "refactor: 完善多轮页面评审"
 ```
 
@@ -1123,9 +1123,9 @@ git commit -m "refactor: 完善多轮页面评审"
 
 **Files:**
 
-- Modify if needed: `/Users/cfj/projects/skills/page-delivery-workflow/skills/reviewing-page-delivery/SKILL.md`
-- Modify if needed: `/Users/cfj/projects/skills/page-delivery-workflow/skills/reviewing-page-delivery/references/*.md`
-- Test: `/Users/cfj/projects/skills/page-delivery-workflow/skills/reviewing-page-delivery/tests/scenarios/review-conflicted-login.md`
+- Modify if needed: `/Users/cfj/projects/skills/plugins/page-delivery-workflow/skills/reviewing-page-delivery/SKILL.md`
+- Modify if needed: `/Users/cfj/projects/skills/plugins/page-delivery-workflow/skills/reviewing-page-delivery/references/*.md`
+- Test: `/Users/cfj/projects/skills/plugins/page-delivery-workflow/skills/reviewing-page-delivery/tests/scenarios/review-conflicted-login.md`
 
 **Step 1: 用新鲜子代理运行有 Skill 场景**
 
@@ -1175,7 +1175,7 @@ git commit -m "refactor: 完善多轮页面评审"
 **Step 5: 提交**
 
 ```bash
-git add page-delivery-workflow/skills/reviewing-page-delivery
+git add plugins/page-delivery-workflow/skills/reviewing-page-delivery
 git commit -m "test: 验证页面交付评审行为"
 ```
 
@@ -1183,15 +1183,15 @@ git commit -m "test: 验证页面交付评审行为"
 
 **Files:**
 
-- Test: `/Users/cfj/projects/skills/page-delivery-workflow/skills/reviewing-page-delivery/tests/fixtures/panel-host.html`
-- Test: `/Users/cfj/projects/skills/page-delivery-workflow/skills/reviewing-page-delivery/tests/fixtures/review-session.json`
-- Modify if needed: `/Users/cfj/projects/skills/page-delivery-workflow/skills/reviewing-page-delivery/scripts/inject-review-panel.js`
+- Test: `/Users/cfj/projects/skills/plugins/page-delivery-workflow/skills/reviewing-page-delivery/tests/fixtures/panel-host.html`
+- Test: `/Users/cfj/projects/skills/plugins/page-delivery-workflow/skills/reviewing-page-delivery/tests/fixtures/review-session.json`
+- Modify if needed: `/Users/cfj/projects/skills/plugins/page-delivery-workflow/skills/reviewing-page-delivery/scripts/inject-review-panel.js`
 
 **Step 1: 记录夹具哈希**
 
 ```bash
 shasum -a 256 \
-  page-delivery-workflow/skills/reviewing-page-delivery/tests/fixtures/panel-host.html
+  plugins/page-delivery-workflow/skills/reviewing-page-delivery/tests/fixtures/panel-host.html
 ```
 
 保存输出用于结束对比。
@@ -1201,7 +1201,7 @@ shasum -a 256 \
 ```bash
 python3 -m http.server 17881 \
   --bind 127.0.0.1 \
-  --directory page-delivery-workflow/skills/reviewing-page-delivery/tests/fixtures
+  --directory plugins/page-delivery-workflow/skills/reviewing-page-delivery/tests/fixtures
 ```
 
 让进程在可控 PTY 中运行，验收后发送 Ctrl-C；不得后台遗留服务。
@@ -1243,7 +1243,7 @@ PageDeliveryReviewPanel.mountReviewPanel(reviewSession)
 **Step 6: 停止服务并复测**
 
 ```bash
-node --test page-delivery-workflow/skills/reviewing-page-delivery/tests/*.test.mjs
+node --test plugins/page-delivery-workflow/skills/reviewing-page-delivery/tests/*.test.mjs
 ```
 
 Expected: 全部 PASS。
@@ -1310,11 +1310,11 @@ python3 -m http.server 17880 \
 ```bash
 rg -n \
   'Vantix|@zan/ui-vue3|Element Plus|UnoCSS|仓配|/Users/cfj/projects/vantix' \
-  page-delivery-workflow/.codex-plugin/plugin.json \
-  page-delivery-workflow/skills/reviewing-page-delivery/SKILL.md \
-  page-delivery-workflow/skills/reviewing-page-delivery/scripts \
-  page-delivery-workflow/skills/reviewing-page-delivery/references \
-  page-delivery-workflow/skills/reviewing-page-delivery/assets
+  plugins/page-delivery-workflow/.codex-plugin/plugin.json \
+  plugins/page-delivery-workflow/skills/reviewing-page-delivery/SKILL.md \
+  plugins/page-delivery-workflow/skills/reviewing-page-delivery/scripts \
+  plugins/page-delivery-workflow/skills/reviewing-page-delivery/references \
+  plugins/page-delivery-workflow/skills/reviewing-page-delivery/assets
 ```
 
 Expected: 无匹配，exit 1。
@@ -1334,7 +1334,7 @@ Expected: 无匹配，exit 1。
 
 **Files:**
 
-- Verify: `/Users/cfj/projects/skills/page-delivery-workflow/**`
+- Verify: `/Users/cfj/projects/skills/plugins/page-delivery-workflow/**`
 - Verify: `/Users/cfj/projects/skills/docs/superpowers/specs/2026-07-23-page-delivery-workflow-design.md`
 - Verify: `/Users/cfj/projects/skills/docs/superpowers/plans/2026-07-23-reviewing-page-delivery.md`
 
@@ -1345,11 +1345,11 @@ Expected: 无匹配，exit 1。
 **Step 2: 运行完整自动化验证**
 
 ```bash
-node --test page-delivery-workflow/skills/reviewing-page-delivery/tests/*.test.mjs
+node --test plugins/page-delivery-workflow/skills/reviewing-page-delivery/tests/*.test.mjs
 python3 /Users/cfj/.codex/skills/.system/skill-creator/scripts/quick_validate.py \
-  page-delivery-workflow/skills/reviewing-page-delivery
+  plugins/page-delivery-workflow/skills/reviewing-page-delivery
 python3 /Users/cfj/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py \
-  page-delivery-workflow
+  plugins/page-delivery-workflow
 git diff --check
 ```
 
@@ -1363,17 +1363,17 @@ Expected: tests 全部 PASS；两个 validator PASS；`git diff --check` 无输�
 排除否定行的方式代替语义检查。
 
 ```bash
-find page-delivery-workflow/skills -mindepth 1 -maxdepth 1 -type d -print
+find plugins/page-delivery-workflow/skills -mindepth 1 -maxdepth 1 -type d -print
 rg -n \
   'pageCompletionRate|plans/<项目>|contracts/drafts/|Vantix|@zan/ui-vue3|Element Plus|UnoCSS|仓配|/Users/cfj/projects/vantix' \
-  page-delivery-workflow/.codex-plugin/plugin.json \
-  page-delivery-workflow/skills/reviewing-page-delivery/SKILL.md \
-  page-delivery-workflow/skills/reviewing-page-delivery/scripts \
-  page-delivery-workflow/skills/reviewing-page-delivery/references \
-  page-delivery-workflow/skills/reviewing-page-delivery/assets
+  plugins/page-delivery-workflow/.codex-plugin/plugin.json \
+  plugins/page-delivery-workflow/skills/reviewing-page-delivery/SKILL.md \
+  plugins/page-delivery-workflow/skills/reviewing-page-delivery/scripts \
+  plugins/page-delivery-workflow/skills/reviewing-page-delivery/references \
+  plugins/page-delivery-workflow/skills/reviewing-page-delivery/assets
 node --test \
   --test-name-pattern='semantic resource policy' \
-  page-delivery-workflow/skills/reviewing-page-delivery/tests/skill-contract.test.mjs
+  plugins/page-delivery-workflow/skills/reviewing-page-delivery/tests/skill-contract.test.mjs
 ```
 
 Expected:
@@ -1403,7 +1403,7 @@ Expected: 只包含本插件、设计文档和实施计划的预期变更；无 
 若最后一轮修复仍有未提交文件：
 
 ```bash
-git add page-delivery-workflow docs/superpowers/specs/2026-07-23-page-delivery-workflow-design.md docs/superpowers/plans/2026-07-23-reviewing-page-delivery.md
+git add .agents/plugins/marketplace.json plugins/page-delivery-workflow docs/superpowers/specs/2026-07-23-page-delivery-workflow-design.md docs/superpowers/plans/2026-07-23-reviewing-page-delivery.md
 git commit -m "feat: 完成页面交付评审工作流"
 ```
 
