@@ -1,6 +1,6 @@
 {
   "name": "page-delivery-workflow",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Reusable page-or-module review and delivery-plan workflow for Codex.",
   "author": {
     "name": "Local developer"

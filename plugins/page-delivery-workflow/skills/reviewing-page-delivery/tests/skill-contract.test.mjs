@@ -148,7 +148,7 @@ const semanticGenericResourcePolicy = {
 test("plugin manifest and the only first-version skill exist", async () => {
   const manifest = JSON.parse(await read(".codex-plugin/plugin.json"));
   assert.equal(manifest.name, "page-delivery-workflow");
-  assert.equal(manifest.version, "0.1.0");
+  assert.equal(manifest.version, "0.1.1");
   assert.equal(manifest.skills, "./skills/");
   assert.equal(manifest.interface.displayName, "Page Delivery Workflow");
 });
@@ -502,4 +502,53 @@ test("pressure scenario preserves required facts and excludes answer oracles", a
   ]) {
     assert.doesNotMatch(scenario, forbidden);
   }
+});
+
+test("feature review is explicit-only and the plugin version is 0.1.1", async () => {
+  const manifest = JSON.parse(await read(".codex-plugin/plugin.json"));
+  const yaml = await read("skills/reviewing-page-delivery/agents/openai.yaml");
+  assert.equal(manifest.version, "0.1.1");
+  assert.match(yaml, /^policy:\n\s+allow_implicit_invocation:\s+false$/m);
+});
+
+test("feature review runtime is ordered and fail-closed", async () => {
+  const skill = visibleMarkdown(await read("skills/reviewing-page-delivery/SKILL.md"));
+  const runtime = await read("skills/reviewing-page-delivery/references/feature-review-runtime.md").catch(() => "");
+  for (const phrase of [
+    "browser:control-in-app-browser",
+    "data-page-delivery-review-host",
+    "host.shadowRoot",
+    "window.__PAGE_DELIVERY_REVIEW__",
+    "PAGE_DELIVERY_REVIEW_SUBMITTED",
+    "评审阻塞",
+  ]) assert.match(`${skill}\n${runtime}`, new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+
+  const ordered = [
+    "选择评审页面",
+    "打开 in-app Browser",
+    "动态注入",
+    "挂载验证",
+    "统一提交",
+    "展示结果",
+  ].map((heading) => runtime.indexOf(heading));
+  assert.ok(ordered.every((offset, index) => offset >= 0 && (index === 0 || ordered[index - 1] < offset)));
+
+  for (const forbidden of [
+    "不得启动消费项目 dev server",
+    "不得执行消费项目 build",
+    "不得退化为静态代码评审",
+    "不得生成独立评审 HTML",
+    "未收到当前提交不得给出最终评审结论",
+  ]) assert.match(runtime, new RegExp(forbidden));
+});
+
+test("runtime pressure scenario contains facts but no answer oracle", async () => {
+  const scenario = await read("skills/reviewing-page-delivery/tests/scenarios/review-runtime-unavailable.md");
+  for (const fact of [
+    "EMFILE: too many open files, watch",
+    "静态 HTML 原型",
+    "Codex in-app Browser",
+    "独立 HTML 报告",
+  ]) assert.match(scenario, new RegExp(fact.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.doesNotMatch(scenario, /正确答案|必须选择|期望行为|PASS|GREEN/);
 });

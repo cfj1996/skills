@@ -25,6 +25,12 @@ Read the Plan semantically; scripts must not parse Markdown. Record a Plan 内�
 
 Keep the page state only as “评审中” or “阻塞” while reviewing. 不得生成 Draft OpenAPI. Use [状态模型](references/status-model.md) for evidence gates and objective counts; never report a single page completion percentage. Use [API 契约阶段](references/api-contract-stages.md) for formal-source discovery and the later planning-only Draft gate.
 
+## 功能评审运行协议
+
+主动选择本 Skill 即进入功能评审，不再启动第二套流程。启动确认通过后，必须按 [功能评审运行协议](references/feature-review-runtime.md) 打开 Codex in-app Browser、动态注入现有 Shadow DOM 面板、验证挂载并等待统一提交。
+
+消费项目 dev server、build 和运行态验收不是功能评审前置条件。没有当前 Browser、host、Shadow Root、临时 API 和当前提交证据时，只能报告“评审阻塞”，不得用独立 HTML、静态代码评审、截图或文字结论替代面板。
+
 ## 统一提交评审
 
 Review only after the user submits all input together. Show the proposed update, preserve review state, and do not write files. 不得在确认前写 Plan.

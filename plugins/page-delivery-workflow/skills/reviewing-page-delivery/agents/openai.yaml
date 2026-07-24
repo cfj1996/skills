@@ -2,3 +2,6 @@ interface:
   display_name: "Reviewing Page Delivery"
   short_description: "Review pages or modules and maintain Plans"
   default_prompt: "Use $reviewing-page-delivery to review this page or module against its PRD, prototype, project rules, and Plan."
+
+policy:
+  allow_implicit_invocation: false
