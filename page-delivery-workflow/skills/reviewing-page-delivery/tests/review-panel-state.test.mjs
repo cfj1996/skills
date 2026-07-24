@@ -25,6 +25,14 @@ test("later rounds include only unresolved, reopened, or changed cards", () => {
   assert.equal(selectRoundCards(session.cards, 1).length, 4);
 });
 
+test("round selection safely ignores malformed cards", () => {
+  const validCard = { id: "REV-valid", conclusion: "待修改" };
+  assert.deepEqual(
+    selectRoundCards([null, 1, {}, { id: "REV-no-conclusion" }, validCard], 1),
+    [validCard],
+  );
+});
+
 test("navigation keeps a single current card and saves edits", () => {
   let state = createReviewState(session);
   state = reduceReviewState(state, {
@@ -223,12 +231,42 @@ test("input edits only the user-controlled conclusion and note", () => {
   assert.equal(Object.hasOwn(state.cards[0], "injected"), false);
   assert.equal(state.planFingerprint, "sha256:fixture");
   assert.equal(state.artifactRuleFingerprint, "sha256:rule-fixture");
+
+  const input = createReviewState(session);
+  assert.equal(
+    reduceReviewState(input, {
+      type: "EDIT_CARD",
+      patch: { conclusion: {}, userNote: 1 },
+    }),
+    input,
+  );
+});
+
+test("editing a card does not share nested evidence with the previous state", () => {
+  const input = createReviewState(session);
+  const edited = reduceReviewState(input, {
+    type: "EDIT_CARD",
+    patch: { userNote: "仅更新可编辑字段" },
+  });
+
+  assert.notEqual(edited.cards[0].evidence, input.cards[0].evidence);
+  edited.cards[0].evidence.locator = "figma://file/edited-node";
+  assert.equal(input.cards[0].evidence.locator, "figma://file/login-node");
 });
 
 test("invalid sessions and reducer inputs are safe", () => {
   assert.throws(() => createReviewState(null), /review session/i);
   assert.throws(() => createReviewState({}), /review session/i);
   assert.throws(() => createReviewState({ cards: {} }), /review session/i);
+  for (const cards of [
+    [null],
+    [1],
+    [{}],
+    [{ id: "REV-without-conclusion" }],
+    [{ conclusion: "待修改" }],
+  ]) {
+    assert.throws(() => createReviewState({ ...session, cards }), /review session/i);
+  }
 
   const state = createReviewState(session);
   for (const action of [null, 1, "invalid", {}, { type: "UNKNOWN" }]) {
@@ -240,7 +278,15 @@ test("invalid sessions and reducer inputs are safe", () => {
 
 test("apply result reports invalid results only for the active submission", () => {
   const reviewing = reduceReviewState(createReviewState(session), { type: "SUBMIT" });
-  for (const results of [null, {}]) {
+  for (const results of [
+    null,
+    {},
+    [null],
+    [1],
+    [{}],
+    [{ id: "result-without-conclusion" }],
+    [{ conclusion: "待修改" }],
+  ]) {
     const invalid = reduceReviewState(reviewing, {
       type: "APPLY_RESULT",
       sessionId: "session-1",

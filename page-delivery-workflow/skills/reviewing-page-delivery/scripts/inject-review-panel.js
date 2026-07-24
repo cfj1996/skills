@@ -28,6 +28,9 @@
     if (!session || typeof session !== "object" || !Array.isArray(session.cards)) {
       throw new TypeError("Review session must include a cards array");
     }
+    if (!session.cards.every(isCard)) {
+      throw new TypeError("Review session must include valid cards");
+    }
 
     const cards = selectRoundCards(session.cards, session.reviewRound).map(deepClone);
 
@@ -81,8 +84,9 @@
   }
 
   function selectRoundCards(cards, reviewRound) {
-    if (reviewRound <= 1) return cards;
-    return cards.filter(
+    const validCards = Array.isArray(cards) ? cards.filter(isCard) : [];
+    if (reviewRound <= 1) return validCards;
+    return validCards.filter(
       (card) =>
         !RESOLVED_CONCLUSIONS.has(card.conclusion) ||
         card.reopened === true ||
@@ -99,14 +103,17 @@
     if (!currentCard || !patch || typeof patch !== "object") return state;
 
     const editablePatch = {};
-    for (const key of ["conclusion", "userNote"]) {
-      if (Object.hasOwn(patch, key)) editablePatch[key] = patch[key];
+    if (Object.hasOwn(patch, "conclusion") && isNonEmptyString(patch.conclusion)) {
+      editablePatch.conclusion = patch.conclusion;
+    }
+    if (Object.hasOwn(patch, "userNote") && typeof patch.userNote === "string") {
+      editablePatch.userNote = patch.userNote;
     }
     if (Object.keys(editablePatch).length === 0) return state;
 
     const cards = state.cards.slice();
     cards[state.currentCardIndex] = {
-      ...currentCard,
+      ...deepClone(currentCard),
       ...editablePatch,
     };
     return { ...state, cards };
@@ -153,6 +160,9 @@
     if (!Array.isArray(action.results)) {
       return { ...state, lastError: "Invalid review results" };
     }
+    if (!action.results.every(isResult)) {
+      return { ...state, lastError: "Invalid review results" };
+    }
 
     return {
       ...state,
@@ -189,6 +199,30 @@
       Array.isArray(state.cards) &&
       Number.isInteger(state.currentCardIndex)
     );
+  }
+
+  function isNormalizedObject(value) {
+    return value !== null && typeof value === "object" && !Array.isArray(value);
+  }
+
+  function isNonEmptyString(value) {
+    return typeof value === "string" && value.trim().length > 0;
+  }
+
+  function hasReviewIdentity(value) {
+    return (
+      isNormalizedObject(value) &&
+      isNonEmptyString(value.id) &&
+      isNonEmptyString(value.conclusion)
+    );
+  }
+
+  function isCard(value) {
+    return hasReviewIdentity(value);
+  }
+
+  function isResult(value) {
+    return hasReviewIdentity(value);
   }
 
   function deepFreeze(value) {
