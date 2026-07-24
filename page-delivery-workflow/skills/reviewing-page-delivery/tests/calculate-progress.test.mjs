@@ -53,3 +53,53 @@ test("countByStatus does not mutate input", () => {
   const rows = Object.freeze([Object.freeze({ status: "待实施" })]);
   assert.deepEqual(countByStatus(rows), { "待实施": 1 });
 });
+
+test("counts prototype-named statuses as ordinary own properties", () => {
+  const counts = countByStatus([
+    { status: "__proto__" },
+    { status: "constructor" },
+    { status: "toString" },
+  ]);
+
+  assert.equal(Object.getPrototypeOf(counts), Object.prototype);
+  assert.deepEqual(
+    counts,
+    Object.fromEntries([
+      ["__proto__", 1],
+      ["constructor", 1],
+      ["toString", 1],
+    ]),
+  );
+});
+
+test("counts unknown applicable tasks without marking them complete or verified", () => {
+  const metrics = calculateObjectiveMetrics({
+    tasks: [{ status: "待对接" }, { status: "已验证" }, { status: "不适用" }],
+  });
+
+  assert.deepEqual(metrics.tasks, {
+    total: 2,
+    completed: 1,
+    verified: 1,
+    completionRate: 50,
+    verificationRate: 50,
+  });
+});
+
+test("returns a stable empty metrics structure for a missing model", () => {
+  assert.deepEqual(calculateObjectiveMetrics(), {
+    review: { total: 0, byStatus: {}, pendingRecheck: 0 },
+    features: {},
+    tasks: {
+      total: 0,
+      completed: 0,
+      verified: 0,
+      completionRate: 0,
+      verificationRate: 0,
+    },
+    apis: {},
+    dependencies: {},
+    acceptances: {},
+    draftOperationCount: 0,
+  });
+});

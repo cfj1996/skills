@@ -1,13 +1,15 @@
 "use strict";
 
 function countByStatus(items = [], field = "status") {
-  return items.reduce((counts, item) => {
+  const counts = items.reduce((counts, item) => {
     const value = item?.[field];
     if (typeof value === "string" && value.length > 0) {
-      counts[value] = (counts[value] || 0) + 1;
+      counts.set(value, (counts.get(value) || 0) + 1);
     }
     return counts;
-  }, {});
+  }, new Map());
+
+  return Object.fromEntries(counts);
 }
 
 function percentage(numerator, denominator) {
