@@ -60,6 +60,22 @@ const statuses = [
   "未验证", "部分通过", "已通过", "验收阻塞",
 ];
 
+const genericResourcePaths = [
+  ".codex-plugin/plugin.json",
+  "skills/reviewing-page-delivery/SKILL.md",
+  "skills/reviewing-page-delivery/agents/openai.yaml",
+  "skills/reviewing-page-delivery/references/page-review-standard.md",
+  "skills/reviewing-page-delivery/references/status-model.md",
+  "skills/reviewing-page-delivery/references/api-contract-stages.md",
+  "skills/reviewing-page-delivery/assets/page-delivery-plan-template.md",
+  "skills/reviewing-page-delivery/scripts/inject-review-panel.js",
+  "skills/reviewing-page-delivery/scripts/calculate-progress.js",
+  "skills/reviewing-page-delivery/scripts/validate-page-plan.js",
+  "skills/reviewing-page-delivery/tests/fixtures/panel-host.html",
+  "skills/reviewing-page-delivery/tests/fixtures/page-plan-model.json",
+  "skills/reviewing-page-delivery/tests/fixtures/review-session.json",
+];
+
 test("plugin manifest and the only first-version skill exist", async () => {
   const manifest = JSON.parse(await read(".codex-plugin/plugin.json"));
   assert.equal(manifest.name, "page-delivery-workflow");
@@ -201,16 +217,7 @@ test("template uses evidence-selected exemption statuses instead of inventing AP
 });
 
 test("documentation status terms match the validator and generic assets contain no project defaults", async () => {
-  const files = [
-    ".codex-plugin/plugin.json",
-    "skills/reviewing-page-delivery/SKILL.md",
-    "skills/reviewing-page-delivery/agents/openai.yaml",
-    "skills/reviewing-page-delivery/references/page-review-standard.md",
-    "skills/reviewing-page-delivery/references/status-model.md",
-    "skills/reviewing-page-delivery/references/api-contract-stages.md",
-    "skills/reviewing-page-delivery/assets/page-delivery-plan-template.md",
-  ];
-  const content = (await Promise.all(files.map(read))).join("\n");
+  const content = (await Promise.all(genericResourcePaths.map(read))).join("\n");
   const statusTerms = Object.values(STATUS_MODEL).flat();
   for (const status of statusTerms) assert.match(content, new RegExp(status));
   assert.match(content, /不得提供默认目录|不得使用插件默认目录/);
@@ -218,6 +225,27 @@ test("documentation status terms match the validator and generic assets contain 
     content,
     /Vantix|@zan\/ui-vue3|Element Plus|UnoCSS|仓配|\/Users\/cfj\/projects\/vantix|product\/plans\/|engineering\/implementation-plans\/|api\/drafts\/|contracts\/openapi\//i,
   );
+});
+
+test("generic resource scanner covers distributable resources and excludes test code and pressure scenarios", () => {
+  const expected = [
+    ".codex-plugin/plugin.json",
+    "skills/reviewing-page-delivery/SKILL.md",
+    "skills/reviewing-page-delivery/agents/openai.yaml",
+    "skills/reviewing-page-delivery/references/page-review-standard.md",
+    "skills/reviewing-page-delivery/references/status-model.md",
+    "skills/reviewing-page-delivery/references/api-contract-stages.md",
+    "skills/reviewing-page-delivery/assets/page-delivery-plan-template.md",
+    "skills/reviewing-page-delivery/scripts/inject-review-panel.js",
+    "skills/reviewing-page-delivery/scripts/calculate-progress.js",
+    "skills/reviewing-page-delivery/scripts/validate-page-plan.js",
+    "skills/reviewing-page-delivery/tests/fixtures/panel-host.html",
+    "skills/reviewing-page-delivery/tests/fixtures/page-plan-model.json",
+    "skills/reviewing-page-delivery/tests/fixtures/review-session.json",
+  ];
+  assert.deepEqual([...genericResourcePaths].sort(), expected.sort());
+  assert.ok(!genericResourcePaths.some((file) => file.endsWith(".test.mjs")));
+  assert.ok(!genericResourcePaths.some((file) => file.includes("tests/scenarios/")));
 });
 
 test("skill links its detailed references without duplicating them", async () => {
