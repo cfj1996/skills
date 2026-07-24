@@ -12,6 +12,7 @@ const {
   assertArtifactLocationRule,
   assertPlanFingerprint,
   loadDraft,
+  mountReviewPanel,
   prioritizeReviewResults,
   reduceReviewState,
   restoreDraft,
@@ -397,13 +398,16 @@ test("editing a card does not share nested evidence with the previous state", ()
 });
 
 test("invalid sessions and reducer inputs are safe", () => {
-  assert.throws(() => createReviewState(null), /review session/i);
-  assert.throws(() => createReviewState({}), /review session/i);
-  assert.throws(() => createReviewState({ cards: {} }), /review session/i);
+  for (const invalidSession of [null, {}, { cards: {} }]) {
+    assert.throws(
+      () => createReviewState(invalidSession),
+      (error) => error instanceof TypeError && error.code === "invalid-review-session" && /review session/i.test(error.message),
+    );
+  }
   for (const sessionId of [undefined, "", "   "]) {
     assert.throws(
       () => createReviewState({ ...session, sessionId }),
-      /review session/i,
+      (error) => error instanceof TypeError && error.code === "invalid-review-session" && /review session/i.test(error.message),
     );
   }
   for (const cards of [
@@ -413,8 +417,16 @@ test("invalid sessions and reducer inputs are safe", () => {
     [{ id: "REV-without-conclusion" }],
     [{ conclusion: "待修改" }],
   ]) {
-    assert.throws(() => createReviewState({ ...session, cards }), /review session/i);
+    assert.throws(
+      () => createReviewState({ ...session, cards }),
+      (error) => error instanceof TypeError && error.code === "invalid-review-session" && /review session/i.test(error.message),
+    );
   }
+
+  assert.throws(
+    () => mountReviewPanel(session),
+    (error) => error instanceof Error && error.code === "browser-document-unavailable" && /browser document/i.test(error.message),
+  );
 
   const state = createReviewState(session);
   for (const action of [null, 1, "invalid", {}, { type: "UNKNOWN" }]) {

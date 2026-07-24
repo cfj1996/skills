@@ -45,10 +45,10 @@
       !isNonEmptyString(session.sessionId) ||
       !Array.isArray(session.cards)
     ) {
-      throw new TypeError("Review session must include a cards array");
+      throw createCodedError(TypeError, "invalid-review-session", "Review session must include a cards array");
     }
     if (!session.cards.every(isCard)) {
-      throw new TypeError("Review session must include valid cards");
+      throw createCodedError(TypeError, "invalid-review-session", "Review session must include valid cards");
     }
 
     const cards = selectReviewCards(session.cards, session.reviewRound, session.viewScope).map(sanitizePanelItem);
@@ -145,7 +145,7 @@
 
   function mountReviewPanel(session, options = {}) {
     if (typeof document === "undefined" || !document?.body) {
-      throw new Error("Review panel requires a browser document");
+      throw createCodedError(Error, "browser-document-unavailable", "Review panel requires a browser document");
     }
 
     const previousApi = globalThis.__PAGE_DELIVERY_REVIEW__;
@@ -728,6 +728,12 @@
 
   function reviewError(code, message) {
     return { code, message };
+  }
+
+  function createCodedError(ErrorType, code, message) {
+    const error = new ErrorType(message);
+    error.code = code;
+    return error;
   }
 
   function assertPlanFingerprint(expected, actual) {

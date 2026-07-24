@@ -23,16 +23,16 @@ const REF_TARGETS = Object.freeze({
   evidenceRefs: "evidence",
 });
 
-function addError(errors, condition, message) {
-  if (!condition) errors.push(message);
+function addError(errors, condition, code, message) {
+  if (!condition) errors.push({ code, message });
 }
 
 function indexById(items, collectionName, errors) {
   const index = new Map();
   for (const item of items) {
-    addError(errors, isNormalizedObject(item) && hasText(item.id), `${collectionName} item requires id`);
+    addError(errors, isNormalizedObject(item) && hasText(item.id), "item-id-required", `${collectionName} item requires id`);
     if (!isNormalizedObject(item) || !hasText(item.id)) continue;
-    addError(errors, !index.has(item.id), `${collectionName} duplicate id: ${item.id}`);
+    addError(errors, !index.has(item.id), "duplicate-id", `${collectionName} duplicate id: ${item.id}`);
     if (index.has(item.id)) continue;
     index.set(item.id, item);
   }
@@ -50,18 +50,18 @@ function hasText(value) {
 }
 
 function validateStatus(errors, subject, status, allowedStatuses) {
-  addError(errors, allowedStatuses.includes(status), `${subject}.status is unsupported: ${String(status)}`);
+  addError(errors, allowedStatuses.includes(status), "unsupported-status", `${subject}.status is unsupported: ${String(status)}`);
 }
 
 function validateArtifactLocationRule(rule, errors) {
-  addError(errors, isNormalizedObject(rule), "artifactLocationRule requires a normalized object");
+  addError(errors, isNormalizedObject(rule), "artifact-rule-object", "artifactLocationRule requires a normalized object");
   if (!isNormalizedObject(rule)) return;
 
-  addError(errors, rule.source === "agents", "artifactLocationRule.source must be agents");
-  addError(errors, hasText(rule.ownerFile), "artifactLocationRule.ownerFile is required");
-  addError(errors, hasText(rule.planPattern), "artifactLocationRule.planPattern is required");
-  addError(errors, hasText(rule.draftOpenApiPattern), "artifactLocationRule.draftOpenApiPattern is required");
-  addError(errors, hasText(rule.ruleFingerprint), "artifactLocationRule.ruleFingerprint is required");
+  addError(errors, rule.source === "agents", "artifact-rule-source", "artifactLocationRule.source must be agents");
+  addError(errors, hasText(rule.ownerFile), "artifact-rule-owner-file", "artifactLocationRule.ownerFile is required");
+  addError(errors, hasText(rule.planPattern), "artifact-rule-plan-pattern", "artifactLocationRule.planPattern is required");
+  addError(errors, hasText(rule.draftOpenApiPattern), "artifact-rule-draft-open-api-pattern", "artifactLocationRule.draftOpenApiPattern is required");
+  addError(errors, hasText(rule.ruleFingerprint), "artifact-rule-fingerprint", "artifactLocationRule.ruleFingerprint is required");
 }
 
 function assertArtifactLocationRule(rule, currentRuleFingerprint) {
@@ -84,12 +84,13 @@ function validateReferences(itemsByCollection, indexes, errors) {
       if (!isNormalizedObject(item)) continue;
       for (const [refName, targetName] of Object.entries(REF_TARGETS)) {
         if (!(refName in item)) continue;
-        addError(errors, Array.isArray(item[refName]), `${collectionName} ${item.id} ${refName} requires an array`);
+        addError(errors, Array.isArray(item[refName]), "reference-array", `${collectionName} ${item.id} ${refName} requires an array`);
         if (!Array.isArray(item[refName])) continue;
         for (const reference of item[refName]) {
           addError(
             errors,
             typeof reference === "string" && indexes[targetName].has(reference),
+            "reference-missing",
             `${collectionName} ${item.id} ${refName} references missing ${targetName} id: ${String(reference)}`,
           );
         }
@@ -112,13 +113,13 @@ function validateReciprocalLinks(itemsByCollection, indexes, errors) {
     for (const apiId of referencesOf(feature, "apiRefs")) {
       const api = indexes.apis.get(apiId);
       if (api) {
-        addError(errors, includesRef(api, "featureRefs", feature.id), `reciprocal feature/API link missing: ${feature.id} ↔ ${apiId}`);
+        addError(errors, includesRef(api, "featureRefs", feature.id), "reciprocal-feature-api", `reciprocal feature/API link missing: ${feature.id} ↔ ${apiId}`);
       }
     }
     for (const taskId of referencesOf(feature, "taskRefs")) {
       const task = indexes.tasks.get(taskId);
       if (task) {
-        addError(errors, includesRef(task, "featureRefs", feature.id), `reciprocal feature/task link missing: ${feature.id} ↔ ${taskId}`);
+        addError(errors, includesRef(task, "featureRefs", feature.id), "reciprocal-feature-task", `reciprocal feature/task link missing: ${feature.id} ↔ ${taskId}`);
       }
     }
   }
@@ -128,13 +129,13 @@ function validateReciprocalLinks(itemsByCollection, indexes, errors) {
     for (const featureId of referencesOf(api, "featureRefs")) {
       const feature = indexes.features.get(featureId);
       if (feature) {
-        addError(errors, includesRef(feature, "apiRefs", api.id), `reciprocal feature/API link missing: ${featureId} ↔ ${api.id}`);
+        addError(errors, includesRef(feature, "apiRefs", api.id), "reciprocal-feature-api", `reciprocal feature/API link missing: ${featureId} ↔ ${api.id}`);
       }
     }
     for (const taskId of referencesOf(api, "taskRefs")) {
       const task = indexes.tasks.get(taskId);
       if (task) {
-        addError(errors, includesRef(task, "apiRefs", api.id), `reciprocal API/task link missing: ${api.id} ↔ ${taskId}`);
+        addError(errors, includesRef(task, "apiRefs", api.id), "reciprocal-api-task", `reciprocal API/task link missing: ${api.id} ↔ ${taskId}`);
       }
     }
   }
@@ -144,13 +145,13 @@ function validateReciprocalLinks(itemsByCollection, indexes, errors) {
     for (const featureId of referencesOf(task, "featureRefs")) {
       const feature = indexes.features.get(featureId);
       if (feature) {
-        addError(errors, includesRef(feature, "taskRefs", task.id), `reciprocal feature/task link missing: ${featureId} ↔ ${task.id}`);
+        addError(errors, includesRef(feature, "taskRefs", task.id), "reciprocal-feature-task", `reciprocal feature/task link missing: ${featureId} ↔ ${task.id}`);
       }
     }
     for (const apiId of referencesOf(task, "apiRefs")) {
       const api = indexes.apis.get(apiId);
       if (api) {
-        addError(errors, includesRef(api, "taskRefs", task.id), `reciprocal API/task link missing: ${apiId} ↔ ${task.id}`);
+        addError(errors, includesRef(api, "taskRefs", task.id), "reciprocal-api-task", `reciprocal API/task link missing: ${apiId} ↔ ${task.id}`);
       }
     }
   }
@@ -159,13 +160,13 @@ function validateReciprocalLinks(itemsByCollection, indexes, errors) {
 function validatePagePlanModel(model) {
   const errors = [];
   if (!isNormalizedObject(model)) {
-    return { valid: false, errors: ["input requires a normalized object"] };
+    return { valid: false, errors: [{ code: "input-normalized-object", message: "input requires a normalized object" }] };
   }
 
-  addError(errors, model.schemaVersion === 1, "schemaVersion must be 1");
-  addError(errors, isNormalizedObject(model.deliveryUnit), "deliveryUnit requires a normalized object");
+  addError(errors, model.schemaVersion === 1, "schema-version", "schemaVersion must be 1");
+  addError(errors, isNormalizedObject(model.deliveryUnit), "delivery-unit-object", "deliveryUnit requires a normalized object");
   if (isNormalizedObject(model.deliveryUnit)) {
-    addError(errors, ["page", "module"].includes(model.deliveryUnit.kind), "deliveryUnit.kind must be page or module");
+    addError(errors, ["page", "module"].includes(model.deliveryUnit.kind), "delivery-unit-kind", "deliveryUnit.kind must be page or module");
     validateStatus(errors, "deliveryUnit", model.deliveryUnit.status, STATUS_MODEL.deliveryUnit);
   }
 
@@ -175,7 +176,7 @@ function validatePagePlanModel(model) {
   const indexes = {};
   for (const collectionName of COLLECTIONS) {
     const items = model[collectionName];
-    addError(errors, Array.isArray(items), `${collectionName} requires an array`);
+    addError(errors, Array.isArray(items), "collection-array", `${collectionName} requires an array`);
     itemsByCollection[collectionName] = Array.isArray(items) ? items : [];
     indexes[collectionName] = indexById(itemsByCollection[collectionName], collectionName, errors);
   }
@@ -206,7 +207,7 @@ function validatePagePlanModel(model) {
 
   return {
     valid: errors.length === 0,
-    errors: errors.sort((left, right) => left.localeCompare(right, "zh-Hans-CN")),
+    errors: errors.sort((left, right) => left.message.localeCompare(right.message, "zh-Hans-CN") || left.code.localeCompare(right.code, "en")),
   };
 }
 

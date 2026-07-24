@@ -10,6 +10,7 @@ const {
   validatePagePlanModel,
 } = require("../scripts/validate-page-plan.js");
 const validModel = JSON.parse(readFileSync(new URL("./fixtures/page-plan-model.json", import.meta.url), "utf8"));
+const errorMessages = (result) => result.errors.map((error) => error.message).join("\n");
 
 function deepFreeze(value) {
   if (value && typeof value === "object") {
@@ -28,7 +29,8 @@ test("rejects an unsupported status", () => {
   model.deliveryUnit.status = "快完成了";
   const result = validatePagePlanModel(model);
   assert.equal(result.valid, false);
-  assert.match(result.errors.join("\n"), /deliveryUnit\.status/);
+  assert.match(errorMessages(result), /deliveryUnit\.status/);
+  assert.equal(result.errors[0].code, "unsupported-status");
 });
 
 test("accepts page or module delivery units and rejects other scopes", () => {
@@ -39,17 +41,17 @@ test("accepts page or module delivery units and rejects other scopes", () => {
   moduleModel.deliveryUnit.kind = "project";
   const result = validatePagePlanModel(moduleModel);
   assert.equal(result.valid, false);
-  assert.match(result.errors.join("\n"), /deliveryUnit\.kind/);
+  assert.match(errorMessages(result), /deliveryUnit\.kind/);
 });
 
 test("requires an AGENTS-owned artifact location rule without defaults", () => {
   const missing = structuredClone(validModel);
   delete missing.artifactLocationRule;
-  assert.match(validatePagePlanModel(missing).errors.join("\n"), /artifactLocationRule/);
+  assert.match(errorMessages(validatePagePlanModel(missing)), /artifactLocationRule/);
 
   const unresolved = structuredClone(validModel);
   unresolved.artifactLocationRule.source = "candidate";
-  assert.match(validatePagePlanModel(unresolved).errors.join("\n"), /artifactLocationRule\.source/);
+  assert.match(errorMessages(validatePagePlanModel(unresolved)), /artifactLocationRule\.source/);
 });
 
 test("rejects missing and one-way references", () => {
@@ -58,20 +60,20 @@ test("rejects missing and one-way references", () => {
   model.tasks[0].apiRefs = ["API-404"];
   const result = validatePagePlanModel(model);
   assert.equal(result.valid, false);
-  assert.match(result.errors.join("\n"), /reciprocal|API-404/);
+  assert.match(errorMessages(result), /reciprocal|API-404/);
 });
 
 test("does not accept markdown as input", () => {
   const result = validatePagePlanModel("# 页面 Plan");
   assert.equal(result.valid, false);
-  assert.match(result.errors.join("\n"), /normalized object/);
+  assert.match(errorMessages(result), /normalized object/);
 });
 
 test("rejects empty or whitespace-only IDs", () => {
   for (const id of ["", "   "]) {
     const model = structuredClone(validModel);
     model.features[0].id = id;
-    assert.match(validatePagePlanModel(model).errors.join("\n"), /features item requires id/);
+    assert.match(errorMessages(validatePagePlanModel(model)), /features item requires id/);
   }
 });
 
@@ -81,7 +83,7 @@ test("keeps validation errors from every duplicate source item", () => {
   model.features[0].apiRefs = ["API-404-A"];
   model.features.push({ ...structuredClone(validModel.features[0]), id: "F-001", status: "坏状态二", apiRefs: ["API-404-B"] });
 
-  const errors = validatePagePlanModel(model).errors.join("\n");
+  const errors = errorMessages(validatePagePlanModel(model));
   assert.match(errors, /features duplicate id: F-001/);
   assert.match(errors, /坏状态一/);
   assert.match(errors, /API-404-A/);
@@ -93,11 +95,11 @@ test("requires every indexed collection to be an array", () => {
   for (const collectionName of ["features", "uiStates", "apis", "dependencies", "tasks", "acceptances", "evidence"]) {
     const missing = structuredClone(validModel);
     delete missing[collectionName];
-    assert.match(validatePagePlanModel(missing).errors.join("\n"), new RegExp(`${collectionName} requires an array`));
+    assert.match(errorMessages(validatePagePlanModel(missing)), new RegExp(`${collectionName} requires an array`));
 
     const nonArray = structuredClone(validModel);
     nonArray[collectionName] = {};
-    assert.match(validatePagePlanModel(nonArray).errors.join("\n"), new RegExp(`${collectionName} requires an array`));
+    assert.match(errorMessages(validatePagePlanModel(nonArray)), new RegExp(`${collectionName} requires an array`));
   }
 });
 
@@ -108,8 +110,8 @@ test("accumulates structural errors for primitive collection items and non-array
 
   const result = validatePagePlanModel(model);
   assert.equal(result.valid, false);
-  assert.equal(result.errors.filter((error) => error === "features item requires id").length, 3);
-  assert.match(result.errors.join("\n"), /features F-001 apiRefs requires an array/);
+  assert.equal(result.errors.filter((error) => error.message === "features item requires id").length, 3);
+  assert.match(errorMessages(result), /features F-001 apiRefs requires an array/);
 });
 
 test("accepts prototype-named IDs through Map indexes", () => {
@@ -134,7 +136,7 @@ test("requires each reciprocal relationship from either direction", () => {
   for (const [direction, update, expectedError] of cases) {
     const model = structuredClone(validModel);
     update(model);
-    assert.match(validatePagePlanModel(model).errors.join("\n"), expectedError, direction);
+    assert.match(errorMessages(validatePagePlanModel(model)), expectedError, direction);
   }
 });
 
@@ -172,6 +174,25 @@ test("does not mutate deeply frozen input and returns stable error order", () =>
   assert.deepEqual(validatePagePlanModel(invalid).errors, validatePagePlanModel(invalid).errors);
 });
 
+test("validator diagnostics are serializable code-message records with deterministic order", () => {
+  const invalid = structuredClone(validModel);
+  invalid.features[0].id = " ";
+  invalid.features[0].apiRefs = "API-001";
+  invalid.apis[0].taskRefs = [];
+
+  const first = validatePagePlanModel(invalid).errors;
+  const second = validatePagePlanModel(invalid).errors;
+  assert.deepEqual(first, second);
+  assert.ok(first.length > 0);
+  for (const error of first) {
+    assert.deepEqual(Object.keys(error).sort(), ["code", "message"]);
+    assert.equal(typeof error.code, "string");
+    assert.equal(typeof error.message, "string");
+    assert.ok(error.code.length > 0 && error.message.length > 0);
+    assert.deepEqual(JSON.parse(JSON.stringify(error)), error);
+  }
+});
+
 test("reports asymmetric API and task links in deterministic sorted order", () => {
   const model = structuredClone(validModel);
   model.apis[0].taskRefs = [];
@@ -181,9 +202,9 @@ test("reports asymmetric API and task links in deterministic sorted order", () =
   const first = validatePagePlanModel(model).errors;
   const second = validatePagePlanModel(model).errors;
   assert.deepEqual(first, second);
-  assert.deepEqual(first, [...first].sort((left, right) => left.localeCompare(right, "zh-Hans-CN")));
-  assert.match(first.join("\n"), /reciprocal API\/task/);
-  assert.match(first.join("\n"), /reciprocal feature\/task/);
+  assert.deepEqual(first, [...first].sort((left, right) => left.message.localeCompare(right.message, "zh-Hans-CN")));
+  assert.match(errorMessages({ errors: first }), /reciprocal API\/task/);
+  assert.match(errorMessages({ errors: first }), /reciprocal feature\/task/);
 });
 
 test("artifact location rule guard uses a stable code and actionable AGENTS message", () => {
