@@ -10,11 +10,16 @@ There is no global build step in this repository. Use targeted commands instead:
 
 ```bash
 npx --package=@zan/tapd-cli@canary zan-tapd-cli <bug|story> <id> --json
-git -C tapd-workflow log --oneline -5
-git -C tapd-workflow status
+git log --oneline -5 -- skills/tapd-workflow
+git status --short
+node --test plugins/page-delivery-workflow/skills/reviewing-page-delivery/tests/*.test.mjs
+python3 /Users/cfj/.codex/skills/.system/skill-creator/scripts/quick_validate.py \
+  plugins/page-delivery-workflow/skills/reviewing-page-delivery
+python3 /Users/cfj/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py \
+  plugins/page-delivery-workflow
 ```
 
-The `npx` command fetches TAPD data for workflow execution. The `git -C tapd-workflow ...` commands inspect the active skill repo because the top-level `skills/` directory is not itself a Git repository.
+The `npx` command fetches TAPD data for workflow execution. Run Git commands from this repository root; use a pathspec such as `-- skills/tapd-workflow` when history should be limited to one standalone skill. The remaining commands run the page-delivery plugin's complete Node test suite and official Skill/Plugin validators.
 
 ## Coding Style & Naming Conventions
 
@@ -22,7 +27,7 @@ Write skill docs in concise Markdown with clear `#`/`##` headings, short rule li
 
 ## Testing Guidelines
 
-No automated test suite is checked in today. Validate changes by running the relevant TAPD workflow command, reviewing the generated Markdown artifacts, and confirming the documented paths and commands still match the repo layout. If you add scripts or tests later, place them inside the owning skill directory and document the exact command here.
+The `page-delivery-workflow` plugin currently has 86 Node tests under `plugins/page-delivery-workflow/skills/reviewing-page-delivery/tests/`; run the complete suite and both official validators for every plugin change. For a standalone skill, run its owning workflow's targeted command, validate `skills/<skill-name>` with `skill-creator/scripts/quick_validate.py`, inspect generated artifacts when applicable, and confirm documented paths and commands still match the repository layout. Keep new scripts and tests inside their owning skill or plugin directory and document the exact command here.
 
 ## Commit & Pull Request Guidelines
 
