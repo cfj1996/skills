@@ -15,13 +15,15 @@ Review a page or independently deliverable module from evidence; do not turn unc
 
 ## 产物位置规则
 
-Read Plan and Draft artifact-location rules from the applicable `AGENTS.md`. When rules are absent, propose candidates only; after user confirmation, draft the rule in the nearest shared-scope `AGENTS.md` and reread it to verify. The plugin 不得提供默认目录. Location-rule confirmation and Plan update confirmation are 两道独立门禁.
+Read Plan and Draft artifact-location rules only from the applicable `AGENTS.md` or its explicit delegation. When rules are absent or conflict, propose a complete candidate and wait for user confirmation; only then may you suggest solidifying it in the nearest shared-scope `AGENTS.md` and reread it to verify. The plugin 不得提供默认目录. Location-rule confirmation and Plan update confirmation are 两道独立门禁.
+
+Use [产物规则与评审卡规范](references/page-review-standard.md) for the required candidate fields, evidence priority, eleven dimensions, and review-round gates. The stable candidate structure is: Plan 路径模式、Draft OpenAPI 路径模式、交付单元命名、编号规则、路径变量、既有文件. Do not fill in any field value until the project confirms it.
 
 ## 评审
 
 Read the Plan semantically; scripts must not parse Markdown. Record a Plan 内容指纹. Generate the full first round, then include only unresolved items and changed evidence by default. Dynamically inject one Shadow DOM card panel in the in-app 浏览器.
 
-Keep the page state only as “评审中” or “阻塞” while reviewing. 不得生成 Draft OpenAPI.
+Keep the page state only as “评审中” or “阻塞” while reviewing. 不得生成 Draft OpenAPI. Use [状态模型](references/status-model.md) for evidence gates and objective counts; never report a single page completion percentage. Use [API 契约阶段](references/api-contract-stages.md) for formal-source discovery and the later planning-only Draft gate.
 
 ## 统一提交评审
 
@@ -30,6 +32,8 @@ Review only after the user submits all input together. Show the proposed update,
 ## 确认更新 Plan
 
 Write the Plan only after the user explicitly confirms the displayed update. This is separate from confirmation of the 产物位置规则.
+
+Use the human-readable [页面交付 Plan 模板](assets/page-delivery-plan-template.md) only after both the project location rule and this update are confirmed. Keep one Plan per page or cohesive module, stable IDs, and explicit bidirectional links; never embed JSON or create another long-term record.
 
 ## 交接
 
