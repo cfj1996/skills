@@ -127,6 +127,20 @@ test("workflow gates have an enforced order and explicit visible prohibitions", 
   );
 });
 
+test("review behavior discovers project rules before resolving ambiguity and rejects unsafe scope or evidence shortcuts", async () => {
+  const skill = visibleMarkdown(await read("skills/reviewing-page-delivery/SKILL.md"));
+  const standard = await read("skills/reviewing-page-delivery/references/page-review-standard.md");
+  const startup = sectionContaining(skill, "启动确认");
+
+  assert.ok(
+    startup.indexOf("Read applicable `AGENTS.md`") < startup.indexOf("superpowers:brainstorming"),
+    "必须先发现项目规则，再处理未决事项",
+  );
+  assert.match(skill, /拒绝项目级“大 Plan”/);
+  assert.match(standard, /项目级范围.*拒绝/);
+  assert.match(standard, /PRD 与原型.*冲突.*单独识别、报告并等待确认.*不得任选其一/);
+});
+
 test("review references define all dimensions, status groups, and artifact gates", async () => {
   const standard = await read("skills/reviewing-page-delivery/references/page-review-standard.md");
   const statusModel = await read("skills/reviewing-page-delivery/references/status-model.md");

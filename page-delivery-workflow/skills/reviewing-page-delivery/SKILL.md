@@ -9,9 +9,9 @@ Review a page or independently deliverable module from evidence; do not turn unc
 
 ## 启动确认
 
-1. Invoke `superpowers:brainstorming` for unresolved matters.
-2. Read applicable `AGENTS.md`, dependencies, and existing constraints. Do not assume a component system.
-3. Confirm the delivery unit is a 页面或模块. Require a module to be independently implementable, integrable, and verifiable. Remain read-only until 启动确认 passes.
+1. Read applicable `AGENTS.md`, dependencies, and existing constraints. Do not assume a component system.
+2. Invoke `superpowers:brainstorming` for unresolved matters.
+3. Confirm the delivery unit is a 页面或模块. Require a module to be independently implementable, integrable, and verifiable; 拒绝项目级“大 Plan”. Remain read-only until 启动确认 passes.
 
 ## 产物位置规则
 
