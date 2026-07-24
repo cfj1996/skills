@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "deliveryUnit": {
+    "id": "UNIT-001",
+    "kind": "page",
+    "name": "示例登录",
+    "status": "评审中"
+  },
+  "artifactLocationRule": {
+    "source": "agents",
+    "ownerFile": "/sample-project/AGENTS.md",
+    "planPattern": "<project-plan-pattern>",
+    "draftOpenApiPattern": "<project-draft-pattern>",
+    "ruleFingerprint": "sha256:rule-fixture"
+  },
+  "features": [
+    {
+      "id": "F-001",
+      "status": "待实施",
+      "apiRefs": ["API-001"],
+      "taskRefs": ["T-001"],
+      "evidenceRefs": ["E-001"]
+    }
+  ],
+  "uiStates": [
+    {
+      "id": "UI-001",
+      "featureRefs": ["F-001"],
+      "evidenceRefs": ["E-001"]
+    }
+  ],
+  "apis": [
+    {
+      "id": "API-001",
+      "status": "Draft已确认",
+      "featureRefs": ["F-001"],
+      "taskRefs": ["T-001"],
+      "evidenceRefs": ["E-001"]
+    }
+  ],
+  "dependencies": [
+    {
+      "id": "DEP-001",
+      "status": "路由契约待确认",
+      "featureRefs": ["F-001"],
+      "evidenceRefs": ["E-001"]
+    }
+  ],
+  "tasks": [
+    {
+      "id": "T-001",
+      "status": "待实施",
+      "featureRefs": ["F-001"],
+      "apiRefs": ["API-001"],
+      "evidenceRefs": ["E-001"]
+    }
+  ],
+  "acceptances": [
+    {
+      "id": "A-001",
+      "status": "未验证",
+      "featureRefs": ["F-001"],
+      "evidenceRefs": ["E-001"]
+    }
+  ],
+  "evidence": [
+    {
+      "id": "E-001",
+      "kind": "prototype",
+      "locator": "#login-form"
+    }
+  ],
+  "reviewBatches": []
+}
