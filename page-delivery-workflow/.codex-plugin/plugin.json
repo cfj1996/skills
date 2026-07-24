@@ -1,0 +1,21 @@
+{
+  "name": "page-delivery-workflow",
+  "version": "0.1.0",
+  "description": "Reusable page-or-module review and delivery-plan workflow for Codex.",
+  "author": {
+    "name": "Local developer"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Page Delivery Workflow",
+    "shortDescription": "Review pages or modules and maintain Plans.",
+    "longDescription": "Adds a reusable, project-aware page or module review workflow with an in-app browser review panel and structured Plan handoff.",
+    "developerName": "Local developer",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "defaultPrompt": "Review this page or module against its PRD, prototype, project rules, and existing delivery Plan."
+  }
+}
