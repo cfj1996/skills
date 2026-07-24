@@ -8,6 +8,14 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
     target?.dispatchEvent(new PointerEvent(type, { bubbles: true, clientX: x, clientY: y, pointerId }));
   const panel = () => document.querySelector("[data-page-delivery-review-host]")?.shadowRoot;
   const state = () => globalThis.__PAGE_DELIVERY_REVIEW__?.getState?.();
+  const canonicalCard = (overrides = {}) => ({
+    ...structuredClone(globalThis.reviewSession.cards[1]),
+    id: "browser-card",
+    conclusion: "待修改",
+    reopened: false,
+    evidenceChanged: false,
+    ...overrides,
+  });
   const consoleEvents = [];
   const consoleMethods = ["debug", "log", "info", "warn", "error"];
   const originalConsole = Object.fromEntries(consoleMethods.map((method) => [method, console[method]]));
@@ -44,11 +52,10 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
     check(getComputedStyle(panel()?.querySelector("[data-review-panel]")).color !== "rgb(0, 255, 0)", "host-page important styles must not pollute panel body color");
     check(panel()?.querySelector("[data-review-context]")?.textContent.includes("交互验收"), "header should render the review domain");
     check(panel()?.querySelector("[data-review-context]")?.textContent.includes("1/3"), "header should render the card sequence");
-    check(panel()?.querySelector("[data-review-context]")?.textContent.includes("4") && panel()?.querySelector("[data-review-context]")?.textContent.includes("2"), "header should render session and objective counts when provided");
-    for (const field of ["reviewDomain", "reviewTarget", "design", "evidence", "relatedApis", "mockScenarios", "acceptanceCriteria"]) {
+    check(panel()?.querySelector("[data-review-context]")?.textContent.includes("会话 3") && panel()?.querySelector("[data-review-context]")?.textContent.includes("目标 3"), "header should derive canonical session and objective counts from active cards");
+    for (const field of ["dimension", "links", "sourceEvidence", "reviewGoal", "design", "regionAndComponents", "interactionStates", "relatedApis", "mockScenarios", "acceptanceCriteria"]) {
       check(Boolean(panel()?.querySelector(`[data-card-field="${field}"]`)), `card should render ${field} when present`);
     }
-    check(Boolean(panel()?.querySelector("[data-card-related-refs]")), "card should render related refs when present");
     check([...panel()?.querySelectorAll('[data-field="conclusion"] option') || []].map((option) => option.value).join(",") === "未评审,已确认,待修改,阻塞,不适用", "input conclusions should use the fixed allowed set");
 
     const storageKey = `page-delivery-review:v1:${globalThis.reviewSession.deliveryUnitKey}`;
@@ -149,7 +156,7 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
         { id: "other", conclusion: "已确认", summary: "全部接受", planChangeSummary: "无需调整 Plan" },
         { id: "conflict", conclusion: "冲突" },
         { id: "pending", conclusion: "待修改" },
-        { id: "blocking", conclusion: "阻塞", reviewDomain: "结果域", nested: { artifactPath: "/private/result" } },
+        { id: "blocking", conclusion: "阻塞", dimension: "结果域", nested: { artifactPath: "/private/result" } },
       ],
     });
     check(state()?.mode === "result", "matching result should enter result mode");
@@ -165,18 +172,17 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
     check(panel()?.querySelector("[data-review-result]")?.getAttribute("data-result-id") === "other", "result navigation should reach the final ordered result");
     check(Boolean(panel()?.querySelector("[data-result-summary]")) && Boolean(panel()?.querySelector("[data-result-plan-change-summary]")), "last result should render available summary and plan change summary");
     check(Boolean(panel()?.querySelector('[data-action="confirm-plan"]')), "last result card should offer plan confirmation");
+    globalThis.__PAGE_DELIVERY_REVIEW__.confirmPlan({
+      planFingerprint: submission.planFingerprint,
+      artifactRuleFingerprint: submission.artifactRuleFingerprint,
+    });
+    check(state()?.mode === "result" && state()?.lastError?.code === "confirmation-request-required", "public confirmation must fail before a trusted UI request");
+    const eventsBeforeSyntheticConfirm = submittedEvents().length;
     click(panel()?.querySelector('[data-action="confirm-plan"]'));
-    check(submittedEvents().some((event) => event.args[0] === "PAGE_DELIVERY_PLAN_CONFIRM_REQUESTED"), "confirm should emit a plan confirmation event");
-    const confirmEvent = submittedEvents().find((event) => event.args[0] === "PAGE_DELIVERY_PLAN_CONFIRM_REQUESTED");
-    check(Object.keys(confirmEvent?.args?.[1] || {}).sort().join(",") === "artifactRuleFingerprint,planFingerprint,sessionId,submissionVersion", "confirm event should contain only session, version, and expected fingerprint metadata");
-    check(state()?.mode === "result", "clicking confirm should wait for Codex to re-read the current Plan and AGENTS rules");
-    globalThis.__PAGE_DELIVERY_REVIEW__.confirmPlan({ planFingerprint: submission.planFingerprint });
-    check(state()?.mode === "result" && state()?.lastError?.code === "missing-artifact-rule-fingerprint", "confirmation should reject a missing artifact-rule fingerprint");
-    globalThis.__PAGE_DELIVERY_REVIEW__.confirmPlan({ planFingerprint: "sha256:changed", artifactRuleFingerprint: submission.artifactRuleFingerprint });
-    check(state()?.mode === "result" && state()?.lastError?.code === "plan-conflict", "confirmation should reject a changed Plan fingerprint");
+    check(submittedEvents().length === eventsBeforeSyntheticConfirm, "page-world element.click must not emit a Plan confirmation request");
     globalThis.__PAGE_DELIVERY_REVIEW__.confirmPlan({ planFingerprint: submission.planFingerprint, artifactRuleFingerprint: submission.artifactRuleFingerprint });
-    check(state()?.mode === "confirmed", "explicitly matching re-read fingerprints should confirm the panel state");
-    check(consoleEvents.length === 2 && consoleEvents.every(({ method, args }) => method === "debug" && ["PAGE_DELIVERY_REVIEW_SUBMITTED", "PAGE_DELIVERY_PLAN_CONFIRM_REQUESTED"].includes(args[0]) && !JSON.stringify(args).includes("/private")), "console should emit only the two lightweight events without full submission data");
+    check(state()?.mode === "result" && state()?.lastError?.code === "confirmation-request-required", "synthetic clicks must not create a consumable confirmation request");
+    check(consoleEvents.length === 1 && consoleEvents[0]?.method === "debug" && consoleEvents[0]?.args?.[0] === "PAGE_DELIVERY_REVIEW_SUBMITTED" && !JSON.stringify(consoleEvents).includes("/private"), "console should emit only the lightweight submit event without full submission data");
 
     window.dispatchEvent(new Event("resize"));
     const panelRect = document.querySelector("[data-page-delivery-review-host]").getBoundingClientRect();
@@ -192,13 +198,13 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
     check(!document.querySelector("[data-page-delivery-review-host]"), "destroy should remove the host");
     check(!document.querySelector("[data-review-evidence-overlay]"), "destroy should remove evidence overlays");
     check(!globalThis.__PAGE_DELIVERY_REVIEW__, "destroy should remove the temporary global API");
-    check(localStorage.getItem(storageKey) === destroyedStorage && destroyedState?.mode === "confirmed", "destroy should remove listeners so pointer and resize events cannot mutate state or storage");
+    check(localStorage.getItem(storageKey) === destroyedStorage && destroyedState?.mode === "result", "destroy should remove listeners so pointer and resize events cannot mutate state or storage");
     check(trackedListeners.length > 0 && trackedListeners.every((entry) => entry.removed), "destroy should pair every runtime pointermove/pointerup/resize listener with the same removeEventListener identity");
 
     localStorage.removeItem(storageKey);
     const allResolvedSession = {
       ...globalThis.reviewSession,
-      cards: [{ id: "resolved", conclusion: "已确认", reopened: false, evidenceChanged: false }],
+      cards: [canonicalCard({ id: "resolved", conclusion: "已确认" })],
     };
     globalThis.PageDeliveryReviewPanel.mountReviewPanel(allResolvedSession);
     check(Boolean(panel()?.querySelector("[data-review-empty]")), "an empty active round should render an explicit empty state");
@@ -224,7 +230,7 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
         artifactPath: "/private/rule",
         unknown: "drop-me",
       },
-      cards: [{ id: "tainted-resolution-card", conclusion: "待修改" }],
+      cards: [canonicalCard({ id: "tainted-resolution-card" })],
     };
     const taintedStorageKey = `page-delivery-review:v1:${taintedResolutionSession.deliveryUnitKey}`;
     const canonicalTemporaryResolution = {
@@ -279,7 +285,7 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
         status: "unresolved-candidate",
         source: "candidate",
       },
-      cards: [{ id: "unresolved-rule-card", conclusion: "阻塞" }],
+      cards: [canonicalCard({ id: "unresolved-rule-card", conclusion: "阻塞" })],
     };
     let unresolvedError = null;
     try {
@@ -344,7 +350,7 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
       planFingerprint: unresolvedSubmission.planFingerprint,
       artifactRuleFingerprint: unresolvedSubmission.artifactRuleFingerprint,
     });
-    check(state()?.mode === "result" && state()?.lastError?.code === "artifact-rule-unresolved", "the public API must reject unresolved artifact rules");
+    check(state()?.mode === "result" && state()?.lastError?.code === "confirmation-request-required", "the public API must reject confirmation without a trusted request");
     globalThis.__PAGE_DELIVERY_REVIEW__.destroy();
 
     const frame = document.createElement("iframe");
@@ -358,7 +364,10 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
       ...globalThis.reviewSession,
       deliveryUnitKey: "sample/frame-evidence",
       reviewRound: 1,
-      cards: [{ id: "frame-evidence", conclusion: "待修改", evidence: { frameSelector: "[data-review-evidence-frame]", selector: "#frame-target" } }],
+      cards: [canonicalCard({
+        id: "frame-evidence",
+        sourceEvidence: [{ id: "frame-evidence-source", kind: "prototype", label: "frame target", frameSelector: "[data-review-evidence-frame]", selector: "#frame-target" }],
+      })],
     };
     globalThis.PageDeliveryReviewPanel.mountReviewPanel(frameEvidenceSession);
     const frameRect = frame.getBoundingClientRect();
@@ -373,7 +382,10 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
     const unavailableEvidenceSession = {
       ...globalThis.reviewSession,
       reviewRound: 1,
-      cards: [{ id: "bad-evidence", conclusion: "待修改", evidence: { selector: "[" } }],
+      cards: [canonicalCard({
+        id: "bad-evidence",
+        sourceEvidence: [{ id: "bad-evidence-source", kind: "prototype", label: "bad selector", selector: "[" }],
+      })],
     };
     globalThis.PageDeliveryReviewPanel.mountReviewPanel(unavailableEvidenceSession);
     click(panel()?.querySelector('[data-action="highlight-evidence"]'));
@@ -384,7 +396,7 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
     const conflictSession = {
       ...globalThis.reviewSession,
       reviewRound: 1,
-      cards: [{ id: "conflict-card", conclusion: "待修改" }],
+      cards: [canonicalCard({ id: "conflict-card" })],
     };
     globalThis.PageDeliveryReviewPanel.mountReviewPanel(conflictSession);
     click(panel()?.querySelector('[data-action="submit"]'));

@@ -27,6 +27,19 @@ Plan 和 Draft OpenAPI 位置只能来自适用项目 `AGENTS.md` 或其委托�
 
 每张临时评审卡均包含：临时卡片编号、评审域、关联的 Plan 功能点/API/UI 状态/页面依赖/任务/证据编号、来源证据、评审目标、设计方案、页面区域、布局和组件、交互状态、关联 API、Mock 场景、验收标准、用户结论和用户备注。卡片是会话临时数据，不是独立长期记录。
 
+运行时只接受批准的 canonical `ReviewSession`。会话字段为
+`schemaVersion`、`sessionId`、`deliveryUnitKey`、`deliveryUnitKind`、
+`artifactRuleFingerprint`、`artifactRuleResolution`、`reviewRound`、
+`planFingerprint`、`submissionVersion`、`mode`、`currentCardIndex`、
+`viewScope` 和 `cards`。卡片字段为 `id`、`dimension`、`links`、
+`sourceEvidence`、`reviewGoal`、`design`、`regionAndComponents`、
+`interactionStates`、`relatedApis`、`mockScenarios`、
+`acceptanceCriteria`、`conclusion`、`userNote`、`reviewResult`、
+`reopened`、`evidenceChanged`；普通业务扩展 `telepath` 可选。
+`links` 只包含 features/apis/uiStates/dependencies/tasks/evidence 六组编号，
+`sourceEvidence` 只包含有类型的 id/kind/label/selector/frameSelector/path。
+未知会话、卡片、结果字段不得进入 state、草稿或 submission。
+
 固定评审维度：
 
 1. 页面定义
@@ -47,4 +60,10 @@ Plan 和 Draft OpenAPI 位置只能来自适用项目 `AGENTS.md` 或其委托�
 
 首次全量生成全部评审维度；后续复评默认仅处理未评审、待修改、阻塞、重开项和证据变化项，已确认或不适用项保留结论。统一提交评审后，冻结本轮输入、核对证据并展示冲突、拟处理方式和 Plan 变更摘要；用户逐卡核对后，仍须单独点击确认更新 Plan 才能一次性回写同一 Plan。
 
-这是两阶段确认：产物位置规则确认与确认更新 Plan 相互独立。写入前重新读取 Plan 并比对 Plan 内容指纹和产物位置规则指纹；任一变化或冲突均停止覆盖、展示冲突并等待用户决定。
+这是两阶段确认：产物位置规则确认与确认更新 Plan 相互独立。确认更新 Plan
+必须先由用户在最终结果卡上进行浏览器可信点击，生成绑定 session、submission
+版本和双指纹的一次性内部请求；脚本触发的 click/dispatchEvent、缺失请求、
+过期请求、跨 session/version/fingerprint 请求和重复消费都必须拒绝。
+pending 请求不得通过 state 或 submission 暴露，并在新结果、重新挂载、销毁
+或身份变化后失效。写入前重新读取 Plan 并比对 Plan 内容指纹和产物位置规则
+指纹；任一变化或冲突均停止覆盖、展示冲突并等待用户决定。

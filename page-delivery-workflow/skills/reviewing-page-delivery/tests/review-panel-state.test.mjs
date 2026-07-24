@@ -7,6 +7,7 @@ const require = createRequire(import.meta.url);
 const {
   buildStorageKey,
   clampPanelPosition,
+  createPlanConfirmationGate,
   createReviewState,
   DRAFT_TTL_MS,
   assertArtifactLocationRule,
@@ -19,7 +20,6 @@ const {
   restoreDraft,
   sanitizeDraft,
   saveDraft,
-  sanitizePanelItem,
   selectRoundCards,
 } = require("../scripts/inject-review-panel.js");
 
@@ -30,6 +30,155 @@ const matchedFingerprints = {
   planFingerprint: session.planFingerprint,
   artifactRuleFingerprint: session.artifactRuleFingerprint,
 };
+
+const approvedCard = (overrides = {}) => ({
+  id: "REV-CANONICAL",
+  dimension: "页面定义",
+  links: {
+    features: ["F-001"],
+    apis: [],
+    uiStates: ["UI-001"],
+    dependencies: [],
+    tasks: ["T-001"],
+    evidence: ["E-001"],
+  },
+  sourceEvidence: [{
+    id: "E-001",
+    kind: "prototype",
+    label: "登录表单",
+    selector: "#login-form",
+    path: "/evidence/login.png",
+  }],
+  reviewGoal: "确认页面职责",
+  design: "提供身份验证入口",
+  regionAndComponents: "主内容区中的登录表单",
+  interactionStates: ["初始", "提交中", "失败", "成功"],
+  relatedApis: [],
+  mockScenarios: [],
+  acceptanceCriteria: ["输入有效凭据后触发提交"],
+  conclusion: "未评审",
+  userNote: "",
+  reviewResult: null,
+  reopened: false,
+  evidenceChanged: false,
+  telepath: "ordinary-business-field",
+  ...overrides,
+});
+
+const approvedSession = (overrides = {}) => ({
+  schemaVersion: 1,
+  sessionId: "session-canonical",
+  deliveryUnitKey: "sample/login",
+  deliveryUnitKind: "page",
+  artifactRuleFingerprint: "sha256:rule-canonical",
+  artifactRuleResolution: { status: "resolved", source: "agents" },
+  reviewRound: 1,
+  planFingerprint: "sha256:plan-canonical",
+  submissionVersion: 0,
+  mode: "input",
+  currentCardIndex: 0,
+  viewScope: "round",
+  cards: [approvedCard()],
+  ...overrides,
+});
+
+test("approved ReviewSession schema drives canonical state without path-bearing unknown fields", () => {
+  const state = createReviewState(approvedSession({
+    planPath: "/private/plan.md",
+    draftPath: "/private/draft.json",
+    absolutePath: "/private/root",
+    nested: { secret: "/private/nested" },
+    cards: [approvedCard({
+      planPath: "/private/card-plan.md",
+      draftPath: "/private/card-draft.json",
+      absolutePath: "/private/card-root",
+      nested: { planPath: "/private/renamed" },
+      arrayPayload: [{ draftPath: "/private/in-array" }],
+    })],
+  }));
+
+  assert.deepEqual(Object.keys(state.cards[0]).sort(), [
+    "acceptanceCriteria", "conclusion", "design", "dimension", "evidenceChanged",
+    "id", "interactionStates", "links", "mockScenarios", "regionAndComponents",
+    "relatedApis", "reopened", "reviewGoal", "reviewResult", "sourceEvidence",
+    "telepath", "userNote",
+  ]);
+  assert.equal(state.cards[0].sourceEvidence[0].path, "/evidence/login.png");
+  assert.equal(state.cards[0].telepath, "ordinary-business-field");
+  assert.doesNotMatch(JSON.stringify(state), /private/);
+  const submitted = reduceReviewState(state, { type: "SUBMIT" });
+  assert.doesNotMatch(JSON.stringify(submitted.lastSubmission), /private/);
+});
+
+test("approved ReviewSession rejects invalid top-level contracts and duplicate cards", () => {
+  for (const [patch, code] of [
+    [{ schemaVersion: 2 }, "invalid-review-schema-version"],
+    [{ deliveryUnitKey: "/absolute/login" }, "invalid-delivery-unit-key"],
+    [{ deliveryUnitKind: "project" }, "invalid-delivery-unit-kind"],
+    [{ planFingerprint: "" }, "invalid-review-fingerprint"],
+    [{ artifactRuleFingerprint: "" }, "invalid-review-fingerprint"],
+    [{ reviewRound: 0 }, "invalid-review-round"],
+    [{ cards: [approvedCard(), approvedCard()] }, "duplicate-review-card-id"],
+    [{ cards: [approvedCard({ conclusion: "冲突" })] }, "invalid-review-card"],
+  ]) {
+    assert.throws(
+      () => createReviewState(approvedSession(patch)),
+      (error) => error?.code === code,
+    );
+  }
+});
+
+test("Plan confirmation gate requires one trusted, current, single-use request", () => {
+  assert.equal(typeof createPlanConfirmationGate, "function");
+  const resultState = {
+    ...createReviewState(approvedSession()),
+    mode: "result",
+    submissionVersion: 1,
+    results: [{ id: "RESULT-1", conclusion: "已确认" }],
+    currentResultIndex: 0,
+  };
+  const fingerprints = {
+    planFingerprint: resultState.planFingerprint,
+    artifactRuleFingerprint: resultState.artifactRuleFingerprint,
+  };
+  const gate = createPlanConfirmationGate();
+
+  assert.equal(gate.consume(resultState, fingerprints)?.code, "confirmation-request-required");
+  assert.equal(gate.request(resultState, { isTrusted: false })?.code, "untrusted-confirmation-request");
+  assert.equal(gate.consume(resultState, fingerprints)?.code, "confirmation-request-required");
+  assert.equal(gate.request(resultState, { isTrusted: true }), null);
+  assert.equal(gate.consume({ ...resultState, sessionId: "other" }, fingerprints)?.code, "stale-confirmation-request");
+  assert.equal(gate.consume(resultState, fingerprints)?.code, "confirmation-request-required");
+
+  assert.equal(gate.request(resultState, { isTrusted: true }), null);
+  assert.equal(gate.consume({ ...resultState, submissionVersion: 2 }, fingerprints)?.code, "stale-confirmation-request");
+  assert.equal(gate.consume(resultState, fingerprints)?.code, "confirmation-request-required");
+
+  assert.equal(gate.request(resultState, { isTrusted: true }), null);
+  assert.equal(gate.consume(resultState, { ...fingerprints, planFingerprint: "sha256:changed" })?.code, "plan-conflict");
+  assert.equal(gate.consume(resultState, fingerprints)?.code, "confirmation-request-required");
+
+  assert.equal(gate.request(resultState, { isTrusted: true }), null);
+  assert.equal(gate.consume(resultState, { ...fingerprints, artifactRuleFingerprint: "sha256:changed" })?.code, "artifact-rule-conflict");
+  assert.equal(gate.consume(resultState, fingerprints)?.code, "confirmation-request-required");
+
+  assert.equal(gate.request(resultState, { isTrusted: true }), null);
+  assert.equal(gate.consume(resultState, fingerprints), null);
+  const confirmed = reduceReviewState(resultState, { type: "CONFIRM_PLAN", ...fingerprints });
+  assert.equal(confirmed.mode, "confirmed");
+  assert.equal(gate.consume(resultState, fingerprints)?.code, "confirmation-request-required");
+
+  assert.equal(gate.request(resultState, { isTrusted: true }), null);
+  gate.invalidate();
+  assert.equal(gate.consume(resultState, fingerprints)?.code, "confirmation-request-required");
+
+  assert.equal(gate.request(resultState, { isTrusted: true }), null);
+  gate.destroy();
+  assert.equal(gate.consume(resultState, fingerprints)?.code, "confirmation-request-required");
+
+  const remountedGate = createPlanConfirmationGate();
+  assert.equal(remountedGate.consume(resultState, fingerprints)?.code, "confirmation-request-required");
+});
 
 test("review state preserves an explicitly resolved AGENTS artifact rule", () => {
   assert.deepEqual(createReviewState(session).artifactRuleResolution, {
@@ -391,7 +540,7 @@ test("confirm plan requires the final non-empty result", () => {
 test("active-card submission and empty results stay out of confirmable result mode", () => {
   const emptyRound = createReviewState({
     ...session,
-    cards: [{ id: "resolved", conclusion: "已确认", reopened: false, evidenceChanged: false }],
+    cards: [approvedCard({ id: "resolved", conclusion: "已确认" })],
   });
   const blockedSubmit = reduceReviewState(emptyRound, { type: "SUBMIT" });
   assert.equal(blockedSubmit.mode, "input");
@@ -478,24 +627,6 @@ test("draft restore requires matching fresh metadata and clamps only valid edita
   }
 });
 
-test("sanitizer removes nested artifact locations but preserves evidence paths and telepath", () => {
-  const sanitized = sanitizePanelItem({
-    id: "nested",
-    conclusion: "待修改",
-    artifactPath: "/private/root",
-    evidence: {
-      path: "/evidence/keep.png",
-      locator: "figma://keep",
-      artifactUrl: "https://private.example/evidence",
-    },
-    nested: [{ artifactPath: "/private/nested", telepath: "keep-me" }],
-  });
-  assert.doesNotMatch(JSON.stringify(sanitized), /private/);
-  assert.equal(sanitized.evidence.path, "/evidence/keep.png");
-  assert.equal(sanitized.evidence.locator, "figma://keep");
-  assert.equal(sanitized.nested[0].telepath, "keep-me");
-});
-
 test("reducer preserves fingerprints and excludes actual artifact paths", () => {
   let state = createReviewState(session);
   assert.equal(state.planFingerprint, "sha256:fixture");
@@ -509,11 +640,13 @@ test("reducer preserves fingerprints and excludes actual artifact paths", () => 
   assert.doesNotMatch(JSON.stringify(state), /private\/artifacts/);
   assert.doesNotMatch(JSON.stringify(state), /artifacts\.example/);
   assert.equal(state.cards[0].telepath, "reviewer-visible evidence marker");
-  assert.deepEqual(state.cards[0].evidence, {
-    locator: "figma://file/login-node",
+  assert.deepEqual(state.cards[0].sourceEvidence, [{
+    id: "E-002",
+    kind: "prototype",
+    label: "登录表单",
     path: "/evidence/login.png",
     selector: "#login-form",
-  });
+  }]);
 
   for (const action of [
     { type: "EDIT_CARD", patch: { planFingerprint: "sha256:mutated" } },
@@ -535,11 +668,11 @@ test("reducer preserves fingerprints and excludes actual artifact paths", () => 
   assert.equal(state.artifactRuleFingerprint, "sha256:rule-fixture");
   assert.equal(Object.hasOwn(state.lastSubmission, "artifactPath"), false);
   assert.equal(Object.hasOwn(state.lastSubmission, "artifactUrl"), false);
-  assert.equal(state.lastSubmission.cards[0].evidence.path, "/evidence/login.png");
+  assert.equal(state.lastSubmission.cards[0].sourceEvidence[0].path, "/evidence/login.png");
   assert.deepEqual(state.lastSubmission.artifactRuleResolution, state.artifactRuleResolution);
 });
 
-test("panel items exclude only top-level artifact locations", () => {
+test("canonical cards and results exclude unknown artifact-location fields", () => {
   const sessionWithArtifactItems = {
     ...session,
     cards: session.cards.map((card, index) =>
@@ -557,12 +690,12 @@ test("panel items exclude only top-level artifact locations", () => {
   assert.equal(Object.hasOwn(state.cards[0], "artifactPath"), false);
   assert.equal(Object.hasOwn(state.cards[0], "artifactUrl"), false);
   assert.equal(state.cards[0].telepath, "reviewer-visible evidence marker");
-  assert.equal(state.cards[0].evidence.path, "/evidence/login.png");
+  assert.equal(state.cards[0].sourceEvidence[0].path, "/evidence/login.png");
 
   state = reduceReviewState(state, { type: "SUBMIT" });
   assert.equal(Object.hasOwn(state.lastSubmission.cards[0], "artifactPath"), false);
   assert.equal(Object.hasOwn(state.lastSubmission.cards[0], "artifactUrl"), false);
-  assert.equal(state.lastSubmission.cards[0].evidence.path, "/evidence/login.png");
+  assert.equal(state.lastSubmission.cards[0].sourceEvidence[0].path, "/evidence/login.png");
 
   state = reduceReviewState(state, {
     type: "APPLY_RESULT",
@@ -584,7 +717,7 @@ test("panel items exclude only top-level artifact locations", () => {
   assert.equal(Object.hasOwn(state.results[0], "artifactPath"), false);
   assert.equal(Object.hasOwn(state.results[0], "artifactUrl"), false);
   assert.equal(state.results[0].telepath, "result-business-field");
-  assert.equal(state.results[0].evidence.path, "/evidence/result-1.png");
+  assert.equal(state.results[0].sourceEvidence[0].path, "/evidence/result-1.png");
 });
 
 test("state transitions are one-way and reject actions outside their mode", () => {
@@ -660,29 +793,29 @@ test("input reducer rejects conclusions outside the fixed reviewer set", () => {
   }
 });
 
-test("editing a card does not share nested evidence with the previous state", () => {
+test("editing a card does not share nested source evidence with the previous state", () => {
   const input = createReviewState(session);
   const edited = reduceReviewState(input, {
     type: "EDIT_CARD",
     patch: { userNote: "仅更新可编辑字段" },
   });
 
-  assert.notEqual(edited.cards[0].evidence, input.cards[0].evidence);
-  edited.cards[0].evidence.locator = "figma://file/edited-node";
-  assert.equal(input.cards[0].evidence.locator, "figma://file/login-node");
+  assert.notEqual(edited.cards[0].sourceEvidence, input.cards[0].sourceEvidence);
+  edited.cards[0].sourceEvidence[0].label = "已修改";
+  assert.equal(input.cards[0].sourceEvidence[0].label, "登录表单");
 });
 
 test("invalid sessions and reducer inputs are safe", () => {
   for (const invalidSession of [null, {}, { cards: {} }]) {
     assert.throws(
       () => createReviewState(invalidSession),
-      (error) => error instanceof TypeError && error.code === "invalid-review-session" && /review session/i.test(error.message),
+      (error) => error instanceof TypeError && error.code === "invalid-review-session" && /ReviewSession/i.test(error.message),
     );
   }
   for (const sessionId of [undefined, "", "   "]) {
     assert.throws(
       () => createReviewState({ ...session, sessionId }),
-      (error) => error instanceof TypeError && error.code === "invalid-review-session" && /review session/i.test(error.message),
+      (error) => error instanceof TypeError && error.code === "invalid-review-session" && /ReviewSession/i.test(error.message),
     );
   }
   for (const cards of [
@@ -694,7 +827,7 @@ test("invalid sessions and reducer inputs are safe", () => {
   ]) {
     assert.throws(
       () => createReviewState({ ...session, cards }),
-      (error) => error instanceof TypeError && error.code === "invalid-review-session" && /review session/i.test(error.message),
+      (error) => error instanceof TypeError && error.code === "invalid-review-card" && /review card/i.test(error.message),
     );
   }
 
@@ -900,15 +1033,15 @@ test("unreachable frame evidence is reported without an uncaught exception", () 
 
 test("view scopes retain confirmed cards and mark changed evidence with its previous conclusion", () => {
   const cards = [
-    { id: "confirmed", conclusion: "已确认" },
-    { id: "changed", conclusion: "已确认", evidenceChanged: true },
-    { id: "open", conclusion: "待修改" },
+    approvedCard({ id: "confirmed", conclusion: "已确认" }),
+    approvedCard({ id: "changed", conclusion: "已确认", evidenceChanged: true }),
+    approvedCard({ id: "open", conclusion: "待修改" }),
   ];
   const round = createReviewState({ ...session, cards, reviewRound: 2, viewScope: "round" });
   const all = createReviewState({ ...session, cards, reviewRound: 2, viewScope: "all" });
 
   assert.deepEqual(round.cards.map((card) => card.id), ["changed", "open"]);
-  assert.equal(round.cards[0].previousConclusion, "已确认");
+  assert.equal(round.cards[0].reviewResult.previousConclusion, "已确认");
   assert.deepEqual(all.cards.map((card) => card.id), ["confirmed", "changed", "open"]);
   assert.equal(all.cards[0].conclusion, "已确认");
 });

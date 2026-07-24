@@ -17,7 +17,7 @@ Review a page or independently deliverable module from evidence; do not turn unc
 
 Read Plan and Draft artifact-location rules only from the applicable `AGENTS.md` or its explicit delegation. When rules are absent or conflict, propose a complete candidate. 未经用户确认不得固化。用户确认完整候选后，必须固化至最近适用公共作用域的 `AGENTS.md`，随后重新读取该规则，并验证 Plan 和 Draft 位置能够唯一解析，才能继续启动确认。 The plugin 不得提供默认目录. Location-rule confirmation and Plan update confirmation are 两道独立门禁.
 
-Use [产物规则与评审卡规范](references/page-review-standard.md) for the required candidate fields, evidence priority, eleven dimensions, and review-round gates. The stable candidate structure is: Plan 路径模式、Draft OpenAPI 路径模式、交付单元命名、编号规则、路径变量、既有文件. Do not fill in any field value until the project confirms it.
+Use [产物规则与评审卡规范](references/page-review-standard.md) for the required candidate fields, evidence priority, eleven dimensions, and review-round gates. The stable candidate structure is: Plan 路径模式、Draft OpenAPI 路径模式、交付单元命名、编号规则、路径变量、既有文件. 必须先依据只读证据填充候选值并向用户展示完整候选；确认前不得固化，也不得视为正式规则。
 
 ## 评审
 

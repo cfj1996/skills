@@ -16,7 +16,8 @@
     ["待修改", 1],
     ["冲突", 2],
   ]);
-  const PANEL_ITEM_ARTIFACT_FIELDS = new Set(["artifactPath", "artifactUrl"]);
+  const RESULT_CONCLUSIONS = new Set(["已确认", "待修改", "阻塞", "冲突", "不适用"]);
+  const LINK_FIELDS = ["features", "apis", "uiStates", "dependencies", "tasks", "evidence"];
   const USER_CONCLUSIONS = new Set(["未评审", "已确认", "待修改", "阻塞", "不适用"]);
   const SNAP_THRESHOLD = 48;
   const FALLBACK_PANEL_SIZE = { width: 320, height: 360 };
@@ -39,47 +40,11 @@
   }
 
   function createReviewState(session) {
-    if (
-      !session ||
-      typeof session !== "object" ||
-      !isNonEmptyString(session.sessionId) ||
-      !Array.isArray(session.cards)
-    ) {
-      throw createCodedError(TypeError, "invalid-review-session", "Review session must include a cards array");
-    }
-    const artifactRuleResolution = canonicalizeArtifactRuleResolution(session.artifactRuleResolution);
-    if (!artifactRuleResolution) {
-      throw createCodedError(
-        TypeError,
-        "invalid-artifact-rule-resolution",
-        "Artifact rule resolution must be resolved from AGENTS, unresolved, or temporarily confirmed",
-      );
-    }
-    if (!isReviewableArtifactRuleResolution(artifactRuleResolution, session.artifactRuleFingerprint)) {
-      throw createCodedError(
-        TypeError,
-        "artifact-rule-confirmation-required",
-        "Artifact rule candidate must be explicitly confirmed for the current fingerprint before review",
-      );
-    }
-    if (!session.cards.every(isCard)) {
-      throw createCodedError(TypeError, "invalid-review-session", "Review session must include valid cards");
-    }
-
-    const cards = selectReviewCards(session.cards, session.reviewRound, session.viewScope).map(sanitizePanelItem);
+    const normalized = normalizeReviewSession(session);
+    const cards = selectReviewCards(normalized.cards, normalized.reviewRound, normalized.viewScope);
 
     return {
-      schemaVersion: session.schemaVersion,
-      sessionId: session.sessionId,
-      deliveryUnitKey: session.deliveryUnitKey,
-      deliveryUnitKind: session.deliveryUnitKind,
-      artifactRuleFingerprint: session.artifactRuleFingerprint,
-      artifactRuleResolution,
-      reviewRound: session.reviewRound,
-      viewScope: session.viewScope === "all" ? "all" : "round",
-      sessionCount: session.sessionCount,
-      objectiveCount: session.objectiveCount,
-      planFingerprint: session.planFingerprint,
+      ...normalized,
       cards,
       currentCardIndex: 0,
       currentResultIndex: 0,
@@ -88,6 +53,116 @@
       lastSubmission: null,
       results: [],
       lastError: null,
+    };
+  }
+
+  function normalizeReviewSession(session) {
+    if (!isNormalizedObject(session) || !Array.isArray(session.cards) || !isNonEmptyString(session.sessionId)) {
+      throw createCodedError(TypeError, "invalid-review-session", "ReviewSession must include a sessionId and cards array");
+    }
+    if (session.schemaVersion !== 1) {
+      throw createCodedError(TypeError, "invalid-review-schema-version", "ReviewSession schemaVersion must be 1");
+    }
+    if (!isDeliveryUnitKey(session.deliveryUnitKey)) {
+      throw createCodedError(TypeError, "invalid-delivery-unit-key", "ReviewSession deliveryUnitKey must be a safe relative key");
+    }
+    if (!["page", "module"].includes(session.deliveryUnitKind)) {
+      throw createCodedError(TypeError, "invalid-delivery-unit-kind", "ReviewSession deliveryUnitKind must be page or module");
+    }
+    if (!isFingerprint(session.planFingerprint) || !isFingerprint(session.artifactRuleFingerprint)) {
+      throw createCodedError(TypeError, "invalid-review-fingerprint", "ReviewSession fingerprints must be sha256 values");
+    }
+    if (!Number.isInteger(session.reviewRound) || session.reviewRound < 1) {
+      throw createCodedError(TypeError, "invalid-review-round", "ReviewSession reviewRound must be a positive integer");
+    }
+    if (
+      session.submissionVersion !== 0 ||
+      session.mode !== "input" ||
+      session.currentCardIndex !== 0 ||
+      !["round", "all"].includes(session.viewScope)
+    ) {
+      throw createCodedError(TypeError, "invalid-review-session", "ReviewSession must start in canonical input state");
+    }
+    const artifactRuleResolution = canonicalizeArtifactRuleResolution(session.artifactRuleResolution);
+    if (!artifactRuleResolution) {
+      throw createCodedError(TypeError, "invalid-artifact-rule-resolution", "Artifact rule resolution is invalid");
+    }
+    if (!isReviewableArtifactRuleResolution(artifactRuleResolution, session.artifactRuleFingerprint)) {
+      throw createCodedError(
+        TypeError,
+        "artifact-rule-confirmation-required",
+        "Artifact rule candidate must be explicitly confirmed for the current fingerprint before review",
+      );
+    }
+    const cards = session.cards.map(normalizeReviewCard);
+    const ids = new Set();
+    for (const card of cards) {
+      if (ids.has(card.id)) {
+        throw createCodedError(TypeError, "duplicate-review-card-id", `Duplicate review card id: ${card.id}`);
+      }
+      ids.add(card.id);
+    }
+    return {
+      schemaVersion: 1,
+      sessionId: session.sessionId,
+      deliveryUnitKey: session.deliveryUnitKey,
+      deliveryUnitKind: session.deliveryUnitKind,
+      artifactRuleFingerprint: session.artifactRuleFingerprint,
+      artifactRuleResolution,
+      reviewRound: session.reviewRound,
+      planFingerprint: session.planFingerprint,
+      submissionVersion: 0,
+      mode: "input",
+      currentCardIndex: 0,
+      viewScope: session.viewScope,
+      cards,
+    };
+  }
+
+  function normalizeReviewCard(card) {
+    const valid = (
+      isNormalizedObject(card) &&
+      isNonEmptyString(card.id) &&
+      isNonEmptyString(card.dimension) &&
+      isNormalizedObject(card.links) &&
+      LINK_FIELDS.every((field) => isStringArray(card.links[field])) &&
+      Array.isArray(card.sourceEvidence) &&
+      card.sourceEvidence.every(isSourceEvidence) &&
+      isNonEmptyString(card.reviewGoal) &&
+      isNonEmptyString(card.design) &&
+      isNonEmptyString(card.regionAndComponents) &&
+      isStringArray(card.interactionStates) &&
+      isStringArray(card.relatedApis) &&
+      isStringArray(card.mockScenarios) &&
+      isStringArray(card.acceptanceCriteria) &&
+      USER_CONCLUSIONS.has(card.conclusion) &&
+      typeof card.userNote === "string" &&
+      (card.reviewResult === null || isNormalizedObject(card.reviewResult)) &&
+      typeof card.reopened === "boolean" &&
+      typeof card.evidenceChanged === "boolean" &&
+      (card.telepath === undefined || typeof card.telepath === "string")
+    );
+    if (!valid) {
+      throw createCodedError(TypeError, "invalid-review-card", "Review cards must follow the approved canonical schema");
+    }
+    return {
+      id: card.id,
+      dimension: card.dimension,
+      links: Object.fromEntries(LINK_FIELDS.map((field) => [field, [...card.links[field]]])),
+      sourceEvidence: card.sourceEvidence.map(normalizeSourceEvidence),
+      reviewGoal: card.reviewGoal,
+      design: card.design,
+      regionAndComponents: card.regionAndComponents,
+      interactionStates: [...card.interactionStates],
+      relatedApis: [...card.relatedApis],
+      mockScenarios: [...card.mockScenarios],
+      acceptanceCriteria: [...card.acceptanceCriteria],
+      conclusion: card.conclusion,
+      userNote: card.userNote,
+      reviewResult: card.reviewResult === null ? null : normalizeEmbeddedReviewResult(card.reviewResult),
+      reopened: card.reopened,
+      evidenceChanged: card.evidenceChanged,
+      ...(card.telepath !== undefined ? { telepath: card.telepath } : {}),
     };
   }
 
@@ -171,7 +246,13 @@
       : selectRoundCards(cards, reviewRound);
     return selected.map((card) => (
       card.evidenceChanged === true && RESOLVED_CONCLUSIONS.has(card.conclusion)
-        ? { ...deepClone(card), previousConclusion: card.previousConclusion || card.conclusion }
+        ? {
+            ...deepClone(card),
+            reviewResult: {
+              ...(card.reviewResult || {}),
+              previousConclusion: card.reviewResult?.previousConclusion || card.conclusion,
+            },
+          }
         : card
     ));
   }
@@ -208,6 +289,7 @@
     let panelPosition = initialPanelPosition(host, safeUiDraft?.panelPosition);
     let drag = null;
     let evidenceStatus = null;
+    const confirmationGate = createPlanConfirmationGate();
 
     setHostPosition(host, panelPosition);
 
@@ -258,7 +340,13 @@
     const showEvidence = () => {
       removeOverlay();
       const card = state.cards[state.currentCardIndex];
-      evidenceStatus = highlightEvidence(document, card?.evidence || { selector: options.evidenceSelector }, addListener, removeOverlay);
+      evidenceStatus = highlightEvidence(
+        document,
+        card?.sourceEvidence?.find((item) => isNonEmptyString(item.selector)) ||
+          { selector: options.evidenceSelector },
+        addListener,
+        removeOverlay,
+      );
       if (evidenceStatus) render();
     };
     const dispatch = (action) => {
@@ -269,12 +357,27 @@
       render();
       return state;
     };
-    const applyResultFromPage = (result) => dispatch({ type: "APPLY_RESULT", ...result });
-    const confirmPlan = (fingerprints) => dispatch({ type: "CONFIRM_PLAN", ...fingerprints });
-    const requestPlanConfirmation = () => {
-      if (state.mode !== "result" || state.results.length === 0 || state.currentResultIndex !== state.results.length - 1) return;
-      const nextState = dispatch({ type: "REQUEST_PLAN_CONFIRMATION" });
-      if (nextState.lastError) return;
+    const setRuntimeError = (error) => {
+      state = { ...state, lastError: error };
+      persistDraft();
+      render();
+      return state;
+    };
+    const applyResultFromPage = (result) => {
+      confirmationGate.invalidate();
+      return dispatch({ type: "APPLY_RESULT", ...result });
+    };
+    const confirmPlan = (fingerprints) => {
+      const confirmationError = confirmationGate.consume(state, fingerprints || {});
+      if (confirmationError) return setRuntimeError(confirmationError);
+      return dispatch({ type: "CONFIRM_PLAN", ...fingerprints });
+    };
+    const requestPlanConfirmation = (event) => {
+      const requestError = confirmationGate.request(state, event);
+      if (requestError) {
+        if (requestError.code !== "untrusted-confirmation-request") setRuntimeError(requestError);
+        return;
+      }
       console.debug("PAGE_DELIVERY_PLAN_CONFIRM_REQUESTED", {
         sessionId: state.sessionId,
         submissionVersion: state.submissionVersion,
@@ -288,6 +391,7 @@
       removeRenderListeners();
       cleanups.cleanup();
       removeOverlay();
+      confirmationGate.destroy();
       if (removeHost) host.remove();
       if (globalThis.__PAGE_DELIVERY_REVIEW__ === pageApi) {
         delete globalThis.__PAGE_DELIVERY_REVIEW__;
@@ -610,9 +714,9 @@
     const currentResult = isResultMode ? state.results[state.currentResultIndex] : null;
     const disabled = state.mode !== "input" ? " disabled" : "";
     const escape = escapeHtml;
-    const reviewDomain = (isResultMode ? currentResult?.reviewDomain : currentCard?.reviewDomain) || "未分类";
-    const sessionCount = Number.isFinite(state.sessionCount) ? state.sessionCount : state.cards.length;
-    const objectiveCount = Number.isFinite(state.objectiveCount) ? state.objectiveCount : state.cards.length;
+    const reviewDomain = (isResultMode ? currentResult?.dimension : currentCard?.dimension) || "未分类";
+    const sessionCount = state.cards.length;
+    const objectiveCount = state.cards.length;
     const contextIndex = isResultMode ? state.currentResultIndex + 1 : state.currentCardIndex + 1;
     const contextLength = isResultMode ? state.results.length : state.cards.length;
     const displayIndex = contextLength === 0 ? 0 : contextIndex;
@@ -654,10 +758,13 @@
 
   function cardFieldsMarkup(card) {
     const fields = [
-      ["reviewDomain", "评审域"],
-      ["reviewTarget", "评审目标"],
+      ["dimension", "评审域"],
+      ["links", "关联"],
+      ["sourceEvidence", "来源证据"],
+      ["reviewGoal", "评审目标"],
       ["design", "设计"],
-      ["evidence", "证据"],
+      ["regionAndComponents", "页面区域、布局和组件"],
+      ["interactionStates", "交互状态"],
       ["relatedApis", "关联接口"],
       ["mockScenarios", "模拟场景"],
       ["acceptanceCriteria", "验收标准"],
@@ -666,10 +773,7 @@
       .filter(([field]) => card[field] !== undefined && card[field] !== null)
       .map(([field, label]) => `<p data-card-field="${field}"><strong>${label}</strong> ${escapeHtml(formatFieldValue(card[field]))}</p>`)
       .join("");
-    const relatedRefs = Array.isArray(card.relatedRefs) && card.relatedRefs.length
-      ? `<p data-card-related-refs><strong>关联引用</strong> ${escapeHtml(formatFieldValue(card.relatedRefs))}</p>`
-      : "";
-    return `${markup}${relatedRefs}`;
+    return markup;
   }
 
   function formatFieldValue(value) {
@@ -740,7 +844,7 @@
       planFingerprint: state.planFingerprint,
       artifactRuleFingerprint: state.artifactRuleFingerprint,
       artifactRuleResolution: deepClone(state.artifactRuleResolution),
-      cards: state.cards.map(sanitizePanelItem),
+      cards: state.cards.map(deepClone),
     });
 
     return {
@@ -771,14 +875,17 @@
     if (action.results.length === 0) {
       return { ...state, lastError: reviewError("empty-results", "空评审结果不能确认更新 Plan。") };
     }
-    if (!action.results.every(isResult)) {
+    let results;
+    try {
+      results = action.results.map(normalizeReviewResult);
+    } catch {
       return { ...state, lastError: reviewError("invalid-results", "评审结果格式无效。") };
     }
 
     return {
       ...state,
       mode: "result",
-      results: prioritizeReviewResults(action.results.map(sanitizePanelItem)),
+      results: prioritizeReviewResults(results),
       currentResultIndex: 0,
       lastError: null,
     };
@@ -793,6 +900,42 @@
 
   function resultPriority(result) {
     return RESULT_PRIORITIES.get(result.conclusion) ?? 3;
+  }
+
+  function normalizeReviewResult(result) {
+    if (
+      !isNormalizedObject(result) ||
+      !isNonEmptyString(result.id) ||
+      !RESULT_CONCLUSIONS.has(result.conclusion)
+    ) {
+      throw createCodedError(TypeError, "invalid-review-result", "Review result is invalid");
+    }
+    const dimension = result.dimension ?? result.reviewDomain ?? "评审结果";
+    if (!isNonEmptyString(dimension)) {
+      throw createCodedError(TypeError, "invalid-review-result", "Review result dimension is invalid");
+    }
+    const sourceEvidence = Array.isArray(result.sourceEvidence)
+      ? result.sourceEvidence
+      : (isNormalizedObject(result.evidence)
+        ? [{
+            id: `${result.id}-EVIDENCE`,
+            kind: "review-result",
+            label: result.id,
+            ...result.evidence,
+          }]
+        : []);
+    if (!sourceEvidence.every(isSourceEvidence)) {
+      throw createCodedError(TypeError, "invalid-review-result", "Review result evidence is invalid");
+    }
+    return {
+      id: result.id,
+      conclusion: result.conclusion,
+      dimension,
+      ...(typeof result.summary === "string" ? { summary: result.summary } : {}),
+      ...(typeof result.planChangeSummary === "string" ? { planChangeSummary: result.planChangeSummary } : {}),
+      sourceEvidence: sourceEvidence.map(normalizeSourceEvidence),
+      ...(typeof result.telepath === "string" ? { telepath: result.telepath } : {}),
+    };
   }
 
   function reviewError(code, message) {
@@ -844,6 +987,62 @@
       : null;
   }
 
+  function createPlanConfirmationGate() {
+    let pending = null;
+    let destroyed = false;
+    const identity = (state) => ({
+      sessionId: state.sessionId,
+      submissionVersion: state.submissionVersion,
+      planFingerprint: state.planFingerprint,
+      artifactRuleFingerprint: state.artifactRuleFingerprint,
+    });
+    const sameIdentity = (left, right) => (
+      left.sessionId === right.sessionId &&
+      left.submissionVersion === right.submissionVersion &&
+      left.planFingerprint === right.planFingerprint &&
+      left.artifactRuleFingerprint === right.artifactRuleFingerprint
+    );
+    return {
+      request(state, event) {
+        if (destroyed || event?.isTrusted !== true) {
+          return reviewError("untrusted-confirmation-request", "确认更新 Plan 必须来自真实用户交互。");
+        }
+        if (
+          state.mode !== "result" ||
+          state.results.length === 0 ||
+          state.currentResultIndex !== state.results.length - 1
+        ) {
+          return reviewError("confirmation-request-unavailable", "当前不是可请求确认的最终评审结果。");
+        }
+        const resolutionError = assertArtifactLocationRule(
+          { ...state.artifactRuleResolution, ruleFingerprint: state.artifactRuleFingerprint },
+          state.artifactRuleFingerprint,
+        );
+        if (resolutionError) return resolutionError;
+        pending = identity(state);
+        return null;
+      },
+      consume(state, fingerprints) {
+        if (destroyed || !pending) {
+          return reviewError("confirmation-request-required", "请先通过面板中的真实用户操作请求确认更新 Plan。");
+        }
+        const request = pending;
+        pending = null;
+        if (!sameIdentity(request, identity(state))) {
+          return reviewError("stale-confirmation-request", "确认请求已过期，请重新发起。");
+        }
+        return assertCurrentFingerprints(state, fingerprints);
+      },
+      invalidate() {
+        pending = null;
+      },
+      destroy() {
+        pending = null;
+        destroyed = true;
+      },
+    };
+  }
+
   function deepClone(value) {
     if (Array.isArray(value)) return value.map(deepClone);
     if (value && typeof value === "object") {
@@ -853,16 +1052,6 @@
       );
     }
     return value;
-  }
-
-  function sanitizePanelItem(item) {
-    if (Array.isArray(item)) return item.map(sanitizePanelItem);
-    if (!item || typeof item !== "object") return item;
-    return Object.fromEntries(
-      Object.entries(item)
-        .filter(([key]) => !PANEL_ITEM_ARTIFACT_FIELDS.has(key))
-        .map(([key, value]) => [key, sanitizePanelItem(value)]),
-    );
   }
 
   function isReviewState(state) {
@@ -917,6 +1106,56 @@
     );
   }
 
+  function isDeliveryUnitKey(value) {
+    return (
+      isNonEmptyString(value) &&
+      !value.startsWith("/") &&
+      !value.includes("\\") &&
+      value.split("/").length >= 2 &&
+      value.split("/").every((part) => part !== "." && part !== ".." && /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(part))
+    );
+  }
+
+  function isFingerprint(value) {
+    return isNonEmptyString(value) && /^sha256:[^\s]+$/.test(value);
+  }
+
+  function isStringArray(value) {
+    return Array.isArray(value) && value.every(isNonEmptyString);
+  }
+
+  function isSourceEvidence(value) {
+    return (
+      isNormalizedObject(value) &&
+      isNonEmptyString(value.id) &&
+      isNonEmptyString(value.kind) &&
+      isNonEmptyString(value.label) &&
+      (value.selector === undefined || typeof value.selector === "string") &&
+      (value.frameSelector === undefined || typeof value.frameSelector === "string") &&
+      (value.path === undefined || typeof value.path === "string")
+    );
+  }
+
+  function normalizeSourceEvidence(value) {
+    return {
+      id: value.id,
+      kind: value.kind,
+      label: value.label,
+      ...(value.selector !== undefined ? { selector: value.selector } : {}),
+      ...(value.frameSelector !== undefined ? { frameSelector: value.frameSelector } : {}),
+      ...(value.path !== undefined ? { path: value.path } : {}),
+    };
+  }
+
+  function normalizeEmbeddedReviewResult(value) {
+    return {
+      ...(RESULT_CONCLUSIONS.has(value.conclusion) ? { conclusion: value.conclusion } : {}),
+      ...(typeof value.summary === "string" ? { summary: value.summary } : {}),
+      ...(typeof value.planChangeSummary === "string" ? { planChangeSummary: value.planChangeSummary } : {}),
+      ...(USER_CONCLUSIONS.has(value.previousConclusion) ? { previousConclusion: value.previousConclusion } : {}),
+    };
+  }
+
   function isNonEmptyString(value) {
     return typeof value === "string" && value.trim().length > 0;
   }
@@ -930,10 +1169,6 @@
   }
 
   function isCard(value) {
-    return hasReviewIdentity(value);
-  }
-
-  function isResult(value) {
     return hasReviewIdentity(value);
   }
 
@@ -959,6 +1194,7 @@
     assertPlanFingerprint,
     clampPanelPosition,
     createCleanupRegistry,
+    createPlanConfirmationGate,
     createReviewState,
     DRAFT_TTL_MS,
     highlightEvidence,
@@ -968,7 +1204,6 @@
     restoreDraft,
     sanitizeDraft,
     saveDraft,
-    sanitizePanelItem,
     selectRoundCards,
     mountReviewPanel,
   };

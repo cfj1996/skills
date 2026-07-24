@@ -218,7 +218,9 @@ test("review references define all dimensions, status groups, and artifact gates
   ]) assert.match(standard, new RegExp(field));
   for (const rule of [
     "证据优先级", "项目规范发现", "首次全量", "后续复评", "两阶段确认", "展示冲突",
-    "一次确认", "AGENTS.md", "不得提供默认目录",
+    "一次确认", "AGENTS.md", "不得提供默认目录", "ReviewSession", "dimension",
+    "sourceEvidence", "reviewGoal", "regionAndComponents", "interactionStates",
+    "浏览器可信点击", "dispatchEvent", "重复消费",
   ]) assert.match(standard, new RegExp(rule));
   for (const status of statuses) assert.match(statusModel, new RegExp(status));
   assert.match(statusModel, /页面完成百分比/);
@@ -245,6 +247,17 @@ test("artifact-location candidates must be confirmed, solidified, reread, and un
     );
     assert.match(document, /未经用户确认不得固化/);
   }
+});
+
+test("a complete artifact candidate is evidence-filled before confirmation but remains unofficial", async () => {
+  const skill = visibleMarkdown(await read("skills/reviewing-page-delivery/SKILL.md"));
+  const locationSection = sectionContaining(skill, "产物位置规则");
+  assert.match(locationSection, /只读证据/);
+  assert.match(locationSection, /填充.*候选值/);
+  assert.match(locationSection, /展示.*完整候选/);
+  assert.match(locationSection, /确认前.*不得固化/);
+  assert.match(locationSection, /确认前.*不得.*正式规则/);
+  assert.doesNotMatch(locationSection, /Do not fill in any field value until the project confirms it/);
 });
 
 test("plan template keeps stable human-readable sections and prohibits unsafe defaults", async () => {
