@@ -107,13 +107,8 @@
         state.results.length > 0 &&
         state.currentResultIndex === state.results.length - 1
       ) {
-        const planError = assertPlanFingerprint(state.planFingerprint, action.planFingerprint ?? state.planFingerprint);
-        if (planError) return { ...state, lastError: planError };
-        const artifactRuleError = assertArtifactLocationRule(
-          { source: "agents", ruleFingerprint: state.artifactRuleFingerprint },
-          action.artifactRuleFingerprint ?? state.artifactRuleFingerprint,
-        );
-        if (artifactRuleError) return { ...state, lastError: artifactRuleError };
+        const fingerprintError = assertCurrentFingerprints(state, action);
+        if (fingerprintError) return { ...state, lastError: fingerprintError };
         return { ...state, mode: "confirmed" };
       }
     }
@@ -236,10 +231,9 @@
       return state;
     };
     const applyResultFromPage = (result) => dispatch({ type: "APPLY_RESULT", ...result });
-    const confirmPlan = () => {
-      const before = state;
-      dispatch({ type: "CONFIRM_PLAN" });
-      if (state === before || state.mode !== "confirmed") return;
+    const confirmPlan = (fingerprints) => dispatch({ type: "CONFIRM_PLAN", ...fingerprints });
+    const requestPlanConfirmation = () => {
+      if (state.mode !== "result" || state.results.length === 0 || state.currentResultIndex !== state.results.length - 1) return;
       console.debug("PAGE_DELIVERY_PLAN_CONFIRM_REQUESTED", {
         sessionId: state.sessionId,
         submissionVersion: state.submissionVersion,
@@ -263,6 +257,7 @@
       getState: runtimeState,
       exportSubmission: () => state.lastSubmission,
       applyResult: applyResultFromPage,
+      confirmPlan,
       destroy,
     };
     const render = () => {
@@ -297,7 +292,7 @@
           });
         }
       });
-      listen('[data-action="confirm-plan"]', "click", confirmPlan);
+      listen('[data-action="confirm-plan"]', "click", requestPlanConfirmation);
       listen('[data-field="conclusion"]', "change", (event) =>
         dispatch({ type: "EDIT_CARD", patch: { conclusion: event.target.value } }),
       );
@@ -399,19 +394,30 @@
     }
   }
 
-  function loadDraft(storageKey, storage) {
+  function loadDraft(storageKey, storage, now = Date.now()) {
     const resolvedStorage = resolveStorage(storage);
     try {
       const raw = resolvedStorage?.getItem(storageKey);
       const draft = typeof raw === "string" ? sanitizeDraft(JSON.parse(raw)) : null;
       if (draft) {
+        if (!isFreshDraft(draft, now)) {
+          memoryDrafts.delete(storageKey);
+          try { resolvedStorage?.removeItem(storageKey); } catch {}
+          return null;
+        }
         memoryDrafts.set(storageKey, deepClone(draft));
         return draft;
       }
     } catch {
       // The in-memory draft is the safe fallback when storage is unavailable.
     }
-    return memoryDrafts.has(storageKey) ? deepClone(memoryDrafts.get(storageKey)) : null;
+    const memoryDraft = memoryDrafts.get(storageKey);
+    if (!memoryDraft) return null;
+    if (!isFreshDraft(memoryDraft, now)) {
+      memoryDrafts.delete(storageKey);
+      return null;
+    }
+    return deepClone(memoryDraft);
   }
 
   function saveDraft(storageKey, draft, storage) {
@@ -451,14 +457,17 @@
   }
 
   function isFreshMatchingDraft(state, draft, now) {
-    if (!draft || !Array.isArray(draft.cards) || !Number.isFinite(draft.savedAt)) return false;
-    if (draft.savedAt > now || now - draft.savedAt > DRAFT_TTL_MS) return false;
+    if (!draft || !Array.isArray(draft.cards) || !isFreshDraft(draft, now)) return false;
     return (
       draft.sessionId === state.sessionId &&
       draft.reviewRound === state.reviewRound &&
       draft.planFingerprint === state.planFingerprint &&
       draft.artifactRuleFingerprint === state.artifactRuleFingerprint
     );
+  }
+
+  function isFreshDraft(draft, now) {
+    return Number.isFinite(draft?.savedAt) && draft.savedAt <= now && now - draft.savedAt <= DRAFT_TTL_MS;
   }
 
   function isFreshSafeUiDraft(state, draft, now) {
@@ -490,10 +499,16 @@
     const unavailable = () => reviewError("evidence-unavailable", "无法定位证据，请检查选择器或跨域 frame 访问权限。");
     if (!isNormalizedObject(evidence) || !isNonEmptyString(evidence.selector)) return unavailable();
     let root = documentObject;
+    let frameOffset = { x: 0, y: 0 };
     try {
       if (isNonEmptyString(evidence.frameSelector)) {
         const frame = documentObject.querySelector(evidence.frameSelector);
         root = frame?.contentDocument;
+        const frameRect = frame?.getBoundingClientRect?.();
+        frameOffset = {
+          x: (frameRect?.left || 0) + (frame?.clientLeft || 0),
+          y: (frameRect?.top || 0) + (frame?.clientTop || 0),
+        };
       }
       const target = root?.querySelector(evidence.selector);
       if (!target) return unavailable();
@@ -504,8 +519,8 @@
       overlay.setAttribute("aria-label", "关闭证据高亮");
       overlay.style.cssText = [
         "position:fixed",
-        `left:${Math.max(0, rect.left)}px`,
-        `top:${Math.max(0, rect.top)}px`,
+        `left:${Math.max(0, frameOffset.x + rect.left)}px`,
+        `top:${Math.max(0, frameOffset.y + rect.top)}px`,
         `width:${Math.max(1, rect.width)}px`,
         `height:${Math.max(1, rect.height)}px`,
         "z-index:2147483646",
@@ -688,13 +703,8 @@
       return { ...state, lastError: reviewError("stale-result", "已忽略过期的评审结果。") };
     }
 
-    const planError = assertPlanFingerprint(state.planFingerprint, action.planFingerprint ?? state.planFingerprint);
-    if (planError) return { ...state, lastError: planError };
-    const artifactRuleError = assertArtifactLocationRule(
-      { source: "agents", ruleFingerprint: state.artifactRuleFingerprint },
-      action.artifactRuleFingerprint ?? state.artifactRuleFingerprint,
-    );
-    if (artifactRuleError) return { ...state, lastError: artifactRuleError };
+    const fingerprintError = assertCurrentFingerprints(state, action);
+    if (fingerprintError) return { ...state, lastError: fingerprintError };
 
     if (!Array.isArray(action.results)) {
       return { ...state, lastError: reviewError("invalid-results", "评审结果格式无效。") };
@@ -740,6 +750,19 @@
     return expected === actual
       ? null
       : reviewError("plan-conflict", "Plan 已变化，请重新解析后再确认更新。");
+  }
+
+  function assertCurrentFingerprints(state, action) {
+    if (!isNonEmptyString(action.planFingerprint)) {
+      return reviewError("missing-plan-fingerprint", "缺少当前 Plan 指纹，无法继续确认。");
+    }
+    if (!isNonEmptyString(action.artifactRuleFingerprint)) {
+      return reviewError("missing-artifact-rule-fingerprint", "缺少当前产物位置规则指纹，无法继续确认。");
+    }
+    return assertPlanFingerprint(state.planFingerprint, action.planFingerprint) || assertArtifactLocationRule(
+      { source: "agents", ruleFingerprint: state.artifactRuleFingerprint },
+      action.artifactRuleFingerprint,
+    );
   }
 
   function assertArtifactLocationRule(rule, currentRuleFingerprint) {

@@ -12,6 +12,7 @@ const {
   assertArtifactLocationRule,
   assertPlanFingerprint,
   loadDraft,
+  highlightEvidence,
   mountReviewPanel,
   prioritizeReviewResults,
   reduceReviewState,
@@ -25,6 +26,10 @@ const {
 const session = JSON.parse(
   readFileSync(new URL("./fixtures/review-session.json", import.meta.url), "utf8"),
 );
+const matchedFingerprints = {
+  planFingerprint: session.planFingerprint,
+  artifactRuleFingerprint: session.artifactRuleFingerprint,
+};
 
 test("later rounds include only unresolved, reopened, or changed cards", () => {
   assert.deepEqual(selectRoundCards(session.cards, 2).map((card) => card.id), [
@@ -111,6 +116,7 @@ test("apply result requires both matching session and submission version", () =>
     type: "APPLY_RESULT",
     sessionId: "session-1",
     submissionVersion: 1,
+    ...matchedFingerprints,
     results: [{ id: "matched-result", conclusion: "已确认" }],
   });
   assert.equal(state.mode, "result");
@@ -122,6 +128,7 @@ test("result cards sort blocking, pending modification, conflict, then other", (
     type: "APPLY_RESULT",
     sessionId: "session-1",
     submissionVersion: 1,
+    ...matchedFingerprints,
     results: [
       { id: "other", conclusion: "已确认" },
       { id: "conflict", conclusion: "冲突" },
@@ -147,6 +154,7 @@ test("confirm plan requires the final non-empty result", () => {
     type: "APPLY_RESULT",
     sessionId: "session-1",
     submissionVersion: 1,
+    ...matchedFingerprints,
     results: [
       { id: "first", conclusion: "阻塞" },
       { id: "last", conclusion: "待修改" },
@@ -155,7 +163,7 @@ test("confirm plan requires the final non-empty result", () => {
   assert.equal(reduceReviewState(result, { type: "CONFIRM_PLAN" }), result);
   result = reduceReviewState(result, { type: "NEXT" });
   assert.equal(result.currentResultIndex, 1);
-  result = reduceReviewState(result, { type: "CONFIRM_PLAN" });
+  result = reduceReviewState(result, { type: "CONFIRM_PLAN", ...matchedFingerprints });
   assert.equal(result.mode, "confirmed");
 });
 
@@ -173,6 +181,7 @@ test("active-card submission and empty results stay out of confirmable result mo
     type: "APPLY_RESULT",
     sessionId: "session-1",
     submissionVersion: 1,
+    ...matchedFingerprints,
     results: [],
   });
   assert.equal(emptyResults.mode, "reviewing");
@@ -295,6 +304,7 @@ test("panel items exclude only top-level artifact locations", () => {
     type: "APPLY_RESULT",
     sessionId: "session-1",
     submissionVersion: 1,
+    ...matchedFingerprints,
     results: [
       {
         id: "result-1",
@@ -331,10 +341,11 @@ test("state transitions are one-way and reject actions outside their mode", () =
     type: "APPLY_RESULT",
     sessionId: "session-1",
     submissionVersion: 1,
+    ...matchedFingerprints,
     results: [{ id: "matched-result", conclusion: "已确认" }],
   });
   assert.equal(result.mode, "result");
-  const confirmed = reduceReviewState(result, { type: "CONFIRM_PLAN" });
+  const confirmed = reduceReviewState(result, { type: "CONFIRM_PLAN", ...matchedFingerprints });
   assert.equal(confirmed.mode, "confirmed");
   assert.equal(reduceReviewState(confirmed, { type: "SUBMIT" }), confirmed);
   assert.equal(reduceReviewState(confirmed, { type: "APPLY_RESULT", results: [] }), confirmed);
@@ -465,6 +476,7 @@ test("apply result reports invalid results only for the active submission", () =
       type: "APPLY_RESULT",
       sessionId: "session-1",
       submissionVersion: 1,
+      ...matchedFingerprints,
       results,
     });
     assert.equal(invalid.mode, "reviewing");
@@ -541,12 +553,85 @@ test("draft helpers fall back to memory when localStorage is unavailable", () =>
     reviewRound: 1,
     planFingerprint: "sha256:memory",
     artifactRuleFingerprint: "sha256:rule",
-    savedAt: 10,
+    savedAt: Date.now(),
     cards: [{ id: "REV-memory", conclusion: "待修改", userNote: "内存草稿" }],
   }, unavailableStorage);
 
   assert.equal(saved.cards[0].userNote, "内存草稿");
   assert.deepEqual(loadDraft(storageKey, unavailableStorage), saved);
+});
+
+test("expired drafts are removed from storage and memory before they can be restored", () => {
+  const storageKey = buildStorageKey("sample/expired-draft");
+  const values = new Map();
+  const storage = {
+    getItem(key) { return values.get(key) || null; },
+    setItem(key, value) { values.set(key, value); },
+    removeItem(key) { values.delete(key); },
+  };
+  saveDraft(storageKey, {
+    deliveryUnitKey: "sample/expired-draft",
+    sessionId: "expired-session",
+    reviewRound: 1,
+    planFingerprint: "sha256:expired",
+    artifactRuleFingerprint: "sha256:rule",
+    savedAt: Date.now() - DRAFT_TTL_MS - 1,
+    cards: [],
+  }, storage);
+
+  assert.equal(loadDraft(storageKey, storage), null);
+  assert.equal(storage.getItem(storageKey), null);
+  assert.equal(loadDraft(storageKey, { getItem() { throw new Error("unavailable"); } }), null);
+});
+
+test("results and confirmation require explicit current fingerprint pairs", () => {
+  const reviewing = reduceReviewState(createReviewState(session), { type: "SUBMIT" });
+  const missingPlan = reduceReviewState(reviewing, {
+    type: "APPLY_RESULT",
+    sessionId: session.sessionId,
+    submissionVersion: 1,
+    results: [{ id: "result", conclusion: "已确认" }],
+  });
+  assert.equal(missingPlan.mode, "reviewing");
+  assert.equal(missingPlan.lastError.code, "missing-plan-fingerprint");
+
+  const missingRule = reduceReviewState(reviewing, {
+    type: "APPLY_RESULT",
+    sessionId: session.sessionId,
+    submissionVersion: 1,
+    planFingerprint: session.planFingerprint,
+    results: [{ id: "result", conclusion: "已确认" }],
+  });
+  assert.equal(missingRule.mode, "reviewing");
+  assert.equal(missingRule.lastError.code, "missing-artifact-rule-fingerprint");
+
+  const result = reduceReviewState(reviewing, {
+    type: "APPLY_RESULT",
+    sessionId: session.sessionId,
+    submissionVersion: 1,
+    ...matchedFingerprints,
+    results: [{ id: "result", conclusion: "已确认" }],
+  });
+  const missingConfirmation = reduceReviewState(result, { type: "CONFIRM_PLAN" });
+  assert.equal(missingConfirmation.mode, "result");
+  assert.equal(missingConfirmation.lastError.code, "missing-plan-fingerprint");
+  assert.equal(reduceReviewState(result, { type: "CONFIRM_PLAN", ...matchedFingerprints }).mode, "confirmed");
+});
+
+test("unreachable frame evidence is reported without an uncaught exception", () => {
+  const frame = {
+    get contentDocument() { throw new Error("cross-origin"); },
+  };
+  const error = highlightEvidence(
+    { querySelector() { return frame; } },
+    { frameSelector: "iframe", selector: "#target" },
+    () => { throw new Error("must not add listener"); },
+    () => {},
+  );
+  assert.deepEqual(error, {
+    code: "evidence-unavailable",
+    message: "无法定位证据，请检查选择器或跨域 frame 访问权限。",
+  });
 });
 
 test("view scopes retain confirmed cards and mark changed evidence with its previous conclusion", () => {

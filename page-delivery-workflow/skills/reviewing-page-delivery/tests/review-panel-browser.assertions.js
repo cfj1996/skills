@@ -142,6 +142,8 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
     globalThis.__PAGE_DELIVERY_REVIEW__.applyResult({
       sessionId: submission.sessionId,
       submissionVersion: submission.submissionVersion,
+      planFingerprint: submission.planFingerprint,
+      artifactRuleFingerprint: submission.artifactRuleFingerprint,
       results: [
         { id: "other", conclusion: "已确认", summary: "全部接受", planChangeSummary: "无需调整 Plan" },
         { id: "conflict", conclusion: "冲突" },
@@ -164,7 +166,15 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
     check(Boolean(panel()?.querySelector('[data-action="confirm-plan"]')), "last result card should offer plan confirmation");
     click(panel()?.querySelector('[data-action="confirm-plan"]'));
     check(submittedEvents().some((event) => event.args[0] === "PAGE_DELIVERY_PLAN_CONFIRM_REQUESTED"), "confirm should emit a plan confirmation event");
-    check(state()?.mode === "confirmed", "confirm should transition only the panel state");
+    const confirmEvent = submittedEvents().find((event) => event.args[0] === "PAGE_DELIVERY_PLAN_CONFIRM_REQUESTED");
+    check(Object.keys(confirmEvent?.args?.[1] || {}).sort().join(",") === "artifactRuleFingerprint,planFingerprint,sessionId,submissionVersion", "confirm event should contain only session, version, and expected fingerprint metadata");
+    check(state()?.mode === "result", "clicking confirm should wait for Codex to re-read the current Plan and AGENTS rules");
+    globalThis.__PAGE_DELIVERY_REVIEW__.confirmPlan({ planFingerprint: submission.planFingerprint });
+    check(state()?.mode === "result" && state()?.lastError?.code === "missing-artifact-rule-fingerprint", "confirmation should reject a missing artifact-rule fingerprint");
+    globalThis.__PAGE_DELIVERY_REVIEW__.confirmPlan({ planFingerprint: "sha256:changed", artifactRuleFingerprint: submission.artifactRuleFingerprint });
+    check(state()?.mode === "result" && state()?.lastError?.code === "plan-conflict", "confirmation should reject a changed Plan fingerprint");
+    globalThis.__PAGE_DELIVERY_REVIEW__.confirmPlan({ planFingerprint: submission.planFingerprint, artifactRuleFingerprint: submission.artifactRuleFingerprint });
+    check(state()?.mode === "confirmed", "explicitly matching re-read fingerprints should confirm the panel state");
     check(consoleEvents.length === 2 && consoleEvents.every(({ method, args }) => method === "debug" && ["PAGE_DELIVERY_REVIEW_SUBMITTED", "PAGE_DELIVERY_PLAN_CONFIRM_REQUESTED"].includes(args[0]) && !JSON.stringify(args).includes("/private")), "console should emit only the two lightweight events without full submission data");
 
     window.dispatchEvent(new Event("resize"));
@@ -222,6 +232,29 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
     check(state()?.cards?.[0]?.conclusion !== "阻塞" && state()?.cards?.[0]?.userNote !== "不能恢复", "a changed plan must not restore prior review conclusions or notes");
     globalThis.__PAGE_DELIVERY_REVIEW__.destroy();
     localStorage.removeItem(storageKey);
+
+    const frame = document.createElement("iframe");
+    frame.setAttribute("data-review-evidence-frame", "");
+    frame.style.cssText = "border:7px solid transparent;height:120px;left:111px;position:fixed;top:73px;width:220px;";
+    frame.srcdoc = '<style>body{margin:0}#frame-target{height:21px;left:19px;position:absolute;top:13px;width:31px}</style><div id="frame-target"></div>';
+    const frameLoaded = new Promise((resolve) => frame.addEventListener("load", resolve, { once: true }));
+    document.body.append(frame);
+    await frameLoaded;
+    const frameEvidenceSession = {
+      ...globalThis.reviewSession,
+      deliveryUnitKey: "sample/frame-evidence",
+      reviewRound: 1,
+      cards: [{ id: "frame-evidence", conclusion: "待修改", evidence: { frameSelector: "[data-review-evidence-frame]", selector: "#frame-target" } }],
+    };
+    globalThis.PageDeliveryReviewPanel.mountReviewPanel(frameEvidenceSession);
+    const frameRect = frame.getBoundingClientRect();
+    const targetRect = frame.contentDocument.querySelector("#frame-target").getBoundingClientRect();
+    click(panel()?.querySelector('[data-action="highlight-evidence"]'));
+    const frameOverlay = document.querySelector("[data-review-evidence-overlay]");
+    check(Math.abs(parseFloat(frameOverlay?.style.left) - (frameRect.left + frame.clientLeft + targetRect.left)) <= 1, "iframe evidence overlay left should use top-level frame coordinates and client border");
+    check(Math.abs(parseFloat(frameOverlay?.style.top) - (frameRect.top + frame.clientTop + targetRect.top)) <= 1, "iframe evidence overlay top should use top-level frame coordinates and client border");
+    globalThis.__PAGE_DELIVERY_REVIEW__.destroy();
+    frame.remove();
 
     const unavailableEvidenceSession = {
       ...globalThis.reviewSession,
