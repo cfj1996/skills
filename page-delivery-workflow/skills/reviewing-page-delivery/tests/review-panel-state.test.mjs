@@ -180,6 +180,53 @@ test("reducer preserves fingerprints and excludes actual artifact paths", () => 
   assert.equal(state.lastSubmission.cards[0].evidence.path, "/evidence/login.png");
 });
 
+test("panel items exclude only top-level artifact locations", () => {
+  const sessionWithArtifactItems = {
+    ...session,
+    cards: session.cards.map((card, index) =>
+      index === 1
+        ? {
+            ...card,
+            artifactPath: "/private/cards/REV-002.html",
+            artifactUrl: "https://artifacts.example.test/cards/REV-002.html",
+          }
+        : card,
+    ),
+  };
+  let state = createReviewState(sessionWithArtifactItems);
+
+  assert.equal(Object.hasOwn(state.cards[0], "artifactPath"), false);
+  assert.equal(Object.hasOwn(state.cards[0], "artifactUrl"), false);
+  assert.equal(state.cards[0].telepath, "reviewer-visible evidence marker");
+  assert.equal(state.cards[0].evidence.path, "/evidence/login.png");
+
+  state = reduceReviewState(state, { type: "SUBMIT" });
+  assert.equal(Object.hasOwn(state.lastSubmission.cards[0], "artifactPath"), false);
+  assert.equal(Object.hasOwn(state.lastSubmission.cards[0], "artifactUrl"), false);
+  assert.equal(state.lastSubmission.cards[0].evidence.path, "/evidence/login.png");
+
+  state = reduceReviewState(state, {
+    type: "APPLY_RESULT",
+    sessionId: "session-1",
+    submissionVersion: 1,
+    results: [
+      {
+        id: "result-1",
+        conclusion: "待修改",
+        artifactPath: "/private/results/result-1.html",
+        artifactUrl: "https://artifacts.example.test/results/result-1.html",
+        telepath: "result-business-field",
+        evidence: { path: "/evidence/result-1.png" },
+      },
+    ],
+  });
+
+  assert.equal(Object.hasOwn(state.results[0], "artifactPath"), false);
+  assert.equal(Object.hasOwn(state.results[0], "artifactUrl"), false);
+  assert.equal(state.results[0].telepath, "result-business-field");
+  assert.equal(state.results[0].evidence.path, "/evidence/result-1.png");
+});
+
 test("state transitions are one-way and reject actions outside their mode", () => {
   const input = createReviewState(session);
   assert.equal(input.mode, "input");

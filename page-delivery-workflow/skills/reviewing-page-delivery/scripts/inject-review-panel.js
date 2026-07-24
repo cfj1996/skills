@@ -9,6 +9,7 @@
     ["待修改", 1],
     ["冲突", 2],
   ]);
+  const PANEL_ITEM_ARTIFACT_FIELDS = new Set(["artifactPath", "artifactUrl"]);
 
   function buildStorageKey(deliveryUnitKey) {
     return `page-delivery-review:v1:${deliveryUnitKey}`;
@@ -37,7 +38,7 @@
       throw new TypeError("Review session must include valid cards");
     }
 
-    const cards = selectRoundCards(session.cards, session.reviewRound).map(deepClone);
+    const cards = selectRoundCards(session.cards, session.reviewRound).map(sanitizePanelItem);
 
     return {
       schemaVersion: session.schemaVersion,
@@ -141,7 +142,7 @@
       submissionVersion,
       planFingerprint: state.planFingerprint,
       artifactRuleFingerprint: state.artifactRuleFingerprint,
-      cards: state.cards.map(deepClone),
+      cards: state.cards.map(sanitizePanelItem),
     });
 
     return {
@@ -173,7 +174,7 @@
     return {
       ...state,
       mode: "result",
-      results: action.results.map(deepClone).sort(compareResults),
+      results: action.results.map(sanitizePanelItem).sort(compareResults),
       lastError: null,
     };
   }
@@ -195,6 +196,14 @@
       );
     }
     return value;
+  }
+
+  function sanitizePanelItem(item) {
+    const sanitized = deepClone(item);
+    for (const field of PANEL_ITEM_ARTIFACT_FIELDS) {
+      delete sanitized[field];
+    }
+    return sanitized;
   }
 
   function isReviewState(state) {
