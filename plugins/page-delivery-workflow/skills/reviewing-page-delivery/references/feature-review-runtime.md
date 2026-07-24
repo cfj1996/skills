@@ -18,7 +18,7 @@ python3 -m http.server <discovered-loopback-port> --bind 127.0.0.1 --directory "
 
 使用 `browser:control-in-app-browser` 打开选定原型的 loopback URL。`browserOpened` 仅在当前 Codex in-app Browser 已打开该评审页面时为真。
 
-消费项目 dev server、build 和运行态验收不是功能评审前置条件：遇到 Vite `EMFILE` 时，保留它作为消费应用运行态证据，继续使用可访问的静态原型页面。不得启动消费项目 dev server；不得执行消费项目 build。
+消费项目 dev server、build 和运行态验收不是功能评审前置条件，且不得执行消费项目运行态验收：遇到 Vite `EMFILE` 时，保留它作为消费应用运行态证据，继续使用可访问的静态原型页面。不得启动消费项目 dev server；不得执行消费项目 build。
 
 ## 动态注入
 
@@ -60,7 +60,12 @@ browserOpened
 
 - 不得启动消费项目 dev server。
 - 不得执行消费项目 build。
+- 不得执行消费项目运行态验收。
 - 不得退化为静态代码评审。
 - 不得生成独立评审 HTML。
 - 未收到当前提交不得给出最终评审结论。
-- 不得以截图、文字结论、独立报告或另一套页面替代当前 Browser 中已验证的面板。
+- 独立评审 HTML 不得替代动态面板。
+- 独立评审 Markdown 不得替代动态面板。
+- 独立评审 JSON 不得替代动态面板。
+- 截图不得替代动态面板。
+- 文字报告不得替代动态面板。

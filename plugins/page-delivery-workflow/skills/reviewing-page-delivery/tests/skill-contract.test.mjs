@@ -536,9 +536,15 @@ test("feature review runtime is ordered and fail-closed", async () => {
   for (const forbidden of [
     "不得启动消费项目 dev server",
     "不得执行消费项目 build",
+    "不得执行消费项目运行态验收",
     "不得退化为静态代码评审",
     "不得生成独立评审 HTML",
     "未收到当前提交不得给出最终评审结论",
+    "独立评审 HTML 不得替代动态面板",
+    "独立评审 Markdown 不得替代动态面板",
+    "独立评审 JSON 不得替代动态面板",
+    "截图不得替代动态面板",
+    "文字报告不得替代动态面板",
   ]) assert.match(runtime, new RegExp(forbidden));
 });
 
