@@ -47,16 +47,23 @@
     ) {
       throw createCodedError(TypeError, "invalid-review-session", "Review session must include a cards array");
     }
-    if (!session.cards.every(isCard)) {
-      throw createCodedError(TypeError, "invalid-review-session", "Review session must include valid cards");
-    }
     const artifactRuleResolution = canonicalizeArtifactRuleResolution(session.artifactRuleResolution);
     if (!artifactRuleResolution) {
       throw createCodedError(
         TypeError,
         "invalid-artifact-rule-resolution",
-        "Artifact rule resolution must be explicitly resolved from AGENTS or marked as an unresolved candidate",
+        "Artifact rule resolution must be resolved from AGENTS, unresolved, or temporarily confirmed",
       );
+    }
+    if (!isReviewableArtifactRuleResolution(artifactRuleResolution, session.artifactRuleFingerprint)) {
+      throw createCodedError(
+        TypeError,
+        "artifact-rule-confirmation-required",
+        "Artifact rule candidate must be explicitly confirmed for the current fingerprint before review",
+      );
+    }
+    if (!session.cards.every(isCard)) {
+      throw createCodedError(TypeError, "invalid-review-session", "Review session must include valid cards");
     }
 
     const cards = selectReviewCards(session.cards, session.reviewRound, session.viewScope).map(sanitizePanelItem);
@@ -170,6 +177,7 @@
   }
 
   function mountReviewPanel(session, options = {}) {
+    let state = createReviewState(session);
     if (typeof document === "undefined" || !document?.body) {
       throw createCodedError(Error, "browser-document-unavailable", "Review panel requires a browser document");
     }
@@ -177,7 +185,6 @@
     const previousApi = globalThis.__PAGE_DELIVERY_REVIEW__;
     if (previousApi?.destroy) previousApi.destroy({ removeHost: false });
 
-    let state = createReviewState(session);
     const storageKey = buildStorageKey(state.deliveryUnitKey);
     const now = Date.now();
     const rawDraft = loadDraft(storageKey);
@@ -494,13 +501,16 @@
 
   function isFreshMatchingDraft(state, draft, now) {
     if (!draft || !Array.isArray(draft.cards) || !isFreshDraft(draft, now)) return false;
+    const draftArtifactRuleResolution = canonicalizeArtifactRuleResolution(draft.artifactRuleResolution);
     return (
       draft.sessionId === state.sessionId &&
       draft.reviewRound === state.reviewRound &&
       draft.planFingerprint === state.planFingerprint &&
       draft.artifactRuleFingerprint === state.artifactRuleFingerprint &&
-      draft.artifactRuleResolution?.status === state.artifactRuleResolution.status &&
-      draft.artifactRuleResolution?.source === state.artifactRuleResolution.source
+      draftArtifactRuleResolution?.status === state.artifactRuleResolution.status &&
+      draftArtifactRuleResolution?.source === state.artifactRuleResolution.source &&
+      draftArtifactRuleResolution?.confirmedRuleFingerprint ===
+        state.artifactRuleResolution.confirmedRuleFingerprint
     );
   }
 
@@ -860,7 +870,10 @@
       state &&
       typeof state === "object" &&
       ["input", "reviewing", "result", "confirmed"].includes(state.mode) &&
-      isArtifactRuleResolution(state.artifactRuleResolution) &&
+      isReviewableArtifactRuleResolution(
+        canonicalizeArtifactRuleResolution(state.artifactRuleResolution),
+        state.artifactRuleFingerprint,
+      ) &&
       Array.isArray(state.cards) &&
       Number.isInteger(state.currentCardIndex) &&
       Number.isInteger(state.currentResultIndex)
@@ -871,10 +884,6 @@
     return value !== null && typeof value === "object" && !Array.isArray(value);
   }
 
-  function isArtifactRuleResolution(value) {
-    return canonicalizeArtifactRuleResolution(value) !== null;
-  }
-
   function canonicalizeArtifactRuleResolution(value) {
     if (!isNormalizedObject(value)) return null;
     if (value.status === "resolved" && value.source === "agents") {
@@ -883,7 +892,29 @@
     if (value.status === "unresolved-candidate" && value.source === "candidate") {
       return { status: "unresolved-candidate", source: "candidate" };
     }
+    if (
+      value.status === "temporarily-confirmed-candidate" &&
+      value.source === "candidate" &&
+      isNonEmptyString(value.confirmedRuleFingerprint)
+    ) {
+      return {
+        status: "temporarily-confirmed-candidate",
+        source: "candidate",
+        confirmedRuleFingerprint: value.confirmedRuleFingerprint,
+      };
+    }
     return null;
+  }
+
+  function isReviewableArtifactRuleResolution(value, artifactRuleFingerprint) {
+    if (!value) return false;
+    if (value.status === "resolved" && value.source === "agents") return true;
+    return (
+      value.status === "temporarily-confirmed-candidate" &&
+      value.source === "candidate" &&
+      isNonEmptyString(artifactRuleFingerprint) &&
+      value.confirmedRuleFingerprint === artifactRuleFingerprint
+    );
   }
 
   function isNonEmptyString(value) {

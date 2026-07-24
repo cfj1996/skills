@@ -88,18 +88,87 @@ test("artifact rule resolution is canonical across state, persisted drafts, and 
   assert.doesNotMatch(JSON.stringify(state.lastSubmission), /secret|private/);
 });
 
-test("unresolved artifact rule candidates can be reviewed but cannot confirm a Plan", () => {
+test("temporary candidate confirmation is canonical across state, persisted drafts, and submissions", () => {
+  const taintedResolution = {
+    status: "temporarily-confirmed-candidate",
+    source: "candidate",
+    confirmedRuleFingerprint: session.artifactRuleFingerprint,
+    absolutePath: "/secret/AGENTS.md",
+    artifactPath: "/private/rule",
+    unknown: "drop-me",
+  };
+  const canonicalResolution = {
+    status: "temporarily-confirmed-candidate",
+    source: "candidate",
+    confirmedRuleFingerprint: session.artifactRuleFingerprint,
+  };
+  let state = createReviewState({
+    ...session,
+    artifactRuleResolution: taintedResolution,
+  });
+  assert.deepEqual(state.artifactRuleResolution, canonicalResolution);
+  assert.doesNotMatch(JSON.stringify(state), /secret|private|drop-me/);
+
+  const values = new Map();
+  const storage = {
+    getItem(key) { return values.get(key) || null; },
+    setItem(key, value) { values.set(key, value); },
+    removeItem(key) { values.delete(key); },
+  };
+  const storageKey = buildStorageKey("sample/temporary-resolution");
+  saveDraft(storageKey, {
+    deliveryUnitKey: "sample/temporary-resolution",
+    sessionId: state.sessionId,
+    reviewRound: state.reviewRound,
+    planFingerprint: state.planFingerprint,
+    artifactRuleFingerprint: state.artifactRuleFingerprint,
+    artifactRuleResolution: taintedResolution,
+    savedAt: Date.now(),
+    cards: [],
+  }, storage);
+  const persistedDraft = JSON.parse(values.get(storageKey));
+  assert.deepEqual(persistedDraft.artifactRuleResolution, canonicalResolution);
+  assert.doesNotMatch(JSON.stringify(persistedDraft), /secret|private|drop-me/);
+
+  state = reduceReviewState(state, { type: "SUBMIT" });
+  assert.deepEqual(state.lastSubmission.artifactRuleResolution, canonicalResolution);
+  assert.doesNotMatch(JSON.stringify(state.lastSubmission), /secret|private|drop-me/);
+});
+
+test("unresolved artifact rule candidates fail before review state creation or mount", () => {
   const unresolvedSession = {
     ...session,
     artifactRuleResolution: {
       status: "unresolved-candidate",
       source: "candidate",
     },
+    cards: [null],
   };
-  let state = createReviewState(unresolvedSession);
-  assert.deepEqual(state.artifactRuleResolution, unresolvedSession.artifactRuleResolution);
+  for (const start of [
+    () => createReviewState(unresolvedSession),
+    () => mountReviewPanel(unresolvedSession),
+  ]) {
+    assert.throws(
+      start,
+      (error) => error?.code === "artifact-rule-confirmation-required",
+    );
+  }
+});
+
+test("a matching temporary candidate confirmation permits read-only review but never Plan confirmation", () => {
+  const temporaryResolution = {
+    status: "temporarily-confirmed-candidate",
+    source: "candidate",
+    confirmedRuleFingerprint: session.artifactRuleFingerprint,
+  };
+  let state = createReviewState({
+    ...session,
+    artifactRuleResolution: temporaryResolution,
+  });
+  assert.deepEqual(state.artifactRuleResolution, temporaryResolution);
 
   state = reduceReviewState(state, { type: "SUBMIT" });
+  assert.deepEqual(state.lastSubmission.artifactRuleResolution, temporaryResolution);
   state = reduceReviewState(state, {
     type: "APPLY_RESULT",
     sessionId: session.sessionId,
@@ -122,6 +191,52 @@ test("unresolved artifact rule candidates can be reviewed but cannot confirm a P
     code: "artifact-rule-unresolved",
     message: "产物位置规则尚未由适用的 AGENTS.md 确认并固化，无法确认更新 Plan。",
   });
+});
+
+test("temporary candidate confirmation rejects a missing or mismatched fingerprint", () => {
+  for (const [artifactRuleResolution, expectedCode] of [
+    [{
+      status: "temporarily-confirmed-candidate",
+      source: "candidate",
+    }, "invalid-artifact-rule-resolution"],
+    [{
+      status: "temporarily-confirmed-candidate",
+      source: "candidate",
+      confirmedRuleFingerprint: "sha256:different-rule",
+    }, "artifact-rule-confirmation-required"],
+  ]) {
+    assert.throws(
+      () => createReviewState({ ...session, artifactRuleResolution }),
+      (error) => error?.code === expectedCode,
+    );
+  }
+});
+
+test("forged unresolved review states cannot submit or apply results", () => {
+  const inputState = {
+    ...createReviewState(session),
+    artifactRuleResolution: {
+      status: "unresolved-candidate",
+      source: "candidate",
+    },
+  };
+  assert.equal(reduceReviewState(inputState, { type: "SUBMIT" }), inputState);
+
+  const reviewingState = {
+    ...inputState,
+    mode: "reviewing",
+    submissionVersion: 1,
+  };
+  assert.equal(
+    reduceReviewState(reviewingState, {
+      type: "APPLY_RESULT",
+      sessionId: session.sessionId,
+      submissionVersion: 1,
+      ...matchedFingerprints,
+      results: [{ id: "result", conclusion: "阻塞" }],
+    }),
+    reviewingState,
+  );
 });
 
 test("artifact rule resolution rejects invalid status and source combinations", () => {
@@ -311,26 +426,42 @@ test("draft restore requires matching fresh metadata and clamps only valid edita
   assert.equal(restored.currentCardIndex, state.cards.length - 1);
   assert.equal(restored.cards[0].conclusion, "阻塞");
 
-  const unresolvedDraft = {
-    ...validDraft,
-    artifactRuleResolution: {
-      status: "unresolved-candidate",
-      source: "candidate",
-    },
+  const temporaryResolution = {
+    status: "temporarily-confirmed-candidate",
+    source: "candidate",
+    confirmedRuleFingerprint: state.artifactRuleFingerprint,
   };
-  const resolvedStateFromUnresolvedDraft = restoreDraft(state, unresolvedDraft, savedAt + 1);
-  assert.equal(resolvedStateFromUnresolvedDraft.currentCardIndex, state.currentCardIndex);
-  assert.equal(resolvedStateFromUnresolvedDraft.cards[0].conclusion, state.cards[0].conclusion);
-  assert.equal(resolvedStateFromUnresolvedDraft.cards[0].userNote, state.cards[0].userNote);
+  const temporaryDraft = {
+    ...validDraft,
+    artifactRuleResolution: temporaryResolution,
+  };
+  const resolvedStateFromTemporaryDraft = restoreDraft(state, temporaryDraft, savedAt + 1);
+  assert.equal(resolvedStateFromTemporaryDraft.currentCardIndex, state.currentCardIndex);
+  assert.equal(resolvedStateFromTemporaryDraft.cards[0].conclusion, state.cards[0].conclusion);
+  assert.equal(resolvedStateFromTemporaryDraft.cards[0].userNote, state.cards[0].userNote);
 
-  const unresolvedState = createReviewState({
+  const temporaryState = createReviewState({
     ...session,
-    artifactRuleResolution: unresolvedDraft.artifactRuleResolution,
+    artifactRuleResolution: temporaryResolution,
   });
-  const unresolvedStateFromResolvedDraft = restoreDraft(unresolvedState, validDraft, savedAt + 1);
-  assert.equal(unresolvedStateFromResolvedDraft.currentCardIndex, unresolvedState.currentCardIndex);
-  assert.equal(unresolvedStateFromResolvedDraft.cards[0].conclusion, unresolvedState.cards[0].conclusion);
-  assert.equal(unresolvedStateFromResolvedDraft.cards[0].userNote, unresolvedState.cards[0].userNote);
+  const matchingTemporaryDraft = restoreDraft(temporaryState, temporaryDraft, savedAt + 1);
+  assert.equal(matchingTemporaryDraft.currentCardIndex, temporaryState.cards.length - 1);
+  assert.equal(matchingTemporaryDraft.cards[0].conclusion, "阻塞");
+
+  const temporaryStateFromResolvedDraft = restoreDraft(temporaryState, validDraft, savedAt + 1);
+  assert.equal(temporaryStateFromResolvedDraft.currentCardIndex, temporaryState.currentCardIndex);
+  assert.equal(temporaryStateFromResolvedDraft.cards[0].conclusion, temporaryState.cards[0].conclusion);
+  assert.equal(temporaryStateFromResolvedDraft.cards[0].userNote, temporaryState.cards[0].userNote);
+
+  const temporaryStateFromMismatchedConfirmation = restoreDraft(temporaryState, {
+    ...temporaryDraft,
+    artifactRuleResolution: {
+      ...temporaryResolution,
+      confirmedRuleFingerprint: "sha256:different-rule",
+    },
+  }, savedAt + 1);
+  assert.equal(temporaryStateFromMismatchedConfirmation.currentCardIndex, temporaryState.currentCardIndex);
+  assert.equal(temporaryStateFromMismatchedConfirmation.cards[0].conclusion, temporaryState.cards[0].conclusion);
 
   for (const [draft, now] of [
     [{ ...validDraft, sessionId: "other" }, savedAt + DRAFT_TTL_MS],

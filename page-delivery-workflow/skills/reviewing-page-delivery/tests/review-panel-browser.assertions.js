@@ -217,23 +217,33 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
       sessionId: "tainted-resolution-session",
       deliveryUnitKey: "sample/tainted-resolution",
       artifactRuleResolution: {
-        status: "resolved",
-        source: "agents",
+        status: "temporarily-confirmed-candidate",
+        source: "candidate",
+        confirmedRuleFingerprint: globalThis.reviewSession.artifactRuleFingerprint,
         absolutePath: "/secret/AGENTS.md",
         artifactPath: "/private/rule",
+        unknown: "drop-me",
       },
       cards: [{ id: "tainted-resolution-card", conclusion: "待修改" }],
     };
     const taintedStorageKey = `page-delivery-review:v1:${taintedResolutionSession.deliveryUnitKey}`;
+    const canonicalTemporaryResolution = {
+      status: "temporarily-confirmed-candidate",
+      source: "candidate",
+      confirmedRuleFingerprint: globalThis.reviewSession.artifactRuleFingerprint,
+    };
     globalThis.PageDeliveryReviewPanel.mountReviewPanel(taintedResolutionSession);
-    check(!JSON.stringify(state()).includes("/secret/AGENTS.md") && !JSON.stringify(state()).includes("/private/rule"), "state must canonicalize artifact-rule resolution metadata");
+    check(JSON.stringify(state()?.artifactRuleResolution) === JSON.stringify(canonicalTemporaryResolution), "state must retain only the canonical temporary confirmation fields");
+    check(!JSON.stringify(state()).includes("/secret/AGENTS.md") && !JSON.stringify(state()).includes("/private/rule") && !JSON.stringify(state()).includes("drop-me"), "state must canonicalize artifact-rule resolution metadata");
     const taintedNote = panel()?.querySelector('[data-field="userNote"]');
     taintedNote.value = "触发安全草稿";
     taintedNote.dispatchEvent(new Event("input", { bubbles: true }));
-    check(!localStorage.getItem(taintedStorageKey).includes("/secret/AGENTS.md") && !localStorage.getItem(taintedStorageKey).includes("/private/rule"), "localStorage draft must canonicalize artifact-rule resolution metadata");
+    check(JSON.stringify(JSON.parse(localStorage.getItem(taintedStorageKey)).artifactRuleResolution) === JSON.stringify(canonicalTemporaryResolution), "localStorage draft must retain only the canonical temporary confirmation fields");
+    check(!localStorage.getItem(taintedStorageKey).includes("/secret/AGENTS.md") && !localStorage.getItem(taintedStorageKey).includes("/private/rule") && !localStorage.getItem(taintedStorageKey).includes("drop-me"), "localStorage draft must canonicalize artifact-rule resolution metadata");
     click(panel()?.querySelector('[data-action="submit"]'));
     const taintedSubmission = globalThis.__PAGE_DELIVERY_REVIEW__.exportSubmission();
-    check(!JSON.stringify(taintedSubmission).includes("/secret/AGENTS.md") && !JSON.stringify(taintedSubmission).includes("/private/rule"), "exportSubmission must canonicalize artifact-rule resolution metadata");
+    check(JSON.stringify(taintedSubmission.artifactRuleResolution) === JSON.stringify(canonicalTemporaryResolution), "exportSubmission must retain only the canonical temporary confirmation fields");
+    check(!JSON.stringify(taintedSubmission).includes("/secret/AGENTS.md") && !JSON.stringify(taintedSubmission).includes("/private/rule") && !JSON.stringify(taintedSubmission).includes("drop-me"), "exportSubmission must canonicalize artifact-rule resolution metadata");
     globalThis.__PAGE_DELIVERY_REVIEW__.destroy();
     localStorage.removeItem(taintedStorageKey);
 
@@ -271,7 +281,50 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
       },
       cards: [{ id: "unresolved-rule-card", conclusion: "阻塞" }],
     };
-    globalThis.PageDeliveryReviewPanel.mountReviewPanel(unresolvedSession);
+    let unresolvedError = null;
+    try {
+      globalThis.PageDeliveryReviewPanel.mountReviewPanel(unresolvedSession);
+    } catch (error) {
+      unresolvedError = error;
+    }
+    check(unresolvedError?.code === "artifact-rule-confirmation-required", "unresolved artifact rules must fail before mounting review cards");
+    check(!document.querySelector("[data-page-delivery-review-host]"), "unresolved artifact rules must not mount a panel host");
+
+    for (const [artifactRuleResolution, expectedCode] of [
+      [{
+        status: "temporarily-confirmed-candidate",
+        source: "candidate",
+      }, "invalid-artifact-rule-resolution"],
+      [{
+        status: "temporarily-confirmed-candidate",
+        source: "candidate",
+        confirmedRuleFingerprint: "sha256:different-rule",
+      }, "artifact-rule-confirmation-required"],
+    ]) {
+      let temporaryError = null;
+      try {
+        globalThis.PageDeliveryReviewPanel.mountReviewPanel({
+          ...unresolvedSession,
+          artifactRuleResolution,
+        });
+      } catch (error) {
+        temporaryError = error;
+      }
+      check(
+        temporaryError?.code === expectedCode,
+        "temporary candidate confirmation must reject a missing or mismatched fingerprint",
+      );
+    }
+
+    const temporarilyConfirmedSession = {
+      ...unresolvedSession,
+      artifactRuleResolution: {
+        status: "temporarily-confirmed-candidate",
+        source: "candidate",
+        confirmedRuleFingerprint: unresolvedSession.artifactRuleFingerprint,
+      },
+    };
+    globalThis.PageDeliveryReviewPanel.mountReviewPanel(temporarilyConfirmedSession);
     click(panel()?.querySelector('[data-action="submit"]'));
     const unresolvedSubmission = globalThis.__PAGE_DELIVERY_REVIEW__.exportSubmission();
     globalThis.__PAGE_DELIVERY_REVIEW__.applyResult({
