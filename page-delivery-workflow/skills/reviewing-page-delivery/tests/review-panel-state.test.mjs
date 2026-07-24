@@ -43,13 +43,14 @@ test("submission versions increase and stale results are rejected", () => {
   assert.equal(state.mode, "reviewing");
   assert.equal(state.submissionVersion, 1);
 
-  const stale = reduceReviewState(state, {
+  state = reduceReviewState(state, {
     type: "APPLY_RESULT",
     sessionId: "session-1",
     submissionVersion: 0,
     results: [],
   });
-  assert.equal(stale, state);
+  assert.equal(state.mode, "reviewing");
+  assert.match(state.lastError, /stale/i);
 });
 
 test("submit stores a deeply frozen copy that later edits cannot change", () => {
@@ -79,13 +80,14 @@ test("submit stores a deeply frozen copy that later edits cannot change", () => 
 test("apply result requires both matching session and submission version", () => {
   let state = reduceReviewState(createReviewState(session), { type: "SUBMIT" });
 
-  const stale = reduceReviewState(state, {
+  state = reduceReviewState(state, {
     type: "APPLY_RESULT",
     sessionId: "other-session",
     submissionVersion: 1,
     results: [],
   });
-  assert.equal(stale, state);
+  assert.equal(state.mode, "reviewing");
+  assert.match(state.lastError, /stale/i);
 
   state = reduceReviewState(state, {
     type: "APPLY_RESULT",
@@ -236,26 +238,18 @@ test("invalid sessions and reducer inputs are safe", () => {
   assert.equal(reduceReviewState("invalid", { type: "SUBMIT" }), "invalid");
 });
 
-test("apply result only accepts an array from the active submission", () => {
+test("apply result reports invalid results only for the active submission", () => {
   const reviewing = reduceReviewState(createReviewState(session), { type: "SUBMIT" });
-  assert.equal(
-    reduceReviewState(reviewing, {
+  for (const results of [null, {}]) {
+    const invalid = reduceReviewState(reviewing, {
       type: "APPLY_RESULT",
       sessionId: "session-1",
       submissionVersion: 1,
-      results: null,
-    }),
-    reviewing,
-  );
-  assert.equal(
-    reduceReviewState(reviewing, {
-      type: "APPLY_RESULT",
-      sessionId: "session-1",
-      submissionVersion: 1,
-      results: {},
-    }),
-    reviewing,
-  );
+      results,
+    });
+    assert.equal(invalid.mode, "reviewing");
+    assert.match(invalid.lastError, /invalid.*results/i);
+  }
 });
 
 test("storage keys isolate project delivery units and position stays visible", () => {

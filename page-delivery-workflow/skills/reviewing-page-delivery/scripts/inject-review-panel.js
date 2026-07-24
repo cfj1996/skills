@@ -143,12 +143,15 @@
 
   function applyResult(state, action) {
     if (
-      !Array.isArray(action.results) ||
       state.submissionVersion === 0 ||
       action.sessionId !== state.sessionId ||
       action.submissionVersion !== state.submissionVersion
     ) {
-      return state;
+      return { ...state, lastError: "Stale review result ignored" };
+    }
+
+    if (!Array.isArray(action.results)) {
+      return { ...state, lastError: "Invalid review results" };
     }
 
     return {
