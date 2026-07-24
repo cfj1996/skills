@@ -43,21 +43,19 @@ test("submission versions increase and stale results are rejected", () => {
   assert.equal(state.mode, "reviewing");
   assert.equal(state.submissionVersion, 1);
 
-  state = reduceReviewState(state, {
+  const stale = reduceReviewState(state, {
     type: "APPLY_RESULT",
     sessionId: "session-1",
     submissionVersion: 0,
     results: [],
   });
-
-  assert.equal(state.mode, "reviewing");
-  assert.match(state.lastError, /stale/i);
+  assert.equal(stale, state);
 });
 
 test("submit stores a deeply frozen copy that later edits cannot change", () => {
   let state = reduceReviewState(createReviewState(session), {
     type: "EDIT_CARD",
-    patch: { userNote: "提交前笔记", evidence: { source: "reviewer" } },
+    patch: { userNote: "提交前笔记" },
   });
   state = reduceReviewState(state, { type: "SUBMIT" });
   const snapshot = state.lastSubmission;
@@ -69,25 +67,25 @@ test("submit stores a deeply frozen copy that later edits cannot change", () => 
     snapshot.cards[0].userNote = "不应修改快照";
   }, TypeError);
 
-  state = reduceReviewState(state, {
+  const afterSubmitEdit = reduceReviewState(state, {
     type: "EDIT_CARD",
     patch: { userNote: "提交后草稿" },
   });
+  assert.equal(afterSubmitEdit, state);
   assert.equal(snapshot.cards[0].userNote, "提交前笔记");
-  assert.equal(state.cards[0].userNote, "提交后草稿");
+  assert.equal(state.cards[0].userNote, "提交前笔记");
 });
 
 test("apply result requires both matching session and submission version", () => {
   let state = reduceReviewState(createReviewState(session), { type: "SUBMIT" });
 
-  state = reduceReviewState(state, {
+  const stale = reduceReviewState(state, {
     type: "APPLY_RESULT",
     sessionId: "other-session",
     submissionVersion: 1,
     results: [],
   });
-  assert.equal(state.mode, "reviewing");
-  assert.match(state.lastError, /stale/i);
+  assert.equal(stale, state);
 
   state = reduceReviewState(state, {
     type: "APPLY_RESULT",
@@ -121,10 +119,10 @@ test("result cards sort blocking, pending modification, conflict, then other", (
 });
 
 test("confirm plan is accepted only from result mode", () => {
-  const reviewing = createReviewState(session);
-  assert.equal(reduceReviewState(reviewing, { type: "CONFIRM_PLAN" }), reviewing);
+  const input = createReviewState(session);
+  assert.equal(reduceReviewState(input, { type: "CONFIRM_PLAN" }), input);
 
-  let result = reduceReviewState(reviewing, { type: "SUBMIT" });
+  let result = reduceReviewState(input, { type: "SUBMIT" });
   result = reduceReviewState(result, {
     type: "APPLY_RESULT",
     sessionId: "session-1",
@@ -140,7 +138,14 @@ test("reducer preserves fingerprints and excludes actual artifact paths", () => 
   assert.equal(state.planFingerprint, "sha256:fixture");
   assert.equal(state.artifactRuleFingerprint, "sha256:rule-fixture");
   assert.equal(Object.hasOwn(state, "artifactPath"), false);
+  assert.equal(Object.hasOwn(state, "artifactUrl"), false);
   assert.doesNotMatch(JSON.stringify(state), /private\/artifacts/);
+  assert.doesNotMatch(JSON.stringify(state), /artifacts\.example/);
+  assert.equal(state.cards[0].telepath, "reviewer-visible evidence marker");
+  assert.deepEqual(state.cards[0].evidence, {
+    locator: "figma://file/login-node",
+    path: "/evidence/login.png",
+  });
 
   for (const action of [
     { type: "EDIT_CARD", patch: { planFingerprint: "sha256:mutated" } },
@@ -160,6 +165,97 @@ test("reducer preserves fingerprints and excludes actual artifact paths", () => 
 
   assert.equal(state.planFingerprint, "sha256:fixture");
   assert.equal(state.artifactRuleFingerprint, "sha256:rule-fixture");
+  assert.equal(Object.hasOwn(state.lastSubmission, "artifactPath"), false);
+  assert.equal(Object.hasOwn(state.lastSubmission, "artifactUrl"), false);
+  assert.equal(state.lastSubmission.cards[0].evidence.path, "/evidence/login.png");
+});
+
+test("state transitions are one-way and reject actions outside their mode", () => {
+  const input = createReviewState(session);
+  assert.equal(input.mode, "input");
+  assert.equal(reduceReviewState(input, { type: "APPLY_RESULT" }), input);
+  assert.equal(reduceReviewState(input, { type: "CONFIRM_PLAN" }), input);
+
+  const reviewing = reduceReviewState(input, { type: "SUBMIT" });
+  assert.equal(reviewing.mode, "reviewing");
+  assert.equal(reduceReviewState(reviewing, { type: "EDIT_CARD", patch: { userNote: "x" } }), reviewing);
+  assert.equal(reduceReviewState(reviewing, { type: "NEXT" }), reviewing);
+  assert.equal(reduceReviewState(reviewing, { type: "PREVIOUS" }), reviewing);
+  assert.equal(reduceReviewState(reviewing, { type: "SUBMIT" }), reviewing);
+  assert.equal(reduceReviewState(reviewing, { type: "CONFIRM_PLAN" }), reviewing);
+
+  const result = reduceReviewState(reviewing, {
+    type: "APPLY_RESULT",
+    sessionId: "session-1",
+    submissionVersion: 1,
+    results: [],
+  });
+  assert.equal(result.mode, "result");
+  const confirmed = reduceReviewState(result, { type: "CONFIRM_PLAN" });
+  assert.equal(confirmed.mode, "confirmed");
+  assert.equal(reduceReviewState(confirmed, { type: "SUBMIT" }), confirmed);
+  assert.equal(reduceReviewState(confirmed, { type: "APPLY_RESULT", results: [] }), confirmed);
+  assert.equal(reduceReviewState(confirmed, { type: "CONFIRM_PLAN" }), confirmed);
+});
+
+test("input edits only the user-controlled conclusion and note", () => {
+  const state = reduceReviewState(createReviewState(session), {
+    type: "EDIT_CARD",
+    patch: {
+      conclusion: "阻塞",
+      userNote: "用户重新判断",
+      id: "REV-ATTACK",
+      reopened: true,
+      evidenceChanged: true,
+      planFingerprint: "sha256:mutated",
+      artifactRuleFingerprint: "sha256:mutated",
+      injected: "must not appear",
+    },
+  });
+
+  assert.equal(state.cards[0].conclusion, "阻塞");
+  assert.equal(state.cards[0].userNote, "用户重新判断");
+  assert.equal(state.cards[0].id, "REV-002");
+  assert.equal(state.cards[0].reopened, false);
+  assert.equal(state.cards[0].evidenceChanged, false);
+  assert.equal(Object.hasOwn(state.cards[0], "injected"), false);
+  assert.equal(state.planFingerprint, "sha256:fixture");
+  assert.equal(state.artifactRuleFingerprint, "sha256:rule-fixture");
+});
+
+test("invalid sessions and reducer inputs are safe", () => {
+  assert.throws(() => createReviewState(null), /review session/i);
+  assert.throws(() => createReviewState({}), /review session/i);
+  assert.throws(() => createReviewState({ cards: {} }), /review session/i);
+
+  const state = createReviewState(session);
+  for (const action of [null, 1, "invalid", {}, { type: "UNKNOWN" }]) {
+    assert.equal(reduceReviewState(state, action), state);
+  }
+  assert.equal(reduceReviewState(null, { type: "SUBMIT" }), null);
+  assert.equal(reduceReviewState("invalid", { type: "SUBMIT" }), "invalid");
+});
+
+test("apply result only accepts an array from the active submission", () => {
+  const reviewing = reduceReviewState(createReviewState(session), { type: "SUBMIT" });
+  assert.equal(
+    reduceReviewState(reviewing, {
+      type: "APPLY_RESULT",
+      sessionId: "session-1",
+      submissionVersion: 1,
+      results: null,
+    }),
+    reviewing,
+  );
+  assert.equal(
+    reduceReviewState(reviewing, {
+      type: "APPLY_RESULT",
+      sessionId: "session-1",
+      submissionVersion: 1,
+      results: {},
+    }),
+    reviewing,
+  );
 });
 
 test("storage keys isolate project delivery units and position stays visible", () => {
@@ -174,5 +270,25 @@ test("storage keys isolate project delivery units and position stays visible", (
       { width: 800, height: 600 },
     ),
     { x: 480, y: 0 },
+  );
+});
+
+test("clamp safely handles missing, negative, and non-finite geometry", () => {
+  assert.deepEqual(clampPanelPosition(), { x: 0, y: 0 });
+  assert.deepEqual(
+    clampPanelPosition(
+      { x: 999, y: -Infinity },
+      { width: Infinity, height: -20 },
+      { width: 300, height: 200 },
+    ),
+    { x: 300, y: 0 },
+  );
+  assert.deepEqual(
+    clampPanelPosition(
+      { x: NaN, y: Infinity },
+      { width: NaN, height: Infinity },
+      { width: -1, height: NaN },
+    ),
+    { x: 0, y: 0 },
   );
 });

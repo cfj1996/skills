@@ -14,18 +14,22 @@
     return `page-delivery-review:v1:${deliveryUnitKey}`;
   }
 
-  function clampPanelPosition(position, panelSize, viewportSize) {
-    const maxX = Math.max(0, finiteNumber(viewportSize.width) - finiteNumber(panelSize.width));
-    const maxY = Math.max(0, finiteNumber(viewportSize.height) - finiteNumber(panelSize.height));
+  function clampPanelPosition(position = {}, panelSize = {}, viewportSize = {}) {
+    const maxX = Math.max(0, nonNegativeFinite(viewportSize.width) - nonNegativeFinite(panelSize.width));
+    const maxY = Math.max(0, nonNegativeFinite(viewportSize.height) - nonNegativeFinite(panelSize.height));
 
     return {
-      x: clamp(finiteNumber(position.x), 0, maxX),
-      y: clamp(finiteNumber(position.y), 0, maxY),
+      x: clamp(nonNegativeFinite(position.x), 0, maxX),
+      y: clamp(nonNegativeFinite(position.y), 0, maxY),
     };
   }
 
   function createReviewState(session) {
-    const cards = selectRoundCards(session.cards || [], session.reviewRound).map(cloneForPanel);
+    if (!session || typeof session !== "object" || !Array.isArray(session.cards)) {
+      throw new TypeError("Review session must include a cards array");
+    }
+
+    const cards = selectRoundCards(session.cards, session.reviewRound).map(deepClone);
 
     return {
       schemaVersion: session.schemaVersion,
@@ -37,7 +41,7 @@
       planFingerprint: session.planFingerprint,
       cards,
       currentCardIndex: 0,
-      mode: "reviewing",
+      mode: "input",
       submissionVersion: 0,
       lastSubmission: null,
       results: [],
@@ -46,22 +50,34 @@
   }
 
   function reduceReviewState(state, action) {
-    switch (action.type) {
-      case "EDIT_CARD":
-        return editCurrentCard(state, action.patch || {});
-      case "NEXT":
-        return moveCurrentCard(state, 1);
-      case "PREVIOUS":
-        return moveCurrentCard(state, -1);
-      case "SUBMIT":
-        return submit(state);
-      case "APPLY_RESULT":
-        return applyResult(state, action);
-      case "CONFIRM_PLAN":
-        return state.mode === "result" ? { ...state, mode: "confirmed" } : state;
-      default:
-        return state;
+    if (!isReviewState(state) || !action || typeof action !== "object") {
+      return state;
     }
+
+    if (state.mode === "input") {
+      switch (action.type) {
+        case "EDIT_CARD":
+          return editCurrentCard(state, action.patch);
+        case "NEXT":
+          return moveCurrentCard(state, 1);
+        case "PREVIOUS":
+          return moveCurrentCard(state, -1);
+        case "SUBMIT":
+          return submit(state);
+        default:
+          return state;
+      }
+    }
+
+    if (state.mode === "reviewing" && action.type === "APPLY_RESULT") {
+      return applyResult(state, action);
+    }
+
+    if (state.mode === "result" && action.type === "CONFIRM_PLAN") {
+      return { ...state, mode: "confirmed" };
+    }
+
+    return state;
   }
 
   function selectRoundCards(cards, reviewRound) {
@@ -80,21 +96,29 @@
 
   function editCurrentCard(state, patch) {
     const currentCard = state.cards[state.currentCardIndex];
-    if (!currentCard) return state;
+    if (!currentCard || !patch || typeof patch !== "object") return state;
+
+    const editablePatch = {};
+    for (const key of ["conclusion", "userNote"]) {
+      if (Object.hasOwn(patch, key)) editablePatch[key] = patch[key];
+    }
+    if (Object.keys(editablePatch).length === 0) return state;
 
     const cards = state.cards.slice();
     cards[state.currentCardIndex] = {
       ...currentCard,
-      ...cloneForPanel(patch),
+      ...editablePatch,
     };
-    return { ...state, cards, lastError: null };
+    return { ...state, cards };
   }
 
   function moveCurrentCard(state, direction) {
     const lastCardIndex = Math.max(0, state.cards.length - 1);
+    const currentCardIndex = clamp(state.currentCardIndex + direction, 0, lastCardIndex);
+    if (currentCardIndex === state.currentCardIndex) return state;
     return {
       ...state,
-      currentCardIndex: clamp(state.currentCardIndex + direction, 0, lastCardIndex),
+      currentCardIndex,
     };
   }
 
@@ -105,7 +129,7 @@
       submissionVersion,
       planFingerprint: state.planFingerprint,
       artifactRuleFingerprint: state.artifactRuleFingerprint,
-      cards: state.cards.map(cloneForPanel),
+      cards: state.cards.map(deepClone),
     });
 
     return {
@@ -119,17 +143,18 @@
 
   function applyResult(state, action) {
     if (
+      !Array.isArray(action.results) ||
       state.submissionVersion === 0 ||
       action.sessionId !== state.sessionId ||
       action.submissionVersion !== state.submissionVersion
     ) {
-      return { ...state, lastError: "Stale review result ignored" };
+      return state;
     }
 
     return {
       ...state,
       mode: "result",
-      results: (action.results || []).map(cloneForPanel).sort(compareResults),
+      results: action.results.map(deepClone).sort(compareResults),
       lastError: null,
     };
   }
@@ -142,16 +167,25 @@
     return RESULT_PRIORITIES.get(result.conclusion) ?? 3;
   }
 
-  function cloneForPanel(value) {
-    if (Array.isArray(value)) return value.map(cloneForPanel);
+  function deepClone(value) {
+    if (Array.isArray(value)) return value.map(deepClone);
     if (value && typeof value === "object") {
       return Object.fromEntries(
         Object.entries(value)
-          .filter(([key]) => !/path$/i.test(key))
-          .map(([key, nestedValue]) => [key, cloneForPanel(nestedValue)]),
+          .map(([key, nestedValue]) => [key, deepClone(nestedValue)]),
       );
     }
     return value;
+  }
+
+  function isReviewState(state) {
+    return (
+      state &&
+      typeof state === "object" &&
+      ["input", "reviewing", "result", "confirmed"].includes(state.mode) &&
+      Array.isArray(state.cards) &&
+      Number.isInteger(state.currentCardIndex)
+    );
   }
 
   function deepFreeze(value) {
@@ -162,8 +196,8 @@
     return value;
   }
 
-  function finiteNumber(value) {
-    return Number.isFinite(value) ? value : 0;
+  function nonNegativeFinite(value) {
+    return Number.isFinite(value) && value >= 0 ? value : 0;
   }
 
   function clamp(value, minimum, maximum) {
