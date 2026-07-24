@@ -30,9 +30,10 @@ function addError(errors, condition, message) {
 function indexById(items, collectionName, errors) {
   const index = new Map();
   for (const item of items) {
-    addError(errors, item && typeof item.id === "string", `${collectionName} item requires id`);
-    if (!item?.id) continue;
+    addError(errors, isNormalizedObject(item) && hasText(item.id), `${collectionName} item requires id`);
+    if (!isNormalizedObject(item) || !hasText(item.id)) continue;
     addError(errors, !index.has(item.id), `${collectionName} duplicate id: ${item.id}`);
+    if (index.has(item.id)) continue;
     index.set(item.id, item);
   }
   return index;
@@ -63,9 +64,10 @@ function validateArtifactLocationRule(rule, errors) {
   addError(errors, hasText(rule.ruleFingerprint), "artifactLocationRule.ruleFingerprint is required");
 }
 
-function validateReferences(indexes, errors) {
+function validateReferences(itemsByCollection, indexes, errors) {
   for (const collectionName of COLLECTIONS) {
-    for (const item of indexes[collectionName].values()) {
+    for (const item of itemsByCollection[collectionName]) {
+      if (!isNormalizedObject(item)) continue;
       for (const [refName, targetName] of Object.entries(REF_TARGETS)) {
         if (!(refName in item)) continue;
         addError(errors, Array.isArray(item[refName]), `${collectionName} ${item.id} ${refName} requires an array`);
@@ -90,8 +92,9 @@ function referencesOf(item, refName) {
   return Array.isArray(item[refName]) ? item[refName] : [];
 }
 
-function validateReciprocalLinks(indexes, errors) {
-  for (const feature of indexes.features.values()) {
+function validateReciprocalLinks(itemsByCollection, indexes, errors) {
+  for (const feature of itemsByCollection.features) {
+    if (!isNormalizedObject(feature)) continue;
     for (const apiId of referencesOf(feature, "apiRefs")) {
       const api = indexes.apis.get(apiId);
       if (api) {
@@ -106,7 +109,8 @@ function validateReciprocalLinks(indexes, errors) {
     }
   }
 
-  for (const api of indexes.apis.values()) {
+  for (const api of itemsByCollection.apis) {
+    if (!isNormalizedObject(api)) continue;
     for (const featureId of referencesOf(api, "featureRefs")) {
       const feature = indexes.features.get(featureId);
       if (feature) {
@@ -121,7 +125,8 @@ function validateReciprocalLinks(indexes, errors) {
     }
   }
 
-  for (const task of indexes.tasks.values()) {
+  for (const task of itemsByCollection.tasks) {
+    if (!isNormalizedObject(task)) continue;
     for (const featureId of referencesOf(task, "featureRefs")) {
       const feature = indexes.features.get(featureId);
       if (feature) {
@@ -152,31 +157,38 @@ function validatePagePlanModel(model) {
 
   validateArtifactLocationRule(model.artifactLocationRule, errors);
 
+  const itemsByCollection = {};
   const indexes = {};
   for (const collectionName of COLLECTIONS) {
     const items = model[collectionName];
     addError(errors, Array.isArray(items), `${collectionName} requires an array`);
-    indexes[collectionName] = indexById(Array.isArray(items) ? items : [], collectionName, errors);
+    itemsByCollection[collectionName] = Array.isArray(items) ? items : [];
+    indexes[collectionName] = indexById(itemsByCollection[collectionName], collectionName, errors);
   }
 
-  for (const feature of indexes.features.values()) {
+  for (const feature of itemsByCollection.features) {
+    if (!isNormalizedObject(feature)) continue;
     validateStatus(errors, `features ${feature.id}`, feature.status, STATUS_MODEL.feature);
   }
-  for (const api of indexes.apis.values()) {
+  for (const api of itemsByCollection.apis) {
+    if (!isNormalizedObject(api)) continue;
     validateStatus(errors, `apis ${api.id}`, api.status, STATUS_MODEL.api);
   }
-  for (const dependency of indexes.dependencies.values()) {
+  for (const dependency of itemsByCollection.dependencies) {
+    if (!isNormalizedObject(dependency)) continue;
     validateStatus(errors, `dependencies ${dependency.id}`, dependency.status, STATUS_MODEL.dependency);
   }
-  for (const task of indexes.tasks.values()) {
+  for (const task of itemsByCollection.tasks) {
+    if (!isNormalizedObject(task)) continue;
     validateStatus(errors, `tasks ${task.id}`, task.status, STATUS_MODEL.feature);
   }
-  for (const acceptance of indexes.acceptances.values()) {
+  for (const acceptance of itemsByCollection.acceptances) {
+    if (!isNormalizedObject(acceptance)) continue;
     validateStatus(errors, `acceptances ${acceptance.id}`, acceptance.status, STATUS_MODEL.acceptance);
   }
 
-  validateReferences(indexes, errors);
-  validateReciprocalLinks(indexes, errors);
+  validateReferences(itemsByCollection, indexes, errors);
+  validateReciprocalLinks(itemsByCollection, indexes, errors);
 
   return { valid: errors.length === 0, errors };
 }

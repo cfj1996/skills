@@ -1,29 +1,19 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
+import { readFileSync } from "node:fs";
 
 const require = createRequire(import.meta.url);
-const { validatePagePlanModel } = require("../scripts/validate-page-plan.js");
+const { STATUS_MODEL, validatePagePlanModel } = require("../scripts/validate-page-plan.js");
+const validModel = JSON.parse(readFileSync(new URL("./fixtures/page-plan-model.json", import.meta.url), "utf8"));
 
-const validModel = {
-  schemaVersion: 1,
-  deliveryUnit: { id: "UNIT-001", kind: "page", name: "示例登录", status: "评审中" },
-  artifactLocationRule: {
-    source: "agents",
-    ownerFile: "/sample-project/AGENTS.md",
-    planPattern: "<project-plan-pattern>",
-    draftOpenApiPattern: "<project-draft-pattern>",
-    ruleFingerprint: "sha256:rule-fixture",
-  },
-  features: [{ id: "F-001", status: "待实施", apiRefs: ["API-001"], taskRefs: ["T-001"], evidenceRefs: ["E-001"] }],
-  uiStates: [{ id: "UI-001", featureRefs: ["F-001"], evidenceRefs: ["E-001"] }],
-  apis: [{ id: "API-001", status: "Draft已确认", featureRefs: ["F-001"], taskRefs: ["T-001"], evidenceRefs: ["E-001"] }],
-  dependencies: [{ id: "DEP-001", status: "路由契约待确认", featureRefs: ["F-001"], evidenceRefs: ["E-001"] }],
-  tasks: [{ id: "T-001", status: "待实施", featureRefs: ["F-001"], apiRefs: ["API-001"], evidenceRefs: ["E-001"] }],
-  acceptances: [{ id: "A-001", status: "未验证", featureRefs: ["F-001"], evidenceRefs: ["E-001"] }],
-  evidence: [{ id: "E-001", kind: "prototype", locator: "#login-form" }],
-  reviewBatches: [],
-};
+function deepFreeze(value) {
+  if (value && typeof value === "object") {
+    Object.freeze(value);
+    for (const child of Object.values(value)) deepFreeze(child);
+  }
+  return value;
+}
 
 test("accepts a normalized model with reciprocal links", () => {
   assert.deepEqual(validatePagePlanModel(validModel), { valid: true, errors: [] });
@@ -71,4 +61,109 @@ test("does not accept markdown as input", () => {
   const result = validatePagePlanModel("# 页面 Plan");
   assert.equal(result.valid, false);
   assert.match(result.errors.join("\n"), /normalized object/);
+});
+
+test("rejects empty or whitespace-only IDs", () => {
+  for (const id of ["", "   "]) {
+    const model = structuredClone(validModel);
+    model.features[0].id = id;
+    assert.match(validatePagePlanModel(model).errors.join("\n"), /features item requires id/);
+  }
+});
+
+test("keeps validation errors from every duplicate source item", () => {
+  const model = structuredClone(validModel);
+  model.features[0].status = "坏状态一";
+  model.features[0].apiRefs = ["API-404-A"];
+  model.features.push({ ...structuredClone(validModel.features[0]), id: "F-001", status: "坏状态二", apiRefs: ["API-404-B"] });
+
+  const errors = validatePagePlanModel(model).errors.join("\n");
+  assert.match(errors, /features duplicate id: F-001/);
+  assert.match(errors, /坏状态一/);
+  assert.match(errors, /API-404-A/);
+  assert.match(errors, /坏状态二/);
+  assert.match(errors, /API-404-B/);
+});
+
+test("requires every indexed collection to be an array", () => {
+  for (const collectionName of ["features", "uiStates", "apis", "dependencies", "tasks", "acceptances", "evidence"]) {
+    const missing = structuredClone(validModel);
+    delete missing[collectionName];
+    assert.match(validatePagePlanModel(missing).errors.join("\n"), new RegExp(`${collectionName} requires an array`));
+
+    const nonArray = structuredClone(validModel);
+    nonArray[collectionName] = {};
+    assert.match(validatePagePlanModel(nonArray).errors.join("\n"), new RegExp(`${collectionName} requires an array`));
+  }
+});
+
+test("accumulates structural errors for primitive collection items and non-array refs", () => {
+  const model = structuredClone(validModel);
+  model.features = [null, "not-an-object", 7, model.features[0]];
+  model.features[3].apiRefs = "API-001";
+
+  const result = validatePagePlanModel(model);
+  assert.equal(result.valid, false);
+  assert.equal(result.errors.filter((error) => error === "features item requires id").length, 3);
+  assert.match(result.errors.join("\n"), /features F-001 apiRefs requires an array/);
+});
+
+test("accepts prototype-named IDs through Map indexes", () => {
+  const model = structuredClone(validModel);
+  model.evidence[0].id = "__proto__";
+  for (const collectionName of ["features", "uiStates", "apis", "dependencies", "tasks", "acceptances"]) {
+    model[collectionName][0].evidenceRefs = ["__proto__"];
+  }
+  assert.deepEqual(validatePagePlanModel(model), { valid: true, errors: [] });
+});
+
+test("requires each reciprocal relationship from either direction", () => {
+  const cases = [
+    ["feature to API", (model) => { model.apis[0].featureRefs = []; }, /reciprocal feature\/API/],
+    ["API to feature", (model) => { model.features[0].apiRefs = []; }, /reciprocal feature\/API/],
+    ["feature to task", (model) => { model.tasks[0].featureRefs = []; }, /reciprocal feature\/task/],
+    ["task to feature", (model) => { model.features[0].taskRefs = []; }, /reciprocal feature\/task/],
+    ["API to task", (model) => { model.tasks[0].apiRefs = []; }, /reciprocal API\/task/],
+    ["task to API", (model) => { model.apis[0].taskRefs = []; }, /reciprocal API\/task/],
+  ];
+
+  for (const [direction, update, expectedError] of cases) {
+    const model = structuredClone(validModel);
+    update(model);
+    assert.match(validatePagePlanModel(model).errors.join("\n"), expectedError, direction);
+  }
+});
+
+test("accepts every declared status and rejects an unsupported value for each status group", () => {
+  const groups = [
+    ["deliveryUnit", STATUS_MODEL.deliveryUnit, (model) => [model.deliveryUnit]],
+    ["feature", STATUS_MODEL.feature, (model) => [model.features[0], model.tasks[0]]],
+    ["api", STATUS_MODEL.api, (model) => [model.apis[0]]],
+    ["dependency", STATUS_MODEL.dependency, (model) => [model.dependencies[0]]],
+    ["acceptance", STATUS_MODEL.acceptance, (model) => [model.acceptances[0]]],
+  ];
+
+  for (const [groupName, statuses, selectItems] of groups) {
+    for (const status of statuses) {
+      const model = structuredClone(validModel);
+      for (const item of selectItems(model)) item.status = status;
+      assert.equal(validatePagePlanModel(model).valid, true, `${groupName} accepts ${status}`);
+    }
+
+    const model = structuredClone(validModel);
+    for (const item of selectItems(model)) item.status = "不在状态模型中";
+    assert.equal(validatePagePlanModel(model).valid, false, `${groupName} rejects an unsupported status`);
+  }
+});
+
+test("does not mutate deeply frozen input and returns stable error order", () => {
+  const frozen = deepFreeze(structuredClone(validModel));
+  const snapshot = structuredClone(frozen);
+  assert.deepEqual(validatePagePlanModel(frozen), { valid: true, errors: [] });
+  assert.deepEqual(frozen, snapshot);
+
+  const invalid = structuredClone(validModel);
+  invalid.features[0].id = " ";
+  invalid.apis[0].featureRefs = ["F-404"];
+  assert.deepEqual(validatePagePlanModel(invalid).errors, validatePagePlanModel(invalid).errors);
 });
