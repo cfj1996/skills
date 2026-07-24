@@ -112,19 +112,31 @@ test("skill root follows the standard skill layout", async () => {
 });
 
 test("test location resolves the plugin root without the current working directory", () => {
+  const repoRoot = path.dirname(pluginRoot);
+  const stagingPath = path.join(repoRoot, "tests", "page-delivery-workflow");
+  const movedTestPath = path.join(
+    pluginRoot,
+    "skills",
+    "reviewing-page-delivery",
+    "tests",
+  );
+
   assert.equal(path.basename(pluginRoot), "page-delivery-workflow");
   assert.equal(path.basename(path.dirname(pluginRoot)), "skills");
+  assert.equal(isStagingLayout(stagingPath), true);
+  assert.equal(resolvePluginRoot(stagingPath), pluginRoot);
+  assert.equal(isStagingLayout(movedTestPath), false);
   assert.equal(resolvePluginRoot(testDir), pluginRoot);
-  assert.equal(
-    resolvePluginRoot(
-      path.join(pluginRoot, "skills", "reviewing-page-delivery", "tests"),
-    ),
-    pluginRoot,
-  );
+  assert.equal(resolvePluginRoot(movedTestPath), pluginRoot);
 });
 
 test("pressure scenario preserves required facts and excludes answer oracles", async () => {
   const scenario = await readFile(scenarioPath, "utf8");
+  const actionOracle =
+    /(?:必须|应当|应该)(?:立即|直接)?(?:拒绝|禁止|停止)(?:生成|创建|编写)\s*(?:任何\s*)?(?:Draft(?:\s*OpenAPI)?|Plan)/i;
+  assert.match("必须拒绝生成 Draft", actionOracle);
+  assert.doesNotMatch("必须给出本轮评审决策", actionOracle);
+
   for (const required of [
     "优先使用项目既有的组件体系",
     "没有给出组件库名称",
@@ -148,6 +160,7 @@ test("pressure scenario preserves required facts and excludes answer oracles", a
     /预期(?:正确)?行为/,
     /答案\s*(?:oracle|标准|样例)/i,
     /(?:正确做法|唯一正确(?:答案|行为)|应当(?:选择|执行|先|不要)|应该(?:选择|执行|先|不要))/,
+    actionOracle,
   ]) {
     assert.doesNotMatch(scenario, forbidden);
   }
