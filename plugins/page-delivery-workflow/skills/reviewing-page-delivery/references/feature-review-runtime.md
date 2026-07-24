@@ -42,7 +42,19 @@ browserOpened
 
 ## 统一提交
 
-在用户通过面板完成当前轮全部输入并统一提交前，`currentSubmissionReceived` 必须为假。等待当前面板提交，观察 `PAGE_DELIVERY_REVIEW_SUBMITTED`，然后调用 `window.__PAGE_DELIVERY_REVIEW__.exportSubmission()`；只有返回当前 ReviewSession 对应的提交，`currentSubmissionReceived` 才为真。
+在用户通过面板完成当前轮全部输入并统一提交前，`currentSubmissionReceived` 必须为假。等待用户操作后，在同一页面轮询 `window.__PAGE_DELIVERY_REVIEW__.exportSubmission()`；返回 `null` 时继续等待，不得猜测用户已经提交。
+
+只有导出的快照同时满足以下身份检查，`currentSubmissionReceived` 才为真：
+
+```js
+submission.sessionId === reviewSession.sessionId
+&& Number.isInteger(submission.submissionVersion)
+&& submission.submissionVersion > 0
+&& submission.planFingerprint === reviewSession.planFingerprint
+&& submission.artifactRuleFingerprint === reviewSession.artifactRuleFingerprint
+```
+
+`PAGE_DELIVERY_REVIEW_SUBMITTED` 仅是诊断日志，不是提交证据；观察到该日志不得单独将 `currentSubmissionReceived` 设为真。完整提交只能通过 `exportSubmission()` 读取，并按 `sessionId`、`submissionVersion`、`planFingerprint` 和 `artifactRuleFingerprint` 核对当前 ReviewSession。
 
 不得用旧提交、截图、文字转述或自动填写替代当前统一提交。未收到当前提交不得给出最终评审结论。
 

@@ -92,7 +92,7 @@ test("feature review runtime is ordered and fail-closed", async () => {
     "data-page-delivery-review-host",
     "host.shadowRoot",
     "window.__PAGE_DELIVERY_REVIEW__",
-    "PAGE_DELIVERY_REVIEW_SUBMITTED",
+    "exportSubmission()",
     "评审阻塞",
   ]) assert.match(`${skill}\n${runtime}`, new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 
@@ -196,7 +196,7 @@ browserOpened
 && currentSubmissionReceived
 ```
 
-It must name `browser:control-in-app-browser`, `data-page-delivery-review-host`, `host.shadowRoot`, `window.__PAGE_DELIVERY_REVIEW__`, `PageDeliveryReviewPanel.mountReviewPanel(reviewSession)`, `exportSubmission()` and `PAGE_DELIVERY_REVIEW_SUBMITTED`. It must explicitly state all five prohibition strings asserted in Step 3. Local prototype service commands must use placeholders derived from discovered evidence and must not introduce a plugin-owned Plan or Draft directory.
+It must name `browser:control-in-app-browser`, `data-page-delivery-review-host`, `host.shadowRoot`, `window.__PAGE_DELIVERY_REVIEW__`, `PageDeliveryReviewPanel.mountReviewPanel(reviewSession)` and `exportSubmission()`. It must require polling the exported snapshot and matching `sessionId`, a positive `submissionVersion`, `planFingerprint`, and `artifactRuleFingerprint` against the current ReviewSession. `PAGE_DELIVERY_REVIEW_SUBMITTED` is diagnostic only and cannot establish submission by itself. It must explicitly state all five prohibition strings asserted in Step 3. Local prototype service commands must use placeholders derived from discovered evidence and must not introduce a plugin-owned Plan or Draft directory.
 
 - [ ] **Step 8: Verify GREEN**
 

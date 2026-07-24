@@ -16,7 +16,7 @@
 1. Agent 将消费项目 Vite 运行态错误视为功能评审前置条件。
 2. Vite 因 `EMFILE` 失败后，Agent 退化成静态代码评审。
 3. 后续显式调用 Skill 时，Agent 创建了独立评审 HTML，但没有打开 in-app Browser。
-4. 整个过程没有挂载 `data-page-delivery-review-host`、创建 Shadow Root、暴露 `window.__PAGE_DELIVERY_REVIEW__` 或等待 `PAGE_DELIVERY_REVIEW_SUBMITTED`。
+4. 整个过程没有挂载 `data-page-delivery-review-host`、创建 Shadow Root、暴露 `window.__PAGE_DELIVERY_REVIEW__` 或读取当前统一提交快照。
 
 根因是 Skill 只要求“动态注入面板”，没有规定可验证的浏览器执行顺序，也没有在最终结论前设置失败关闭门禁。
 
@@ -34,7 +34,7 @@
    - `data-page-delivery-review-host` 存在；
    - `host.shadowRoot` 存在；
    - `window.__PAGE_DELIVERY_REVIEW__` 存在；
-   - 当前会话已经收到 `PAGE_DELIVERY_REVIEW_SUBMITTED`。
+   - `exportSubmission()` 已返回与当前会话、提交版本和两个指纹一致的快照。
 7. 任一验证失败时只报告“评审阻塞”；独立 HTML、截图、静态代码评审和文字结论都不能替代面板。
 
 临时处理不得写入消费项目源码、Plan、Draft 或 `AGENTS.md`。产物位置规则仍执行既有门禁。
@@ -74,8 +74,9 @@ Skill 在启动确认和产物位置规则门禁通过后，必须依次执行�
    - 验证失败时进入“评审阻塞”，不得降级。
 5. **统一提交**
    - 保持任务运行，等待用户在面板统一提交。
-   - 只接受当前 `sessionId` 和 `submissionVersion` 的轻量事件。
-   - 通过 `exportSubmission()` 读取完整冻结快照。
+   - 轮询 `exportSubmission()` 读取完整冻结快照。
+   - 只有 `sessionId`、正整数 `submissionVersion`、`planFingerprint` 和 `artifactRuleFingerprint` 与当前 ReviewSession 一致时才接受。
+   - `PAGE_DELIVERY_REVIEW_SUBMITTED` 只作诊断日志，不作为提交证据。
 6. **展示结果**
    - 收到当前提交后才能执行评审和 `applyResult()`。
    - 最终文字答复只能总结已经在面板展示的结果。

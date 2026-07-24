@@ -530,8 +530,25 @@ test("feature review runtime is ordered and fail-closed", async () => {
     "挂载验证",
     "统一提交",
     "展示结果",
-  ].map((heading) => runtime.indexOf(heading));
+  ].map((heading) => runtime.indexOf(`## ${heading}`));
   assert.ok(ordered.every((offset, index) => offset >= 0 && (index === 0 || ordered[index - 1] < offset)));
+  assert.match(
+    runtime,
+    /browserOpened\s*&&\s*hostExists\s*&&\s*shadowRootExists\s*&&\s*reviewApiExists\s*&&\s*currentSubmissionReceived/,
+  );
+
+  const submission = sectionContaining(runtime, "统一提交");
+  for (const identity of [
+    "sessionId",
+    "submissionVersion",
+    "planFingerprint",
+    "artifactRuleFingerprint",
+  ]) assert.match(submission, new RegExp(identity));
+  assert.match(submission, /submissionVersion > 0/);
+  assert.match(submission, /exportSubmission\(\)/);
+  assert.match(submission, /轮询/);
+  assert.match(submission, /PAGE_DELIVERY_REVIEW_SUBMITTED.*仅.*诊断/);
+  assert.match(submission, /不得.*单独.*currentSubmissionReceived/);
 
   for (const forbidden of [
     "不得启动消费项目 dev server",
