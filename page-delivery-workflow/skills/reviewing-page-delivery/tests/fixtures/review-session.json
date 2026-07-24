@@ -24,7 +24,8 @@
       "evidence": {
         "locator": "figma://file/login-node",
         "path": "/evidence/login.png",
-        "selector": "#login-form"
+        "selector": "#login-form",
+        "artifactPath": "/private/evidence-source"
       },
       "relatedApis": ["POST /login"],
       "mockScenarios": ["账号为空", "密码错误"],

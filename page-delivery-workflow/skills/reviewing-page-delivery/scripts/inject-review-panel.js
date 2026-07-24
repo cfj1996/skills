@@ -1,4 +1,11 @@
 (function initPageDeliveryReview(globalObject, factory) {
+  if (globalObject?.__PAGE_DELIVERY_REVIEW__?.destroy) {
+    try {
+      globalObject.__PAGE_DELIVERY_REVIEW__.destroy();
+    } catch {
+      // A stale page-global must not prevent a fresh injected panel from mounting.
+    }
+  }
   const api = factory();
   if (typeof module === "object" && module.exports) module.exports = api;
   if (globalObject) globalObject.PageDeliveryReviewPanel = api;
@@ -13,6 +20,7 @@
   const USER_CONCLUSIONS = new Set(["未评审", "已确认", "待修改", "阻塞", "不适用"]);
   const SNAP_THRESHOLD = 48;
   const FALLBACK_PANEL_SIZE = { width: 320, height: 360 };
+  const DRAFT_TTL_MS = 24 * 60 * 60 * 1000;
   let activeRuntime = null;
 
   function buildStorageKey(deliveryUnitKey) {
@@ -92,7 +100,13 @@
     if (state.mode === "result") {
       if (action.type === "NEXT") return moveCurrentResult(state, 1);
       if (action.type === "PREVIOUS") return moveCurrentResult(state, -1);
-      if (action.type === "CONFIRM_PLAN") return { ...state, mode: "confirmed" };
+      if (
+        action.type === "CONFIRM_PLAN" &&
+        state.results.length > 0 &&
+        state.currentResultIndex === state.results.length - 1
+      ) {
+        return { ...state, mode: "confirmed" };
+      }
     }
 
     return state;
@@ -114,10 +128,13 @@
       throw new Error("Review panel requires a browser document");
     }
 
+    const previousApi = globalThis.__PAGE_DELIVERY_REVIEW__;
+    if (previousApi?.destroy) previousApi.destroy({ removeHost: false });
+
     let state = createReviewState(session);
     const storageKey = buildStorageKey(state.deliveryUnitKey);
     const draft = readDraft(storageKey);
-    state = restoreDraft(state, draft);
+    state = restoreDraft(state, draft, Date.now());
 
     if (activeRuntime) activeRuntime.destroy({ removeHost: false });
 
@@ -160,6 +177,11 @@
         localStorage.setItem(
           storageKey,
           JSON.stringify({
+            sessionId: state.sessionId,
+            reviewRound: state.reviewRound,
+            planFingerprint: state.planFingerprint,
+            artifactRuleFingerprint: state.artifactRuleFingerprint,
+            savedAt: Date.now(),
             cards: state.cards.map(({ id, conclusion, userNote }) => ({ id, conclusion, userNote })),
             currentCardIndex: state.currentCardIndex,
             collapsed,
@@ -348,6 +370,7 @@
     host.style.setProperty("display", "block", "important");
     host.style.setProperty("width", `${FALLBACK_PANEL_SIZE.width}px`, "important");
     host.style.setProperty("max-width", "calc(100vw - 16px)", "important");
+    host.style.setProperty("max-height", "calc(100vh - 16px)", "important");
   }
 
   function readDraft(storageKey) {
@@ -359,8 +382,8 @@
     }
   }
 
-  function restoreDraft(state, draft) {
-    if (!draft || !Array.isArray(draft.cards)) return state;
+  function restoreDraft(state, draft, now = Date.now()) {
+    if (!isFreshMatchingDraft(state, draft, now)) return state;
     const edits = new Map(
       draft.cards
         .filter((card) => card && typeof card === "object" && isNonEmptyString(card.id))
@@ -376,21 +399,32 @@
         const saved = edits.get(card.id);
         if (!saved) return card;
         const patch = {};
-        if (isNonEmptyString(saved.conclusion)) patch.conclusion = saved.conclusion;
+        if (USER_CONCLUSIONS.has(saved.conclusion)) patch.conclusion = saved.conclusion;
         if (typeof saved.userNote === "string") patch.userNote = saved.userNote;
         return Object.keys(patch).length ? { ...deepClone(card), ...patch } : card;
       }),
     };
   }
 
+  function isFreshMatchingDraft(state, draft, now) {
+    if (!draft || !Array.isArray(draft.cards) || !Number.isFinite(draft.savedAt)) return false;
+    if (draft.savedAt > now || now - draft.savedAt > DRAFT_TTL_MS) return false;
+    return (
+      draft.sessionId === state.sessionId &&
+      draft.reviewRound === state.reviewRound &&
+      draft.planFingerprint === state.planFingerprint &&
+      draft.artifactRuleFingerprint === state.artifactRuleFingerprint
+    );
+  }
+
   function panelCss() {
     return `
       :host { all: initial; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #172033; }
       * { box-sizing: border-box; }
-      [data-review-panel] { background: #fff !important; border: 1px solid #cbd5e1; border-radius: 10px; box-shadow: 0 12px 28px rgba(15, 23, 42, .22); color: #172033 !important; overflow: hidden; }
+      [data-review-panel] { background: #fff !important; border: 1px solid #cbd5e1; border-radius: 10px; box-shadow: 0 12px 28px rgba(15, 23, 42, .22); color: #172033 !important; display: flex; flex-direction: column; max-height: calc(100vh - 16px); overflow: hidden; }
       [data-review-panel-titlebar] { align-items: center; background: #0f172a; color: #fff; cursor: grab; display: flex; font-size: 14px; font-weight: 600; justify-content: space-between; min-height: 40px; padding: 0 10px; touch-action: none; }
       [data-review-panel-titlebar] button { cursor: pointer; }
-      [data-review-body] { display: grid; gap: 10px; padding: 12px; }
+      [data-review-body] { display: grid; gap: 10px; max-height: calc(100vh - 56px); min-height: 0; overflow-y: auto; padding: 12px; }
       [data-review-card], [data-review-result] { border: 1px solid #e2e8f0; border-radius: 7px; padding: 10px; }
       label { display: grid; gap: 4px; font-size: 12px; font-weight: 600; }
       textarea, select { font: inherit; min-width: 0; padding: 6px; }
@@ -405,15 +439,19 @@
 
   function panelMarkup(state, collapsed) {
     const currentCard = state.cards[state.currentCardIndex];
+    const isResultMode = state.mode === "result" || state.mode === "confirmed";
+    const currentResult = isResultMode ? state.results[state.currentResultIndex] : null;
     const disabled = state.mode !== "input" ? " disabled" : "";
     const escape = escapeHtml;
-    const reviewDomain = currentCard?.reviewDomain || "未分类";
+    const reviewDomain = (isResultMode ? currentResult?.reviewDomain : currentCard?.reviewDomain) || "未分类";
     const sessionCount = Number.isFinite(state.sessionCount) ? state.sessionCount : state.cards.length;
     const objectiveCount = Number.isFinite(state.objectiveCount) ? state.objectiveCount : state.cards.length;
-    const header = `<header data-review-panel-titlebar><span data-review-context>${escape(reviewDomain)} · ${state.currentCardIndex + 1}/${state.cards.length} · 会话 ${sessionCount} · 目标 ${objectiveCount}</span><button type="button" data-action="toggle-collapse">${collapsed ? "展开" : "收起"}</button></header>`;
+    const contextIndex = isResultMode ? state.currentResultIndex + 1 : state.currentCardIndex + 1;
+    const contextLength = isResultMode ? state.results.length : state.cards.length;
+    const header = `<header data-review-panel-titlebar><span data-review-context>${escape(reviewDomain)} · ${contextIndex}/${contextLength} · 会话 ${sessionCount} · 目标 ${objectiveCount}</span><button type="button" data-action="toggle-collapse">${collapsed ? "展开" : "收起"}</button></header>`;
     if (collapsed) return header;
     if (state.mode === "result" || state.mode === "confirmed") {
-      const result = state.results[state.currentResultIndex];
+      const result = currentResult;
       const lastResult = state.currentResultIndex >= state.results.length - 1;
       const resultMarkup = result
         ? `<article data-review-result data-result-id="${escape(result.id)}"><strong>${escape(result.conclusion)}</strong> ${escape(result.id)}${result.summary ? `<p data-result-summary>${escape(result.summary)}</p>` : ""}${result.planChangeSummary ? `<p data-result-plan-change-summary>${escape(result.planChangeSummary)}</p>` : ""}</article>`
@@ -509,6 +547,9 @@
   }
 
   function submit(state) {
+    if (state.cards.length === 0) {
+      return { ...state, lastError: "No active review cards to submit" };
+    }
     const submissionVersion = state.submissionVersion + 1;
     const snapshot = deepFreeze({
       sessionId: state.sessionId,
@@ -539,6 +580,9 @@
 
     if (!Array.isArray(action.results)) {
       return { ...state, lastError: "Invalid review results" };
+    }
+    if (action.results.length === 0) {
+      return { ...state, lastError: "Empty review results cannot be confirmed" };
     }
     if (!action.results.every(isResult)) {
       return { ...state, lastError: "Invalid review results" };
@@ -573,11 +617,13 @@
   }
 
   function sanitizePanelItem(item) {
-    const sanitized = deepClone(item);
-    for (const field of PANEL_ITEM_ARTIFACT_FIELDS) {
-      delete sanitized[field];
-    }
-    return sanitized;
+    if (Array.isArray(item)) return item.map(sanitizePanelItem);
+    if (!item || typeof item !== "object") return item;
+    return Object.fromEntries(
+      Object.entries(item)
+        .filter(([key]) => !PANEL_ITEM_ARTIFACT_FIELDS.has(key))
+        .map(([key, value]) => [key, sanitizePanelItem(value)]),
+    );
   }
 
   function isReviewState(state) {
@@ -635,7 +681,10 @@
     buildStorageKey,
     clampPanelPosition,
     createReviewState,
+    DRAFT_TTL_MS,
     reduceReviewState,
+    restoreDraft,
+    sanitizePanelItem,
     selectRoundCards,
     mountReviewPanel,
   };

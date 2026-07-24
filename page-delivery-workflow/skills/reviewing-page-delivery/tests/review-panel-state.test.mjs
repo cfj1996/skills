@@ -8,7 +8,10 @@ const {
   buildStorageKey,
   clampPanelPosition,
   createReviewState,
+  DRAFT_TTL_MS,
   reduceReviewState,
+  restoreDraft,
+  sanitizePanelItem,
   selectRoundCards,
 } = require("../scripts/inject-review-panel.js");
 
@@ -101,7 +104,7 @@ test("apply result requires both matching session and submission version", () =>
     type: "APPLY_RESULT",
     sessionId: "session-1",
     submissionVersion: 1,
-    results: [],
+    results: [{ id: "matched-result", conclusion: "已确认" }],
   });
   assert.equal(state.mode, "result");
 });
@@ -128,7 +131,7 @@ test("result cards sort blocking, pending modification, conflict, then other", (
   ]);
 });
 
-test("confirm plan is accepted only from result mode", () => {
+test("confirm plan requires the final non-empty result", () => {
   const input = createReviewState(session);
   assert.equal(reduceReviewState(input, { type: "CONFIRM_PLAN" }), input);
 
@@ -137,10 +140,85 @@ test("confirm plan is accepted only from result mode", () => {
     type: "APPLY_RESULT",
     sessionId: "session-1",
     submissionVersion: 1,
-    results: [],
+    results: [
+      { id: "first", conclusion: "阻塞" },
+      { id: "last", conclusion: "待修改" },
+    ],
   });
+  assert.equal(reduceReviewState(result, { type: "CONFIRM_PLAN" }), result);
+  result = reduceReviewState(result, { type: "NEXT" });
+  assert.equal(result.currentResultIndex, 1);
   result = reduceReviewState(result, { type: "CONFIRM_PLAN" });
   assert.equal(result.mode, "confirmed");
+});
+
+test("active-card submission and empty results stay out of confirmable result mode", () => {
+  const emptyRound = createReviewState({
+    ...session,
+    cards: [{ id: "resolved", conclusion: "已确认", reopened: false, evidenceChanged: false }],
+  });
+  const blockedSubmit = reduceReviewState(emptyRound, { type: "SUBMIT" });
+  assert.equal(blockedSubmit.mode, "input");
+  assert.match(blockedSubmit.lastError, /active/i);
+
+  const reviewing = reduceReviewState(createReviewState(session), { type: "SUBMIT" });
+  const emptyResults = reduceReviewState(reviewing, {
+    type: "APPLY_RESULT",
+    sessionId: "session-1",
+    submissionVersion: 1,
+    results: [],
+  });
+  assert.equal(emptyResults.mode, "reviewing");
+  assert.match(emptyResults.lastError, /empty/i);
+});
+
+test("draft restore requires matching fresh metadata and clamps only valid editable fields", () => {
+  const state = createReviewState(session);
+  const savedAt = 1_000;
+  const validDraft = {
+    sessionId: state.sessionId,
+    reviewRound: state.reviewRound,
+    planFingerprint: state.planFingerprint,
+    artifactRuleFingerprint: state.artifactRuleFingerprint,
+    savedAt,
+    currentCardIndex: 999,
+    cards: [{ id: "REV-002", conclusion: "阻塞", userNote: "可恢复" }],
+  };
+  const restored = restoreDraft(state, validDraft, savedAt + DRAFT_TTL_MS);
+  assert.equal(restored.currentCardIndex, state.cards.length - 1);
+  assert.equal(restored.cards[0].conclusion, "阻塞");
+
+  for (const [draft, now] of [
+    [{ ...validDraft, sessionId: "other" }, savedAt + DRAFT_TTL_MS],
+    [{ ...validDraft, reviewRound: state.reviewRound + 1 }, savedAt + DRAFT_TTL_MS],
+    [{ ...validDraft, savedAt: savedAt - 1 }, savedAt + DRAFT_TTL_MS + 1],
+    [{ ...validDraft, cards: [{ id: "REV-002", conclusion: "冲突", userNote: "tampered" }] }, savedAt + DRAFT_TTL_MS],
+  ]) {
+    const candidate = restoreDraft(state, draft, now);
+    assert.equal(candidate.cards[0].conclusion, state.cards[0].conclusion);
+    assert.equal(
+      candidate.currentCardIndex,
+      draft.cards[0].conclusion === "冲突" ? state.cards.length - 1 : state.currentCardIndex,
+    );
+  }
+});
+
+test("sanitizer removes nested artifact locations but preserves evidence paths and telepath", () => {
+  const sanitized = sanitizePanelItem({
+    id: "nested",
+    conclusion: "待修改",
+    artifactPath: "/private/root",
+    evidence: {
+      path: "/evidence/keep.png",
+      locator: "figma://keep",
+      artifactUrl: "https://private.example/evidence",
+    },
+    nested: [{ artifactPath: "/private/nested", telepath: "keep-me" }],
+  });
+  assert.doesNotMatch(JSON.stringify(sanitized), /private/);
+  assert.equal(sanitized.evidence.path, "/evidence/keep.png");
+  assert.equal(sanitized.evidence.locator, "figma://keep");
+  assert.equal(sanitized.nested[0].telepath, "keep-me");
 });
 
 test("reducer preserves fingerprints and excludes actual artifact paths", () => {
@@ -246,7 +324,7 @@ test("state transitions are one-way and reject actions outside their mode", () =
     type: "APPLY_RESULT",
     sessionId: "session-1",
     submissionVersion: 1,
-    results: [],
+    results: [{ id: "matched-result", conclusion: "已确认" }],
   });
   assert.equal(result.mode, "result");
   const confirmed = reduceReviewState(result, { type: "CONFIRM_PLAN" });

@@ -8,13 +8,11 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
     target?.dispatchEvent(new PointerEvent(type, { bubbles: true, clientX: x, clientY: y, pointerId }));
   const panel = () => document.querySelector("[data-page-delivery-review-host]")?.shadowRoot;
   const state = () => globalThis.__PAGE_DELIVERY_REVIEW__?.getState?.();
-  const submittedEvents = [];
-  const originalDebug = console.debug;
-  console.debug = (...args) => {
-    if (args[0] === "PAGE_DELIVERY_REVIEW_SUBMITTED" || args[0] === "PAGE_DELIVERY_PLAN_CONFIRM_REQUESTED") {
-      submittedEvents.push(args);
-    }
-  };
+  const consoleEvents = [];
+  const consoleMethods = ["debug", "log", "info", "warn", "error"];
+  const originalConsole = Object.fromEntries(consoleMethods.map((method) => [method, console[method]]));
+  for (const method of consoleMethods) console[method] = (...args) => consoleEvents.push({ method, args });
+  const submittedEvents = () => consoleEvents.filter(({ args }) => args[0] === "PAGE_DELIVERY_REVIEW_SUBMITTED" || args[0] === "PAGE_DELIVERY_PLAN_CONFIRM_REQUESTED");
 
   try {
     const host = document.querySelector("[data-page-delivery-review-host]");
@@ -22,6 +20,7 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
     check(Boolean(host?.shadowRoot), "review host should use an open Shadow Root");
     check(panel()?.querySelectorAll("[data-review-card]").length === 1, "exactly one review card should be rendered");
     check(panel()?.querySelector("[data-review-card]")?.getAttribute("data-card-id") === "REV-002", "round should begin with the first active card");
+    check(!JSON.stringify(state()).includes("/private/evidence-source"), "initial state must recursively sanitize nested artifact locations");
     check(getComputedStyle(panel()?.querySelector("[data-review-panel]")).color !== "rgb(0, 255, 0)", "host-page important styles must not pollute panel body color");
     check(panel()?.querySelector("[data-review-context]")?.textContent.includes("交互验收"), "header should render the review domain");
     check(panel()?.querySelector("[data-review-context]")?.textContent.includes("1/3"), "header should render the card sequence");
@@ -32,7 +31,10 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
     check(Boolean(panel()?.querySelector("[data-card-related-refs]")), "card should render related refs when present");
     check([...panel()?.querySelectorAll('[data-field="conclusion"] option') || []].map((option) => option.value).join(",") === "未评审,已确认,待修改,阻塞,不适用", "input conclusions should use the fixed allowed set");
 
+    let legacyDestroyCalls = 0;
+    globalThis.__PAGE_DELIVERY_REVIEW__ = { destroy: () => { legacyDestroyCalls += 1; } };
     globalThis.PageDeliveryReviewPanel.mountReviewPanel(globalThis.reviewSession);
+    check(legacyDestroyCalls === 1, "mount should destroy a previous script instance API before adding listeners");
     check(document.querySelectorAll("[data-page-delivery-review-host]").length === 1, "mount should be idempotent and retain one host");
 
     click(panel()?.querySelector('[data-action="next"]'));
@@ -58,6 +60,7 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
     check(Boolean(localStorage.getItem(`page-delivery-review:v1:${globalThis.reviewSession.deliveryUnitKey}`)), "editable draft should be persisted");
     const persistedDraft = JSON.parse(localStorage.getItem(`page-delivery-review:v1:${globalThis.reviewSession.deliveryUnitKey}`));
     check(persistedDraft.currentCardIndex === 1, "draft should persist the current input card index");
+    check(persistedDraft.sessionId === "session-1" && persistedDraft.reviewRound === 2 && persistedDraft.planFingerprint === "sha256:fixture" && persistedDraft.artifactRuleFingerprint === "sha256:rule-fixture" && Number.isFinite(persistedDraft.savedAt), "draft should persist matching metadata and a saved timestamp");
     check(!JSON.stringify(persistedDraft).includes("evidence") && !JSON.stringify(persistedDraft).includes("results"), "draft must exclude evidence and results");
     check(saved?.collapsed === true, "collapse state should be persisted");
     check(saved?.panelPosition?.x >= 0 && saved?.panelPosition?.y >= 0, "drag position should stay inside the viewport");
@@ -84,10 +87,11 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
     click(panel()?.querySelector('[data-action="submit"]'));
     check(state()?.mode === "reviewing", "submit should enter reviewing mode");
     check(panel()?.querySelector('[data-field="userNote"]')?.disabled === true, "submit should freeze inputs");
-    check(submittedEvents.length === 1 && submittedEvents[0][0] === "PAGE_DELIVERY_REVIEW_SUBMITTED", "submit should emit exactly the lightweight submit event");
-    check(Object.keys(submittedEvents[0]?.[1] || {}).sort().join(",") === "sessionId,submissionVersion", "submit event should omit full submission data");
+    check(submittedEvents().length === 1 && submittedEvents()[0].args[0] === "PAGE_DELIVERY_REVIEW_SUBMITTED", "submit should emit exactly the lightweight submit event");
+    check(Object.keys(submittedEvents()[0]?.args[1] || {}).sort().join(",") === "sessionId,submissionVersion", "submit event should omit full submission data");
     const submission = globalThis.__PAGE_DELIVERY_REVIEW__.exportSubmission();
     check(submission?.cards?.length === 3 && submission?.sessionId === "session-1", "exportSubmission should return the complete frozen snapshot");
+    check(!JSON.stringify(submission).includes("/private/evidence-source"), "submission must recursively sanitize nested artifact locations");
 
     globalThis.__PAGE_DELIVERY_REVIEW__.applyResult({
       sessionId: submission.sessionId,
@@ -96,12 +100,14 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
         { id: "other", conclusion: "已确认", summary: "全部接受", planChangeSummary: "无需调整 Plan" },
         { id: "conflict", conclusion: "冲突" },
         { id: "pending", conclusion: "待修改" },
-        { id: "blocking", conclusion: "阻塞" },
+        { id: "blocking", conclusion: "阻塞", reviewDomain: "结果域", nested: { artifactPath: "/private/result" } },
       ],
     });
     check(state()?.mode === "result", "matching result should enter result mode");
     check(panel()?.querySelectorAll("[data-review-result]").length === 1, "result mode should render exactly one result card");
     check(panel()?.querySelector("[data-review-result]")?.getAttribute("data-result-id") === "blocking", "results should begin with blocking items");
+    check(panel()?.querySelector("[data-review-context]")?.textContent.includes("结果域") && panel()?.querySelector("[data-review-context]")?.textContent.includes("1/4"), "result header should use the result domain and result sequence");
+    check(!JSON.stringify(state()).includes("/private/result") && !panel()?.textContent.includes("/private/result"), "result state and DOM must not leak nested artifact locations");
     check(!panel()?.querySelector('[data-action="confirm-plan"]'), "only the last result card should offer plan confirmation");
     click(panel()?.querySelector('[data-action="next"]'));
     check(panel()?.querySelector("[data-review-result]")?.getAttribute("data-result-id") === "pending", "result navigation should preserve priority order");
@@ -111,17 +117,29 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
     check(Boolean(panel()?.querySelector("[data-result-summary]")) && Boolean(panel()?.querySelector("[data-result-plan-change-summary]")), "last result should render available summary and plan change summary");
     check(Boolean(panel()?.querySelector('[data-action="confirm-plan"]')), "last result card should offer plan confirmation");
     click(panel()?.querySelector('[data-action="confirm-plan"]'));
-    check(submittedEvents.some((event) => event[0] === "PAGE_DELIVERY_PLAN_CONFIRM_REQUESTED"), "confirm should emit a plan confirmation event");
+    check(submittedEvents().some((event) => event.args[0] === "PAGE_DELIVERY_PLAN_CONFIRM_REQUESTED"), "confirm should emit a plan confirmation event");
     check(state()?.mode === "confirmed", "confirm should transition only the panel state");
+    check(consoleEvents.length === 2 && consoleEvents.every(({ method, args }) => method === "debug" && ["PAGE_DELIVERY_REVIEW_SUBMITTED", "PAGE_DELIVERY_PLAN_CONFIRM_REQUESTED"].includes(args[0]) && !JSON.stringify(args).includes("/private")), "console should emit only the two lightweight events without full submission data");
 
+    window.dispatchEvent(new Event("resize"));
+    const panelRect = document.querySelector("[data-page-delivery-review-host]").getBoundingClientRect();
+    check(panelRect.bottom <= innerHeight + 1, "panel bottom should remain reachable after resize");
+    check(["auto", "scroll"].includes(getComputedStyle(panel()?.querySelector("[data-review-body]")).overflowY), "long panel body should scroll within a viewport bound");
+
+    const destroyedStorage = localStorage.getItem(`page-delivery-review:v1:${globalThis.reviewSession.deliveryUnitKey}`);
+    const destroyedState = state();
     globalThis.__PAGE_DELIVERY_REVIEW__.destroy();
+    pointer(document, "pointermove", 1, 1);
+    pointer(document, "pointerup", 1, 1);
+    window.dispatchEvent(new Event("resize"));
     check(!document.querySelector("[data-page-delivery-review-host]"), "destroy should remove the host");
     check(!document.querySelector("[data-review-evidence-overlay]"), "destroy should remove evidence overlays");
     check(!globalThis.__PAGE_DELIVERY_REVIEW__, "destroy should remove the temporary global API");
+    check(localStorage.getItem(`page-delivery-review:v1:${globalThis.reviewSession.deliveryUnitKey}`) === destroyedStorage && destroyedState?.mode === "confirmed", "destroy should remove listeners so pointer and resize events cannot mutate state or storage");
   } catch (error) {
     failures.push(`assertion execution failed: ${error?.message || error}`);
   } finally {
-    console.debug = originalDebug;
+    for (const method of consoleMethods) console[method] = originalConsole[method];
   }
 
   return { valid: failures.length === 0, failures };
