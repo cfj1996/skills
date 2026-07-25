@@ -8,14 +8,23 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
     target?.dispatchEvent(new PointerEvent(type, { bubbles: true, clientX: x, clientY: y, pointerId }));
   const panel = () => document.querySelector("[data-page-delivery-review-host]")?.shadowRoot;
   const state = () => globalThis.__PAGE_DELIVERY_REVIEW__?.getState?.();
-  const canonicalCard = (overrides = {}) => ({
-    ...structuredClone(globalThis.reviewSession.cards[1]),
-    id: "browser-card",
-    conclusion: "待修改",
-    reopened: false,
-    evidenceChanged: false,
-    ...overrides,
-  });
+  const canonicalCard = (overrides = {}) => {
+    const card = {
+      ...structuredClone(globalThis.reviewSession.cards[1]),
+      id: "browser-card",
+      conclusion: "待修改",
+      reopened: false,
+      evidenceChanged: false,
+      ...overrides,
+    };
+    if (!overrides.implementationPlan) {
+      card.implementationPlan = {
+        ...card.implementationPlan,
+        evidenceIds: card.sourceEvidence.map((evidence) => evidence.id),
+      };
+    }
+    return card;
+  };
   const consoleEvents = [];
   const consoleMethods = ["debug", "log", "info", "warn", "error"];
   const originalConsole = Object.fromEntries(consoleMethods.map((method) => [method, console[method]]));
@@ -51,12 +60,22 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
     check(!JSON.stringify(state()).includes("/private/evidence-source"), "initial state must recursively sanitize nested artifact locations");
     check(getComputedStyle(panel()?.querySelector("[data-review-panel]")).color !== "rgb(0, 255, 0)", "host-page important styles must not pollute panel body color");
     check(panel()?.querySelector("[data-review-context]")?.textContent.includes("交互验收"), "header should render the review domain");
+    check(panel()?.querySelector("[data-review-title]")?.textContent.includes("登录模块 功能评审"), "header should render the delivery unit review title");
     check(panel()?.querySelector("[data-review-context]")?.textContent.includes("1/3"), "header should render the card sequence");
     check(panel()?.querySelector("[data-review-context]")?.textContent.includes("会话 3") && panel()?.querySelector("[data-review-context]")?.textContent.includes("目标 3"), "header should derive canonical session and objective counts from active cards");
+    check(panel()?.querySelectorAll("[data-review-list-item]").length === 3, "left navigation should list every active review card");
+    check(panel()?.querySelector("[data-review-list-item][aria-current='true']")?.getAttribute("data-card-index") === "0", "left navigation should mark the current card");
+    check(panel()?.querySelectorAll("[data-review-status-summary] [data-review-status]").length === 5, "header should summarize all fixed review statuses");
+    check(panel()?.querySelectorAll("[data-review-conclusion-group] [data-action='select-conclusion']").length === 5, "conclusion should use five exclusive buttons");
+    check(!panel()?.querySelector("select[data-field='conclusion']"), "conclusion should not use a select input");
+    check(panel()?.querySelector("[data-review-resize-edge='left']") && !panel()?.querySelector("[data-review-resize-edge='right']"), "right-docked panel should expose only its left resize edge");
+    check(Boolean(panel()?.querySelector("[data-review-implementation-summary]")), "detail should lead with one implementation summary");
+    check(panel()?.querySelectorAll("[data-review-implementation-section]").length === 4, "detail should show exactly four implementation summary blocks");
+    check(Boolean(panel()?.querySelector("[data-review-implementation-evidence]")), "supporting implementation evidence should remain available in a disclosure");
     for (const field of ["dimension", "links", "sourceEvidence", "reviewGoal", "design", "regionAndComponents", "interactionStates", "relatedApis", "mockScenarios", "acceptanceCriteria"]) {
       check(Boolean(panel()?.querySelector(`[data-card-field="${field}"]`)), `card should render ${field} when present`);
     }
-    check([...panel()?.querySelectorAll('[data-field="conclusion"] option') || []].map((option) => option.value).join(",") === "未评审,已确认,待修改,阻塞,不适用", "input conclusions should use the fixed allowed set");
+    check([...panel()?.querySelectorAll('[data-action="select-conclusion"]') || []].map((button) => button.dataset.value).join(",") === "未评审,已确认,待修改,阻塞,不适用", "input conclusions should use the fixed allowed set");
 
     const storageKey = `page-delivery-review:v1:${globalThis.reviewSession.deliveryUnitKey}`;
     const baseDraft = {
@@ -92,13 +111,22 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
     check(panel()?.querySelectorAll("[data-review-card]").length === 1, "next should still render one card");
     check(panel()?.querySelector("[data-review-card]")?.getAttribute("data-card-id") === "REV-003", "next should change the current card");
     click(panel()?.querySelector('[data-action="previous"]'));
-    check(panel()?.querySelector("[data-review-card]")?.getAttribute("data-card-id") === "REV-002", "previous should restore the prior card");
+
+    click(panel()?.querySelector('[data-review-list-item][data-card-index="2"]'));
+    check(panel()?.querySelector("[data-review-card]")?.getAttribute("data-card-id") === "REV-004", "clicking a list item should select its detail");
+    check(panel()?.querySelector("[data-review-list-item][aria-current='true']")?.getAttribute("data-card-index") === "2", "list selection and detail should stay synchronized");
+    click(panel()?.querySelector('[data-action="previous"]'));
+    check(panel()?.querySelector("[data-review-card]")?.getAttribute("data-card-id") === "REV-003", "previous should select the adjacent prior card");
     check(!panel()?.querySelector('[data-action="submit"]'), "only the last input card should offer submission");
     click(panel()?.querySelector('[data-action="next"]'));
     click(panel()?.querySelector('[data-action="next"]'));
     check(panel()?.querySelector("[data-review-card]")?.getAttribute("data-card-id") === "REV-004", "input navigation should reach the last card");
     check(Boolean(panel()?.querySelector('[data-action="submit"]')), "last input card should offer submission");
     click(panel()?.querySelector('[data-action="previous"]'));
+
+    click(panel()?.querySelector('[data-action="select-conclusion"][data-value="阻塞"]'));
+    check(state()?.cards?.[state()?.currentCardIndex]?.conclusion === "阻塞", "conclusion button group should update the current card");
+    check(panel()?.querySelector('[data-action="select-conclusion"][data-value="阻塞"]')?.getAttribute("aria-pressed") === "true", "selected conclusion button should expose its selected state");
 
     const note = panel()?.querySelector('[data-field="userNote"]');
     note.value = "恢复这条草稿";
@@ -114,9 +142,10 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
     check(persistedDraft.sessionId === "session-1" && persistedDraft.reviewRound === 2 && persistedDraft.planFingerprint === "sha256:fixture" && persistedDraft.artifactRuleFingerprint === "sha256:rule-fixture" && Number.isFinite(persistedDraft.savedAt), "draft should persist matching metadata and a saved timestamp");
     check(!JSON.stringify(persistedDraft).includes("evidence") && !JSON.stringify(persistedDraft).includes("results"), "draft must exclude evidence and results");
     check(saved?.collapsed === true, "collapse state should be persisted");
+    check(Number.isFinite(saved?.panelWidth) && ["left", "right", "floating"].includes(saved?.dockSide), "panel width and dock side should be exposed in runtime state");
     check(saved?.panelPosition?.x >= 0 && saved?.panelPosition?.y >= 0, "drag position should stay inside the viewport");
     check(saved?.panelPosition?.x <= innerWidth && saved?.panelPosition?.y <= innerHeight, "drag position should be clamped to the viewport");
-    check(saved?.panelPosition?.x === 0 || saved?.panelPosition?.x >= innerWidth - 340, "drag should snap to a horizontal viewport edge");
+    check(saved?.panelPosition?.x === 0 || saved?.panelPosition?.x >= innerWidth - saved?.panelWidth - 1, "drag should snap to a horizontal viewport edge");
 
     globalThis.__PAGE_DELIVERY_REVIEW__.destroy();
     globalThis.PageDeliveryReviewPanel.mountReviewPanel(globalThis.reviewSession);

@@ -44,6 +44,88 @@ test("accepts page or module delivery units and rejects other scopes", () => {
   assert.match(errorMessages(result), /deliveryUnit\.kind/);
 });
 
+test("requires every feature to classify its own API need with decision evidence", () => {
+  const noApiNeed = structuredClone(validModel);
+  noApiNeed.features[0].apiNeed = "none";
+  noApiNeed.features[0].apiDecisionEvidenceRefs = ["E-001"];
+  noApiNeed.features[0].apiRefs = [];
+  noApiNeed.apis = [];
+  noApiNeed.tasks[0].apiRefs = [];
+  assert.equal(validatePagePlanModel(noApiNeed).valid, true);
+
+  const missingEvidence = structuredClone(noApiNeed);
+  missingEvidence.features[0].apiDecisionEvidenceRefs = [];
+  assert.match(errorMessages(validatePagePlanModel(missingEvidence)), /API decision evidence/);
+
+  const leakedModuleConclusion = structuredClone(noApiNeed);
+  leakedModuleConclusion.features[0].apiRefs = ["API-001"];
+  leakedModuleConclusion.apis = structuredClone(validModel.apis);
+  assert.match(errorMessages(validatePagePlanModel(leakedModuleConclusion)), /apiNeed none.*apiRefs/i);
+});
+
+test("requires every Plan feature to preserve a ready evidence-backed implementation contract", () => {
+  const missing = structuredClone(validModel);
+  delete missing.features[0].implementationPlan;
+  assert.match(errorMessages(validatePagePlanModel(missing)), /implementationPlan is required/);
+
+  const incomplete = structuredClone(validModel);
+  incomplete.features[0].implementationPlan.linkage = [];
+  assert.match(errorMessages(validatePagePlanModel(incomplete)), /implementationPlan\.linkage/);
+
+  const blocked = structuredClone(validModel);
+  blocked.features[0].implementationPlan.status = "blocked";
+  blocked.features[0].implementationPlan.blockers = ["组件体系尚未确认"];
+  assert.match(errorMessages(validatePagePlanModel(blocked)), /implementationPlan\.status must be ready/);
+
+  const unsupportedEvidence = structuredClone(validModel);
+  unsupportedEvidence.features[0].implementationPlan.evidenceIds = ["E-404"];
+  assert.match(errorMessages(validatePagePlanModel(unsupportedEvidence)), /implementationPlan\.evidenceIds references missing evidence id: E-404/);
+});
+
+test("requires API facts to separate capability, runtime scope, and delivery relation", () => {
+  const model = structuredClone(validModel);
+  model.features[0].apiNeed = "required";
+  model.features[0].apiDecisionEvidenceRefs = ["E-001"];
+  model.apis[0].status = "已有正式契约";
+  model.apis[0].capabilityDomain = "身份与会话";
+  model.apis[0].runtimeScopes = ["application", "session"];
+  model.apis[0].formalSourceEvidenceRefs = ["E-001"];
+  model.apis[0].deliveryRelations = [
+    { featureRef: "F-001", relation: "直接消费" },
+  ];
+  assert.equal(validatePagePlanModel(model).valid, true);
+
+  for (const field of ["capabilityDomain", "runtimeScopes", "formalSourceEvidenceRefs", "deliveryRelations"]) {
+    const missing = structuredClone(model);
+    delete missing.apis[0][field];
+    assert.match(errorMessages(validatePagePlanModel(missing)), new RegExp(field));
+  }
+});
+
+test("accepts inherited API dependencies without inventing implementation tasks", () => {
+  const model = structuredClone(validModel);
+  model.features[0].apiNeed = "required";
+  model.features[0].apiDecisionEvidenceRefs = ["E-001"];
+  model.features[0].taskRefs = [];
+  model.apis[0].status = "已有正式契约";
+  model.apis[0].capabilityDomain = "身份与会话";
+  model.apis[0].runtimeScopes = ["application", "session"];
+  model.apis[0].formalSourceEvidenceRefs = ["E-001"];
+  model.apis[0].deliveryRelations = [
+    { featureRef: "F-001", relation: "继承依赖" },
+  ];
+  model.apis[0].taskRefs = [];
+  model.tasks = [];
+  assert.equal(validatePagePlanModel(model).valid, true);
+});
+
+test("does not model no-API decisions as API statuses", () => {
+  assert.ok(STATUS_MODEL.api.includes("已有正式契约"));
+  assert.ok(STATUS_MODEL.api.includes("正式契约缺失"));
+  assert.ok(!STATUS_MODEL.api.includes("不涉及接口"));
+  assert.ok(!STATUS_MODEL.api.includes("不适用"));
+});
+
 test("requires an AGENTS-owned artifact location rule without defaults", () => {
   const missing = structuredClone(validModel);
   delete missing.artifactLocationRule;
@@ -117,6 +199,9 @@ test("accumulates structural errors for primitive collection items and non-array
 test("accepts prototype-named IDs through Map indexes", () => {
   const model = structuredClone(validModel);
   model.evidence[0].id = "__proto__";
+  model.features[0].apiDecisionEvidenceRefs = ["__proto__"];
+  model.features[0].implementationPlan.evidenceIds = ["__proto__"];
+  model.apis[0].formalSourceEvidenceRefs = ["__proto__"];
   for (const collectionName of ["features", "uiStates", "apis", "dependencies", "tasks", "acceptances"]) {
     model[collectionName][0].evidenceRefs = ["__proto__"];
   }

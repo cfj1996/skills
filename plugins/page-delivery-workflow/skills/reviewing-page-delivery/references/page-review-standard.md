@@ -25,20 +25,55 @@ Plan 和 Draft OpenAPI 位置只能来自适用项目 `AGENTS.md` 或其委托�
 
 按证据优先级核对：适用项目规范与明确委托规范、用户已确认业务事实、正式契约来源、PRD、原型、已有 Plan/Draft 与仓库惯例。仓库惯例只能作为位置规则候选，不是正式规则。无法可靠定位的证据只说明原因，不猜测选择器或事实。
 
-每张临时评审卡均包含：临时卡片编号、评审域、关联的 Plan 功能点/API/UI 状态/页面依赖/任务/证据编号、来源证据、评审目标、设计方案、页面区域、布局和组件、交互状态、关联 API、Mock 场景、验收标准、用户结论和用户备注。卡片是会话临时数据，不是独立长期记录。
+生成评审卡前，先按 [API 契约阶段](api-contract-stages.md) 建立消费需求清单。拆分粒度必须保证每个消费点只有一种 API 需求结论；页面内容区、应用壳层、路由守卫、权限入口、跨页面状态和会话级能力不得因处于同一交付单元而合并判断。对每个消费点记录 API 需求及证据；对每个关联接口分别记录能力归属、运行时范围、正式来源搜索证据和本次交付关系。未完成该清单时不得生成 API 设计或 Mock 设计结论。
+
+应用壳层、跨页面状态和会话级能力可以与当前页面存在消费或继承关系，但不因此归属当前页面或模块。已有能力由上层提供时记录为 `继承依赖`；当前消费点直接绑定时记录为 `直接消费`；确实修改契约时记录为 `契约变更`。无关接口不进入当前 Plan。
+
+每个消费需求生成一张独立的 API 设计卡；不得把 API 维度压缩成一张页面级或模块级汇总卡。使用现有 canonical 卡片字段按固定形状呈现：
+
+- `regionAndComponents`：具体消费点。
+- `reviewGoal`：API 需求 `required` 或 `none` 及判断目标。
+- `design`：能力归属、运行时范围和本次交付关系。
+- `relatedApis`：接口事实清单；`none` 时为空。
+- `sourceEvidence`：API 判断与正式来源搜索证据。
+
+每张临时评审卡均包含：临时卡片编号、评审域、关联的 Plan 功能点/API/UI 状态/页面依赖/任务/证据编号、来源证据、评审目标、设计方案、页面区域、布局和组件、交互状态、关联 API、Mock 场景、验收标准、结构化 `implementationPlan`、用户结论和用户备注。卡片是会话临时数据，不是独立长期记录。
+
+`implementationPlan` 是每个功能点的实施契约，不是额外的长篇说明：
+
+- `status`：`ready` 或 `blocked`。
+- `summary`：一句话实施方案。
+- `structure`：怎么实现；列出项目证据确认的具体组件、组合方式、复用边界和代码落点。
+- `linkage`：怎么联动；使用“触发条件 → 判断/动作 → 状态变化 → 页面反馈”的短流程。
+- `dataFlow`：数据怎么走；说明状态归属、API 消费点、参数/返回映射、请求时机和错误反馈；没有 API 时也明确本地数据流。
+- `acceptanceFocus`：怎么验收；只保留最容易跑偏的三至五项关键场景。
+- `evidenceIds`：引用本卡 `sourceEvidence` 中支撑实施决策的证据编号。
+- `blockers`：尚未由项目规范、依赖、源码、PRD、原型或正式 API 来源确定的实施决策。
+
+只有 `structure`、`linkage`、`dataFlow`、`acceptanceFocus` 和 `evidenceIds`
+全部齐全且 `blockers` 为空时，`status` 才能为 `ready` 并允许确认。组件体系、
+代码落点、触发条件或状态变化缺少证据时，`status` 使用 `blocked`，
+`blockers` 明确缺口，评审结论保持“阻塞”。项目采用 Zan 或其他组件体系时，
+必须写出从消费项目发现的具体组件及复用来源；“使用弹框”“增加筛选”
+“完善表单”等通用名词不构成具体实现方案。
+
+确认更新 Plan 时，必须按功能点原样保留已确认的 `ready` 实施契约：一句话摘要、
+四个实施块与证据引用缺一不可。`validate-page-plan.js` 拒绝缺失、阻塞、内容为空
+或引用不存在证据的 `implementationPlan`，不得在回写时退化为抽象设计描述。
 
 运行时只接受批准的 canonical `ReviewSession`。会话字段为
-`schemaVersion`、`sessionId`、`deliveryUnitKey`、`deliveryUnitKind`、
+`schemaVersion`、`sessionId`、`deliveryUnitKey`、`deliveryUnitKind`、`deliveryUnitName`、
 `artifactRuleFingerprint`、`artifactRuleResolution`、`reviewRound`、
 `planFingerprint`、`submissionVersion`、`mode`、`currentCardIndex`、
 `viewScope` 和 `cards`。卡片字段为 `id`、`dimension`、`links`、
 `sourceEvidence`、`reviewGoal`、`design`、`regionAndComponents`、
 `interactionStates`、`relatedApis`、`mockScenarios`、
-`acceptanceCriteria`、`conclusion`、`userNote`、`reviewResult`、
+`acceptanceCriteria`、`implementationPlan`、`conclusion`、`userNote`、`reviewResult`、
 `reopened`、`evidenceChanged`；普通业务扩展 `telepath` 可选。
 `links` 只包含 features/apis/uiStates/dependencies/tasks/evidence 六组编号，
 `sourceEvidence` 只包含有类型的 id/kind/label/selector/frameSelector/path。
 未知会话、卡片、结果字段不得进入 state、草稿或 submission。
+`deliveryUnitName` 是面板标题使用的页面或内聚模块显示名称，不得从接口能力归属推断。
 
 固定评审维度：
 

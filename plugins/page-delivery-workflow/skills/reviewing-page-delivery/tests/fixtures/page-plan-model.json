@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "deliveryUnit": {
     "id": "UNIT-001",
     "kind": "page",
@@ -17,9 +17,21 @@
     {
       "id": "F-001",
       "status": "待实施",
+      "apiNeed": "required",
+      "apiDecisionEvidenceRefs": ["E-001"],
       "apiRefs": ["API-001"],
       "taskRefs": ["T-001"],
-      "evidenceRefs": ["E-001"]
+      "evidenceRefs": ["E-001"],
+      "implementationPlan": {
+        "status": "ready",
+        "summary": "复用项目现有表单能力完成登录",
+        "structure": ["使用项目确认的表单、字段和按钮组件，并落在现有登录模块"],
+        "linkage": ["点击提交 → 校验 → 请求登录 → 更新会话并跳转"],
+        "dataFlow": ["表单值 → 登录接口 → 会话状态"],
+        "acceptanceFocus": ["校验、失败反馈、重复提交和成功跳转均可验证"],
+        "evidenceIds": ["E-001"],
+        "blockers": []
+      }
     }
   ],
   "uiStates": [
@@ -33,6 +45,15 @@
     {
       "id": "API-001",
       "status": "Draft已确认",
+      "capabilityDomain": "身份与会话",
+      "runtimeScopes": ["page", "session"],
+      "formalSourceEvidenceRefs": ["E-001"],
+      "deliveryRelations": [
+        {
+          "featureRef": "F-001",
+          "relation": "直接消费"
+        }
+      ],
       "featureRefs": ["F-001"],
       "taskRefs": ["T-001"],
       "evidenceRefs": ["E-001"]

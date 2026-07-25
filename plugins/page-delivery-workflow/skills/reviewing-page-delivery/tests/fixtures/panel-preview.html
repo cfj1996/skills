@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Page Delivery Review Panel Preview</title>
+    <style>
+      :root {
+        color: rgba(0, 0, 0, .87);
+        font-family: Roboto, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        background: #f5f7fa;
+        margin: 0;
+        min-height: 100vh;
+      }
+
+      [data-preview-prototype] {
+        margin: 48px auto;
+        max-width: 1120px;
+        padding: 0 24px;
+      }
+
+      .preview-appbar {
+        align-items: center;
+        background: #fff;
+        border-bottom: 1px solid rgba(0, 0, 0, .12);
+        display: flex;
+        height: 64px;
+        justify-content: space-between;
+        padding: 0 24px;
+      }
+
+      .preview-card {
+        background: #fff;
+        border: 1px solid rgba(0, 0, 0, .12);
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, .08);
+        display: grid;
+        gap: 20px;
+        padding: 32px;
+      }
+
+      #login-form {
+        display: grid;
+        gap: 16px;
+        max-width: 360px;
+      }
+
+      input {
+        border: 1px solid rgba(0, 0, 0, .23);
+        border-radius: 4px;
+        min-height: 48px;
+        padding: 0 12px;
+      }
+
+      button {
+        background: #1976d2;
+        border: 0;
+        border-radius: 4px;
+        color: #fff;
+        min-height: 40px;
+        padding: 8px 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="preview-appbar">
+      <strong>原型预览</strong>
+      <span>评审面板开发测试页</span>
+    </header>
+    <main data-preview-prototype>
+      <section class="preview-card">
+        <div>
+          <h1>登录</h1>
+          <p>这是评审面板背后的模拟原型，仅用于开发预览。</p>
+        </div>
+        <form id="login-form">
+          <label>账号 <input name="account" value="reviewer@example.test" /></label>
+          <label>密码 <input name="password" type="password" value="not-a-secret" /></label>
+          <button type="submit">登录</button>
+        </form>
+      </section>
+    </main>
+    <script src="../../scripts/inject-review-panel.js"></script>
+    <script src="../review-panel-browser.assertions.js"></script>
+    <script>
+      async function mountPreview() {
+        const response = await fetch("./review-session.json", { cache: "no-store" });
+        if (!response.ok) throw new Error(`ReviewSession 加载失败：${response.status}`);
+        globalThis.reviewSession = await response.json();
+        const query = new URLSearchParams(location.search);
+        if (query.has("assert")) {
+          localStorage.removeItem(`page-delivery-review:v1:${globalThis.reviewSession.deliveryUnitKey}`);
+        }
+        globalThis.PageDeliveryReviewPanel.mountReviewPanel(globalThis.reviewSession);
+        if (query.has("assert")) {
+          const result = await globalThis.runPageDeliveryBrowserAssertions();
+          const output = document.createElement("pre");
+          output.setAttribute("data-browser-assertions", result.valid ? "passed" : "failed");
+          output.textContent = result.valid
+            ? "Browser assertions passed"
+            : result.failures.join("\n");
+          document.body.append(output);
+        }
+      }
+
+      mountPreview().catch((error) => {
+        const message = document.createElement("pre");
+        message.textContent = error.stack || error.message;
+        document.body.append(message);
+      });
+
+      const reloadEvents = new EventSource("/__reload");
+      reloadEvents.addEventListener("message", () => location.reload());
+    </script>
+  </body>
+</html>

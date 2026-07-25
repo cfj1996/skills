@@ -6,17 +6,23 @@ import { readFileSync } from "node:fs";
 const require = createRequire(import.meta.url);
 const {
   buildStorageKey,
+  clampPanelWidth,
   clampPanelPosition,
+  countReviewConclusions,
   createPlanConfirmationGate,
   createReviewState,
   DRAFT_TTL_MS,
+  PANEL_WIDTH_LIMITS,
   assertArtifactLocationRule,
   assertPlanFingerprint,
   loadDraft,
   highlightEvidence,
   mountReviewPanel,
+  panelMarkup,
   prioritizeReviewResults,
   reduceReviewState,
+  resizePanelGeometry,
+  resolveDockSide,
   restoreDraft,
   sanitizeDraft,
   saveDraft,
@@ -56,6 +62,16 @@ const approvedCard = (overrides = {}) => ({
   relatedApis: [],
   mockScenarios: [],
   acceptanceCriteria: ["输入有效凭据后触发提交"],
+  implementationPlan: {
+    status: "ready",
+    summary: "使用项目现有表单能力完成身份验证",
+    structure: ["复用项目表单容器、字段和按钮组件"],
+    linkage: ["点击提交 → 校验字段 → 请求登录 → 更新会话并跳转"],
+    dataFlow: ["表单值 → 登录接口 → 会话状态"],
+    acceptanceFocus: ["校验、提交、错误和成功跳转均可验证"],
+    evidenceIds: ["E-001"],
+    blockers: [],
+  },
   conclusion: "未评审",
   userNote: "",
   reviewResult: null,
@@ -70,6 +86,7 @@ const approvedSession = (overrides = {}) => ({
   sessionId: "session-canonical",
   deliveryUnitKey: "sample/login",
   deliveryUnitKind: "page",
+  deliveryUnitName: "登录功能",
   artifactRuleFingerprint: "sha256:rule-canonical",
   artifactRuleResolution: { status: "resolved", source: "agents" },
   reviewRound: 1,
@@ -99,7 +116,7 @@ test("approved ReviewSession schema drives canonical state without path-bearing 
 
   assert.deepEqual(Object.keys(state.cards[0]).sort(), [
     "acceptanceCriteria", "conclusion", "design", "dimension", "evidenceChanged",
-    "id", "interactionStates", "links", "mockScenarios", "regionAndComponents",
+    "id", "implementationPlan", "interactionStates", "links", "mockScenarios", "regionAndComponents",
     "relatedApis", "reopened", "reviewGoal", "reviewResult", "sourceEvidence",
     "telepath", "userNote",
   ]);
@@ -108,18 +125,52 @@ test("approved ReviewSession schema drives canonical state without path-bearing 
   assert.doesNotMatch(JSON.stringify(state), /private/);
   const submitted = reduceReviewState(state, { type: "SUBMIT" });
   assert.doesNotMatch(JSON.stringify(submitted.lastSubmission), /private/);
+  assert.equal(state.deliveryUnitName, "登录功能");
 });
 
 test("approved ReviewSession rejects invalid top-level contracts and duplicate cards", () => {
   for (const [patch, code] of [
     [{ schemaVersion: 2 }, "invalid-review-schema-version"],
     [{ deliveryUnitKey: "/absolute/login" }, "invalid-delivery-unit-key"],
+    [{ deliveryUnitName: "" }, "invalid-delivery-unit-name"],
     [{ deliveryUnitKind: "project" }, "invalid-delivery-unit-kind"],
     [{ planFingerprint: "" }, "invalid-review-fingerprint"],
     [{ artifactRuleFingerprint: "" }, "invalid-review-fingerprint"],
     [{ reviewRound: 0 }, "invalid-review-round"],
     [{ cards: [approvedCard(), approvedCard()] }, "duplicate-review-card-id"],
     [{ cards: [approvedCard({ conclusion: "冲突" })] }, "invalid-review-card"],
+    [{ cards: [approvedCard({ implementationPlan: null })] }, "invalid-implementation-plan"],
+    [{
+      cards: [approvedCard({
+        implementationPlan: {
+          ...approvedCard().implementationPlan,
+          structure: [],
+        },
+      })],
+    }, "incomplete-implementation-plan"],
+    [{
+      cards: [approvedCard({
+        implementationPlan: {
+          status: "blocked",
+          summary: "项目组件体系尚未确认",
+          structure: [],
+          linkage: [],
+          dataFlow: [],
+          acceptanceFocus: [],
+          evidenceIds: [],
+          blockers: ["缺少适用项目组件规范"],
+        },
+        conclusion: "待修改",
+      })],
+    }, "implementation-blocker-requires-blocked-conclusion"],
+    [{
+      cards: [approvedCard({
+        implementationPlan: {
+          ...approvedCard().implementationPlan,
+          evidenceIds: ["E-404"],
+        },
+      })],
+    }, "invalid-implementation-evidence"],
   ]) {
     assert.throws(
       () => createReviewState(approvedSession(patch)),
@@ -429,6 +480,107 @@ test("navigation keeps a single current card and saves edits", () => {
   assert.equal(state.cards[0].userNote, "需补证据");
   assert.equal(state.currentCardIndex, 1);
   assert.equal(state.cards[state.currentCardIndex].id, "REV-003");
+});
+
+test("list selection and previous-next navigation share one current card index", () => {
+  let state = createReviewState(session);
+  state = reduceReviewState(state, { type: "SELECT_CARD", index: 2 });
+  assert.equal(state.currentCardIndex, 2);
+  assert.equal(state.cards[state.currentCardIndex].id, "REV-004");
+
+  state = reduceReviewState(state, { type: "PREVIOUS" });
+  assert.equal(state.currentCardIndex, 1);
+
+  const unchanged = reduceReviewState(state, { type: "SELECT_CARD", index: 99 });
+  assert.equal(unchanged, state);
+});
+
+test("panel markup renders MUI-style list detail navigation, badges, and an exclusive button group", () => {
+  const state = createReviewState(session);
+  const markup = panelMarkup(state, false, null, { dockSide: "right" });
+
+  assert.match(markup, /登录模块 功能评审/);
+  assert.equal((markup.match(/data-review-list-item/g) ?? []).length, state.cards.length);
+  assert.match(markup, /data-review-list-item[^>]*aria-current="true"/);
+  assert.match(markup, /data-review-status-summary/);
+  for (const conclusion of ["未评审", "已确认", "待修改", "阻塞", "不适用"]) {
+    assert.match(markup, new RegExp(`data-status="${conclusion}"`));
+  }
+  assert.match(markup, /role="radiogroup"/);
+  assert.match(markup, /data-action="select-conclusion"/);
+  assert.doesNotMatch(markup, /<select/);
+  assert.match(markup, /data-review-detail/);
+  assert.match(markup, /data-review-implementation-summary/);
+  for (const section of ["structure", "linkage", "data", "acceptance"]) {
+    assert.match(markup, new RegExp(`data-review-implementation-section="${section}"`));
+  }
+  assert.equal((markup.match(/data-review-implementation-section=/g) ?? []).length, 4);
+  assert.match(markup, /data-review-implementation-evidence/);
+  assert.match(markup, /怎么实现/);
+  assert.match(markup, /怎么联动/);
+  assert.match(markup, /数据怎么走/);
+  assert.match(markup, /怎么验收/);
+  assert.match(markup, /data-action="previous"/);
+  assert.match(markup, /data-action="next"/);
+  assert.match(markup, /data-review-resize-edge="left"/);
+  assert.doesNotMatch(markup, /data-review-resize-edge="right"/);
+});
+
+test("review conclusion statistics always include every fixed status", () => {
+  assert.deepEqual(countReviewConclusions(session.cards), {
+    "未评审": 0,
+    "已确认": 2,
+    "待修改": 1,
+    "阻塞": 0,
+    "不适用": 1,
+  });
+});
+
+test("panel width and docked resize geometry use fixed limits and viewport safety", () => {
+  assert.deepEqual(PANEL_WIDTH_LIMITS, { default: 960, min: 720, max: 1280, viewportGap: 16 });
+  assert.equal(clampPanelWidth(300, 1600), 720);
+  assert.equal(clampPanelWidth(1400, 1600), 1280);
+  assert.equal(clampPanelWidth(960, 800), 784);
+
+  assert.deepEqual(
+    resizePanelGeometry({
+      edge: "right",
+      dockSide: "left",
+      panelWidth: 960,
+      panelX: 0,
+      startPointerX: 960,
+      pointerX: 1200,
+      viewportWidth: 1600,
+    }),
+    { dockSide: "left", panelWidth: 1200, panelX: 0 },
+  );
+  assert.deepEqual(
+    resizePanelGeometry({
+      edge: "left",
+      dockSide: "right",
+      panelWidth: 960,
+      panelX: 640,
+      startPointerX: 640,
+      pointerX: 400,
+      viewportWidth: 1600,
+    }),
+    { dockSide: "right", panelWidth: 1200, panelX: 400 },
+  );
+  assert.deepEqual(
+    resizePanelGeometry({
+      edge: "left",
+      dockSide: "floating",
+      panelWidth: 960,
+      panelX: 300,
+      startPointerX: 300,
+      pointerX: 500,
+      viewportWidth: 1600,
+    }),
+    { dockSide: "floating", panelWidth: 760, panelX: 500 },
+  );
+  assert.equal(resolveDockSide(0, 960, 1600), "left");
+  assert.equal(resolveDockSide(640, 960, 1600), "right");
+  assert.equal(resolveDockSide(300, 960, 1600), "floating");
 });
 
 test("submission versions increase and stale results are rejected", () => {
@@ -793,6 +945,30 @@ test("input reducer rejects conclusions outside the fixed reviewer set", () => {
   }
 });
 
+test("an implementation-blocked card cannot be changed to a non-blocked conclusion", () => {
+  const blockedCard = approvedCard({
+    conclusion: "阻塞",
+    implementationPlan: {
+      status: "blocked",
+      summary: "项目组件体系尚未确认",
+      structure: [],
+      linkage: [],
+      dataFlow: [],
+      acceptanceFocus: [],
+      evidenceIds: [],
+      blockers: ["缺少适用项目组件规范"],
+    },
+  });
+  const state = createReviewState(approvedSession({ cards: [blockedCard] }));
+  const edited = reduceReviewState(state, {
+    type: "EDIT_CARD",
+    patch: { conclusion: "已确认" },
+  });
+
+  assert.equal(edited, state);
+  assert.equal(edited.cards[0].conclusion, "阻塞");
+});
+
 test("editing a card does not share nested source evidence with the previous state", () => {
   const input = createReviewState(session);
   const edited = reduceReviewState(input, {
@@ -929,11 +1105,15 @@ test("plan fingerprint changes preserve only safe draft UI preferences", () => {
     currentCardIndex: 2,
     collapsed: true,
     panelPosition: { x: 12, y: 24 },
+    panelWidth: 960,
+    dockSide: "right",
   };
 
   const sanitized = sanitizeDraft(draft);
   assert.deepEqual(sanitized.panelPosition, { x: 12, y: 24 });
   assert.equal(sanitized.collapsed, true);
+  assert.equal(sanitized.panelWidth, 960);
+  assert.equal(sanitized.dockSide, "right");
   assert.equal(restoreDraft(state, sanitized, 1_001).cards[0].conclusion, "待修改");
   assert.equal(restoreDraft(state, sanitized, 1_001).cards[0].userNote, state.cards[0].userNote);
 });

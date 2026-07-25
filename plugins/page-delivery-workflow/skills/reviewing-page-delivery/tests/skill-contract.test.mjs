@@ -148,7 +148,7 @@ const semanticGenericResourcePolicy = {
 test("plugin manifest and the only first-version skill exist", async () => {
   const manifest = JSON.parse(await read(".codex-plugin/plugin.json"));
   assert.equal(manifest.name, "page-delivery-workflow");
-  assert.equal(manifest.version, "0.1.1");
+  assert.match(manifest.version, /^0\.1\.1\+codex\.[a-z0-9-]+$/);
   assert.equal(manifest.skills, "./skills/");
   assert.equal(manifest.interface.displayName, "Page Delivery Workflow");
 });
@@ -264,6 +264,92 @@ test("review references define all dimensions, status groups, and artifact gates
   ]) assert.match(apiStages, new RegExp(rule));
 });
 
+test("API review is gated by consumer needs and never assigns an API to a page or module", async () => {
+  const skill = visibleMarkdown(await read("skills/reviewing-page-delivery/SKILL.md"));
+  const standard = await read("skills/reviewing-page-delivery/references/page-review-standard.md");
+  const apiStages = await read("skills/reviewing-page-delivery/references/api-contract-stages.md");
+  const template = await read("skills/reviewing-page-delivery/assets/page-delivery-plan-template.md");
+  const scenario = await readFile(
+    path.join(testDir, "scenarios", "review-app-shell-current-user.md"),
+    "utf8",
+  );
+
+  for (const required of [
+    "消费需求清单",
+    "能力归属",
+    "运行时范围",
+    "本次交付关系",
+    "正式来源搜索",
+    "接口事实清单",
+  ]) {
+    assert.match(`${skill}\n${standard}\n${apiStages}`, new RegExp(required));
+  }
+
+  assert.match(apiStages, /消费需求清单[\s\S]*正式来源搜索[\s\S]*接口事实清单[\s\S]*(?:Mock|Draft)/);
+  assert.match(apiStages, /“不涉及接口”[\s\S]*具体消费需求/);
+  assert.match(apiStages, /不得[\s\S]*页面[\s\S]*模块[\s\S]*接口归属/);
+  assert.match(standard, /应用壳层[\s\S]*跨页面[\s\S]*会话级/);
+  assert.match(template, /^## 消费需求与运行时依赖$/m);
+  assert.match(template, /API 需求：`<required\/none>`/);
+  assert.match(template, /能力归属：/);
+  assert.match(template, /运行时范围：/);
+  assert.match(template, /本次交付关系：`<直接消费\/继承依赖\/契约变更>`/);
+  assert.match(template, /继承依赖[\s\S]*不得制造实施任务/);
+
+  assert.match(scenario, /Layout 用户区/);
+  assert.match(scenario, /首页内容区/);
+  assert.match(scenario, /当前登录用户/);
+  assert.match(scenario, /正式接口来源/);
+});
+
+test("each API consumer gets a dedicated browser review card with visible ownership and relation facts", async () => {
+  const standard = await read("skills/reviewing-page-delivery/references/page-review-standard.md");
+  assert.match(standard, /每个消费需求生成一张独立的 API 设计卡/);
+  for (const mapping of [
+    "`regionAndComponents`：具体消费点",
+    "`reviewGoal`：API 需求",
+    "`design`：能力归属、运行时范围和本次交付关系",
+    "`relatedApis`：接口事实清单",
+    "`sourceEvidence`：API 判断与正式来源搜索证据",
+  ]) {
+    assert.match(standard, new RegExp(mapping.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
+  assert.match(standard, /不得把 API 维度压缩成一张页面级或模块级汇总卡/);
+});
+
+test("every feature review card carries a compact evidence-backed implementation contract", async () => {
+  const [skill, standard, runtime, template] = await Promise.all([
+    read("skills/reviewing-page-delivery/SKILL.md"),
+    read("skills/reviewing-page-delivery/references/page-review-standard.md"),
+    read("skills/reviewing-page-delivery/references/feature-review-runtime.md"),
+    read("skills/reviewing-page-delivery/assets/page-delivery-plan-template.md"),
+  ]);
+
+  for (const required of [
+    "implementationPlan",
+    "怎么实现",
+    "怎么联动",
+    "数据怎么走",
+    "怎么验收",
+    "实现依据",
+    "具体组件",
+    "代码落点",
+    "触发条件",
+    "状态变化",
+    "项目规范",
+    "阻塞",
+  ]) {
+    assert.match(`${skill}\n${standard}\n${runtime}`, new RegExp(required));
+  }
+  assert.match(standard, /status.*ready.*blocked/s);
+  assert.match(standard, /structure.*linkage.*dataFlow.*acceptanceFocus.*evidenceIds.*blockers/s);
+  assert.match(standard, /只有.*structure.*linkage.*dataFlow.*acceptanceFocus.*齐全.*确认/s);
+  assert.match(runtime, /四块|4\s*块/);
+  assert.match(runtime, /折叠|展开/);
+  assert.match(template, /一句话实施方案.*怎么实现.*怎么联动.*数据怎么走.*怎么验收.*实现依据/s);
+  assert.match(template, /implementationPlan\.status.*ready/s);
+});
+
 test("artifact-location candidates must be confirmed, solidified, reread, and uniquely resolved before review continues", async () => {
   const skill = visibleMarkdown(await read("skills/reviewing-page-delivery/SKILL.md"));
   const standard = await read("skills/reviewing-page-delivery/references/page-review-standard.md");
@@ -309,13 +395,13 @@ test("plan template keeps stable human-readable sections and prohibits unsafe de
   ]) assert.match(template, new RegExp(`不得.*${forbidden}`));
 });
 
-test("plan template limits validated bidirectional links to feature, API, and task triples", async () => {
+test("plan template validates declared bidirectional links without inventing tasks for inherited APIs", async () => {
   const template = await read("skills/reviewing-page-delivery/assets/page-delivery-plan-template.md");
   const lineWith = (id) => template.split(/\r?\n/).find((line) => line.startsWith(`- \`${id}\``));
 
   for (const [id, expected] of [
     ["F-001", "双向关联：`<API-001, T-001>`"],
-    ["API-001", "双向关联：`<F-001, T-001>`"],
+    ["API-001", "双向关联功能：`<F-001>`；可选双向关联任务：`<T-001>`"],
     ["T-001", "双向关联：`<F-001, API-001>`"],
   ]) assert.match(lineWith(id), new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 
@@ -327,15 +413,17 @@ test("plan template limits validated bidirectional links to feature, API, and ta
     assert.match(line, /关联：/);
     assert.doesNotMatch(line, /双向关联：/);
   }
-  assert.match(template, /功能点↔API、功能点↔任务、API↔任务/);
-  assert.match(template, /其他关联只校验目标存在或一致性/);
+  assert.match(template, /所有已声明的功能点↔API、功能点↔任务、API↔任务双向关联/);
+  assert.match(template, /继承依赖.*不要求 API↔任务关联/);
 });
 
-test("template uses evidence-selected exemption statuses instead of inventing API or dependency facts", async () => {
+test("template keeps no-API decisions on consumers instead of inventing API records", async () => {
   const template = await read("skills/reviewing-page-delivery/assets/page-delivery-plan-template.md");
   assert.match(template, /API-001.*状态：`<证据确认后从接口固定状态集合选择>`/);
   assert.match(template, /DEP-001.*状态：`<证据确认后从页面依赖固定状态集合选择>`/);
-  assert.match(template, /“不涉及接口”状态必须有不适用证据/);
+  assert.match(template, /API 需求：`<required\/none>`/);
+  assert.match(template, /不存在接口实体时不得创建状态为“不涉及接口”的 API 记录/);
+  assert.match(template, /`none` 必须有 API 判断证据/);
   assert.match(template, /“不涉及”状态必须有不适用证据/);
   assert.doesNotMatch(template, /API-001.*状态：`不涉及接口`/);
   assert.doesNotMatch(template, /DEP-001.*状态：`不涉及`/);
@@ -504,10 +592,11 @@ test("pressure scenario preserves required facts and excludes answer oracles", a
   }
 });
 
-test("feature review is explicit-only and the plugin version is 0.1.1", async () => {
+test("feature review is explicit-only and the plugin version has one 0.1.1 cachebuster", async () => {
   const manifest = JSON.parse(await read(".codex-plugin/plugin.json"));
   const yaml = await read("skills/reviewing-page-delivery/agents/openai.yaml");
-  assert.equal(manifest.version, "0.1.1");
+  assert.match(manifest.version, /^0\.1\.1\+codex\.[a-z0-9-]+$/);
+  assert.equal((manifest.version.match(/\+codex\./g) ?? []).length, 1);
   assert.match(yaml, /^policy:\n\s+allow_implicit_invocation:\s+false$/m);
 });
 
@@ -563,6 +652,34 @@ test("feature review runtime is ordered and fail-closed", async () => {
     "截图不得替代动态面板",
     "文字报告不得替代动态面板",
   ]) assert.match(runtime, new RegExp(forbidden));
+});
+
+test("runtime supports secure remote prototypes without leaking their URLs into review state", async () => {
+  const [skill, runtime, panel] = await Promise.all([
+    read("skills/reviewing-page-delivery/SKILL.md"),
+    read("skills/reviewing-page-delivery/references/feature-review-runtime.md"),
+    read("skills/reviewing-page-delivery/scripts/inject-review-panel.js"),
+  ]);
+
+  assert.match(`${skill}\n${runtime}`, /远程.*HTTPS|HTTPS.*远程/s);
+  assert.match(runtime, /远程.*直接.*in-app Browser|in-app Browser.*直接.*远程/s);
+  assert.match(runtime, /本地.*loopback|loopback.*本地/s);
+  assert.match(runtime, /已有登录态|现有登录态/);
+  assert.match(runtime, /重定向.*最终 URL|最终 URL.*重定向/s);
+  assert.match(runtime, /跨域 iframe.*不得.*selector|跨域 iframe.*无法.*DOM/s);
+  assert.match(runtime, /不得.*ReviewSession.*原型 URL|原型 URL.*不得.*ReviewSession/s);
+  assert.doesNotMatch(panel, /prototypeUrl\s*:/);
+});
+
+test("the plugin ships a real interactive review-panel preview fixture", async () => {
+  const preview = await read("skills/reviewing-page-delivery/tests/fixtures/panel-preview.html");
+  const previewServer = await read("skills/reviewing-page-delivery/tests/preview-review-panel.mjs");
+  assert.match(preview, /inject-review-panel\.js/);
+  assert.match(preview, /review-session\.json/);
+  assert.match(preview, /EventSource/);
+  assert.match(preview, /data-preview-prototype/);
+  assert.match(previewServer, /__reload/);
+  assert.match(previewServer, /panel-preview\.html/);
 });
 
 test("runtime pressure scenario contains facts but no answer oracle", async () => {
