@@ -1,0 +1,25 @@
+{
+  "name": "zan-workflows",
+  "version": "0.1.0+codex.20260810052255",
+  "description": "Company project, functional TAPD, MR review, debug token, identity, and memory skills for Codex.",
+  "author": {
+    "name": "Local developer"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Zan Workflows",
+    "shortDescription": "Company project and functional TAPD workflows.",
+    "longDescription": "Bundles project context; six function-like TAPD skills for work resolution, repair, Wiki drafting, test submission, optional master merge, and end-to-end orchestration; plus GitLab MR review, debug tokens, team identity, and project memory workflows.",
+    "developerName": "Local developer",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Use the appropriate Zan workflow skill for this task.",
+      "Resolve and scope this TAPD work before changing code.",
+      "Repair, draft a TAPD Wiki, submit for test, or merge to master with the matching functional skill."
+    ]
+  }
+}

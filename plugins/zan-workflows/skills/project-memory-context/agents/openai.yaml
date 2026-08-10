@@ -1,0 +1,7 @@
+interface:
+  display_name: "项目记忆上下文"
+  short_description: "检索带分数和来源边界的模糊项目记忆"
+  default_prompt: "Use $project-memory-context before project work to retrieve a bounded ai-session-memory context pack, inspect memory_kind, score, selected/excluded memories, and verify fuzzy memory against current source code."
+
+policy:
+  allow_implicit_invocation: true
