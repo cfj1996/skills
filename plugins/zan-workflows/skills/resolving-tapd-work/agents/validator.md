@@ -14,10 +14,16 @@ Validate these invariants:
    `HIGH|MEDIUM|LOW` and each supplies reasons and missing evidence.
 4. A verified project fingerprint contains expected and actual repository path,
    Git root, and origin remote. Fixed project/path constraints have explicit
-   `PASS`, `FAIL`, or `PENDING` results.
+   `PASS`, `FAIL`, or `PENDING` results. A supplied fixed branch has an explicit
+   branch constraint with the same result set.
 5. Resume checks ran only after a single verified repository was selected. A
-   fixed branch has local/remote ref and TAPD-association/raw evidence before
-   `RESUME` or `REUSE_FIXED` is allowed.
+   `REUSE_FIXED` definition has exactly one `fixed_branch` constraint. It may
+   set `resume.selected_ref` only to `refs/heads/<fixed_branch>` or
+   `refs/remotes/origin/<fixed_branch>`, and only when its constraint and every
+   required branch check (`local_ref`, `remote_ref`, `tapd_association`,
+   `raw_md`, and `test_evidence`) are `PASS`. If that condition is not met,
+   `resume.selected_ref` is `null` and the decision is `BLOCKED` or a
+   confirmation-required pending state; an alternate ref is invalid.
 6. Scope includes in-scope work, non-scope, historical-content policy,
    acceptance criteria, and required/present/missing confirmations. Missing
    scope confirmation keeps `scope_confidence=LOW` and the status pending.

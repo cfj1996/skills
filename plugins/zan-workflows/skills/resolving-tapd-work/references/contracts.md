@@ -34,6 +34,7 @@ TapdWorkDefinition:
     mode: AUTO | CREATE | REUSE_FIXED
     fixed_branch: string | null
     source: string | null
+    constraints: [{name: fixed_branch, expected: string | null, actual: string | null, result: PASS | FAIL | PENDING, evidence: string}]
     checks: [{check: local_ref | remote_ref | tapd_association | raw_md | test_evidence, result: PASS | FAIL | PENDING, evidence: string}]
   resume:
     decision: RESUME | FRESH | NEED_CONFIRMATION | PENDING_PROJECT | PENDING_REPO_VERIFICATION | BLOCKED
@@ -66,6 +67,14 @@ TapdWorkDefinition:
   unresolved gap. `LOW` names material missing or conflicting evidence.
 - `RESUME` requires a selected target-repository ref with historical raw and a
   TAPD association. `REUSE_FIXED` is a requested mode, not proof of `RESUME`.
+- When `fixed_branch` is supplied, `branch.constraints` contains exactly one
+  `fixed_branch` comparison. With `REUSE_FIXED`,
+  `resume.selected_ref` is only `refs/heads/<fixed_branch>` or
+  `refs/remotes/origin/<fixed_branch>` after its constraint and every required
+  `branch.checks` entry (`local_ref`, `remote_ref`, `tapd_association`,
+  `raw_md`, and `test_evidence`) are `PASS`. A mismatch or incomplete check has
+  `selected_ref=null` and a `FAIL`/`PENDING` constraint with `BLOCKED` or a
+  confirmation-required decision; a different ref cannot substitute for it.
 - Scope confirmation is independent from evidence quality. Until the user
   confirms the displayed in-scope, out-of-scope, and history policy,
   `scope.status=PENDING_CONFIRMATION` and `scope_confidence=LOW`.

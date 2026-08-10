@@ -53,9 +53,13 @@ fallback to a different project, repository, or branch.
    fixed path/project constraint. Record expected and actual values. A missing
    or conflicting verification leaves `repo_verification` pending or blocked.
 5. In the verified repository only, perform the read-only resume check from
-   `collection-and-resume.md`. Treat a fixed branch as a candidate. Verify local
-   and remote refs plus the TAPD association and historical `raw.md`; do not
-   create or change a ref. Emit an explicit resume decision even when pending.
+   `collection-and-resume.md`. Record `fixed_branch` as an explicit
+   `PASS|FAIL|PENDING` branch constraint whenever supplied. With
+   `branch_mode=REUSE_FIXED`, inspect only the exact fixed branch ref and set
+   `resume.selected_ref` only after every required branch check passes. A
+   missing or mismatched fixed ref blocks or waits for confirmation with
+   `selected_ref=null`; never select a different candidate ref. Do not create
+   or change a ref. Emit an explicit resume decision even when pending.
 6. Build context as `PreviousContext + LatestTapdRefresh + UserIncrement`.
    Previous context supplies history, the refresh supplies only current changes,
    and `scope_increment` supplies this request's delta. Never overwrite history
@@ -86,8 +90,12 @@ has high confidence.
   search.
 - Wrong TAPD type, unresolved project, fixed-constraint mismatch, or an
   unverified repository: return `BLOCKED` or `PENDING`, never guess.
-- A fixed branch without matching refs and `raw.md`/TAPD-association evidence:
-  `NEED_CONFIRMATION` or `PENDING_REPO_VERIFICATION`, never automatic reuse.
+- A fixed branch is an explicit `PASS|FAIL|PENDING` constraint. With
+  `REUSE_FIXED`, only `refs/heads/<fixed_branch>` or
+  `refs/remotes/origin/<fixed_branch>` may become `selected_ref`, and only when
+  every required check passes. Any missing, mismatched, or failed check leaves
+  `selected_ref=null` and returns `BLOCKED` or a confirmation-required state;
+  never select an alternate ref.
 - Conflicting historical and current claims: retain both evidence items and
   name the required decision; never overwrite historical context.
 - No explicit scope/history confirmation: no pre-edit transition. This skill

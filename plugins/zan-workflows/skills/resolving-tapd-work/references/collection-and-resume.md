@@ -31,17 +31,25 @@ searching another repository.
 
 Use read-only commands and record their evidence:
 
-1. For `fixed_branch`, check `refs/heads/<branch>` and
-   `refs/remotes/origin/<branch>`.
-2. Extract branch/MR/commit clues from TAPD comments or linked Wiki, then
-   verify them locally.
-3. Search local refs for `feature/*` or `fixbug/*` containing the short-id and
-   commit trailers `--story=<short-id>`, `--bug=<short-id>`, or
-   `--task=<short-id>`. If local evidence is insufficient, `git fetch origin
-   --prune` is permitted only as read-only synchronization.
-4. For every candidate, inspect `<ref>:docs/<short-id>/raw.md` and
-   `__test___/<short-id>` evidence. Do not stop after the first candidate with
-   missing raw.
+1. When `fixed_branch` is supplied, record one explicit branch constraint. Check
+   only `refs/heads/<fixed_branch>` and
+   `refs/remotes/origin/<fixed_branch>`; record their exact expected and actual
+   refs. With `REUSE_FIXED`, do not search, score, or select alternate refs.
+2. For `REUSE_FIXED`, inspect the exact fixed refs for TAPD association,
+   `<ref>:docs/<short-id>/raw.md`, and `__test___/<short-id>` evidence. Set the
+   constraint to `PASS` only when `local_ref`, `remote_ref`,
+   `tapd_association`, `raw_md`, and `test_evidence` all pass. Otherwise use
+   `FAIL` or `PENDING`, retain `selected_ref=null`, and block or request
+   confirmation.
+3. Only when `branch.mode` is not `REUSE_FIXED`, extract branch/MR/commit clues
+   from TAPD comments or linked Wiki, then verify them locally. Search local
+   refs for `feature/*` or `fixbug/*` containing the short-id and commit
+   trailers `--story=<short-id>`, `--bug=<short-id>`, or `--task=<short-id>`.
+   If local evidence is insufficient, `git fetch origin --prune` is permitted
+   only as read-only synchronization.
+4. Only when `branch.mode` is not `REUSE_FIXED`, inspect every candidate ref for
+   `<ref>:docs/<short-id>/raw.md` and `__test___/<short-id>` evidence. Do not
+   stop after the first candidate with missing raw.
 
 Select decisions as follows:
 
@@ -49,10 +57,11 @@ Select decisions as follows:
 | --- | --- |
 | Route unresolved or ambiguous | `PENDING_PROJECT` |
 | Repository fingerprint not verified | `PENDING_REPO_VERIFICATION` |
-| Candidate ref has raw and TAPD association | `RESUME` |
-| Fixed branch exists but raw/association is incomplete | `NEED_CONFIRMATION` |
-| No fixed branch and every investigated candidate lacks raw | `NEED_CONFIRMATION` |
-| No branch, Wiki, MR, trailer, raw, or test anchor exists | `FRESH` |
+| `REUSE_FIXED` and exact fixed ref passes every required check | `RESUME`, with `selected_ref` equal to that fixed ref |
+| `REUSE_FIXED` and fixed ref is missing, mismatched, or has an incomplete check | `BLOCKED` or `NEED_CONFIRMATION`, with `selected_ref=null` |
+| Non-`REUSE_FIXED` candidate ref has raw and TAPD association | `RESUME` |
+| Non-`REUSE_FIXED` and every investigated candidate lacks raw | `NEED_CONFIRMATION` |
+| Non-`REUSE_FIXED` and no branch, Wiki, MR, trailer, raw, or test anchor exists | `FRESH` |
 | Fixed constraint or repository evidence conflicts | `BLOCKED` |
 
 For `RESUME`, compose:
