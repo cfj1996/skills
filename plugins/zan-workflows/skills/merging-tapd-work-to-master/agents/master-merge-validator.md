@@ -16,12 +16,18 @@ planned payloads, and evidence bundle. Accept only
   match the supplied original `feature/*` or `fixbug/*` repair branch; target
   is exactly `master`; current-round commit lists match; and inherited-base
   differences are recorded separately;
+- `expected_source_ref_sha`, `expected_target_master_ref_sha`,
+  `confirmed_source_ref_sha`, and `confirmed_target_master_ref_sha` are all
+  present and matching pairs. `merge_base_sha` is present when inherited-base
+  reasoning requires it. Reject missing target-`master` SHA evidence or any
+  mismatch: a branch name alone never binds a master-merge authorization;
 - neither expected nor actual source is `develop`, `dev`, `master`, `merge/*`,
   or a release branch, and no unrelated `develop` commit is in the planned
   current-round list;
 - `MergeConfirmationGate` shows expected and actual repository/source/target/
-  commits, planned direct MR/merge operation, purpose, and still-current
-  explicit authorization for the exact source-to-`master` merge;
+  commits, planned direct MR/merge operation, purpose, and the immutable
+  expected/confirmed source and target-`master` SHA snapshot, plus
+  still-current explicit authorization for the exact source-to-`master` merge;
 - planned scope explicitly excludes production publishing, smoke tests, TAPD
   status/comments, test-version publication, `develop -> master`, and Wiki
   creation; and
@@ -30,8 +36,11 @@ planned payloads, and evidence bundle. Accept only
   separate current authorization covers that exact update. If no existing Wiki
   exists, require `wiki.status=SKIPPED_NO_WIKI` and no Wiki write payload.
 
-Do not require an MR merge, `master` containment, or Wiki write/readback in
-`PRE_WRITE`, because none has happened yet. Reject any unknown phase.
+Do not require an MR merge, `execution_preflight_source_ref_sha`,
+`execution_preflight_target_master_ref_sha`,
+`execution_post_master_ref_sha`, `master` containment, or Wiki
+write/readback in `PRE_WRITE`, because none has happened yet. Reject any
+unknown phase.
 
 Return exactly one Chinese line and nothing else:
 

@@ -25,6 +25,15 @@ MasterMergeResult:
     actual_target_branch: string | null
     actual_commit_list: [string]
     inherited_base_difference: [string]
+    ref_snapshot:
+      expected_source_ref_sha: string | null
+      expected_target_master_ref_sha: string | null
+      merge_base_sha: string | null
+      confirmed_source_ref_sha: string | null
+      confirmed_target_master_ref_sha: string | null
+      execution_preflight_source_ref_sha: string | null
+      execution_preflight_target_master_ref_sha: string | null
+      execution_post_master_ref_sha: string | null
     confirmation_gate:
       intended_operation: create_or_update_and_merge_mr
       purpose: string | null
@@ -72,6 +81,16 @@ MasterMergeResult:
   passing explicit `MergeConfirmationGate`, `validation.pre_write.verdict=验证通过`,
   successful MR/merge readback, and `master_containment.result=PASS` for every
   approved commit.
+- `MERGED` also requires a consistent immutable-ref chain:
+  `expected_source_ref_sha=confirmed_source_ref_sha=execution_preflight_source_ref_sha`
+  and
+  `expected_target_master_ref_sha=confirmed_target_master_ref_sha=execution_preflight_target_master_ref_sha`.
+  `execution_post_master_ref_sha` must be an actual post-merge `master` readback
+  and support the recorded containment evidence. A required `merge_base_sha`
+  must be retained when inherited history is evaluated. Missing/mismatching
+  source or target SHA evidence blocks before merge; a changed preflight SHA
+  invalidates authorization and requires re-verification plus fresh
+  confirmation.
 - The target is exactly `master`. `develop -> master`, `dev -> master`, a
   `merge/*` intermediary, a release branch, or any substituted/rebuilt source
   is always `BLOCKED`. Legal inherited history is recorded only in

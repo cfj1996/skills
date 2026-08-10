@@ -39,16 +39,21 @@ Do not continue on a non-passing verdict.
 
 1. Re-verify the repository fingerprint against `TestSubmissionResult` and use
    the approved GitLab mapping to read the actual original source ref,
-   `master` ref, MR state, and exact current-round commit list. The expected
-   source is the supplied original repair branch and the expected target is
-   exactly `master`. Record legal inherited-source history separately; never
-   add it to this round's commits or promote unrelated `develop` changes.
+   `master` ref, MR state, and exact current-round commit list. Record
+   `expected_source_ref_sha`, `expected_target_master_ref_sha`, and, when
+   needed to explain inherited history, `merge_base_sha`. The expected source
+   is the supplied original repair branch and the expected target is exactly
+   `master`. Record legal inherited-source history separately; never add it to
+   this round's commits or promote unrelated `develop` changes.
 2. Display `MergeConfirmationGate` with the expected and actual repository,
    source, target, current-round commits, inherited-base differences, planned
-   MR/merge operation, and purpose. Obtain explicit current-conversation
-   authorization for this exact `original-repair-branch -> master` MR/merge.
-   If any displayed fact changes, invalidate that authorization, redisplay all
-   actual facts, and obtain a fresh authorization.
+   MR/merge operation, purpose, `expected_source_ref_sha`, and
+   `expected_target_master_ref_sha`. Obtain explicit current-conversation
+   authorization that binds the displayed immutable source and `master` SHA
+   facts; record them as `confirmed_source_ref_sha` and
+   `confirmed_target_master_ref_sha`. If any displayed fact changes, invalidate
+   that authorization, redisplay all actual facts, and obtain a fresh
+   authorization.
 3. For an existing Wiki marker request, read the identified Wiki first. Display
    its exact target, the smallest `已合并` patch, and the full resulting body.
    Obtain a separate explicit authorization for that exact Wiki update. If no
@@ -58,11 +63,18 @@ Do not continue on a non-passing verdict.
    `PRE_WRITE` validation. It checks only evidence and planned effects that
    exist before the first write; it must not require merge or Wiki readback
    that has not happened.
-5. Only after `PRE_WRITE=验证通过`, create or update the direct source-to-master
-   MR as needed and merge it. Read back the MR/merge state and prove that every
-   approved current-round commit is contained in `origin/master`. A conflict,
-   failed pipeline or merge, wrong source/target, or incomplete containment is
-   `BLOCKED`; preserve actual effects and do not write a Wiki marker.
+5. Immediately before creating, updating, or merging the MR, re-read the
+   actual source and `master` SHA values. Record
+   `execution_preflight_source_ref_sha` and
+   `execution_preflight_target_master_ref_sha`; both must equal the confirmed
+   SHA snapshot. Any source or `master` head change invalidates authorization:
+   stop, re-verify, re-run `PRE_WRITE`, redisplay the new facts, and obtain a
+   fresh authorization. Only then create or update the direct source-to-master
+   MR as needed and merge it. Read back the MR/merge state,
+   `execution_post_master_ref_sha`, and prove that every approved current-round
+   commit is contained in `origin/master`. A conflict, failed pipeline or
+   merge, wrong source/target/SHA, or incomplete containment is `BLOCKED`;
+   preserve actual effects and do not write a Wiki marker.
 6. If an existing Wiki marker was separately authorized, run `WikiWriteGate`,
    apply only the confirmed minimal `已合并` patch, and read the same Wiki back.
    If its readback lacks the patch, return a truthful partial `BLOCKED` result;

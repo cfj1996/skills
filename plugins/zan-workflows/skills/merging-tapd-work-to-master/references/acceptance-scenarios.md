@@ -29,6 +29,22 @@ Expected: no merge. Show actual repository/source/`master`/commits and obtain
 fresh authorization for the exact direct MR/merge; changed facts invalidate an
 earlier authorization.
 
+## C1. Master head SHA is part of authorization
+
+Input: `fixbug/123` and `master` names are displayed, but the target
+`master` ref SHA is absent; or the user confirms source SHA `a1` and master SHA
+`b1`, then preflight reads master SHA `b2` (or source SHA `a2`).
+
+Expected: the gate displays and binds `expected_source_ref_sha`,
+`confirmed_source_ref_sha`, `expected_target_master_ref_sha`, and
+`confirmed_target_master_ref_sha` (and `merge_base_sha` when needed). Missing
+SHA evidence blocks private `PRE_WRITE` validation. A changed
+`execution_preflight_source_ref_sha` or
+`execution_preflight_target_master_ref_sha` invalidates prior authorization;
+re-read all facts, re-run validation, and obtain a fresh confirmation before
+any MR action. Record the confirmed, preflight, and
+`execution_post_master_ref_sha` chain in the result.
+
 ## D. No Wiki is a normal successful branch
 
 Input: all merge facts/readbacks pass and no existing Wiki is identified, or
