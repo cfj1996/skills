@@ -91,13 +91,18 @@ invented changes or evidence.
 9. Give the exact diff, scope, baseline comparison, branch/worktree facts, plan,
    and unmodified evidence bundle to the isolated reviewer described in
    [agents/change-reviewer.md](agents/change-reviewer.md). It must be read-only
-   and must return `REVIEW_PASSED` or `REVIEW_FAILED`. Tool unavailability,
-   missing inputs, or any failure blocks delivery; the implementing agent may
-   not self-approve.
+   and must return exactly one approved Chinese verdict line. At this producer
+   boundary, map a passing private verdict to the public
+   `review.verdict=REVIEW_PASSED`. Map a failing private verdict to
+   `review.verdict=REVIEW_FAILED`, copy only its reason into
+   `review.failure_reason` and `blocker_reason`, and block delivery. Never store
+   the private raw verdict in `ReviewedChange`. Tool unavailability or missing
+   inputs maps to `review.verdict=NOT_RUN` and blocks delivery; the implementing
+   agent may not self-approve.
 10. Re-read [acceptance-scenarios.md](references/acceptance-scenarios.md). Only
-    after a passing review return the complete `ReviewedChange`, including known
-    risks. A result is reusable evidence for a later skill, not authorization
-    for any further external write.
+    after the public mapped review state is `REVIEW_PASSED` return the complete
+    `ReviewedChange`, including known risks. A result is reusable evidence for
+    a later skill, not authorization for any further external write.
 
 ## Required response
 

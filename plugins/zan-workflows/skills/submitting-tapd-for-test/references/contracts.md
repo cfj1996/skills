@@ -14,7 +14,7 @@ TestSubmissionResult:
     short_id: string
   reviewed_change:
     terminal_state: REVIEWED
-    review_verdict: REVIEW_PASSED
+    review_verdict: REVIEW_PASSED # public producer-mapped state; never a private raw verdict
     project_fingerprint_result: PASS
   repository:
     expected: {repo_path: string, git_root: string, origin_remote: string}
@@ -84,6 +84,9 @@ TestSubmissionResult:
   fingerprint, `profile` to be exact, both upstream success states, matching
   source/target/current-round commit lists, a passing merge confirmation, a
   successful merge readback, and `develop_containment.result=PASS`.
+- `reviewed_change.review_verdict` consumes only the repairing skill's public
+  mapped state. Submission validation must not request, load, parse, or persist
+  the private reviewer protocol or its raw output.
 - Current-round commits are the reviewed submission scope. Legal extra commits
   from an inherited source baseline are recorded only in
   `inherited_base_difference`; they do not become current-round commits,

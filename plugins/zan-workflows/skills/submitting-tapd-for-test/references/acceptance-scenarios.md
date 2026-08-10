@@ -70,3 +70,12 @@ validate actual merge/status/version and, for `STANDARD`, Wiki/comment
 readbacks; an absent or failed readback returns `验证不通过` and a truthful
 partial `BLOCKED` result. In `NO_WIKI`, neither phase loads or requires Wiki
 material.
+
+## H. Submission consumes only the public repair-review state
+
+Input: a `ReviewedChange` with `terminal_state=REVIEWED` and the producer-mapped
+public `review.verdict=REVIEW_PASSED`, without the private reviewer output.
+
+Expected: the submission validator accepts that upstream review gate as
+complete and never requests, loads, parses, or persists the repairing skill's
+private verdict. A missing or non-passing public mapping blocks submission.

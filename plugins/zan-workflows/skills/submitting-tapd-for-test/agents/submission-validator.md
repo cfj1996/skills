@@ -8,8 +8,10 @@ Inspect only the supplied `validation_phase`, proposed
 `TestSubmissionResult`/write payload, and evidence bundle. First check common
 invariants:
 
-- inputs contain an approved `TapdWorkDefinition`, a `REVIEWED`/
-  `REVIEW_PASSED` `ReviewedChange`, and exactly `STANDARD` or `NO_WIKI`;
+- inputs contain an approved `TapdWorkDefinition`, a `ReviewedChange` whose
+  public producer-mapped states are `terminal_state=REVIEWED` and
+  `review.verdict=REVIEW_PASSED`, and exactly `STANDARD` or `NO_WIKI`; never
+  request or inspect the repairing skill's private reviewer output;
 - expected and actual repository, source, target=`develop`, and current-round
   commit lists match; inherited-base differences are separate and not claimed
   as current-round work;

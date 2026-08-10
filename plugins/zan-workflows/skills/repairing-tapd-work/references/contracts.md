@@ -76,7 +76,8 @@ ReviewedChange:
     reviewer: string | null
     input_bundle: [string]
     verdict: REVIEW_PASSED | REVIEW_FAILED | NOT_RUN
-    report: string | null
+    failure_reason: string | null
+    private_verdict_persisted: false
   risks: [string]
   blocker_reason: string | null
 ```
@@ -88,6 +89,13 @@ ReviewedChange:
   a confirmed location, branch and worktree results of `PASS` or `REUSE`, a
   scope baseline `PASS`, completed RED then GREEN evidence, no unaccounted
   verification failure, and `review.verdict=REVIEW_PASSED`.
+- The isolated reviewer returns only the private Chinese protocol defined in
+  `agents/change-reviewer.md`. The producer maps its passing form to the public
+  `review.verdict=REVIEW_PASSED`; it maps its failing form to
+  `review.verdict=REVIEW_FAILED`, extracts only the reason into
+  `review.failure_reason` and `blocker_reason`, and keeps
+  `terminal_state=BLOCKED`. The raw private verdict is never persisted in the
+  artifact. Reviewer unavailability or missing input maps to `NOT_RUN`.
 - `actual.selected_project` and `actual.repo_path` are required actual values,
   not labels inferred from the CWD. `selected_project` must equal the approved
   project. `repo_path` is `EXACT` only when its canonical absolute path equals

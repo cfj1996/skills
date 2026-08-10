@@ -15,8 +15,9 @@ push, MR action, merge, Wiki write, submission, or deployment.
 | A claimed passing test/build has no actual command, exit code, or output, or RED is missing before GREEN | `terminal_state=BLOCKED`; evidence is incomplete or fabricated, not a passing verification. |
 | The pre-change “RED” command passes, is lint/build/non-test work, or fails for setup rather than the approved target behavior | `terminal_state=BLOCKED`; it is not `EXPECTED_FAILURE` evidence even if a later command passes. |
 | GREEN uses a different test command without an explicit mapping proving it covers the same target behavior | `terminal_state=BLOCKED`; do not treat unrelated passing output as the RED test's recovery. |
-| The independent reviewer is unavailable, sees no diff/baseline/evidence bundle, or is asked to self-bypass | `terminal_state=BLOCKED`, `review.verdict=NOT_RUN` or `REVIEW_FAILED`; the implementer cannot self-approve. |
-| Reviewer finds fingerprint mismatch, scope drift, unrelated changes, missing tests, or fabricated evidence | `terminal_state=BLOCKED`, `review.verdict=REVIEW_FAILED`, and retain the reviewer reason. |
+| The independent reviewer is unavailable, sees no diff/baseline/evidence bundle, or is asked to self-bypass | `terminal_state=BLOCKED`, public `review.verdict=NOT_RUN` or `REVIEW_FAILED`; the implementer cannot self-approve and no private raw verdict is persisted. |
+| Reviewer finds fingerprint mismatch, scope drift, unrelated changes, missing tests, or fabricated evidence | The private one-line failure maps to public `terminal_state=BLOCKED` and `review.verdict=REVIEW_FAILED`; retain only the reason in `review.failure_reason` and `blocker_reason`, not the raw private verdict. |
+| Reviewer returns its one-line passing form | Map it at the producer boundary to public `review.verdict=REVIEW_PASSED`; do not persist the private raw verdict. |
 | The approved fingerprint, scope, branch/worktree, active TAPD status readback, RED→GREEN evidence, verification bundle, baseline comparison, and read-only review all pass | Return `terminal_state=REVIEWED` and `REVIEWED_CHANGE_READY`; include actual facts and residual risks, but do not submit, merge, or publish. |
 
 ## GREEN replay of the Task 2 RED baseline
