@@ -9,13 +9,13 @@
 基础 Bug 流程由五个能力技能和一个编排技能组成：
 
 ```text
-resolving-tapd-work
-  -> repairing-tapd-work
-  -> submitting-tapd-for-test
-  -> merging-tapd-work-to-master（可选）
+preparing-work
+  -> implementing-work
+  -> submitting-for-test
+  -> going-live（可选）
 ```
 
-`drafting-tapd-wiki` 是 `submitting-tapd-for-test` 复用的独立内容能力，也允许用户直接调用。`fixing-tapd-bug` 只负责编排。
+`drafting-wiki` 是 `submitting-for-test` 复用的独立内容能力，也允许用户直接调用。`fixing-bug` 只负责编排。
 
 技能通过结果契约组合，不使用全局、可变的 `TapdTaskContext`：
 
@@ -39,7 +39,7 @@ TapdWorkDefinition
 
 ## 技能设计
 
-### `resolving-tapd-work`
+### `preparing-work`
 
 回答“改什么、在哪个项目改、使用哪个分支”。
 
@@ -60,15 +60,15 @@ scope_increment（可选）
 
 `fixed_branch` 在三种模式中都是不可替换硬约束：`AUTO+fixed_branch` 只能恢复或创建该精确分支；`CREATE` 必须携带 `fixed_branch`、保留为精确 `branch_to_create` 且绝不返回 `RESUME`；`REUSE_FIXED` 必须携带并只检查精确 ref。resolver 使用唯一终止模型 `READY_FOR_HANDOFF | PENDING | BLOCKED`，响应 marker 与其一致，并为非 handoff 状态提供 `blocker_reason`。
 
-### `repairing-tapd-work`
+### `implementing-work`
 
 回答“如何产生已经测试并独立审核通过的代码变更”。
 
-输入 `TapdWorkDefinition`。单独触发而缺少该结果时，必须调用 `resolving-tapd-work` 安全补齐，不能猜测。
+输入 `TapdWorkDefinition`。单独触发而缺少该结果时，必须调用 `preparing-work` 安全补齐，不能猜测。
 
 功能：核对实际 Git root/remote/branch；更新 TAPD 为修复中或进行中；创建或复用 Worktree；确认实际路径；使用 Superpowers 规划和 TDD 实现；运行验证；生成证据；调用内部只读代码 reviewer。只有全部通过才输出 `ReviewedChange`。
 
-### `drafting-tapd-wiki`
+### `drafting-wiki`
 
 回答“如何从当前会话或显式结果生成经过语义验证、可直接复制的 TAPD Wiki Markdown”。
 
@@ -76,7 +76,7 @@ scope_increment（可选）
 
 该技能没有外部写入，不创建 Wiki、不修改 TAPD、不合并和不发布。
 
-### `submitting-tapd-for-test`
+### `submitting-for-test`
 
 回答“如何完成一次提测业务事务”。
 
@@ -87,13 +87,13 @@ STANDARD = 合并 develop + 更新 Bug 状态 + 生成并写入 Wiki + 发布测
 NO_WIKI  = 合并 develop + 更新 Bug 状态 + 发布测试版本
 ```
 
-`STANDARD` 必须复用 `drafting-tapd-wiki`，展示完整草稿并获得用户确认后才写入和回读。`NO_WIKI` 不加载 Wiki 生成能力，并在结果中记录 `wiki = SKIPPED_BY_POLICY`，不能把缺失 Wiki 判为失败。
+`STANDARD` 必须复用 `drafting-wiki`，展示完整草稿并获得用户确认后才写入和回读。`NO_WIKI` 不加载 Wiki 生成能力，并在结果中记录 `wiki = SKIPPED_BY_POLICY`，不能把缺失 Wiki 判为失败。
 
 技能负责实际源/目标分支和 commit 列表确认、提交/推送/MR、合并 `develop`、TAPD 状态、测试版本发布，以及启用 Wiki 时的写入与回读。输出 `TestSubmissionResult`。
 
 在任何 commit/push/MR create-or-update/merge 前，私有 `PRE_FIRST_WRITE` 验证仓库、source/target/ref、精确 diff/commits、操作 payload 与授权，并在每次执行前重读；变化即重新展示、授权和验证。技能不维护跨调用事务状态：每次调用都先读取外部目标的真实状态；精确效果已存在时展示回读并经用户确认后标记 `ADOPTED_EXISTING_EFFECT`、不重复写，确定不存在时才以 fresh 授权和验证执行一次新写入，无法判断时阻断。合并回读后，保留独立的 `PRE_SUBMISSION_WRITE` 验证 Wiki/TAPD/version 计划，最终使用 `POST_WRITE` 验证实际效果与 readback。三个阶段都只持久化公共映射状态。
 
-### `merging-tapd-work-to-master`
+### `going-live`
 
 回答“如何把原修复分支合并到 `master` 并更新已有 Wiki 标记”。该能力按需调用，不是所有修复流程的必经步骤。
 
@@ -101,17 +101,17 @@ NO_WIKI  = 合并 develop + 更新 Bug 状态 + 发布测试版本
 
 它不发布生产版本、不增加上线检查、不强制要求 Wiki、不额外修改 TAPD 状态。输出 `MasterMergeResult`。
 
-### `fixing-tapd-bug`
+### `fixing-bug`
 
 接收 TAPD URL、可选项目/分支约束、`STANDARD | NO_WIKI` 提测策略，以及是否需要合并 `master`。
 
 它只按声明的结果契约组合：
 
 ```text
-resolving-tapd-work
-  -> repairing-tapd-work
-  -> submitting-tapd-for-test
-  -> if requested: merging-tapd-work-to-master
+preparing-work
+  -> implementing-work
+  -> submitting-for-test
+  -> if requested: going-live
 ```
 
 任一能力阻断、验证失败或等待用户授权时立即暂停。编排技能不复制项目判断、开发、Wiki、提测或合并规则。
@@ -123,13 +123,13 @@ V1 使用插件脚本维护一个原子替换写入的本地 `run.json`，暂不
 ## 调用方式
 
 ```text
-$zan-workflows:resolving-tapd-work <TAPD URL>
-$zan-workflows:repairing-tapd-work <TapdWorkDefinition 或 TAPD URL>
-$zan-workflows:drafting-tapd-wiki 根据当前会话输出可复制 Wiki
-$zan-workflows:submitting-tapd-for-test 使用 STANDARD 或 NO_WIKI
-$zan-workflows:merging-tapd-work-to-master <TestSubmissionResult>
-$zan-workflows:fixing-tapd-bug <TAPD URL>
-$zan-workflows:fixing-tapd-bug run_id=<已有运行 ID>
+$zan-workflows:preparing-work <TAPD URL>
+$zan-workflows:implementing-work <TapdWorkDefinition 或 TAPD URL>
+$zan-workflows:drafting-wiki 根据当前会话输出可复制 Wiki
+$zan-workflows:submitting-for-test 使用 STANDARD 或 NO_WIKI
+$zan-workflows:going-live <TestSubmissionResult>
+$zan-workflows:fixing-bug <TAPD URL>
+$zan-workflows:fixing-bug run_id=<已有运行 ID>
 ```
 
 ## 插件目录
@@ -138,12 +138,12 @@ $zan-workflows:fixing-tapd-bug run_id=<已有运行 ID>
 
 ```text
 plugins/zan-workflows/skills/
-  resolving-tapd-work/
-  repairing-tapd-work/
-  drafting-tapd-wiki/
-  submitting-tapd-for-test/
-  merging-tapd-work-to-master/
-  fixing-tapd-bug/
+  preparing-work/
+  implementing-work/
+  drafting-wiki/
+  submitting-for-test/
+  going-live/
+  fixing-bug/
 ```
 
 旧独立目录 `skills/tapd-workflow/` 不删除、不修改。每个能力技能的 validator/reviewer 和 references 留在该技能目录内，不作为插件技能暴露。
