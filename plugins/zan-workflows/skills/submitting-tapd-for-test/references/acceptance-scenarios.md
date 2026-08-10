@@ -55,3 +55,18 @@ summary; or a status write succeeds and test-version publish fails.
 Expected: first case blocks before comment write because actual text differs.
 Second case returns `BLOCKED`, preserving status success/readback and the
 version failure; it does not report a successful transaction.
+
+## G. First standard write has a reachable validation path
+
+Input: develop merge/readback, exact authorization, a valid
+`ValidatedWikiDraft`, complete displayed draft confirmation, confirmed Wiki
+target and expected patch, and planned TAPD-status/test-version payloads; no
+Wiki write has happened yet.
+
+Expected: `validation_phase=PRE_WRITE` can return `验证通过` without any Wiki,
+comment, status, or version readback. It then permits the first Wiki write.
+After all permitted effects, `validation_phase=POST_WRITE` must receive and
+validate actual merge/status/version and, for `STANDARD`, Wiki/comment
+readbacks; an absent or failed readback returns `验证不通过` and a truthful
+partial `BLOCKED` result. In `NO_WIKI`, neither phase loads or requires Wiki
+material.

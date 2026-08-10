@@ -26,11 +26,21 @@ or inconsistent evidence is a blocked result. Never infer a repository,
 source branch, target branch, commit, project, service, user confirmation, or
 successful external effect.
 
-Use an isolated, read-only validator described in
-[agents/submission-validator.md](agents/submission-validator.md) before an
-external write and again whenever its proposed target or payload changes. Its
-only permitted response is `验证通过` or `验证不通过：<原因>`; keep that response
-private.
+Use the same isolated, read-only validator described in
+[agents/submission-validator.md](agents/submission-validator.md) twice. Its
+only permitted response is `验证通过` or `验证不通过：<原因>`; keep both responses
+private:
+
+- `validation_phase=PRE_WRITE` runs after the develop-merge readback but before
+  this submission's Wiki, TAPD-status, comment, or test-version write. It
+  validates only the profile, source/target/current-round commits, current
+  authorization, `ValidatedWikiDraft` when applicable, Wiki target/patch and
+  full-draft confirmation when applicable, and the *planned* status/version
+  payloads. It must not require a write/readback that has not happened.
+- Execute the planned writes only after `PRE_WRITE=验证通过`. Then run
+  `validation_phase=POST_WRITE` with actual merge, Wiki, comment, status,
+  version, and readback evidence. A post-write failure stops any remaining
+  action and returns a truthful partial `BLOCKED` result.
 
 ## Common transaction procedure
 
@@ -52,11 +62,15 @@ private.
    containment blocks all later submission writes.
 4. Select the profile procedure below. Do not downgrade `STANDARD` to
    `NO_WIKI`, and do not use a missing Wiki to block `NO_WIKI`.
-5. Before each TAPD status update or test-version publication, validate the
-   exact payload privately. Write the permitted TAPD state and publish the
-   required test version, then read each target back. Preserve actual IDs,
-   status/version values, timestamps, and evidence URLs or errors.
-6. Re-read [acceptance-scenarios.md](references/acceptance-scenarios.md), form
+5. Complete the profile preparation, run the private `PRE_WRITE` validation,
+   and stop before any planned submission write unless it returns `验证通过`.
+   Write the permitted TAPD state and publish the required test version, then
+   read each target back. Preserve actual IDs, status/version values,
+   timestamps, and evidence URLs or errors.
+6. Run private `POST_WRITE` validation using the actual effects and readbacks.
+   If it returns `验证不通过`, stop and form a truthful partial `BLOCKED` result;
+   do not attempt another write to repair, conceal, or complete the transaction.
+7. Re-read [acceptance-scenarios.md](references/acceptance-scenarios.md), form
    the complete result with every actual readback, and return the single
    `TestSubmissionResult`. Stop immediately; do not begin a master merge,
    cleanup workflow, or additional write.
@@ -76,11 +90,15 @@ After the develop-merge readback and before any Wiki/TAPD write, invoke
    explicit authorization for this draft, target, Wiki write, exact TAPD
    comment, TAPD status update, and test-version publication. A summary,
    partial body, or a request to “write directly” is not confirmation.
-3. Run `WikiWriteGate`, write the smallest confirmed patch, then read the Wiki
+3. Give the evidenced full draft, target, patch, confirmation, and planned
+   TAPD-status/test-version payloads to `PRE_WRITE`. Only a `验证通过` verdict
+   permits the first Wiki write; this phase must not demand a successful Wiki,
+   comment, status, or version readback because none exists yet.
+4. Run `WikiWriteGate`, write the smallest confirmed patch, then read the Wiki
    back. Do not create a replacement Wiki when the TAPD already identifies one.
    If the expected patch is absent after readback, stop before comment or TAPD
    state update.
-4. For a Bug, write only the exact comment generated from the final Wiki URL:
+5. For a Bug, write only the exact comment generated from the final Wiki URL:
    `提测wiki：[https://www.tapd.cn/{workspace_id}/markdown_wikis/show/#{wiki_id}](https://www.tapd.cn/{workspace_id}/markdown_wikis/show/#{wiki_id})`.
    Record `TAPD_COMMENT_GATE`; any extra text, changed link, or newline blocks
    the comment. Record comment readback. For a Story/Task, record the
@@ -94,10 +112,13 @@ update, or comment a Wiki. In particular, never load
 ask for a Wiki confirmation and do not treat a missing Wiki as a failure.
 
 After the common merge readback, obtain explicit authorization for the exact
-TAPD-status and test-version payloads, perform only those writes, and read
-them back. Set `wiki.status=SKIPPED_BY_POLICY`, with no Wiki target, draft,
-write, comment, or readback evidence. Return the normal result even though its
-Wiki fields are skipped.
+TAPD-status and test-version payloads. Run `PRE_WRITE` without loading or
+supplying any Wiki material; it may validate only the common facts and planned
+status/version payloads. On `验证通过`, perform only those writes and read them
+back, then run `POST_WRITE` without requiring or loading Wiki evidence. Set
+`wiki.status=SKIPPED_BY_POLICY`, with no Wiki target, draft, write, comment, or
+readback evidence. Return the normal result even though its Wiki fields are
+skipped.
 
 ## Hard stops
 

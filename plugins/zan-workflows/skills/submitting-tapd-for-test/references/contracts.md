@@ -69,7 +69,12 @@ TestSubmissionResult:
   validation:
     validator: agents/submission-validator.md
     checked_privately: true
-    verdict: 验证通过 | 验证不通过：string
+    pre_write:
+      validation_phase: PRE_WRITE
+      verdict: 验证通过 | 验证不通过：string
+    post_write:
+      validation_phase: POST_WRITE
+      verdict: 验证通过 | 验证不通过：string
   blocker_reason: string | null
 ```
 
@@ -85,14 +90,26 @@ TestSubmissionResult:
   commentary, or a reason to rebuild the branch from `develop`.
 - `SUBMITTED` requires `tapd.status_write=PASS`, `tapd.status_readback=PASS`,
   `test_version.publish=PASS`, `test_version.readback=PASS`, and private
-  `validation.verdict=验证通过`.
+  `validation.pre_write.verdict=验证通过` plus
+  `validation.post_write.verdict=验证通过`.
+- `PRE_WRITE` occurs after develop-merge evidence and before this submission's
+  Wiki, TAPD-status, comment, or test-version write. It validates profile,
+  actual source/target/current-round commits, authorization, and planned
+  status/version payloads; under `STANDARD`, it also validates the
+  `ValidatedWikiDraft`, full-draft confirmation, Wiki target, and expected
+  patch. It must not require a write/readback that has not happened.
+- `POST_WRITE` receives actual merge, status, version, and their readbacks;
+  under `STANDARD` it also receives actual Wiki/comment effects and readbacks.
+  A non-passing post-write verdict returns `BLOCKED`, preserves partial effects,
+  and forbids a later write in this transaction.
 - Under `STANDARD`, `SUBMITTED` also requires `wiki.status=WRITTEN`, full draft
   confirmation, a passing Wiki write gate/readback, and for Bugs an exact,
   passing, read-back Wiki-link comment. Its status update cannot precede
   Wiki-readback success.
 - Under `NO_WIKI`, `SUBMITTED` requires `wiki.status=SKIPPED_BY_POLICY`; every
   other Wiki field is null or `NOT_ATTEMPTED`, and all comment fields are
-  `NOT_APPLICABLE`. Wiki absence is not a blocker.
+  `NOT_APPLICABLE`. Both validation phases omit Wiki material and do not load
+  or require a Wiki. Wiki absence is not a blocker.
 - `BLOCKED` preserves observed actual values, has a non-empty blocker, and
   never claims unperformed writes, merge, publication, or readbacks. It may
   represent an irreversible partial external transaction; do not roll back or

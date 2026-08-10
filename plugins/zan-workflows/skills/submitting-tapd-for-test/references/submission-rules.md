@@ -28,9 +28,15 @@ duplicating it. The original business source must be one evidenced
 
 Show the complete final Markdown and write target, then obtain a confirmation
 covering exact Wiki body/target, exact one-line Bug comment, TAPD status, and
-test-version payload. Use `WikiWriteGate`: target, mode, before hash, expected
-patch, after hash, and a readback proving the patch. A failed readback prevents
-the comment and state write.
+test-version payload. Before the first Wiki write, call the private validator
+with `validation_phase=PRE_WRITE`. It checks the confirmed draft/target/patch
+and planned status/version payloads, but must not require Wiki/comment/status/
+version readback that does not exist. Only `验证通过` permits the write. Use
+`WikiWriteGate`: target, mode, before hash, expected patch, after hash, and a
+readback proving the patch. A failed readback prevents the comment and state
+write. After all permitted writes/readbacks, call the same validator with
+`validation_phase=POST_WRITE`; a non-passing verdict records partial failure
+and forbids further writes.
 
 For a Bug, generate and compare exactly:
 
@@ -50,8 +56,10 @@ create/update call, Wiki comment, or Wiki confirmation. Set
 `NOT_ATTEMPTED`; set TAPD comment fields to `NOT_APPLICABLE`.
 
 Still require the merge gate/readback plus exact TAPD-status and test-version
-authorization, write, and readback. A user request to create or validate a
-Wiki conflicts with this profile: stop and ask them to choose `STANDARD`.
+authorization, write, and readback. `PRE_WRITE` and `POST_WRITE` both omit all
+Wiki material and never load a Wiki capability. A user request to create or
+validate a Wiki conflicts with this profile: stop and ask them to choose
+`STANDARD`.
 
 ## Status, version, and partial failures
 
