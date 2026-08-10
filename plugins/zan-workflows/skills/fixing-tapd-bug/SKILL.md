@@ -31,8 +31,10 @@ restate, replace, or bypass their contracts or private validation.
 Accept a TAPD URL, optional resolver-only hard constraints
 (`fixed_project`, `fixed_repo_path`, `fixed_branch`, and `branch_mode`), an
 exact `submission_profile` of `STANDARD` or `NO_WIKI`, and an explicit optional
-master-merge request. Do not choose a profile, project, repository, branch,
-or master merge by default. Pass project/repository/branch constraints only to
+master-merge request. A fresh invocation has `prior_report=null`; a resumed
+invocation must include the complete immutable prior `FixingTapdBugReport`.
+Do not choose a profile, project, repository, branch, or master merge by
+default. Pass project/repository/branch constraints only to
 `resolving-tapd-work`; they remain hard constraints rather than hints.
 
 Pass only the declared immutable handoffs:
@@ -46,12 +48,15 @@ TapdWorkDefinition
 
 Never make, mutate, or rely on a `TapdTaskContext`, an implicit current
 directory, hidden conversation state, or a replacement summary as a handoff.
+Use the supplied `prior_report` as the only cross-invocation recovery source.
 Keep each returned artifact intact and retain its source with the final report.
 
 ## Orchestration procedure
 
 1. Validate the request shape in [contracts.md](references/contracts.md). If a
-   required choice is absent or not exact, pause before calling a capability.
+   required choice is absent or not exact, or a supplied prior report is not
+   compatible with the immutable request identity, pause before calling a
+   capability.
 2. Invoke `zan-workflows:resolving-tapd-work` with the TAPD URL, resolver-only
    constraints, and any explicit user increment. Preserve its returned
    `TapdWorkDefinition`. Do not call repair while the resolver result is
@@ -75,7 +80,10 @@ Keep each returned artifact intact and retain its source with the final report.
    changed upstream fact, missing requirement, or pending user authorization
    pauses the workflow immediately. Preserve all completed artifacts and form
    the resume record; do not call a later capability, create compensating
-   work, or claim an unperformed effect.
+   work, or claim an unperformed effect. When explicit new information causes
+   a producer to replace an upstream artifact, preserve the old exact artifact
+   in `history.superseded_results` with its replacement reason and new result
+   slot before considering downstream work.
 7. Only at the orchestration boundary, produce the final
    `FixingTapdBugReport`. Cleanup is separately optional: identify an eligible
    cleanup target from completed artifacts, show it, obtain specific user
@@ -86,11 +94,11 @@ Keep each returned artifact intact and retain its source with the final report.
 ## Resumption and response
 
 The word “继续” is not authorization and does not repair or discard a blocked
-artifact. Resume from the earliest paused capability using the retained result
-objects plus the user's explicit new information; rerun that capability when
-its own contract requires fresh facts or authorization. Do not reconstruct a
-handoff from memory or advance to a later capability merely because earlier
-artifacts exist.
+artifact. On a fresh invocation, resume only from the supplied immutable
+`prior_report` plus the user's explicit new information; rerun the earliest
+paused capability when its own contract requires fresh facts or authorization.
+Do not reconstruct a handoff from memory or advance to a later capability
+merely because earlier artifacts exist.
 
 Return one `FixingTapdBugReport` as defined in
 [contracts.md](references/contracts.md). It must contain the real result chain,

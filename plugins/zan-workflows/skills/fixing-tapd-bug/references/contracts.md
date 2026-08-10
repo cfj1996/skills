@@ -18,6 +18,7 @@ FixingTapdBugRequest:
   master_merge:
     requested: true | false
     existing_wiki_mark_request: true | false | null
+  prior_report: FixingTapdBugReport | null
   user_increment:
     source: string | null
     changes: [string]
@@ -31,6 +32,12 @@ FixingTapdBugRequest:
   for the orchestrator or later capabilities.
 - `master_merge.requested=true` must be an explicit user request in the current
   conversation. `false` means the master capability is not invoked.
+- `prior_report=null` identifies a new run. A resume is a fresh invocation
+  whose request carries the complete, immutable report returned by the prior
+  invocation; it must not consume hidden conversation state. Except for an
+  explicit `user_increment`, its TAPD URL, resolver constraints, profile, and
+  master request must agree with `prior_report.request`. A mismatch pauses at
+  `request-validation` without a capability call.
 
 ## Result handoffs
 
@@ -67,6 +74,16 @@ FixingTapdBugReport:
     master_merge:
       request: REQUESTED | NOT_REQUESTED
       result: MasterMergeResult | null
+  history:
+    superseded_results:
+      - capability: resolving-tapd-work | repairing-tapd-work | submitting-tapd-for-test | merging-tapd-work-to-master
+        artifact_type: TapdWorkDefinition | ReviewedChange | TestSubmissionResult | MasterMergeResult
+        artifact: TapdWorkDefinition | ReviewedChange | TestSubmissionResult | MasterMergeResult
+        reason: string
+        replaced_by:
+          capability: resolving-tapd-work | repairing-tapd-work | submitting-tapd-for-test | merging-tapd-work-to-master
+          result_chain_slot: definition | reviewed_change | submission | master_merge.result
+          terminal_state: STOPPED_FOR_HANDOFF | REVIEWED | SUBMITTED | MERGED | BLOCKED
   pause:
     capability: resolving-tapd-work | repairing-tapd-work | submitting-tapd-for-test | merging-tapd-work-to-master | request-validation | null
     reason: string | null
@@ -88,12 +105,18 @@ FixingTapdBugReport:
 - `PAUSED` preserves every returned result exactly as supplied, identifies the
   first incomplete capability or request gate, and names a truthful next
   action. It never contains invented downstream artifacts.
+- A resumed report begins with every `prior_report.history.superseded_results`
+  unchanged. When an explicit user increment or fresh producer evidence
+  replaces an artifact from `prior_report.result_chain`, append that old exact
+  artifact once with the truthful `reason` and the new producer/slot/terminal
+  state in `replaced_by`; the replacement itself occupies the current result
+  chain slot. An unchanged carried-forward artifact is not superseded.
 - A `BLOCKED` capability result, non-passing validation, or an authorization
   wait is `PAUSED`; it is not converted into a success and no later capability
   is invoked.
-- Resume uses only the retained immutable artifacts and explicit new user
-  information. “继续” without that information/authorization cannot advance a
-  paused gate.
+- Resume uses only `prior_report`, retained immutable artifacts within it, and
+  explicit new user information. “继续” without that
+  information/authorization cannot advance a paused gate.
 - The final report may describe cleanup but must not add cleanup rules to any
   capability. No cleanup action is inferred or authorized by an upstream
   result.

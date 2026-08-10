@@ -6,7 +6,7 @@ a producer state or gate.
 
 | Order | Invoke | Exact input | Continue only when | Pause/result ownership |
 | --- | --- | --- | --- | --- |
-| 0 | none | `FixingTapdBugRequest` | TAPD URL and exact profile are present; named skills are available | Return `PAUSED` at `request-validation`; no capability result exists. |
+| 0 | none | `FixingTapdBugRequest`, including `prior_report` or explicit null | TAPD URL and exact profile are present; named skills are available; a prior report, when supplied, matches the immutable request identity | Return `PAUSED` at `request-validation`; no capability result exists. |
 | 1 | `zan-workflows:resolving-tapd-work` | TAPD URL, resolver-only constraints, user increment | Its producer permits an actionable handoff | Preserve `TapdWorkDefinition`; resolver owns blocked/pending evidence and requested confirmation. |
 | 2 | `zan-workflows:repairing-tapd-work` | unchanged `TapdWorkDefinition` | `ReviewedChange.terminal_state=REVIEWED` and its review passes | Preserve definition and change; repair owns location, planning, TDD, verification, and review decisions. |
 | 3 | `zan-workflows:submitting-tapd-for-test` | unchanged definition, unchanged reviewed change, exact profile | `TestSubmissionResult.terminal_state=SUBMITTED` | Preserve all three results; submission owns develop, Wiki policy, authorization, writes, and readbacks. |
@@ -27,12 +27,15 @@ Forward the request profile exactly once to submission:
 1. Stop at the first capability that is blocked, has a failing validation, or
    is waiting for authorization/required user input.
 2. Return the already-produced artifacts unchanged in `FixingTapdBugReport`.
-3. On a later turn, accept only an explicit user increment or authorization
-   plus those artifacts. Resume at the paused producer; it decides whether
+3. A later invocation must provide that report in `prior_report`, plus an
+   explicit user increment or authorization. Do not read hidden conversation
+   state. Resume at the earliest paused producer; it decides whether
    revalidation is needed. Do not replay later stages first.
 4. If the new information changes an upstream artifact, preserve the earlier
-   artifact as evidence, rerun the owning producer, and discard no prior
-   observed result. Downstream execution waits for a new eligible handoff.
+   artifact as evidence by appending its exact value, replacement reason, and
+   replacement slot to `history.superseded_results`. Rerun the owning producer
+   and leave the new result in the current chain; downstream execution waits
+   for its new eligible handoff. Carry unchanged historical entries forward.
 
 ## Cleanup boundary
 
