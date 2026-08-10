@@ -37,7 +37,7 @@ class WorkflowRuntimeTest(unittest.TestCase):
         return self.cli(
             "init",
             "--workflow",
-            "fixing-tapd-bug",
+            "fixing-bug",
             "--workflow-version",
             "1",
             "--request-json",
@@ -58,7 +58,7 @@ class WorkflowRuntimeTest(unittest.TestCase):
             "--run-id",
             run_id,
             "--skill",
-            "zan-workflows:resolving-tapd-work",
+            "zan-workflows:preparing-work",
             "--input-json",
             json.dumps({"tapd_url": "https://www.tapd.cn/1/bugtrace/bugs/view/2"}),
         )
@@ -75,13 +75,13 @@ class WorkflowRuntimeTest(unittest.TestCase):
             "--validation-state",
             "PASSED",
             "--next-skill",
-            "zan-workflows:repairing-tapd-work",
+            "zan-workflows:implementing-work",
         )
 
         resumed = self.cli("resume", "--run-id", run_id)
         run = self.cli("show", "--run-id", run_id)
 
-        self.assertEqual(resumed["current_skill"], "zan-workflows:repairing-tapd-work")
+        self.assertEqual(resumed["current_skill"], "zan-workflows:implementing-work")
         self.assertEqual(resumed["status"], "RUNNING")
         self.assertEqual(resumed["completed_outputs"][0]["skill_version"], "1")
         self.assertEqual(
@@ -100,7 +100,7 @@ class WorkflowRuntimeTest(unittest.TestCase):
             "--run-id",
             run_id,
             "--skill",
-            "zan-workflows:submitting-tapd-for-test",
+            "zan-workflows:submitting-for-test",
             "--input-json",
             json.dumps({"profile": "NO_WIKI"}),
         )["invocation_id"]
@@ -171,7 +171,7 @@ class WorkflowRuntimeTest(unittest.TestCase):
             "--run-id",
             run_id,
             "--skill",
-            "zan-workflows:submitting-tapd-for-test",
+            "zan-workflows:submitting-for-test",
             "--input-json",
             json.dumps({"profile": "STANDARD"}),
         )["invocation_id"]
@@ -218,7 +218,7 @@ class WorkflowRuntimeTest(unittest.TestCase):
             "--run-id",
             run_id,
             "--skill",
-            "zan-workflows:submitting-tapd-for-test",
+            "zan-workflows:submitting-for-test",
             "--input-json",
             json.dumps({"profile": "NO_WIKI"}),
         )["invocation_id"]
@@ -318,7 +318,7 @@ class WorkflowRuntimeTest(unittest.TestCase):
         run_id = self.cli(
             "init",
             "--workflow",
-            "standalone:resolving-tapd-work",
+            "standalone:preparing-work",
             "--workflow-version",
             "1",
             "--request-json",
@@ -345,7 +345,7 @@ class WorkflowRuntimeTest(unittest.TestCase):
             "--run-id",
             run_id,
             "--skill",
-            "zan-workflows:submitting-tapd-for-test",
+            "zan-workflows:submitting-for-test",
             "--input-json",
             json.dumps({"profile": "NO_WIKI"}),
         )["invocation_id"]
@@ -424,7 +424,7 @@ class WorkflowRuntimeTest(unittest.TestCase):
             "--run-id",
             run_id,
             "--skill",
-            "zan-workflows:resolving-tapd-work",
+            "zan-workflows:preparing-work",
             "--input-json",
             json.dumps({"tapd_url": "https://www.tapd.cn/1/bugtrace/bugs/view/2"}),
         )["invocation_id"]
@@ -441,14 +441,14 @@ class WorkflowRuntimeTest(unittest.TestCase):
             "--output-json",
             json.dumps({"terminal_state": "READY_FOR_HANDOFF"}),
             "--next-skill",
-            "zan-workflows:repairing-tapd-work",
+            "zan-workflows:implementing-work",
         )
         repair = self.cli(
             "begin-skill",
             "--run-id",
             run_id,
             "--skill",
-            "zan-workflows:repairing-tapd-work",
+            "zan-workflows:implementing-work",
             "--input-json",
             json.dumps({"terminal_state": "READY_FOR_HANDOFF"}),
         )["invocation_id"]
@@ -465,7 +465,7 @@ class WorkflowRuntimeTest(unittest.TestCase):
             "--output-json",
             json.dumps({"terminal_state": "REVIEWED"}),
             "--next-skill",
-            "zan-workflows:submitting-tapd-for-test",
+            "zan-workflows:submitting-for-test",
         )
 
         self.cli(
@@ -475,15 +475,15 @@ class WorkflowRuntimeTest(unittest.TestCase):
             "--from-invocation-id",
             repair,
             "--current-skill",
-            "zan-workflows:repairing-tapd-work",
+            "zan-workflows:implementing-work",
             "--reason",
             "scope changed",
         )
         resumed = self.cli("resume", "--run-id", run_id)
         run = self.cli("show", "--run-id", run_id)
 
-        self.assertEqual(resumed["current_skill"], "zan-workflows:repairing-tapd-work")
-        self.assertEqual([item["skill"] for item in resumed["completed_outputs"]], ["zan-workflows:resolving-tapd-work"])
+        self.assertEqual(resumed["current_skill"], "zan-workflows:implementing-work")
+        self.assertEqual([item["skill"] for item in resumed["completed_outputs"]], ["zan-workflows:preparing-work"])
         self.assertEqual(run["invocations"][1]["status"], "INVALIDATED")
         self.assertEqual(run["invocations"][1]["invalidation_reason"], "scope changed")
 
@@ -494,7 +494,7 @@ class WorkflowRuntimeTest(unittest.TestCase):
             "--run-id",
             run_id,
             "--skill",
-            "zan-workflows:resolving-tapd-work",
+            "zan-workflows:preparing-work",
             "--input-json",
             json.dumps({"tapd_url": "https://www.tapd.cn/1/bugtrace/bugs/view/2"}),
         )["invocation_id"]
@@ -525,7 +525,7 @@ class WorkflowRuntimeTest(unittest.TestCase):
             "--run-id",
             run_id,
             "--skill",
-            "zan-workflows:submitting-tapd-for-test",
+            "zan-workflows:submitting-for-test",
             "--input-json",
             json.dumps({"profile": "NO_WIKI"}),
         )["invocation_id"]
@@ -573,7 +573,7 @@ class WorkflowRuntimeTest(unittest.TestCase):
                 "--run-id",
                 run_id,
                 "--skill",
-                "zan-workflows:submitting-tapd-for-test",
+                "zan-workflows:submitting-for-test",
                 "--input-json",
                 json.dumps({"profile": "NO_WIKI"}),
             )
@@ -587,13 +587,13 @@ class WorkflowRuntimeTest(unittest.TestCase):
             "--reason",
             "retry after correcting readback",
         )
-        self.assertEqual(invalidated["current_skill"], "zan-workflows:submitting-tapd-for-test")
+        self.assertEqual(invalidated["current_skill"], "zan-workflows:submitting-for-test")
         retry = self.cli(
             "begin-skill",
             "--run-id",
             run_id,
             "--skill",
-            "zan-workflows:submitting-tapd-for-test",
+            "zan-workflows:submitting-for-test",
             "--input-json",
             json.dumps({"profile": "NO_WIKI"}),
         )
@@ -643,7 +643,7 @@ class WorkflowRuntimeTest(unittest.TestCase):
             "--run-id",
             run_id,
             "--skill",
-            "zan-workflows:submitting-tapd-for-test",
+            "zan-workflows:submitting-for-test",
             "--input-json",
             json.dumps({"profile": "STANDARD"}),
         )["invocation_id"]
@@ -652,7 +652,7 @@ class WorkflowRuntimeTest(unittest.TestCase):
             "--run-id",
             run_id,
             "--skill",
-            "zan-workflows:drafting-tapd-wiki",
+            "zan-workflows:drafting-wiki",
             "--parent-invocation-id",
             submission,
             "--input-json",
@@ -670,7 +670,7 @@ class WorkflowRuntimeTest(unittest.TestCase):
                 "--validation-state",
                 "PASSED",
                 "--next-skill",
-                "zan-workflows:merging-tapd-work-to-master",
+                "zan-workflows:going-live",
                 "--output-json",
                 json.dumps({"terminal_state": "SUBMITTED"}),
             )
@@ -687,7 +687,7 @@ class WorkflowRuntimeTest(unittest.TestCase):
             "--output-json",
             json.dumps({"terminal_state": "VALIDATED", "rendered_markdown": "draft v1"}),
         )
-        self.assertEqual(child_finish["current_skill"], "zan-workflows:submitting-tapd-for-test")
+        self.assertEqual(child_finish["current_skill"], "zan-workflows:submitting-for-test")
         self.cli(
             "finish-skill",
             "--run-id",
@@ -712,7 +712,7 @@ class WorkflowRuntimeTest(unittest.TestCase):
             "draft facts changed",
         )
         self.assertEqual(invalidated["invalidated_invocation_ids"], [submission, drafter])
-        self.assertEqual(invalidated["current_skill"], "zan-workflows:submitting-tapd-for-test")
+        self.assertEqual(invalidated["current_skill"], "zan-workflows:submitting-for-test")
         resumed = self.cli("resume", "--run-id", run_id)
         self.assertEqual(resumed["completed_outputs"], [])
 
@@ -723,7 +723,7 @@ class WorkflowRuntimeTest(unittest.TestCase):
             "--run-id",
             run_id,
             "--skill",
-            "zan-workflows:submitting-tapd-for-test",
+            "zan-workflows:submitting-for-test",
             "--input-json",
             json.dumps({"profile": "NO_WIKI"}),
         )["invocation_id"]
@@ -788,7 +788,7 @@ class WorkflowRuntimeTest(unittest.TestCase):
             "--run-id",
             run_id,
             "--skill",
-            "zan-workflows:submitting-tapd-for-test",
+            "zan-workflows:submitting-for-test",
             "--input-json",
             json.dumps({"profile": "NO_WIKI"}),
         )["invocation_id"]

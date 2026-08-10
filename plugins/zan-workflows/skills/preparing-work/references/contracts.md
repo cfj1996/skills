@@ -1,6 +1,6 @@
 # TapdWorkDefinition contract
 
-`resolving-tapd-work` is an analysis-only producer. It returns this definition
+`preparing-work` is an analysis-only producer. It returns this definition
 with one authoritative terminal state; no field authorizes a write.
 
 ```yaml

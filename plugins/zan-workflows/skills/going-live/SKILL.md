@@ -1,5 +1,5 @@
 ---
-name: merging-tapd-work-to-master
+name: going-live
 description: Use when an already submitted TAPD change must optionally merge its original repair branch directly to master, with verified readback and an optional confirmed marker on an existing Wiki.
 ---
 
@@ -12,14 +12,14 @@ workflow, or a TAPD-update workflow.
 
 ## Workflow runtime envelope
 
-When invoked by `fixing-tapd-bug`, accept its `run_id` and `invocation_id` only
+When invoked by `fixing-bug`, accept its `run_id` and `invocation_id` only
 as execution metadata and follow
 [workflow-runtime.md](../../references/workflow-runtime.md). The orchestrator
 records the exact input and public `MasterMergeResult`. Record the master MR
 create/update/merge and optional existing-Wiki marker as effects before their
 external calls, then mark their actual return and readback. Never finish
 `SUCCEEDED` with a nonterminal effect. A standalone call may create a
-`standalone:merging-tapd-work-to-master` run.
+`standalone:going-live` run.
 
 ## Inputs, boundary, and result
 

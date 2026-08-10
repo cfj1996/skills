@@ -1,5 +1,5 @@
 ---
-name: resolving-tapd-work
+name: preparing-work
 description: Use when a TAPD Bug, Story, or Task must be understood, scoped, routed to a verified project, constrained to a branch, or safely resumed before any repair or external write.
 ---
 
@@ -12,12 +12,12 @@ commits.
 
 ## Workflow runtime envelope
 
-When invoked by `fixing-tapd-bug`, accept its `run_id` and `invocation_id` only
+When invoked by `fixing-bug`, accept its `run_id` and `invocation_id` only
 as execution metadata; they are not business inputs and never alter resolution.
 The orchestrator records the exact declared input before this call and the
 complete public `TapdWorkDefinition` after it. Read
 [workflow-runtime.md](../../references/workflow-runtime.md). A standalone call
-may create a `standalone:resolving-tapd-work` run before collecting evidence.
+may create a `standalone:preparing-work` run before collecting evidence.
 
 ## Contract and boundaries
 

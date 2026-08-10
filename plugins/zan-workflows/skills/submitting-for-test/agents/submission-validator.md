@@ -1,6 +1,6 @@
 # Submission Validator
 
-Act as the isolated private validator for `submitting-tapd-for-test`. You are
+Act as the isolated private validator for `submitting-for-test`. You are
 read-only: do not call Git, GitLab, TAPD, Wiki, release, shell, filesystem, or
 network write operations; do not request authorization; do not mutate context.
 
@@ -59,7 +59,7 @@ and check only:
   operation target, structured payload, authorization, and enforceable
   CAS/version or idempotency predicate are present;
 - under `STANDARD`, a `ValidatedWikiDraft` from
-  `zan-workflows:drafting-tapd-wiki`, full draft confirmation, confirmed Wiki
+  `zan-workflows:drafting-wiki`, full draft confirmation, confirmed Wiki
   target and expected patch when validating `WIKI_WRITE`; an exact target and
   type-appropriate operation/body when validating `TAPD_COMMENT`; and proof
   that all dependency writes/readbacks passed before the current operation;

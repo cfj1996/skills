@@ -1,5 +1,5 @@
 ---
-name: fixing-tapd-bug
+name: fixing-bug
 description: Use when the user asks to carry a TAPD Bug through the managed end-to-end workflow.
 ---
 
@@ -16,7 +16,7 @@ Read [contracts.md](references/contracts.md), then
 ## Workflow runtime record
 
 Read [workflow-runtime.md](../../references/workflow-runtime.md). For a fresh
-request without `run_id`, initialize `workflow=fixing-tapd-bug` before invoking
+request without `run_id`, initialize `workflow=fixing-bug` before invoking
 resolver, persist the exact request, and expose the returned `run_id` in the
 first progress update and final report. Before every capability call, create a
 `begin-skill` record with its exact function input; after every return, call
@@ -37,12 +37,12 @@ recovery because `resume` returns the last persisted public report. Never edit
 All of these named capabilities must be available before starting. Do not
 restate, replace, or bypass their contracts or private validation.
 
-- `zan-workflows:resolving-tapd-work`
-- `zan-workflows:repairing-tapd-work`
-- `zan-workflows:submitting-tapd-for-test`
-- `zan-workflows:drafting-tapd-wiki` (owned and invoked by submission only for
+- `zan-workflows:preparing-work`
+- `zan-workflows:implementing-work`
+- `zan-workflows:submitting-for-test`
+- `zan-workflows:drafting-wiki` (owned and invoked by submission only for
   `STANDARD`; this orchestrator does not invoke it directly)
-- `zan-workflows:merging-tapd-work-to-master` (optional, only on an explicit
+- `zan-workflows:going-live` (optional, only on an explicit
   request)
 
 ## Input and handoff boundary
@@ -57,7 +57,7 @@ invocation must provide the existing `run_id`. `prior_report` may be null when
 the runtime already contains the completed producer outputs.
 Do not choose a profile, project, repository, branch, or master merge by
 default. Pass project/repository/branch constraints only to
-`resolving-tapd-work`; they remain hard constraints rather than hints.
+`preparing-work`; they remain hard constraints rather than hints.
 
 Pass only the declared immutable handoffs:
 
@@ -82,26 +82,26 @@ with the final report.
    compatible with that immutable request identity, persist the blocker and
    pause before calling a capability.
 2. Choose exactly one entry route. For `run_id=null`, create the run and start
-   with `resolving-tapd-work`. For a resume, route strictly by the runtime's
+   with `preparing-work`. For a resume, route strictly by the runtime's
    `current_skill`, current invocation output, and pending effects using the
    table in [workflow.md](references/workflow.md):
    reuse every earlier unchanged artifact and invoke only the paused producer.
    Do not call resolver or repair merely because they are earlier in the fresh
    sequence. A `request-validation` pause invokes no producer.
 3. Rerun resolver only when the prior pause capability is
-   `resolving-tapd-work`, or explicit new information changes resolver-owned
+   `preparing-work`, or explicit new information changes resolver-owned
    work identity, scope, project, repository, or branch constraints. Pass only
    `tapd_url`, `fixed_project`, `fixed_repo_path`, `fixed_branch`,
    `branch_mode`, and `scope_increment`; never pass `prior_report` or another
    artifact. A changed TAPD URL or other immutable request identity denotes a
    new request, not a silent resume.
 4. For a repair pause, reuse the exact eligible definition and invoke only
-   `repairing-tapd-work`, forwarding only a matching exact authorization
+   `implementing-work`, forwarding only a matching exact authorization
    increment when supplied. For a submission pause, reuse the exact definition
-   and reviewed change and invoke only `submitting-tapd-for-test` with the
+   and reviewed change and invoke only `submitting-for-test` with the
    unchanged profile and matching exact authorization increment. For a master
    pause, reuse the exact definition, reviewed
-   change, and submission and invoke only `merging-tapd-work-to-master` with
+   change, and submission and invoke only `going-live` with
    the exact original repair branch, marker request, and matching exact
    authorization increment. Each producer independently verifies the binding;
    the orchestrator never treats it as proof. No resumed route may

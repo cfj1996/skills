@@ -35,7 +35,7 @@
 
 ## Standard Wiki rule
 
-`STANDARD` must invoke `zan-workflows:drafting-tapd-wiki` after merge readback.
+`STANDARD` must invoke `zan-workflows:drafting-wiki` after merge readback.
 It must pass factual input, retain the full resulting Markdown, and treat a
 blocked draft as a submission blocker. Locate the existing Wiki from TAPD
 detail/comments first; preserve it and append rather than replacing or

@@ -7,10 +7,10 @@ a producer state or gate.
 | Order | Invoke | Exact input | Continue only when | Pause/result ownership |
 | --- | --- | --- | --- | --- |
 | 0 | runtime only | `FixingTapdBugRequest`, including a new null `run_id` or existing `run_id` | TAPD URL and exact profile are present; named skills are available; stored request identity and optional prior report match | Persist request/progress first; return `PAUSED` at `request-validation` when invalid. |
-| 1 | `zan-workflows:resolving-tapd-work` | Only `tapd_url`, `fixed_project`, `fixed_repo_path`, `fixed_branch`, `branch_mode`, and `scope_increment`, plus runtime envelope | Its producer permits an actionable handoff | Preserve `TapdWorkDefinition` as the invocation output; resolver owns blocked/pending evidence and requested confirmation. |
-| 2 | `zan-workflows:repairing-tapd-work` | unchanged `TapdWorkDefinition` | `ReviewedChange.terminal_state=REVIEWED` and its review passes | Preserve definition and change; repair owns location, planning, TDD, verification, and review decisions. |
-| 3 | `zan-workflows:submitting-tapd-for-test` | unchanged definition, unchanged reviewed change, exact profile | `TestSubmissionResult.terminal_state=SUBMITTED` | Preserve all three results; submission owns develop, Wiki policy, authorization, writes, and readbacks. |
-| 4 | `zan-workflows:merging-tapd-work-to-master` | unchanged submitted result, exact original repair branch, optional existing-Wiki mark request | `MasterMergeResult.terminal_state=MERGED` | Invoke only for an explicit master request. Preserve all results; master capability owns its authorization and readbacks. |
+| 1 | `zan-workflows:preparing-work` | Only `tapd_url`, `fixed_project`, `fixed_repo_path`, `fixed_branch`, `branch_mode`, and `scope_increment`, plus runtime envelope | Its producer permits an actionable handoff | Preserve `TapdWorkDefinition` as the invocation output; resolver owns blocked/pending evidence and requested confirmation. |
+| 2 | `zan-workflows:implementing-work` | unchanged `TapdWorkDefinition` | `ReviewedChange.terminal_state=REVIEWED` and its review passes | Preserve definition and change; repair owns location, planning, TDD, verification, and review decisions. |
+| 3 | `zan-workflows:submitting-for-test` | unchanged definition, unchanged reviewed change, exact profile | `TestSubmissionResult.terminal_state=SUBMITTED` | Preserve all three results; submission owns develop, Wiki policy, authorization, writes, and readbacks. |
+| 4 | `zan-workflows:going-live` | unchanged submitted result, exact original repair branch, optional existing-Wiki mark request | `MasterMergeResult.terminal_state=MERGED` | Invoke only for an explicit master request. Preserve all results; master capability owns its authorization and readbacks. |
 | 5 | none | complete result chain | reporting is formed | The orchestrator owns optional cleanup handling and the final report only. |
 
 ## Profile routing
@@ -19,7 +19,7 @@ Forward the request profile exactly once to submission:
 
 | Request profile | Orchestrator action | Submission-owned behavior |
 | --- | --- | --- |
-| `STANDARD` | Invoke submission with `STANDARD`; do not draft a Wiki itself. | Submission invokes `zan-workflows:drafting-tapd-wiki` under its own contract. |
+| `STANDARD` | Invoke submission with `STANDARD`; do not draft a Wiki itself. | Submission invokes `zan-workflows:drafting-wiki` under its own contract. |
 | `NO_WIKI` | Invoke submission with `NO_WIKI`; do not load any Wiki material or capability. | Submission records its producer-defined skip result. |
 
 ## Pause and resume
@@ -47,10 +47,10 @@ Forward the request profile exactly once to submission:
 | Runtime `current_skill` / last pause | Reuse unchanged | Invoke now | Never replay by default |
 | --- | --- | --- | --- |
 | `request-validation` | Complete prior report | none | every producer |
-| `resolving-tapd-work` | request/history only | resolver | repair/submission/master until eligible |
-| `repairing-tapd-work` | definition | repair | resolver |
-| `submitting-tapd-for-test` | definition + reviewed change | submission | resolver + repair |
-| `merging-tapd-work-to-master` | definition + reviewed change + submission | master | resolver + repair + submission |
+| `preparing-work` | request/history only | resolver | repair/submission/master until eligible |
+| `implementing-work` | definition | repair | resolver |
+| `submitting-for-test` | definition + reviewed change | submission | resolver + repair |
+| `going-live` | definition + reviewed change + submission | master | resolver + repair + submission |
 
 For a repair, submission, or master authorization pause, forward only an
 `authorization_increment` whose capability, operation, exact confirmation,

@@ -1,5 +1,5 @@
 ---
-name: repairing-tapd-work
+name: implementing-work
 description: Use when an approved TAPD work definition must be repaired in its verified repository and returned as a tested, independently reviewed change without submitting, merging, or publishing it.
 ---
 
@@ -15,21 +15,21 @@ write a Wiki, or claim a deployment result. Those are separate capabilities.
 
 ## Workflow runtime envelope
 
-When invoked by `fixing-tapd-bug`, accept its `run_id` and `invocation_id` only
+When invoked by `fixing-bug`, accept its `run_id` and `invocation_id` only
 as execution metadata; they are not fields of `TapdWorkDefinition` or
 `ReviewedChange`. The orchestrator records the exact input and public output
 using [workflow-runtime.md](../../references/workflow-runtime.md). Before the
 first local source edit, record a `SOURCE_EDIT` effect with the exact repository,
 worktree, branch, and approved scope; mark it `APPLIED` after editing and
 `VERIFIED` only after the required tests and private review pass. A standalone
-call may create a `standalone:repairing-tapd-work` run.
+call may create a `standalone:implementing-work` run.
 
 ## Inputs and result
 
 Read [contracts.md](references/contracts.md) before acting. Accept either:
 
 - a `TapdWorkDefinition` with `terminal_state=READY_FOR_HANDOFF`; or
-- a TAPD URL, in which case call `zan-workflows:resolving-tapd-work` first and
+- a TAPD URL, in which case call `zan-workflows:preparing-work` first and
   stop unless it returns an approved definition.
 
 Return a schema-shaped `ReviewedChange` only when every pre-edit, development,

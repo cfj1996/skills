@@ -1,6 +1,6 @@
 # FixingTapdBug orchestration contract
 
-`fixing-tapd-bug` is a composition boundary. It transports the stable results
+`fixing-bug` is a composition boundary. It transports the stable results
 owned by its capability producers; it does not define a mutable task context or
 duplicate a producer's business validation.
 
@@ -28,7 +28,7 @@ FixingTapdBugRequest:
     source: string | null
     changes: [string]
   authorization_increment:
-    capability: repairing-tapd-work | submitting-tapd-for-test | merging-tapd-work-to-master | null
+    capability: implementing-work | submitting-for-test | going-live | null
     operation: string | null
     confirmation_text: string | null
     confirmed_at: string | null
@@ -38,7 +38,7 @@ FixingTapdBugRequest:
 - `tapd_url` and `submission_profile` are required. A missing or different
   profile pauses before a capability is invoked; it is never silently
   defaulted.
-- `resolver_constraints` are passed only to `resolving-tapd-work`. They are
+- `resolver_constraints` are passed only to `preparing-work`. They are
   immutable request facts, not an alternate project/branch-selection mechanism
   for the orchestrator or later capabilities.
 - `master_merge.requested=true` must be an explicit user request in the current
@@ -86,13 +86,13 @@ contracts:
 
 | Artifact | Producer | Consumer | Required handoff state |
 | --- | --- | --- | --- |
-| `TapdWorkDefinition` | `zan-workflows:resolving-tapd-work` | `zan-workflows:repairing-tapd-work` | `terminal_state=READY_FOR_HANDOFF`, matching response marker, and no unresolved required user action |
-| `ReviewedChange` | `zan-workflows:repairing-tapd-work` | `zan-workflows:submitting-tapd-for-test` | `terminal_state=REVIEWED` and producer review passes |
-| `TestSubmissionResult` | `zan-workflows:submitting-tapd-for-test` | `zan-workflows:merging-tapd-work-to-master` | `terminal_state=SUBMITTED` |
-| `MasterMergeResult` | `zan-workflows:merging-tapd-work-to-master` | final report only | `terminal_state=MERGED` |
+| `TapdWorkDefinition` | `zan-workflows:preparing-work` | `zan-workflows:implementing-work` | `terminal_state=READY_FOR_HANDOFF`, matching response marker, and no unresolved required user action |
+| `ReviewedChange` | `zan-workflows:implementing-work` | `zan-workflows:submitting-for-test` | `terminal_state=REVIEWED` and producer review passes |
+| `TestSubmissionResult` | `zan-workflows:submitting-for-test` | `zan-workflows:going-live` | `terminal_state=SUBMITTED` |
+| `MasterMergeResult` | `zan-workflows:going-live` | final report only | `terminal_state=MERGED` |
 
-`drafting-tapd-wiki` is a named required dependency but is not a fourth
-handoff. `submitting-tapd-for-test` owns that composition under `STANDARD`; it
+`drafting-wiki` is a named required dependency but is not a fourth
+handoff. `submitting-for-test` owns that composition under `STANDARD`; it
 must not be invoked, inspected, or represented for `NO_WIKI`.
 
 ## Final report
@@ -111,23 +111,23 @@ FixingTapdBugReport:
       result: MasterMergeResult | null
   history:
     superseded_results:
-      - capability: resolving-tapd-work | repairing-tapd-work | submitting-tapd-for-test | merging-tapd-work-to-master
+      - capability: preparing-work | implementing-work | submitting-for-test | going-live
         artifact_type: TapdWorkDefinition | ReviewedChange | TestSubmissionResult | MasterMergeResult
         artifact: TapdWorkDefinition | ReviewedChange | TestSubmissionResult | MasterMergeResult
         reason: string
         disposition: REPLACED | INVALIDATED_BY_UPSTREAM_REPLACEMENT
         replaced_by:
-          capability: resolving-tapd-work | repairing-tapd-work | submitting-tapd-for-test | merging-tapd-work-to-master | null
+          capability: preparing-work | implementing-work | submitting-for-test | going-live | null
           result_chain_slot: definition | reviewed_change | submission | master_merge.result | null
           terminal_state: READY_FOR_HANDOFF | PENDING | REVIEWED | SUBMITTED | MERGED | BLOCKED | null
   resume_route:
-    source_pause_capability: resolving-tapd-work | repairing-tapd-work | submitting-tapd-for-test | merging-tapd-work-to-master | request-validation | null
+    source_pause_capability: preparing-work | implementing-work | submitting-for-test | going-live | request-validation | null
     reused_slots: [definition | reviewed_change | submission | master_merge.result]
-    entry_capability: resolving-tapd-work | repairing-tapd-work | submitting-tapd-for-test | merging-tapd-work-to-master | null
+    entry_capability: preparing-work | implementing-work | submitting-for-test | going-live | null
     replaced_slots: [definition | reviewed_change | submission | master_merge.result]
     invalidated_slots: [definition | reviewed_change | submission | master_merge.result]
   pause:
-    capability: resolving-tapd-work | repairing-tapd-work | submitting-tapd-for-test | merging-tapd-work-to-master | request-validation | null
+    capability: preparing-work | implementing-work | submitting-for-test | going-live | request-validation | null
     reason: string | null
     next_required_action: string | null
     resume_with: [TapdWorkDefinition | ReviewedChange | TestSubmissionResult | MasterMergeResult]

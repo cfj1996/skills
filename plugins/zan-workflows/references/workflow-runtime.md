@@ -28,7 +28,7 @@ For a fresh orchestration, create the run before invoking the first skill:
 
 ```text
 python3 <runtime> init \
-  --workflow fixing-tapd-bug \
+  --workflow fixing-bug \
   --workflow-version 1 \
   --request-file <exact-request.json>
 ```
@@ -145,7 +145,7 @@ input, `next_action`, completed immutable outputs with `skill_version` and
 target, intended payload/hash, actual return, and readback. Reuse a completed
 output only when the current skill version and reconstructed input hash match
 its recorded values. If an
-upstream input changes, let `fixing-tapd-bug` select the affected linear suffix,
+upstream input changes, let `fixing-bug` select the affected linear suffix,
 then mark it before re-execution:
 
 ```text

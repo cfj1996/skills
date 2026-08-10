@@ -1,6 +1,6 @@
 # ValidatedWikiDraft contract
 
-`drafting-tapd-wiki` is a pure renderer. It consumes only supplied facts and
+`drafting-wiki` is a pure renderer. It consumes only supplied facts and
 returns a draft boundary; it never creates, selects, reads, or updates a Wiki
 and never writes TAPD, Git, MR, release, or local state.
 

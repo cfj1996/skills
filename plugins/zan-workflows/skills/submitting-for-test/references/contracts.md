@@ -1,6 +1,6 @@
 # TestSubmissionResult contract
 
-`submitting-tapd-for-test` consumes approved upstream facts, runs one bounded
+`submitting-for-test` consumes approved upstream facts, runs one bounded
 submission transaction, and returns exactly one terminal result. It does not
 authorize or perform a later `master` merge.
 
@@ -73,7 +73,7 @@ TestSubmissionResult:
       result: PASS | FAIL | NOT_ATTEMPTED
   wiki:
     status: WRITTEN | SKIPPED_BY_POLICY | BLOCKED | NOT_ATTEMPTED
-    drafter: zan-workflows:drafting-tapd-wiki | null
+    drafter: zan-workflows:drafting-wiki | null
     full_draft: string | null
     confirmation_text: string | null
     target_wiki_id: string | null

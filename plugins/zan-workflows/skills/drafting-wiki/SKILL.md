@@ -1,5 +1,5 @@
 ---
-name: drafting-tapd-wiki
+name: drafting-wiki
 description: Use when current conversation facts or supplied TAPD work, reviewed change, delivery, and existing Wiki-draft results must become a semantically validated, directly copyable TAPD Wiki Markdown draft without creating or updating a Wiki, TAPD item, Git state, MR, or release.
 ---
 

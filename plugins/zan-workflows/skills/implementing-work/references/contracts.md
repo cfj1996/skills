@@ -1,6 +1,6 @@
 # ReviewedChange contract
 
-`repairing-tapd-work` consumes an approved `TapdWorkDefinition`. It preserves
+`implementing-work` consumes an approved `TapdWorkDefinition`. It preserves
 the definition's project fingerprint as a constraint and emits this result; it
 does not grant any later submission, merge, Wiki, or deployment authority.
 

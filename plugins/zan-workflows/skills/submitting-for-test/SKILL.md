@@ -1,5 +1,5 @@
 ---
-name: submitting-tapd-for-test
+name: submitting-for-test
 description: Use when a reviewed TAPD Bug, Story, or Task change must be submitted as a single test-delivery transaction using exactly the STANDARD or NO_WIKI policy, including verified merge to develop, TAPD status and test-version write/readback, and optional confirmed Wiki writeback.
 ---
 
@@ -11,17 +11,17 @@ production-release workflow.
 
 ## Workflow runtime envelope
 
-When invoked by `fixing-tapd-bug`, require its `run_id` and `invocation_id` as
+When invoked by `fixing-bug`, require its `run_id` and `invocation_id` as
 execution metadata and follow
 [workflow-runtime.md](../../references/workflow-runtime.md). They are not fields
 of the three business inputs. Under `STANDARD`, create and finish a nested
-`zan-workflows:drafting-tapd-wiki` invocation in the same run with
+`zan-workflows:drafting-wiki` invocation in the same run with
 `parent_invocation_id=<this submission invocation id>`. Record every
 significant external operation (`COMMIT`, `PUSH`, `MR_CREATE_OR_UPDATE`,
 `MR_MERGE`, `WIKI_WRITE`, `TAPD_COMMENT`, `TAPD_STATUS`, `TEST_VERSION`) as an
 effect before the call, advance it through execution and readback, and never
 finish this invocation `SUCCEEDED` while an effect is nonterminal. A standalone
-call may create a `standalone:submitting-tapd-for-test` run.
+call may create a `standalone:submitting-for-test` run.
 
 ## Inputs, boundary, and result
 
@@ -170,7 +170,7 @@ line in `TestSubmissionResult` or orchestration history.
 ## `STANDARD`: mandatory Wiki transaction
 
 After the develop-merge readback and before any Wiki/TAPD write, invoke
-`zan-workflows:drafting-tapd-wiki`. It is mandatory and remains read-only:
+`zan-workflows:drafting-wiki`. It is mandatory and remains read-only:
 
 1. Give it evidenced facts, including the original `feature/*` or `fixbug/*`
    source branch (never a `merge/*` intermediary), any existing Wiki body, and
@@ -210,7 +210,7 @@ After the develop-merge readback and before any Wiki/TAPD write, invoke
 
 Do **not** load, invoke, inspect, validate, draft, select, read, create,
 update, or comment a Wiki. In particular, never load
-`zan-workflows:drafting-tapd-wiki`, its validator, or Wiki templates. Do not
+`zan-workflows:drafting-wiki`, its validator, or Wiki templates. Do not
 ask for a Wiki confirmation and do not treat a missing Wiki as a failure.
 
 After the common merge readback, obtain explicit authorization for the exact

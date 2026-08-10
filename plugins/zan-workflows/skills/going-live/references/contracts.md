@@ -1,6 +1,6 @@
 # MasterMergeResult contract
 
-`merging-tapd-work-to-master` consumes a completed `TestSubmissionResult` and
+`going-live` consumes a completed `TestSubmissionResult` and
 performs at most one direct original-repair-branch-to-`master` transaction. It
 does not authorize or perform release, smoke-test, TAPD, test-version, or Wiki
 creation work.
