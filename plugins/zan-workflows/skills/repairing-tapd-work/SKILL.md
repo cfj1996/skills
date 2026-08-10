@@ -49,10 +49,13 @@ invented changes or evidence.
    fingerprint is verified, scope is confirmed, branch constraints are
    satisfied, and its required confirmations are present. Missing input facts
    are a blocked result, not a reason to reconstruct them by guessing.
-2. In the input's exact repository, capture actual Git root, origin remote,
-   current ref, HEAD, worktree list, and dirty-state baseline. Compare them
-   field by field with the input fingerprint. Record the initial baseline so
-   unrelated changes cannot later be claimed by this work.
+2. In the input's exact repository, capture actual selected project, canonical
+   repository path, Git root, common Git directory, origin remote, current ref,
+   HEAD, worktree list, and dirty-state baseline. Compare every actual value
+   with the input fingerprint. A worktree is equivalent only under the explicit
+   canonical-common-Git-directory rule in `contracts.md`; its matching branch
+   or directory name is insufficient. Record the initial baseline so unrelated
+   changes cannot later be claimed by this work.
 3. Read [development-rules.md](references/development-rules.md). Derive and
    display the expected branch and expected execution path. Ask for one
    explicit choice: the existing confirmed worktree/current project path, a
@@ -71,12 +74,17 @@ invented changes or evidence.
    evidence when the definition cites a prototype: repair work uses systematic
    debugging then planning; new Story/Task behavior uses brainstorming then
    planning. Keep the approved in-scope/out-of-scope boundary in the plan.
-7. Implement with `superpowers:test-driven-development`: record a focused RED
-   command, exit code, and relevant output before the change; then record the
-   corresponding GREEN run. Run the project-relevant verification commands and
-   retain actual command, exit code, output excerpt, and blocker reason for
-   every failure or skipped command. Follow [development-rules.md](references/development-rules.md)
-   for evidence and prototype handling.
+7. Implement with `superpowers:test-driven-development`: before the change, run
+   a focused target-behavior **test** command and record its non-zero exit,
+   output proving the target failure, and `EXPECTED_FAILURE` RED result. After
+   the change, run that same command and record its zero-exit GREEN result. A
+   different GREEN command is valid only when the evidence explicitly maps it
+   to the same target behavior; lint, build, setup failures, and passing
+   pre-change commands are never RED evidence. Run project-relevant
+   verification commands and retain actual command, exit code, output excerpt,
+   and blocker reason for every failure or skipped command. Follow
+   [development-rules.md](references/development-rules.md) for evidence and
+   prototype handling.
 8. Compare the final diff and status with the baseline and approved scope.
    Stop if unrelated changes, an unexpected path, or untracked generated
    artifacts would be attributed to the repair.

@@ -7,11 +7,14 @@ push, MR action, merge, Wiki write, submission, or deployment.
 | Scenario | Required result |
 | --- | --- |
 | The shell is in another repository, or actual Git root/origin differs from the approved fingerprint | `terminal_state=BLOCKED`, fingerprint result `FAIL`; never fall back to CWD or a similarly named repository. |
+| Actual selected project or canonical repository path is absent or differs from the approved fingerprint | `terminal_state=BLOCKED`; record the missing/mismatched actual value. A differing worktree root is allowed only with the contract's common-Git-directory and origin equivalence facts. |
 | A new feature/fix branch was created from `develop` or `dev` | `terminal_state=BLOCKED`, branch result `FAIL`; do not edit or treat the branch as a usable repair branch. |
 | Actual branch or absolute worktree path differs from the confirmed expected value | `terminal_state=BLOCKED`, record expected and actual values; no edit until the user confirms a corrected explicit location. |
 | The user says “edit first; tests and review later” | Do not emit `PRE_EDIT_GATE: PASS`; return `BLOCKED` with missing planning, TDD, verification, and review gates. |
 | The target repository has pre-existing dirty/untracked changes outside approved scope | Preserve the before-status snapshot; exclude those paths or block for scope/location reconciliation. Never attribute them to this repair. |
 | A claimed passing test/build has no actual command, exit code, or output, or RED is missing before GREEN | `terminal_state=BLOCKED`; evidence is incomplete or fabricated, not a passing verification. |
+| The pre-change “RED” command passes, is lint/build/non-test work, or fails for setup rather than the approved target behavior | `terminal_state=BLOCKED`; it is not `EXPECTED_FAILURE` evidence even if a later command passes. |
+| GREEN uses a different test command without an explicit mapping proving it covers the same target behavior | `terminal_state=BLOCKED`; do not treat unrelated passing output as the RED test's recovery. |
 | The independent reviewer is unavailable, sees no diff/baseline/evidence bundle, or is asked to self-bypass | `terminal_state=BLOCKED`, `review.verdict=NOT_RUN` or `REVIEW_FAILED`; the implementer cannot self-approve. |
 | Reviewer finds fingerprint mismatch, scope drift, unrelated changes, missing tests, or fabricated evidence | `terminal_state=BLOCKED`, `review.verdict=REVIEW_FAILED`, and retain the reviewer reason. |
 | The approved fingerprint, scope, branch/worktree, active TAPD status readback, RED→GREEN evidence, verification bundle, baseline comparison, and read-only review all pass | Return `terminal_state=REVIEWED` and `REVIEWED_CHANGE_READY`; include actual facts and residual risks, but do not submit, merge, or publish. |
