@@ -10,12 +10,26 @@
    Record legal source-history divergence separately as
    `inherited_base_difference`; never include it in this round or create a
    develop-based replacement branch because of it.
-3. Display the full `MergeConfirmationGate`: expected/actual source and target,
-   exact current-round commits, inherited difference, MR impact, and purpose.
-   Obtain explicit authorization. Any post-confirmation change invalidates it.
-4. Only after the gate may an authorized commit/push/MR/merge proceed. Read
-   merge state and every current-round commit from `origin/develop`. Stop before
-   TAPD, version, or Wiki writes on any failed containment/readback.
+3. Display `GitDeliveryWritePlan` in order. Materialize only the next exact
+   operation payload; later required operations remain
+   `PENDING_MATERIALIZATION` until the prior result supplies exact IDs/SHAs.
+   Display repository, expected/actual source and target, ref SHAs, reviewed
+   diff hash, exact current-round commits, inherited difference, next payload,
+   and purpose. Obtain each required authorization; record a policy-evidenced
+   `NOT_REQUIRED` only when applicable.
+4. Immediately before every commit/push/MR/merge, re-read the immutable facts
+   and run private `PRE_FIRST_WRITE` for that exact operation. A changed fact
+   or payload invalidates validation and authorization and requires redisplay,
+   fresh authorization when required, and revalidation. Only a passing public
+   mapped state permits that one write. Require a provider-enforced expected
+   SHA/ref lease (or equivalent atomic predicate) in the exact payload. Before
+   the call, durably append `ATTEMPT_RESERVED` and consume the passing validation
+   run; append an observed write return and the reconciled readback as later
+   events. A crash may omit the return event; never manufacture it. Never replay
+   a reserved attempt after a crash/unknown outcome—reconcile it by execution
+   ID/idempotency key, or block if presence/absence cannot be proven. Read merge state and every current-round
+   commit from `origin/develop`. Stop before TAPD, version, or Wiki writes on
+   any failed containment/readback.
 
 ## Standard Wiki rule
 
@@ -27,14 +41,31 @@ duplicating it. The original business source must be one evidenced
 `feature/*`/`fixbug/*` branch, never `merge/*`.
 
 Show the complete final Markdown and write target, then obtain a confirmation
-covering exact Wiki body/target, exact one-line Bug comment, TAPD status, and
-test-version payload. Before the first Wiki write, call the private validator
-with `validation_phase=PRE_WRITE`. It checks the confirmed draft/target/patch
+covering the exact Wiki body/target plus the materialized TAPD status and
+test-version payloads. When updating an existing Wiki whose real ID is already
+known, the same display may include the exact one-line Bug comment. When
+creating a Wiki, the pre-Wiki confirmation does **not** cover a placeholder or
+future comment: after write/readback returns the real Wiki ID, materialize and
+display the exact comment, obtain a separate authorization, and validate it
+before comment write. Before the first Wiki write, call the private validator
+with `validation_phase=PRE_SUBMISSION_WRITE`. It checks the confirmed draft/target/patch
 and planned status/version payloads, but must not require Wiki/comment/status/
-version readback that does not exist. Only `验证通过` permits the write. Use
+version readback that does not exist. Only a mapped `VALIDATION_PASSED` permits
+the write. Bind the fresh facts, payload, authorization, validation run, and
+execution using matching snapshot/payload/authorization hashes and ordered
+timestamps. The submission preflight includes exact source/target ref SHAs and
+reviewed diff hash; authorization binds that snapshot/facts/CAS tuple. Require
+a remote resource-version/CAS predicate or idempotency key, reserve and consume
+the validation run before the call, and append the write/readback as later
+events. Immediately before execution, re-read the immutable repository,
+source/target/commit/profile/target/payload snapshot; any change invalidates
+authorization and validation and requires redisplay and revalidation. Use
 `WikiWriteGate`: target, mode, before hash, expected patch, after hash, and a
 readback proving the patch. A failed readback prevents the comment and state
-write. After all permitted writes/readbacks, call the same validator with
+write. Apply the same fresh `PRE_SUBMISSION_WRITE` binding immediately before
+the exact comment, status, and version operations. Execute/read back each one
+before the next: Wiki, applicable comment, status, then version. After all
+permitted writes/readbacks, call the same validator with
 `validation_phase=POST_WRITE`; a non-passing verdict records partial failure
 and forbids further writes.
 
@@ -55,9 +86,10 @@ create/update call, Wiki comment, or Wiki confirmation. Set
 `wiki.status=SKIPPED_BY_POLICY` and all other Wiki evidence to null or
 `NOT_ATTEMPTED`; set TAPD comment fields to `NOT_APPLICABLE`.
 
-Still require the merge gate/readback plus exact TAPD-status and test-version
-authorization, write, and readback. `PRE_WRITE` and `POST_WRITE` both omit all
-Wiki material and never load a Wiki capability. A user request to create or
+Still require the merge gate/readback plus exact TAPD-status and structured
+test-version authorization, write, and readback. Run separate fresh
+`PRE_SUBMISSION_WRITE` gates and immediate readbacks for status, then version.
+All validation phases omit Wiki material and never load a Wiki capability. A user request to create or
 validate a Wiki conflicts with this profile: stop and ask them to choose
 `STANDARD`.
 

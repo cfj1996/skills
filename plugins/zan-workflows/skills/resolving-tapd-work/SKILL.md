@@ -35,6 +35,23 @@ scope_increment (optional)
 they do not prove a fact or authorize a write. A mismatch is `BLOCKED`, never a
 fallback to a different project, repository, or branch.
 
+Valid branch input combinations are:
+
+| `branch_mode` | `fixed_branch` | Allowed outcome |
+| --- | --- | --- |
+| `AUTO` | absent | Discover all evidenced candidates; choose one only under the normal resume rules, otherwise `FRESH`. |
+| `AUTO` | present | Inspect only the exact fixed branch. It may be the exact resumed ref or exact `branch_to_create`; no other ref may substitute. |
+| `CREATE` | required | Preserve the exact fixed value as `branch_to_create`. This mode never returns `RESUME`, even when another historical candidate is attractive. |
+| `REUSE_FIXED` | required | Inspect and, only when fully proven, resume the exact fixed ref. No other ref may be searched, scored, or selected. |
+
+`CREATE` or `REUSE_FIXED` without `fixed_branch` is an invalid combination and
+returns `BLOCKED`. A supplied `fixed_branch` is a hard constraint in every mode.
+Use `PENDING` only for unavailable/unfinished evidence or a named user decision
+that could still satisfy the constraint. Use `BLOCKED` for an invalid input
+combination, proven mismatch, existing ref under `CREATE`, conflicting exact
+refs, or another disproven hard constraint. Proven absence of both exact refs
+is `ABSENT`, not failure, when `AUTO`/`CREATE` evaluates exact creation.
+
 ## Read-only resolution procedure
 
 1. Parse the TAPD URL and use its path to select the correct Bug, Story, or Task
@@ -54,12 +71,13 @@ fallback to a different project, repository, or branch.
    or conflicting verification leaves `repo_verification` pending or blocked.
 5. In the verified repository only, perform the read-only resume check from
    `collection-and-resume.md`. Record `fixed_branch` as an explicit
-   `PASS|FAIL|PENDING` branch constraint whenever supplied. With
-   `branch_mode=REUSE_FIXED`, inspect only the exact fixed branch ref and set
-   `resume.selected_ref` only after every required branch check passes. A
-   missing or mismatched fixed ref blocks or waits for confirmation with
-   `selected_ref=null`; never select a different candidate ref. Do not create
-   or change a ref. Emit an explicit resume decision even when pending.
+   `PASS|FAIL|PENDING` branch constraint whenever supplied. In all modes, a
+   fixed branch permits only its exact local/remote ref or the exact same
+   `branch_to_create`; never search, score, or select a different ref. `CREATE`
+   always keeps `selected_ref=null`, sets the exact `branch_to_create`, and
+   returns `FRESH` only when creation eligibility is proven. It never returns
+   `RESUME`. Do not create or change a ref. Emit an explicit resume decision
+   even when pending.
 6. Build context as `PreviousContext + LatestTapdRefresh + UserIncrement`.
    Previous context supplies history, the refresh supplies only current changes,
    and `scope_increment` supplies this request's delta. Never overwrite history
@@ -71,17 +89,21 @@ fallback to a different project, repository, or branch.
 8. Assign `context_confidence`, `project_confidence`, and `scope_confidence` as
    `HIGH`, `MEDIUM`, or `LOW`, each with reasons and missing evidence. Run the
    private validator in [agents/validator.md](agents/validator.md). If it says
-   `验证不通过`, return the blocked or pending definition with its reason.
-9. Set `terminal_state=STOPPED_FOR_HANDOFF` and return the definition. Do not
-   advance toward repair or prepare an edit gate.
+   `验证不通过`, map its reason to a normalized public `blocker_reason` and
+   return `PENDING` or `BLOCKED`; do not persist the raw private verdict.
+9. Set exactly one authoritative terminal state: `READY_FOR_HANDOFF` only for
+   an actionable, confirmed definition; `PENDING` when named user input or
+   evidence can resolve the gap; or `BLOCKED` for a hard conflict/invalid
+   combination. Do not advance toward repair or prepare an edit gate.
 
 ## Required response shape
 
-Return one fenced YAML or JSON `TapdWorkDefinition`, followed by a compact
-`STOPPED_FOR_HANDOFF` line. Include unresolved fields with their explicit
-pending state; do not omit them. A downstream repair skill may proceed only
-after its own authorization and verification gates, even when this definition
-has high confidence.
+Return one fenced YAML or JSON `TapdWorkDefinition`, followed by the matching
+single marker: `RESOLUTION_READY_FOR_HANDOFF`, `RESOLUTION_PENDING: <reason>`,
+or `RESOLUTION_BLOCKED: <reason>`. Include unresolved fields and a normalized
+`blocker_reason`; do not omit them. A downstream repair skill may proceed only
+from `READY_FOR_HANDOFF` and after its own authorization and verification
+gates, even when this definition has high confidence.
 
 ## Non-negotiable stops
 
@@ -89,13 +111,18 @@ has high confidence.
   `resume_decision=PENDING_PROJECT`, request one discriminator, and do no Git
   search.
 - Wrong TAPD type, unresolved project, fixed-constraint mismatch, or an
-  unverified repository: return `BLOCKED` or `PENDING`, never guess.
-- A fixed branch is an explicit `PASS|FAIL|PENDING` constraint. With
-  `REUSE_FIXED`, only `refs/heads/<fixed_branch>` or
-  `refs/remotes/origin/<fixed_branch>` may become `selected_ref`, and only when
-  every required check passes. Any missing, mismatched, or failed check leaves
-  `selected_ref=null` and returns `BLOCKED` or a confirmation-required state;
-  never select an alternate ref.
+  unverified repository: use `PENDING` only while evidence is unavailable;
+  use `BLOCKED` once a mismatch/conflict is proven. Never guess.
+- A fixed branch is an explicit `PASS|FAIL|PENDING` constraint in every mode.
+  `AUTO` and `REUSE_FIXED` may select only
+  `refs/heads/<fixed_branch>` or `refs/remotes/origin/<fixed_branch>`;
+  `CREATE` may retain only that exact value as `branch_to_create` and can never
+  select or resume a ref. A `PENDING` check yields terminal `PENDING`; a
+  `FAIL`, conflicting SHA, or `ABSENT` required resume ref yields `BLOCKED`.
+  Both leave `selected_ref=null` and never select an alternate ref.
+- When both exact local and remote refs are valid for resume, they must point
+  to the same SHA and `selected_ref` is the remote ref. A SHA mismatch is
+  `BLOCKED`; exact-ref selection is deterministic.
 - Conflicting historical and current claims: retain both evidence items and
   name the required decision; never overwrite historical context.
 - No explicit scope/history confirmation: no pre-edit transition. This skill

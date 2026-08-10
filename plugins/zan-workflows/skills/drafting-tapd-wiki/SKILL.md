@@ -49,11 +49,15 @@ or provide writeback instructions.
    [contracts.md](references/contracts.md). Run the isolated, read-only
    validator in [agents/wiki-validator.md](agents/wiki-validator.md) with the
    proposed result, original draft, and patch. The validator response is
-   private: do not expose it as commentary or a second user-facing artifact.
-6. If the private verdict is `验证不通过`, return the blocked result with
-   `rendered_markdown=null`. Do not emit a claimed final Wiki body, operational
-   narration, target selection, or write instructions.
-7. If the verdict is `验证通过`, return **only** `rendered_markdown` as raw
+   private. Map it immediately to public `NOT_RUN`, `VALIDATION_PASSED`, or
+   `VALIDATION_FAILED`; copy only a normalized business reason to
+   `validation.failure_reason`/`blocker_reason`, then discard the raw line. Do
+   not expose or persist it in the result, commentary, or orchestration history.
+6. If the mapped state is `VALIDATION_FAILED` or `NOT_RUN`, return the blocked
+   result with `rendered_markdown=null`. Do not emit a claimed final Wiki body,
+   operational narration, target selection, or write instructions.
+7. If the mapped state is `VALIDATION_PASSED`, return **only**
+   `rendered_markdown` as raw
    Markdown. Do not wrap it in a code fence and do not add a title, status,
    explanation, validation message, or next step. Stop immediately.
 

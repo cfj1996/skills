@@ -56,7 +56,7 @@ checklist:
 
 ## Output
 
-When every required check passes and confidence is at least `0.8`, output:
+When every required check above passes on the supplied evidence, output:
 
 ```text
 验证通过

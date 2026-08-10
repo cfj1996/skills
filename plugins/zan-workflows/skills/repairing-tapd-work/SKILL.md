@@ -17,7 +17,7 @@ write a Wiki, or claim a deployment result. Those are separate capabilities.
 
 Read [contracts.md](references/contracts.md) before acting. Accept either:
 
-- an approved, non-blocked `TapdWorkDefinition`; or
+- a `TapdWorkDefinition` with `terminal_state=READY_FOR_HANDOFF`; or
 - a TAPD URL, in which case call `zan-workflows:resolving-tapd-work` first and
   stop unless it returns an approved definition.
 
@@ -45,7 +45,8 @@ invented changes or evidence.
 
 ## Repair procedure
 
-1. Validate the input is approved: its terminal state permits handoff, project
+1. Validate the input is approved: its terminal state is exactly
+   `READY_FOR_HANDOFF`, its response marker matches, project
    fingerprint is verified, scope is confirmed, branch constraints are
    satisfied, and its required confirmations are present. Missing input facts
    are a blocked result, not a reason to reconstruct them by guessing.

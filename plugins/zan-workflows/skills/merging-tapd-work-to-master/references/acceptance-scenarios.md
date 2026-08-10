@@ -38,7 +38,8 @@ Input: `fixbug/123` and `master` names are displayed, but the target
 Expected: the gate displays and binds `expected_source_ref_sha`,
 `confirmed_source_ref_sha`, `expected_target_master_ref_sha`, and
 `confirmed_target_master_ref_sha` (and `merge_base_sha` when needed). Missing
-SHA evidence blocks private `PRE_WRITE` validation. A changed
+SHA evidence blocks private `PRE_WRITE` validation and maps to
+`VALIDATION_FAILED`. A changed
 `execution_preflight_source_ref_sha` or
 `execution_preflight_target_master_ref_sha` invalidates prior authorization;
 re-read all facts, re-run validation, and obtain a fresh confirmation before
@@ -78,6 +79,15 @@ Input: submitted upstream evidence, matching original repair source/master/
 commits, current merge and optional Wiki confirmations, and planned payloads;
 no MR merge or Wiki update has occurred.
 
-Expected: private `validation_phase=PRE_WRITE` returns `验证通过` without
+Expected: private `validation_phase=PRE_WRITE` maps to `VALIDATION_PASSED` without
 requiring future merge, containment, Wiki write, or Wiki readback evidence.
 Only then may the direct MR/merge begin.
+
+## H. Private verdict mapping stays outside the artifact
+
+Input: the private validator returns a passing or failing protocol line.
+
+Expected: `MasterMergeResult.validation.pre_write` stores only
+`VALIDATION_PASSED` or `VALIDATION_FAILED` and a normalized reason; the raw
+line is absent from the result and any orchestration history. Validator
+unavailability maps to `NOT_RUN` and blocks execution.

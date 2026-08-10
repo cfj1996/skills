@@ -25,7 +25,7 @@ Read these cookies from the response:
 Use the merchant platform token and merchant id to call:
 
 ```bash
-curl 'https://testbk.jubaozan.cn/micro/user/admin/agent/access/token/{用户ID}' \
+curl 'https://testbk.jubaozan.cn/micro/user/admin/agent/access/token/{运行时用户ID}' \
   -H 'accept: application/json, text/plain, */*' \
   -H 'origin: https://testm.jubaozan.cn' \
   -H 'referer: https://testm.jubaozan.cn/' \
@@ -36,10 +36,10 @@ curl 'https://testbk.jubaozan.cn/micro/user/admin/agent/access/token/{用户ID}'
   -H 'x-c3-token: {商家平台TOKEN}'
 ```
 
-Known user IDs:
-
-- `320037001` -> self
-- `350004927` -> 熊思，C 端开发人员
+Pass the C-end user ID at runtime. Accept it from the current user's explicit
+input, or resolve an approved controlled test identity through the runtime
+identity source. Record only that runtime source in transient debug context;
+do not package, guess, log, or persist a person-to-user-ID mapping.
 
 ## 3. Local debug URL
 

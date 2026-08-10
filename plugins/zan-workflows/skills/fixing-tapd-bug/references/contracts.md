@@ -19,9 +19,19 @@ FixingTapdBugRequest:
     requested: true | false
     existing_wiki_mark_request: true | false | null
   prior_report: FixingTapdBugReport | null
+  upstream_change:
+    requested: true | false
+    fields: [WORK_IDENTITY | SCOPE | PROJECT | REPOSITORY | BRANCH_CONSTRAINT]
+    reason: string | null
   scope_increment:
     source: string | null
     changes: [string]
+  authorization_increment:
+    capability: repairing-tapd-work | submitting-tapd-for-test | merging-tapd-work-to-master | null
+    operation: string | null
+    confirmation_text: string | null
+    confirmed_at: string | null
+    scope_hash: string | null
 ```
 
 - `tapd_url` and `submission_profile` are required. A missing or different
@@ -34,14 +44,27 @@ FixingTapdBugRequest:
   conversation. `false` means the master capability is not invoked.
 - `prior_report=null` identifies a new run. A resume is a fresh invocation
   whose request carries the complete, immutable report returned by the prior
-  invocation; it must not consume hidden conversation state. Only an explicit
-  `scope_increment` may differ from `prior_report.request`; TAPD URL, resolver
-  constraints, profile, and master request must agree. A mismatch pauses at
+  invocation; it must not consume hidden conversation state. TAPD URL, profile,
+  and master request must agree. Resolver constraints may differ only when the
+  user explicitly declares the corresponding `upstream_change` field and
+  reason; that route invalidates the affected suffix and starts at resolver.
+  `scope_increment` or an explicitly declared resolver-owned upstream change
+  may also route resolver. The actual delta and source must also be normalized
+  into `scope_increment`, because that is the only change payload passed to the
+  resolver; `upstream_change` is routing metadata, not a hidden input. Any undeclared mismatch pauses at
   `request-validation` without a capability call.
 - On every resolver call, the orchestrator passes only the resolver's declared
   `tapd_url`, `fixed_project`, `fixed_repo_path`, `fixed_branch`,
   `branch_mode`, and `scope_increment`. `prior_report`, a prior definition,
   and history are orchestration-only inputs and are never resolver inputs.
+- `authorization_increment` is the only cross-invocation authorization input.
+  It must identify the paused non-resolver capability and exact operation, carry
+  the current explicit confirmation text/time/scope hash, and is forwarded only
+  to that producer for its own verification. A capability mismatch, incomplete
+  binding, stale authorization, or generic “继续” pauses at request validation;
+  the orchestrator never upgrades it to authorization. Resolver never receives
+  this field, and an authorization increment never invalidates unchanged
+  upstream artifacts.
 
 ## Result handoffs
 
@@ -56,7 +79,7 @@ contracts:
 
 | Artifact | Producer | Consumer | Required handoff state |
 | --- | --- | --- | --- |
-| `TapdWorkDefinition` | `zan-workflows:resolving-tapd-work` | `zan-workflows:repairing-tapd-work` | producer permits handoff and has no unresolved required user action |
+| `TapdWorkDefinition` | `zan-workflows:resolving-tapd-work` | `zan-workflows:repairing-tapd-work` | `terminal_state=READY_FOR_HANDOFF`, matching response marker, and no unresolved required user action |
 | `ReviewedChange` | `zan-workflows:repairing-tapd-work` | `zan-workflows:submitting-tapd-for-test` | `terminal_state=REVIEWED` and producer review passes |
 | `TestSubmissionResult` | `zan-workflows:submitting-tapd-for-test` | `zan-workflows:merging-tapd-work-to-master` | `terminal_state=SUBMITTED` |
 | `MasterMergeResult` | `zan-workflows:merging-tapd-work-to-master` | final report only | `terminal_state=MERGED` |
@@ -84,10 +107,17 @@ FixingTapdBugReport:
         artifact_type: TapdWorkDefinition | ReviewedChange | TestSubmissionResult | MasterMergeResult
         artifact: TapdWorkDefinition | ReviewedChange | TestSubmissionResult | MasterMergeResult
         reason: string
+        disposition: REPLACED | INVALIDATED_BY_UPSTREAM_REPLACEMENT
         replaced_by:
-          capability: resolving-tapd-work | repairing-tapd-work | submitting-tapd-for-test | merging-tapd-work-to-master
-          result_chain_slot: definition | reviewed_change | submission | master_merge.result
-          terminal_state: STOPPED_FOR_HANDOFF | REVIEWED | SUBMITTED | MERGED | BLOCKED
+          capability: resolving-tapd-work | repairing-tapd-work | submitting-tapd-for-test | merging-tapd-work-to-master | null
+          result_chain_slot: definition | reviewed_change | submission | master_merge.result | null
+          terminal_state: READY_FOR_HANDOFF | PENDING | REVIEWED | SUBMITTED | MERGED | BLOCKED | null
+  resume_route:
+    source_pause_capability: resolving-tapd-work | repairing-tapd-work | submitting-tapd-for-test | merging-tapd-work-to-master | request-validation | null
+    reused_slots: [definition | reviewed_change | submission | master_merge.result]
+    entry_capability: resolving-tapd-work | repairing-tapd-work | submitting-tapd-for-test | merging-tapd-work-to-master | null
+    replaced_slots: [definition | reviewed_change | submission | master_merge.result]
+    invalidated_slots: [definition | reviewed_change | submission | master_merge.result]
   pause:
     capability: resolving-tapd-work | repairing-tapd-work | submitting-tapd-for-test | merging-tapd-work-to-master | request-validation | null
     reason: string | null
@@ -115,13 +145,32 @@ FixingTapdBugReport:
   it is a replacement does the orchestrator append the old exact artifact once
   with the truthful `reason` and the new producer/slot/terminal state in
   `replaced_by`; the replacement itself occupies the current result chain slot.
-  An unchanged carried-forward artifact is not superseded.
-- A `BLOCKED` capability result, non-passing validation, or an authorization
+  Every downstream artifact whose input changed is appended once with
+  `disposition=INVALIDATED_BY_UPSTREAM_REPLACEMENT`, cleared from the current
+  chain, and recomputed only as part of the affected suffix. An unchanged
+  prefix artifact is reused and is not superseded.
+- `resume_route.entry_capability` records only the first producer selected by
+  `pause.capability`; a successful replacement may continue through its
+  affected suffix in the same invocation. `replaced_slots` contains producer
+  slots directly replaced in this run. `invalidated_slots` contains only their
+  dependent downstream slots, never the replaced root itself. An invalidated
+  history entry has all `replaced_by` fields null until that same slot is
+  recomputed, then points to the new same-slot producer result.
+- A `BLOCKED`/`PENDING` capability result, non-passing validation, or an authorization
   wait is `PAUSED`; it is not converted into a success and no later capability
   is invoked.
 - Resume uses only `prior_report`, retained immutable artifacts within it, and
-  explicit new user information. “继续” without that
+  explicit `scope_increment`/`authorization_increment`. It routes by
+  `pause.capability`: resolver
+  pause invokes resolver; repair pause invokes repair with the retained
+  definition; submission pause invokes submission with retained definition and
+  reviewed change; master pause invokes master with the retained submission;
+  request validation invokes none. Resolver reruns only for its own pause or an
+  explicit resolver-owned scope/identity change. “继续” without required
   information/authorization cannot advance a paused gate.
+- Result-chain and history artifacts contain only producer-owned public mapped
+  validation states and normalized business reasons. A raw private validator
+  line is invalid orchestration input and is never persisted or copied.
 - The final report may describe cleanup but must not add cleanup rules to any
   capability. No cleanup action is inferred or authorized by an upstream
   result.

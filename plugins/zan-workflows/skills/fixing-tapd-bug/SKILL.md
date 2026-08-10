@@ -1,6 +1,6 @@
 ---
 name: fixing-tapd-bug
-description: Use when a TAPD Bug must be taken from a supplied TAPD URL through independently resolved, repaired, reviewed, and submitted result artifacts, with optional direct original-repair-branch-to-master merge only when the user explicitly requests it.
+description: Use when the user asks to carry a TAPD Bug through the managed end-to-end workflow.
 ---
 
 # Fix TAPD Bug
@@ -31,7 +31,9 @@ restate, replace, or bypass their contracts or private validation.
 Accept a TAPD URL, optional resolver-only hard constraints
 (`fixed_project`, `fixed_repo_path`, `fixed_branch`, and `branch_mode`), an
 exact `submission_profile` of `STANDARD` or `NO_WIKI`, and an explicit optional
-master-merge request. A fresh invocation has `prior_report=null`; a resumed
+master-merge request. A resumed non-resolver authorization may be supplied only
+as an exact `authorization_increment` bound to the paused capability/operation;
+it is never implied by “继续”. A fresh invocation has `prior_report=null`; a resumed
 invocation must include the complete immutable prior `FixingTapdBugReport`.
 Do not choose a profile, project, repository, branch, or master merge by
 default. Pass project/repository/branch constraints only to
@@ -57,32 +59,43 @@ Keep each returned artifact intact and retain its source with the final report.
    required choice is absent or not exact, or a supplied prior report is not
    compatible with the immutable request identity, pause before calling a
    capability.
-2. Invoke `zan-workflows:resolving-tapd-work` with the TAPD URL, resolver-only
-   constraints, and any explicit `scope_increment`. These are its only
-   inputs: `tapd_url`, `fixed_project`, `fixed_repo_path`, `fixed_branch`,
-   `branch_mode`, and `scope_increment`. Do not pass `prior_report` or any
-   prior artifact to the resolver. Preserve its returned `TapdWorkDefinition`.
-   The orchestrator compares that returned definition with
-   `prior_report.result_chain.definition`, when present; it records the old
-   exact definition in history only when the producer returned a replacement.
-   Do not call repair while the resolver result is blocked or identifies
-   required user input/confirmation.
-3. Invoke `zan-workflows:repairing-tapd-work` with that unchanged
-   `TapdWorkDefinition`. Preserve its returned `ReviewedChange`. Do not call
-   submission unless the repair result is `REVIEWED` with its producer's
-   required evidence and review verdict.
-4. Invoke `zan-workflows:submitting-tapd-for-test` with the unchanged
-   definition, unchanged reviewed change, and the exact profile supplied by
-   the user. Forward `STANDARD` or `NO_WIKI` verbatim. The submitting skill
-   exclusively owns Wiki behavior; in particular, this skill must not load,
-   draft, inspect, validate, select, or write a Wiki for `NO_WIKI`.
-5. If, and only if, the user explicitly requested a master merge, invoke
-   `zan-workflows:merging-tapd-work-to-master` after a `SUBMITTED` result. Give
-   it that unchanged submission result and the exact original repair branch
-   evidenced by the existing handoffs. Do not substitute `develop`, a
-   `merge/*` branch, or a reconstructed branch. Without that explicit request,
-   record `NOT_REQUESTED` and stop after submission.
-6. At every capability boundary, a `BLOCKED` result, non-passing validation,
+2. Choose exactly one entry route. For `prior_report=null`, start with
+   `resolving-tapd-work`. For a resume, route strictly by
+   `prior_report.pause.capability` using the table in [workflow.md](references/workflow.md):
+   reuse every earlier unchanged artifact and invoke only the paused producer.
+   Do not call resolver or repair merely because they are earlier in the fresh
+   sequence. A `request-validation` pause invokes no producer.
+3. Rerun resolver only when the prior pause capability is
+   `resolving-tapd-work`, or explicit new information changes resolver-owned
+   work identity, scope, project, repository, or branch constraints. Pass only
+   `tapd_url`, `fixed_project`, `fixed_repo_path`, `fixed_branch`,
+   `branch_mode`, and `scope_increment`; never pass `prior_report` or another
+   artifact. A changed TAPD URL or other immutable request identity denotes a
+   new request, not a silent resume.
+4. For a repair pause, reuse the exact eligible definition and invoke only
+   `repairing-tapd-work`, forwarding only a matching exact authorization
+   increment when supplied. For a submission pause, reuse the exact definition
+   and reviewed change and invoke only `submitting-tapd-for-test` with the
+   unchanged profile and matching exact authorization increment. For a master
+   pause, reuse the exact definition, reviewed
+   change, and submission and invoke only `merging-tapd-work-to-master` with
+   the exact original repair branch, marker request, and matching exact
+   authorization increment. Each producer independently verifies the binding;
+   the orchestrator never treats it as proof. No resumed route may
+   replay an earlier side-effecting producer whose input artifact is unchanged.
+5. On a fresh route, or after the routed producer returns an eligible
+   replacement, continue only through the affected downstream suffix in
+   normal order. If an upstream artifact is replaced, move its old exact value
+   and every now-invalid downstream artifact to
+   `history.superseded_results`, clear only those affected downstream slots,
+   and rerun only that suffix. Reuse all unaffected prefix artifacts. Never
+   invalidate the whole chain by default.
+6. Submission exclusively owns Wiki behavior. Forward `STANDARD` or
+   `NO_WIKI` verbatim; this orchestrator must not load, draft, inspect,
+   validate, select, or write a Wiki for `NO_WIKI`. Invoke master only after a
+   `SUBMITTED` result and only when explicitly requested; otherwise record
+   `NOT_REQUESTED` and stop after submission.
+7. At every capability boundary, a `BLOCKED`/`PENDING` result, non-passing validation,
    changed upstream fact, missing requirement, or pending user authorization
    pauses the workflow immediately. Preserve all completed artifacts and form
    the resume record; do not call a later capability, create compensating
@@ -90,7 +103,7 @@ Keep each returned artifact intact and retain its source with the final report.
    a producer to replace an upstream artifact, preserve the old exact artifact
    in `history.superseded_results` with its replacement reason and new result
    slot before considering downstream work.
-7. Only at the orchestration boundary, produce the final
+8. Only at the orchestration boundary, produce the final
    `FixingTapdBugReport`. Cleanup is separately optional: identify an eligible
    cleanup target from completed artifacts, show it, obtain specific user
    authorization, perform/read back only the approved cleanup, and record the
@@ -100,11 +113,17 @@ Keep each returned artifact intact and retain its source with the final report.
 ## Resumption and response
 
 The word “继续” is not authorization and does not repair or discard a blocked
-artifact. On a fresh invocation, resume only from the supplied immutable
-`prior_report` plus the user's explicit new information; rerun the earliest
-paused capability when its own contract requires fresh facts or authorization.
-Do not reconstruct a handoff from memory or advance to a later capability
-merely because earlier artifacts exist.
+artifact. Resume only from the supplied immutable `prior_report` plus the
+user's explicit new information, routing by `pause.capability` and reusing all
+earlier unchanged artifacts. Represent a resolver delta only as
+`scope_increment` and a non-resolver authorization only as the exact
+`authorization_increment`; do not reconstruct a handoff from memory, rerun
+resolver/repair unconditionally, or advance beyond the paused producer.
+
+Producer artifacts and `history.superseded_results` may contain only public
+mapped validation states and normalized business reasons. Reject and pause on
+any artifact that persists a private raw validator line; never copy such a line
+into orchestration history.
 
 Return one `FixingTapdBugReport` as defined in
 [contracts.md](references/contracts.md). It must contain the real result chain,

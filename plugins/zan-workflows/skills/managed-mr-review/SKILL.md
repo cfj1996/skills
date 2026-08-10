@@ -1,6 +1,6 @@
 ---
 name: managed-mr-review
-description: 管理用户管辖项目的 GitLab MR 三段式流程：1. 获取需要用户合并的 open MR，2. 对这些 MR 或指定 MR 做 code review 并输出审核报告，重点详细展开不通过/暂缓 MR 的打回理由，且根据 MR 数量自动启用 Spark 模型的 mr-code-reviewer 角色并行审核，3. 对已审核通过的 MR 或指定 MR 使用 GitLab MCP 远程合并。仅处理目标分支为 master 或 main 的 MR，仓库限定为 admin_menu、jbz_admin、kp_admin、order-admin、poster_admin、statistics_admin、store_admin、supplier-admin-web、ledger_admin、weixin-live、zan-projects、zan-devops。
+description: Use when the user asks to find, review, or remotely merge open GitLab MRs for governed company repositories, including provider-mobile, whose target branch is master or main.
 ---
 
 # 管辖项目 MR 审核

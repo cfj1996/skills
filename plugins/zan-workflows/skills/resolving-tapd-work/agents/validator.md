@@ -16,19 +16,33 @@ Validate these invariants:
    Git root, and origin remote. Fixed project/path constraints have explicit
    `PASS`, `FAIL`, or `PENDING` results. A supplied fixed branch has an explicit
    branch constraint with the same result set.
-5. Resume checks ran only after a single verified repository was selected. A
-   `REUSE_FIXED` definition has exactly one `fixed_branch` constraint. It may
-   set `resume.selected_ref` only to `refs/heads/<fixed_branch>` or
-   `refs/remotes/origin/<fixed_branch>`, and only when its constraint and every
-   required branch check (`local_ref`, `remote_ref`, `tapd_association`,
-   `raw_md`, and `test_evidence`) are `PASS`. If that condition is not met,
-   `resume.selected_ref` is `null` and the decision is `BLOCKED` or a
-   confirmation-required pending state; an alternate ref is invalid.
+5. Resume checks ran only after a single verified repository was selected.
+   `CREATE` and `REUSE_FIXED` require `fixed_branch`; missing it is `BLOCKED`.
+   Whenever `fixed_branch` exists, exactly one fixed-branch constraint exists
+   and neither `resume.selected_ref` nor `branch.branch_to_create` names a
+   different branch. `AUTO` with a fixed branch inspects only the exact fixed
+   refs and may choose only that ref or the same `branch_to_create` value.
+   `CREATE` always has `resume.selected_ref=null`, never has
+   `resume.decision=RESUME`, and preserves the exact fixed value in
+   `branch.branch_to_create`. `REUSE_FIXED` may select only the exact fixed ref
+   after every required check passes. When exact local and remote refs both
+   exist, their SHAs match and `selected_ref` is the remote ref; a mismatch is
+   `BLOCKED`. Any attractive alternate ref is invalid.
+   Every `RESUME` result has `branch.branch_to_create=null`. For fixed-branch
+   resume, both local and remote required refs exist and pass; a proven absent
+   side is `BLOCKED`, while an unavailable check is `PENDING`.
 6. Scope includes in-scope work, non-scope, historical-content policy,
    acceptance criteria, and required/present/missing confirmations. Missing
    scope confirmation keeps `scope_confidence=LOW` and the status pending.
-7. `terminal_state` is `STOPPED_FOR_HANDOFF`, and no proposed operation is an
-   edit, branch creation, worktree creation, TAPD write, or `raw.md` write.
+7. `terminal_state` is exactly `READY_FOR_HANDOFF`, `PENDING`, or `BLOCKED`.
+   `READY_FOR_HANDOFF` has an eligible handoff with no required user action;
+   `PENDING` and `BLOCKED` have a normalized non-empty `blocker_reason` and do
+   not advertise handoff. No proposed operation is an edit, branch creation,
+   worktree creation, TAPD write, or `raw.md` write.
+8. `PENDING` is used only for missing/unavailable evidence or a named user
+   decision that can still satisfy the constraint. `BLOCKED` is used for a
+   proven mismatch/conflict or invalid combination. In creation evaluation,
+   proven absence is recorded as `ABSENT`; it is not a failed constraint.
 
 Return exactly one line:
 

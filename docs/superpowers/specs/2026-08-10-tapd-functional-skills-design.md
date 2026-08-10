@@ -31,9 +31,9 @@ TapdWorkDefinition
 - 每个技能声明输入、输出、外部副作用、阻断条件和内部验证。
 - 固定项目、仓库和分支是硬约束，不是提示；事实不一致时阻断，不能自动换目标。
 - 内部验证属于产生结果的技能，不暴露成独立技能。
-- 内部验证使用隔离、只读子智能体，只返回 `验证通过` 或 `验证不通过：<原因>`，验证结果不落库。
+- 内部验证使用隔离、只读子智能体，只返回 `验证通过` 或 `验证不通过：<原因>`；producer 边界立即映射为 `NOT_RUN | VALIDATION_PASSED | VALIDATION_FAILED` 和规范化业务原因，raw verdict 不进入结果契约或编排 history。
 - 验证不能替代范围、执行路径、合并和 Wiki 写入等用户授权。
-- 外部写入前验证拟执行内容，写入后回读实际结果；验证后内容或目标变化时重新验证。
+- 外部写入前验证拟执行内容，写入后回读实际结果；commit、push、MR 创建/更新和 merge 的首写前及每次执行前都重读不可变事实并验证精确 payload/授权，验证后内容、目标或 ref 变化时重新展示、授权和验证。
 - 核心保证不能通过参数跳过，例如项目核对、测试、代码审核和读回验证。
 - 业务差异使用命名策略，不为每个内部动作增加布尔开关。
 
@@ -57,6 +57,8 @@ scope_increment（可选）
 功能：识别 Bug/Story/Task，读取详情、评论、附件、PRD/原型和动态字段；调用 `workspace-project-knowledge`；在精确仓库中恢复历史分支、MR、commit、raw 和测试证据；合成历史、最新 TAPD 与用户增量；生成上下文、项目和范围可信度；形成并确认范围。
 
 固定参数只限制选择空间，不能跳过验证。输出 `TapdWorkDefinition`，其中包含工作项、证据与冲突、三类可信度、精确项目指纹、分支及其来源、恢复结论、包含/排除范围、历史策略、验收标准和用户确认。
+
+`fixed_branch` 在三种模式中都是不可替换硬约束：`AUTO+fixed_branch` 只能恢复或创建该精确分支；`CREATE` 必须携带 `fixed_branch`、保留为精确 `branch_to_create` 且绝不返回 `RESUME`；`REUSE_FIXED` 必须携带并只检查精确 ref。resolver 使用唯一终止模型 `READY_FOR_HANDOFF | PENDING | BLOCKED`，响应 marker 与其一致，并为非 handoff 状态提供 `blocker_reason`。
 
 ### `repairing-tapd-work`
 
@@ -89,6 +91,8 @@ NO_WIKI  = 合并 develop + 更新 Bug 状态 + 发布测试版本
 
 技能负责实际源/目标分支和 commit 列表确认、提交/推送/MR、合并 `develop`、TAPD 状态、测试版本发布，以及启用 Wiki 时的写入与回读。输出 `TestSubmissionResult`。
 
+在任何 commit/push/MR create-or-update/merge 前，私有 `PRE_FIRST_WRITE` 验证仓库、source/target/ref、精确 diff/commits、操作 payload 与授权，并在每次执行前重读；变化即重新展示、授权和验证。每次外部写在调用前以 durable `ATTEMPT_RESERVED` 消费该次验证，并使用 provider-enforced expected-SHA/lease、resource CAS 或幂等键；崩溃恢复只对账同一 attempt，禁止重放旧 PASS。合并回读后，保留独立的 `PRE_SUBMISSION_WRITE` 验证 Wiki/TAPD/version 计划，最终使用 `POST_WRITE` 验证实际效果与 readback。三个阶段都只持久化公共映射状态。
+
 ### `merging-tapd-work-to-master`
 
 回答“如何把原修复分支合并到 `master` 并更新已有 Wiki 标记”。该能力按需调用，不是所有修复流程的必经步骤。
@@ -111,6 +115,8 @@ resolving-tapd-work
 ```
 
 任一能力阻断、验证失败或等待用户授权时立即暂停。编排技能不复制项目判断、开发、Wiki、提测或合并规则。
+
+恢复时按 `pause.capability` 唯一路由，复用所有更早且未变化的产物并只调用暂停 producer；resolver 只在 resolver 暂停或显式 resolver-owned scope/identity 改变时重跑。非 resolver 的本轮授权以绑定 capability、operation、原文、时间和 scope hash 的 `authorization_increment` 仅传给暂停 producer，由 producer 自行复核；“继续”不构成授权。上游产物替换只失效并重跑依赖它的下游后缀，未受影响的前缀保持不变。
 
 ## 调用方式
 

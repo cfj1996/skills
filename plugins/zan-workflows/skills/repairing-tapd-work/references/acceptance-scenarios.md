@@ -6,6 +6,7 @@ push, MR action, merge, Wiki write, submission, or deployment.
 
 | Scenario | Required result |
 | --- | --- |
+| Input definition is `PENDING` or `BLOCKED`, or its response marker disagrees | `terminal_state=BLOCKED`; do not consume it as a handoff or perform any repair side effect. |
 | The shell is in another repository, or actual Git root/origin differs from the approved fingerprint | `terminal_state=BLOCKED`, fingerprint result `FAIL`; never fall back to CWD or a similarly named repository. |
 | Actual selected project or canonical repository path is absent or differs from the approved fingerprint | `terminal_state=BLOCKED`; record the missing/mismatched actual value. A differing worktree root is allowed only with the contract's common-Git-directory and origin equivalence facts. |
 | A new feature/fix branch was created from `develop` or `dev` | `terminal_state=BLOCKED`, branch result `FAIL`; do not edit or treat the branch as a usable repair branch. |

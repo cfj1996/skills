@@ -31,23 +31,34 @@ searching another repository.
 
 Use read-only commands and record their evidence:
 
-1. When `fixed_branch` is supplied, record one explicit branch constraint. Check
-   only `refs/heads/<fixed_branch>` and
-   `refs/remotes/origin/<fixed_branch>`; record their exact expected and actual
-   refs. With `REUSE_FIXED`, do not search, score, or select alternate refs.
-2. For `REUSE_FIXED`, inspect the exact fixed refs for TAPD association,
+1. Validate the mode/branch combination first. `CREATE` and `REUSE_FIXED`
+   require `fixed_branch`; otherwise block. When `fixed_branch` is supplied in
+   any mode, record one explicit branch constraint and inspect only
+   `refs/heads/<fixed_branch>` and `refs/remotes/origin/<fixed_branch>`. Do not
+   search, score, or select alternate refs.
+2. For `AUTO` with a fixed branch or `REUSE_FIXED`, inspect the exact fixed refs
+   for TAPD association,
    `<ref>:docs/<short-id>/raw.md`, and `__test___/<short-id>` evidence. Set the
-   constraint to `PASS` only when `local_ref`, `remote_ref`,
-   `tapd_association`, `raw_md`, and `test_evidence` all pass. Otherwise use
-   `FAIL` or `PENDING`, retain `selected_ref=null`, and block or request
-   confirmation.
-3. Only when `branch.mode` is not `REUSE_FIXED`, extract branch/MR/commit clues
+   constraint for reuse to `PASS` only when `local_ref`, `remote_ref`,
+   `tapd_association`, `raw_md`, and `test_evidence` all pass. Otherwise retain
+   `selected_ref=null`. When both exact refs are proven `ABSENT` under `AUTO`,
+   preserve the fixed name as `branch_to_create` only after creation eligibility
+   passes. Any `PENDING` required check yields `NEED_CONFIRMATION`/terminal
+   `PENDING`; any `FAIL`, one-sided `ABSENT`, or mismatched exact SHA yields
+   `BLOCKED`. Never fall back to another ref.
+3. For `CREATE`, do not perform candidate discovery and never select or resume
+   an existing ref. Prove that the exact fixed branch can be created, set
+   `branch_to_create=<fixed_branch>`, retain `selected_ref=null`, and return
+   `FRESH`. If the exact ref already exists, return `BLOCKED`; if creation
+   eligibility is uncertain, return `NEED_CONFIRMATION`/terminal `PENDING`. An historical candidate
+   cannot replace the requested branch-to-create.
+4. Only for `AUTO` without `fixed_branch`, extract branch/MR/commit clues
    from TAPD comments or linked Wiki, then verify them locally. Search local
    refs for `feature/*` or `fixbug/*` containing the short-id and commit
    trailers `--story=<short-id>`, `--bug=<short-id>`, or `--task=<short-id>`.
    If local evidence is insufficient, `git fetch origin --prune` is permitted
    only as read-only synchronization.
-4. Only when `branch.mode` is not `REUSE_FIXED`, inspect every candidate ref for
+5. Only for `AUTO` without `fixed_branch`, inspect every candidate ref for
    `<ref>:docs/<short-id>/raw.md` and `__test___/<short-id>` evidence. Do not
    stop after the first candidate with missing raw.
 
@@ -57,12 +68,26 @@ Select decisions as follows:
 | --- | --- |
 | Route unresolved or ambiguous | `PENDING_PROJECT` |
 | Repository fingerprint not verified | `PENDING_REPO_VERIFICATION` |
+| `CREATE` or `REUSE_FIXED` without `fixed_branch` | `BLOCKED`, invalid combination |
+| `CREATE` with both exact refs proven `ABSENT` and creation eligibility passing | `FRESH`, `selected_ref=null`, `branch_to_create=<fixed_branch>` |
+| `CREATE` with any attractive historical candidate | Never `RESUME`; ignore it for selection and preserve the exact branch-to-create constraint |
+| `AUTO` with exact fixed local/remote refs at the same SHA and complete resume evidence | `RESUME`, selecting the remote exact ref |
+| `AUTO` with both exact refs proven `ABSENT` and creation eligibility proven | `FRESH`, `selected_ref=null`, `branch_to_create=<fixed_branch>` |
+| `AUTO` with fixed-branch evidence unavailable/incomplete while another candidate looks reusable | `NEED_CONFIRMATION` with terminal `PENDING`, never select the alternate ref |
 | `REUSE_FIXED` and exact fixed ref passes every required check | `RESUME`, with `selected_ref` equal to that fixed ref |
-| `REUSE_FIXED` and fixed ref is missing, mismatched, or has an incomplete check | `BLOCKED` or `NEED_CONFIRMATION`, with `selected_ref=null` |
-| Non-`REUSE_FIXED` candidate ref has raw and TAPD association | `RESUME` |
-| Non-`REUSE_FIXED` and every investigated candidate lacks raw | `NEED_CONFIRMATION` |
-| Non-`REUSE_FIXED` and no branch, Wiki, MR, trailer, raw, or test anchor exists | `FRESH` |
+| `REUSE_FIXED` has an unavailable/incomplete required check | `NEED_CONFIRMATION` with terminal `PENDING`, `selected_ref=null` |
+| `REUSE_FIXED` has a failed/mismatched required check, absent required ref, or conflicting local/remote SHA | `BLOCKED` with terminal `BLOCKED`, `selected_ref=null` |
+| `AUTO` without a fixed branch has a candidate ref with raw and TAPD association | `RESUME` |
+| `AUTO` without a fixed branch and every investigated candidate lacks raw | `NEED_CONFIRMATION` |
+| `AUTO` without a fixed branch and no branch, Wiki, MR, trailer, raw, or test anchor exists | `FRESH` |
 | Fixed constraint or repository evidence conflicts | `BLOCKED` |
+
+Terminal mapping is deterministic: `PENDING_PROJECT`,
+`PENDING_REPO_VERIFICATION`, and `NEED_CONFIRMATION` use
+`terminal_state=PENDING`; a `BLOCKED` resume decision uses
+`terminal_state=BLOCKED`; an eligible `RESUME`/`FRESH` plus confirmed scope uses
+`READY_FOR_HANDOFF`. A later scope-confirmation wait changes only the terminal
+state to `PENDING`; it does not rewrite the evidenced resume decision.
 
 For `RESUME`, compose:
 

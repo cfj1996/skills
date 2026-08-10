@@ -27,17 +27,30 @@ source branch, target branch, commit, project, service, user confirmation, or
 successful external effect.
 
 Use the same isolated, read-only validator described in
-[agents/submission-validator.md](agents/submission-validator.md) twice. Its
-only permitted response is `验证通过` or `验证不通过：<原因>`; keep both responses
-private:
+[agents/submission-validator.md](agents/submission-validator.md) at every
+required phase. Its
+only permitted response is `验证通过` or `验证不通过：<原因>`; keep all responses
+private and map each response immediately at the producer boundary to
+`NOT_RUN`, `VALIDATION_PASSED`, or `VALIDATION_FAILED`. Persist only the mapped
+state and a normalized business `failure_reason`; never retain the raw private
+line in `TestSubmissionResult` or orchestration history.
 
-- `validation_phase=PRE_WRITE` runs after the develop-merge readback but before
-  this submission's Wiki, TAPD-status, comment, or test-version write. It
-  validates only the profile, source/target/current-round commits, current
-  authorization, `ValidatedWikiDraft` when applicable, Wiki target/patch and
-  full-draft confirmation when applicable, and the *planned* status/version
-  payloads. It must not require a write/readback that has not happened.
-- Execute the planned writes only after `PRE_WRITE=验证通过`. Then run
+- `validation_phase=PRE_FIRST_WRITE` runs before **any** commit, push, MR
+  create/update, or MR merge. Run it once for the first planned operation and
+  again immediately before every subsequent Git/GitLab write. It validates the
+  repository, source/target refs and SHAs, exact reviewed diff/current-round
+  commits, the exact operation payload, and the operation's authorization.
+  It must not require a commit, push, MR, merge, or readback that has not yet
+  happened.
+- `validation_phase=PRE_SUBMISSION_WRITE` runs after the develop-merge readback
+  and immediately before each applicable Wiki, TAPD-comment, TAPD-status, or
+  test-version write. It validates only the profile,
+  source/target/current-round commits, current authorization, and the exact
+  operation payload; for Wiki it includes the `ValidatedWikiDraft`, target,
+  patch, and full-draft confirmation. It must not require a write/readback that
+  has not happened.
+- Execute each planned write only after its current private phase maps to
+  `VALIDATION_PASSED`. Then run
   `validation_phase=POST_WRITE` with actual merge, Wiki, comment, status,
   version, and readback evidence. A post-write failure stops any remaining
   action and returns a truthful partial `BLOCKED` result.
@@ -51,24 +64,80 @@ private:
    another branch. Separate legal inherited-base differences from this round's
    commits. Inherited commits are recorded but neither presented as this
    submission nor used to force a cherry-pick/rebuilt branch.
-2. Show `MergeConfirmationGate` with expected and actual source, target,
-   current-round commits, inherited-base differences, and purpose. Obtain an
-   explicit user authorization for this exact merge. If any actual value changes
-   after display, invalidate the authorization and repeat this step.
-3. Commit and push only the reviewed, in-scope change when they are required
-   and separately authorized. Create/update the MR, merge it to `develop`, and
-   read back the MR/merge state and `origin/develop` containment of every
-   current-round commit. A conflict, failed pipeline, failed merge, or missing
-   containment blocks all later submission writes.
+2. Assemble `GitDeliveryWritePlan` in execution order. Materialize the exact
+   payload only for the next operation; mark later required payloads
+   `PENDING_MATERIALIZATION` until prior writes produce their immutable IDs or
+   SHAs. Before each operation, materialize and show its exact payload: commit
+   uses reviewed diff hash/paths and message; push uses actual remote/refspec/
+   commit SHAs; MR create/update uses source/target/title/body/source SHA; MR
+   merge uses actual MR ID/source SHA/target SHA/target and all merge options.
+   Every Git/GitLab payload carries an operation-specific atomic expected-state
+   guard: a source-ref expected SHA for commit, an expected remote SHA or
+   `ABSENT` lease for push, exact source/target SHAs for MR create/update, and
+   exact source/target SHAs for merge. If the provider cannot enforce the
+   expected SHA/lease or an equivalent atomic predicate, block before writing.
+   Mark
+   inapplicable operations explicitly. Obtain every authorization required for
+   the now-exact operation; record an evidenced `NOT_REQUIRED` only where
+   policy truly requires none.
+3. Before the first and every later commit/push/MR/merge operation, re-read the
+   repository fingerprint, source and target ref SHAs, reviewed diff hash, and
+   exact current-round commits. Run private `PRE_FIRST_WRITE` for the one
+   operation and its exact payload/authorization. If any immutable fact or
+   payload differs from the validated/authorized snapshot, do not write:
+   invalidate the mapped validation state and authorization, redisplay the new
+   facts, obtain any required fresh authorization, and revalidate. Commit/push,
+   create/update the MR, and merge to `develop` only through these per-operation
+   gates. Immediately before the external call, durably append an
+   `ATTEMPT_RESERVED` event that consumes that exact validation run and binds
+   its execution ID/idempotency key, CAS token, payload, authorization, and
+   expected-state guard. Append the write return when observed and the
+   reconciled readback as later events; a crash may legitimately omit the
+   return event, but never permits manufacturing one or filling it retroactively
+   into the reservation. Then read
+   back MR/merge state and `origin/develop` containment of
+   every current-round commit. A conflict, failed pipeline, failed merge, or
+   missing containment blocks all later submission writes. A planned commit's
+   resulting source SHA is expected materialization, not drift: rebuild and
+   validate the later push/MR payload from that actual SHA only after commit
+   readback proves its actual tree/diff equals the reviewed diff. Any unreviewed
+   diff or extra commit is scope drift and blocks rather than becoming
+   reauthorizable. The chronologically last validation run before execution
+   must pass and be consumed by that reservation; a later failed run invalidates
+   every older pass. After a crash or unknown write outcome, never replay the
+   operation. Reconcile the reserved attempt by execution ID/idempotency key and
+   exact external state. If no effect is proven, a retry requires a new attempt,
+   new authorization when required, and new validation; if the effect cannot be
+   proven present or absent, return `BLOCKED`.
 4. Select the profile procedure below. Do not downgrade `STANDARD` to
    `NO_WIKI`, and do not use a missing Wiki to block `NO_WIKI`.
-5. Complete the profile preparation, run the private `PRE_WRITE` validation,
-   and stop before any planned submission write unless it returns `验证通过`.
-   Write the permitted TAPD state and publish the required test version, then
-   read each target back. Preserve actual IDs, status/version values,
-   timestamps, and evidence URLs or errors.
-6. Run private `POST_WRITE` validation using the actual effects and readbacks.
-   If it returns `验证不通过`, stop and form a truthful partial `BLOCKED` result;
+5. Complete the profile preparation. Immediately before each applicable
+   `WIKI_WRITE`, `TAPD_COMMENT`, `TAPD_STATUS`, and `TEST_VERSION` operation,
+   re-read the repository, source/target, exact current-round commits, profile,
+   target, and exact payload; bind them to one snapshot ID, payload hash,
+   authorization-binding hash, source/target ref SHAs, reviewed diff hash, and
+   timestamp. Run private
+   `PRE_SUBMISSION_WRITE` for that one operation and stop unless it maps to
+   `VALIDATION_PASSED`. Any change invalidates that operation's validation and
+   authorization and requires redisplay, fresh authorization when required,
+   and a new run. Execute in dependency order with immediate readback:
+   Wiki write/readback, applicable comment write/readback, TAPD status
+   write/readback, then test-version publish/readback. Preserve actual IDs,
+   values, timestamps, and evidence URLs or errors before considering the next
+   operation.
+   Each validation/execution pair must share canonical snapshot/facts/payload/
+   authorization hashes and a compare-and-swap token. The authorization scope
+   includes the snapshot/facts/CAS values. Before the call, reserve and consume
+   the validation run in the same durable append-only attempt ledger used for
+   Git writes. The remote request must enforce the CAS/version predicate or an
+   idempotency key; if neither is available, block. Preserve ordered reservation,
+   execution-return, and readback events and timestamps.
+6. After the last readback, hash the complete immutable result/readback bundle
+   and run a fresh private `POST_WRITE` validation using that exact hash and
+   actual effects. Record the validator run ID/input/final-readback hashes and
+   timestamp, then map and discard its raw response. Any later artifact change
+   invalidates the POST result. If it maps to `VALIDATION_FAILED`,
+   stop and form a truthful partial `BLOCKED` result;
    do not attempt another write to repair, conceal, or complete the transaction.
 7. Re-read [acceptance-scenarios.md](references/acceptance-scenarios.md), form
    the complete result with every actual readback, and return the single
@@ -87,17 +156,23 @@ After the develop-merge readback and before any Wiki/TAPD write, invoke
 2. Determine the Wiki target from TAPD detail and comments, preserve an
    existing TAPD Wiki when present, and read the target before writing. Show
    the **entire final draft/body** and exact write target to the user. Obtain
-   explicit authorization for this draft, target, Wiki write, exact TAPD
-   comment, TAPD status update, and test-version publication. A summary,
-   partial body, or a request to “write directly” is not confirmation.
+   explicit authorization for this exact draft/target/Wiki operation. Before
+   each later comment, TAPD status, and test-version operation, show and obtain
+   authorization for its exact materialized payload. For an existing Wiki ID,
+   the exact comment may be confirmed at this point; for Wiki creation, do not
+   claim an exact comment yet. A summary, partial body, placeholder comment, or
+   a request to “write directly” is not confirmation.
 3. Give the evidenced full draft, target, patch, confirmation, and planned
-   TAPD-status/test-version payloads to `PRE_WRITE`. Only a `验证通过` verdict
-   permits the first Wiki write; this phase must not demand a successful Wiki,
+   exact Wiki-write payload to `PRE_SUBMISSION_WRITE(WIKI_WRITE)`. Only a
+   `VALIDATION_PASSED` mapped state permits that Wiki write; this phase must
+   not demand a successful Wiki,
    comment, status, or version readback because none exists yet.
 4. Run `WikiWriteGate`, write the smallest confirmed patch, then read the Wiki
    back. Do not create a replacement Wiki when the TAPD already identifies one.
    If the expected patch is absent after readback, stop before comment or TAPD
-   state update.
+   state update. When this operation created the Wiki, use its read-back real
+   Wiki ID to materialize the exact comment, display it, obtain separate exact
+   authorization, and run `PRE_SUBMISSION_WRITE(TAPD_COMMENT)` before writing.
 5. For a Bug, write only the exact comment generated from the final Wiki URL:
    `提测wiki：[https://www.tapd.cn/{workspace_id}/markdown_wikis/show/#{wiki_id}](https://www.tapd.cn/{workspace_id}/markdown_wikis/show/#{wiki_id})`.
    Record `TAPD_COMMENT_GATE`; any extra text, changed link, or newline blocks
@@ -112,10 +187,12 @@ update, or comment a Wiki. In particular, never load
 ask for a Wiki confirmation and do not treat a missing Wiki as a failure.
 
 After the common merge readback, obtain explicit authorization for the exact
-TAPD-status and test-version payloads. Run `PRE_WRITE` without loading or
-supplying any Wiki material; it may validate only the common facts and planned
-status/version payloads. On `验证通过`, perform only those writes and read them
-back, then run `POST_WRITE` without requiring or loading Wiki evidence. Set
+TAPD-status and test-version payloads. Run separate
+`PRE_SUBMISSION_WRITE(TAPD_STATUS)` and
+`PRE_SUBMISSION_WRITE(TEST_VERSION)` gates immediately before their operations,
+without loading or supplying any Wiki material. On each mapped
+`VALIDATION_PASSED`, perform only that write and read it back before the next,
+then run `POST_WRITE` without requiring or loading Wiki evidence. Set
 `wiki.status=SKIPPED_BY_POLICY`, with no Wiki target, draft, write, comment, or
 readback evidence. Return the normal result even though its Wiki fields are
 skipped.

@@ -66,10 +66,12 @@ MasterMergeResult:
     wiki_creation: NOT_PERFORMED
   validation:
     validator: agents/master-merge-validator.md
-    checked_privately: true
+    checked_privately: true | false
+    private_verdict_persisted: false
     pre_write:
       validation_phase: PRE_WRITE
-      verdict: 验证通过 | 验证不通过：string
+      state: NOT_RUN | VALIDATION_PASSED | VALIDATION_FAILED
+      failure_reason: string | null
   blocker_reason: string | null
 ```
 
@@ -78,7 +80,8 @@ MasterMergeResult:
 - `MERGED` requires a `SUBMITTED` upstream result, `repository.result=PASS`,
   the original repair branch to be the same submitted `feature/*` or
   `fixbug/*` source, exact actual source/target/current-round commits, a
-  passing explicit `MergeConfirmationGate`, `validation.pre_write.verdict=验证通过`,
+  passing explicit `MergeConfirmationGate`,
+  `validation.pre_write.state=VALIDATION_PASSED`,
   successful MR/merge readback, and `master_containment.result=PASS` for every
   approved commit.
 - `MERGED` also requires a consistent immutable-ref chain:
@@ -107,3 +110,9 @@ MasterMergeResult:
 - Every result records the six scope exclusions as `NOT_PERFORMED` (and
   `develop_to_master=FORBIDDEN`). No field implies production release, smoke
   test, TAPD state/comment mutation, test version, or Wiki creation.
+- The producer maps the private validator response immediately to
+  `NOT_RUN|VALIDATION_PASSED|VALIDATION_FAILED`. It stores only the normalized
+  business reason in `failure_reason`/`blocker_reason`; the raw protocol line
+  never appears in this artifact or orchestration history.
+- `checked_privately=false` pairs only with `state=NOT_RUN`; a completed
+  passing or failing private validation sets it to `true`.

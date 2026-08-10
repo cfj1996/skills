@@ -8,6 +8,7 @@ does not grant any later submission, merge, Wiki, or deployment authority.
 ReviewedChange:
   terminal_state: REVIEWED | BLOCKED
   source_definition:
+    terminal_state: READY_FOR_HANDOFF
     tapd_url: string
     work_type: BUG | STORY | TASK
     short_id: string

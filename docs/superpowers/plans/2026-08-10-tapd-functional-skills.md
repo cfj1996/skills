@@ -14,8 +14,9 @@
 - Preserve `/Users/cfj/projects/skills/skills/tapd-workflow/` unchanged; replace only the plugin copy.
 - Do not introduce a mutable `TapdTaskContext`.
 - Compose `TapdWorkDefinition -> ReviewedChange -> TestSubmissionResult -> MasterMergeResult`.
-- Validators/reviewers stay private to the owning skill, are read-only, and return only `验证通过` or `验证不通过：<原因>`.
-- Fixed project/repository/branch inputs are verified hard constraints, never hints.
+- Validators/reviewers stay private to the owning skill, are read-only, and return only `验证通过` or `验证不通过：<原因>`; producers persist only `NOT_RUN | VALIDATION_PASSED | VALIDATION_FAILED` plus a normalized reason.
+- Fixed project/repository/branch inputs are verified hard constraints, never hints; `fixed_branch` cannot be substituted in `AUTO`, `CREATE`, or `REUSE_FIXED`, and `CREATE` never resumes.
+- Commit, push, MR create/update, and merge payloads/authorization receive private validation before the first and every subsequent write; immutable facts are re-read immediately before execution.
 - Project checks, TDD evidence, independent review, user authorization and post-write readback cannot be disabled.
 - Submission supports exactly `STANDARD` and `NO_WIKI`; `STANDARD` reuses `drafting-tapd-wiki`, while `NO_WIKI` records `SKIPPED_BY_POLICY` and does not invoke it.
 - Master merge is optional and only merges the original repair branch to `master`, then optionally marks an existing Wiki as merged.
@@ -35,12 +36,12 @@
 
 **Interfaces:**
 - Consumes: TAPD URL; optional fixed project/repository/branch, `AUTO | CREATE | REUSE_FIXED`, user increment; `zan-workflows:workspace-project-knowledge`.
-- Produces: `TapdWorkDefinition` with work identity, evidence/conflicts, three confidence judgments, verified project fingerprint, branch/source, resume decision, confirmed scope/history policy and acceptance criteria.
+- Produces: `TapdWorkDefinition` with `READY_FOR_HANDOFF | PENDING | BLOCKED`, matching marker, blocker reason, work identity, evidence/conflicts, three confidence judgments, verified project fingerprint, exact branch/branch-to-create, resume decision, confirmed scope/history policy and acceptance criteria.
 
 - [ ] **Step 1:** Run a fresh read-only RED subagent with two project candidates, the wrong shell repository, a fixed branch and pressure to edit. Record project guessing, wrong-repo search, blind trust, missing confidence evidence or premature editing.
 - [ ] **Step 2:** Create the skill with frontmatter name `resolving-tapd-work` and a `Use when...` description covering TAPD understanding, scoping, routing, constraints and resumption.
 - [ ] **Step 3:** Adapt correct entity routing, collection, prototype, local resume, `PreviousContext + LatestTapdRefresh + UserIncrement`, confidence and project-fingerprint rules from the old monolith. Do not preserve stage-number coupling.
-- [ ] **Step 4:** Add a private evidence-to-conclusion validator and scenarios for wrong type, unresolved project, multiple refs, history overwrite, constraint mismatch, ambiguous project and unconfirmed scope.
+- [ ] **Step 4:** Add a private evidence-to-conclusion validator and scenarios for wrong type, unresolved project, multiple refs, history overwrite, constraint mismatch, ambiguous project, all three fixed-branch modes, truthful pending/blocked results, and unconfirmed scope.
 - [ ] **Step 5:** Replay GREEN; expect a verified target or explicit block and no edit. Run `quick_validate.py plugins/zan-workflows/skills/resolving-tapd-work`.
 
 ### Task 2: Implement `repairing-tapd-work`
@@ -95,9 +96,9 @@
 - Produces: `TestSubmissionResult` with source/develop/commits, MR/merge, TAPD state, test-version, Wiki result and readbacks.
 
 - [ ] **Step 1:** Run RED once with `NO_WIKI` pressure to create a Wiki and once with `STANDARD` pressure to write a suspicious draft without confirmation.
-- [ ] **Step 2:** Create `submitting-tapd-for-test`. Both profiles verify source/target/commits, obtain merge authorization, merge to develop, update TAPD status, publish a test version and read back effects.
+- [ ] **Step 2:** Create `submitting-tapd-for-test`. Both profiles validate exact commit/push/MR/merge payloads and authorization before each Git/GitLab write, re-read immutable facts, merge to develop, run a separate post-merge/pre-submission-write validation, update TAPD status, publish a test version, and finish with POST/readback validation.
 - [ ] **Step 3:** For `STANDARD`, require `zan-workflows:drafting-tapd-wiki`, show the full draft, obtain confirmation, write and read back. For `NO_WIKI`, never invoke Wiki drafting/validation and record `SKIPPED_BY_POLICY`.
-- [ ] **Step 4:** Adapt merge, inherited-base, exact-comment, Wiki write and test-version evidence rules. Add scenarios for policy confusion, changed commits, wrong target, missing authorization/readback and partial failure.
+- [ ] **Step 4:** Adapt merge, inherited-base, exact-comment, Wiki write and test-version evidence rules. Add scenarios for first-write validation, changed commits/payloads, wrong target, missing authorization/readback, public private-verdict mapping, and partial failure.
 - [ ] **Step 5:** Replay both GREEN scenarios. Run `quick_validate.py plugins/zan-workflows/skills/submitting-tapd-for-test`.
 
 ### Task 5: Implement `merging-tapd-work-to-master`
@@ -133,7 +134,7 @@
 - Produces: the declared result chain and final report.
 
 - [ ] **Step 1:** Run RED with an ambiguous project, fixed branch, `NO_WIKI` and no master merge; record context mutation, default selection, Wiki creation, unconditional merge or duplicated rules.
-- [ ] **Step 2:** Create `fixing-tapd-bug`; require the five capability skills by name, pass contracts and constraints, stop on blocks/authorization, and invoke master merge only when requested.
+- [ ] **Step 2:** Create `fixing-tapd-bug`; require the five capability skills by name, pass contracts and constraints, stop on blocks/authorization, route resumes by `pause.capability`, reuse unchanged prefix artifacts, invalidate only an affected suffix, and invoke master merge only when requested.
 - [ ] **Step 3:** Keep cleanup/final reporting at the orchestration boundary and do not reproduce capability rules.
 - [ ] **Step 4:** Delete only the plugin `tapd-workflow`, add composition scenarios, replay GREEN and run `quick_validate.py plugins/zan-workflows/skills/fixing-tapd-bug`.
 - [ ] **Step 5:** Prove `git diff --exit-code -- skills/tapd-workflow` succeeds and the plugin monolith path no longer exists.

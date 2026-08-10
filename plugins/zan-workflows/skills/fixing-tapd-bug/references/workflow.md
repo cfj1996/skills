@@ -28,16 +28,38 @@ Forward the request profile exactly once to submission:
    is waiting for authorization/required user input.
 2. Return the already-produced artifacts unchanged in `FixingTapdBugReport`.
 3. A later invocation must provide that report in `prior_report`, plus an
-   explicit `scope_increment` or authorization. Do not read hidden conversation
-   state. Resume at the earliest paused producer; it decides whether
-   revalidation is needed. Do not replay later stages first.
-4. Call resolver with only its declared input fields. After it returns, the
-   orchestrator compares the new definition with
-   `prior_report.result_chain.definition`. If it is a replacement, preserve the
-   earlier exact artifact by appending it with its replacement reason and
-   replacement slot to `history.superseded_results`; leave the new result in
-   the current chain. Downstream execution waits for its new eligible handoff.
-   Carry unchanged historical entries forward.
+   explicit `scope_increment` or schema-shaped `authorization_increment`. Do not read hidden conversation
+   state. Route exactly by `pause.capability`; invoke only that paused producer
+   and reuse all earlier unchanged artifacts.
+4. Rerun resolver only for a resolver pause or an explicitly declared change
+   to resolver-owned work identity, scope, project, repository, or branch
+   constraint. Call it with only its declared input fields. Do not call resolver
+   or repair before resuming submission/master when their upstream artifacts
+   are unchanged.
+5. When any producer replaces an artifact, preserve the old exact artifact and
+   every downstream artifact whose input depended on it in
+   `history.superseded_results`. Clear and recompute only that affected suffix;
+   retain the unaffected prefix unchanged.
+
+| `prior_report.pause.capability` | Reuse unchanged | Invoke now | Never replay by default |
+| --- | --- | --- | --- |
+| `request-validation` | Complete prior report | none | every producer |
+| `resolving-tapd-work` | request/history only | resolver | repair/submission/master until eligible |
+| `repairing-tapd-work` | definition | repair | resolver |
+| `submitting-tapd-for-test` | definition + reviewed change | submission | resolver + repair |
+| `merging-tapd-work-to-master` | definition + reviewed change + submission | master | resolver + repair + submission |
+
+For a repair, submission, or master authorization pause, forward only an
+`authorization_increment` whose capability, operation, exact confirmation,
+timestamp, and scope hash match that paused producer's requested gate. The
+producer still re-reads facts and validates the authorization; the orchestrator
+does not authorize on its behalf. A generic “继续”, stale binding, or capability
+mismatch stays at `request-validation` and invokes no producer.
+
+An explicit resolver-owned upstream change overrides the table only by routing
+to resolver and invalidating the affected downstream suffix. It never justifies
+replaying an unchanged prefix producer. Put the actual change in
+`scope_increment`; `upstream_change.fields/reason` only selects this route.
 
 ## Cleanup boundary
 

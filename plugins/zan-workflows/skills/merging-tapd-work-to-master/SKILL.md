@@ -30,7 +30,10 @@ when the user requested a marker but no existing Wiki can be identified.
 
 Use [master-merge-validator.md](agents/master-merge-validator.md) as an
 isolated, read-only private validator. It may return only `验证通过` or
-`验证不通过：<原因>`; keep its response private. Run it as
+`验证不通过：<原因>`; keep its response private. Map it immediately at the
+producer boundary to `NOT_RUN`, `VALIDATION_PASSED`, or `VALIDATION_FAILED`.
+Persist only the mapped state and a normalized business failure reason; never
+store the raw private line in `MasterMergeResult` or orchestration history. Run it as
 `validation_phase=PRE_WRITE` after facts and every applicable authorization
 are collected, but before creating/updating/merging an MR or writing a Wiki.
 Do not continue on a non-passing verdict.
@@ -60,16 +63,18 @@ Do not continue on a non-passing verdict.
    existing Wiki is identified, record `SKIPPED_NO_WIKI`; do not draft, create,
    search for a replacement, or treat absence as a failure.
 4. Assemble the planned `MasterMergeResult` facts and run private
-   `PRE_WRITE` validation. It checks only evidence and planned effects that
-   exist before the first write; it must not require merge or Wiki readback
-   that has not happened.
+   `PRE_WRITE` validation. Map and discard the raw response. Only
+   `VALIDATION_PASSED` permits execution. This phase checks only evidence and
+   planned effects that exist before the first write; it must not require merge
+   or Wiki readback that has not happened.
 5. Immediately before creating, updating, or merging the MR, re-read the
    actual source and `master` SHA values. Record
    `execution_preflight_source_ref_sha` and
    `execution_preflight_target_master_ref_sha`; both must equal the confirmed
    SHA snapshot. Any source or `master` head change invalidates authorization:
-   stop, re-verify, re-run `PRE_WRITE`, redisplay the new facts, and obtain a
-   fresh authorization. Only then create or update the direct source-to-master
+   stop, re-verify, redisplay the new facts, obtain a fresh authorization, and
+   re-run `PRE_WRITE` until its mapped state is `VALIDATION_PASSED`. Only then
+   create or update the direct source-to-master
    MR as needed and merge it. Read back the MR/merge state,
    `execution_post_master_ref_sha`, and prove that every approved current-round
    commit is contained in `origin/master`. A conflict, failed pipeline or
@@ -80,8 +85,8 @@ Do not continue on a non-passing verdict.
    If its readback lacks the patch, return a truthful partial `BLOCKED` result;
    do not perform any compensating or unrelated write.
 7. Form the complete result with all actual facts, authorization text,
-   merge/readback, optional Wiki result, scope exclusions, and validator
-   verdict. Return the one `MasterMergeResult` and stop immediately.
+   merge/readback, optional Wiki result, scope exclusions, and public mapped
+   validation state. Return the one `MasterMergeResult` and stop immediately.
 
 ## Hard stops and exclusions
 

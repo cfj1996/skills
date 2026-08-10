@@ -1,3 +1,11 @@
+# SUPERSEDED — DO NOT EXECUTE
+
+This scaffold plan is superseded by
+[the TAPD functional-skills implementation plan](/Users/cfj/projects/skills/docs/superpowers/plans/2026-08-10-tapd-functional-skills.md).
+Do not run any scaffold, copy, validation, staging, or commit command below;
+in particular, do not execute the obsolete `cp -R` commands that recreate the
+plugin monolith. This file is retained only as historical design context.
+
 # Zan Workflows Plugin Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
