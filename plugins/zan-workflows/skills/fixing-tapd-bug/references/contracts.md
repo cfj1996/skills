@@ -34,9 +34,9 @@ FixingTapdBugRequest:
   conversation. `false` means the master capability is not invoked.
 - `prior_report=null` identifies a new run. A resume is a fresh invocation
   whose request carries the complete, immutable report returned by the prior
-  invocation; it must not consume hidden conversation state. Except for an
-  explicit `user_increment`, its TAPD URL, resolver constraints, profile, and
-  master request must agree with `prior_report.request`. A mismatch pauses at
+  invocation; it must not consume hidden conversation state. Only an explicit
+  `scope_increment` may differ from `prior_report.request`; TAPD URL, resolver
+  constraints, profile, and master request must agree. A mismatch pauses at
   `request-validation` without a capability call.
 - On every resolver call, the orchestrator passes only the resolver's declared
   `tapd_url`, `fixed_project`, `fixed_repo_path`, `fixed_branch`,
