@@ -10,7 +10,7 @@ ValidatedWikiDraft:
   effects: NONE
   facts:
     claims:
-      - field: service_name | repository_url | developer | feature_description | effective_wiki_branch_name | impact_scope | tester | environment | existing_draft
+      - field: sequence | service_name | repository_url | developer | feature_description | effective_wiki_branch_name | impact_scope | tester | environment | existing_draft
         value: string | null
         source: string
     conflicts:
@@ -19,9 +19,10 @@ ValidatedWikiDraft:
         sources: [string]
         critical: boolean
         required_decision: string | null
-    missing_noncritical: [service_name | repository_url | developer | feature_description | impact_scope | tester]
+    missing_noncritical: [sequence | service_name | repository_url | developer | feature_description | impact_scope | tester]
   current_entry:
     sequence: string | 待补充
+    sequence_source: string | null
     service_name: string | 待补充
     repository_url: string | 待补充
     developer: string | 待补充
@@ -49,7 +50,9 @@ ValidatedWikiDraft:
 Noncritical fields may be absent and must render as the literal `待补充`:
 
 - sequence, service name, repository URL, developer, feature description,
-  impact scope, and tester;
+  impact scope, and tester. A non-placeholder `current_entry.sequence` must
+  match one `facts.claims` item whose `field=sequence`, and
+  `sequence_source` must reproduce that item's `source`;
 - an unavailable dynamic tester field. Never substitute `reporter`.
 
 Critical facts cannot be replaced by a placeholder:

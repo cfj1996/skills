@@ -7,6 +7,7 @@ write.
 | Scenario | Required result |
 | --- | --- |
 | Tester is absent, while one evidenced `feature/order-refactor` branch and all other current facts are consistent | `terminal_state=VALIDATED`; tester renders as `待补充`; do not query fields or use `reporter`. |
+| The supplied facts set sequence to `7` with source `用户粘贴的月目录顺序` | `current_entry.sequence=7`, `sequence_source=用户粘贴的月目录顺序`, and one `facts.claims` item has `field=sequence`, value `7`, and the same source. Do not turn it into `待补充` or invent a different order. |
 | Current facts contain both `feature/order-refactor` and `fixbug/123` as applicable branches | Retain both source claims; `terminal_state=BLOCKED`, validator verdict begins `验证不通过：`, and `rendered_markdown=null`. Never select either branch. |
 | Current facts contain only `merge/order-to-develop` as a branch | `BLOCKED`; a merge intermediate branch is not an effective Wiki branch and cannot render. |
 | A pasted draft contains valid historical material and the current facts identify a new distinct entry | `VALIDATED`; the entire original string is unchanged and the canonical current entry is appended as `expected_patch`. |

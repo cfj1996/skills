@@ -9,8 +9,11 @@ MR, source files, deployments, or local state.
 Validate these invariants in order:
 
 1. Every non-placeholder value in the proposed current entry has a cited,
-   mutually consistent supplied fact. Missing noncritical values are exactly
-   `待补充`; no person was guessed or copied from `reporter` as a tester.
+   mutually consistent supplied fact. In particular, a non-placeholder
+   `current_entry.sequence` has exactly one matching `facts.claims` item with
+   `field=sequence`, and `sequence_source` equals that claim's `source`.
+   Missing noncritical values are exactly `待补充`; no person was guessed or
+   copied from `reporter` as a tester.
 2. The current entry has exactly one evidenced
    `effective_wiki_branch_name`, formatted as `feature/*` or `fixbug/*`. It is
    the only value on its `代码分支名` line and is not a `merge/*` branch. Missing,
