@@ -19,7 +19,7 @@ FixingTapdBugRequest:
     requested: true | false
     existing_wiki_mark_request: true | false | null
   prior_report: FixingTapdBugReport | null
-  user_increment:
+  scope_increment:
     source: string | null
     changes: [string]
 ```
@@ -38,6 +38,10 @@ FixingTapdBugRequest:
   explicit `user_increment`, its TAPD URL, resolver constraints, profile, and
   master request must agree with `prior_report.request`. A mismatch pauses at
   `request-validation` without a capability call.
+- On every resolver call, the orchestrator passes only the resolver's declared
+  `tapd_url`, `fixed_project`, `fixed_repo_path`, `fixed_branch`,
+  `branch_mode`, and `scope_increment`. `prior_report`, a prior definition,
+  and history are orchestration-only inputs and are never resolver inputs.
 
 ## Result handoffs
 
@@ -106,11 +110,12 @@ FixingTapdBugReport:
   first incomplete capability or request gate, and names a truthful next
   action. It never contains invented downstream artifacts.
 - A resumed report begins with every `prior_report.history.superseded_results`
-  unchanged. When an explicit user increment or fresh producer evidence
-  replaces an artifact from `prior_report.result_chain`, append that old exact
-  artifact once with the truthful `reason` and the new producer/slot/terminal
-  state in `replaced_by`; the replacement itself occupies the current result
-  chain slot. An unchanged carried-forward artifact is not superseded.
+  unchanged. After a producer returns its new artifact, the orchestrator
+  compares it with the matching `prior_report.result_chain` artifact. Only if
+  it is a replacement does the orchestrator append the old exact artifact once
+  with the truthful `reason` and the new producer/slot/terminal state in
+  `replaced_by`; the replacement itself occupies the current result chain slot.
+  An unchanged carried-forward artifact is not superseded.
 - A `BLOCKED` capability result, non-passing validation, or an authorization
   wait is `PAUSED`; it is not converted into a success and no later capability
   is invoked.

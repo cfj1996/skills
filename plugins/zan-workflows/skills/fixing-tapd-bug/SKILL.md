@@ -58,9 +58,15 @@ Keep each returned artifact intact and retain its source with the final report.
    compatible with the immutable request identity, pause before calling a
    capability.
 2. Invoke `zan-workflows:resolving-tapd-work` with the TAPD URL, resolver-only
-   constraints, and any explicit user increment. Preserve its returned
-   `TapdWorkDefinition`. Do not call repair while the resolver result is
-   blocked or identifies required user input/confirmation.
+   constraints, and any explicit `scope_increment`. These are its only
+   inputs: `tapd_url`, `fixed_project`, `fixed_repo_path`, `fixed_branch`,
+   `branch_mode`, and `scope_increment`. Do not pass `prior_report` or any
+   prior artifact to the resolver. Preserve its returned `TapdWorkDefinition`.
+   The orchestrator compares that returned definition with
+   `prior_report.result_chain.definition`, when present; it records the old
+   exact definition in history only when the producer returned a replacement.
+   Do not call repair while the resolver result is blocked or identifies
+   required user input/confirmation.
 3. Invoke `zan-workflows:repairing-tapd-work` with that unchanged
    `TapdWorkDefinition`. Preserve its returned `ReviewedChange`. Do not call
    submission unless the repair result is `REVIEWED` with its producer's

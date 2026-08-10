@@ -7,7 +7,7 @@ a producer state or gate.
 | Order | Invoke | Exact input | Continue only when | Pause/result ownership |
 | --- | --- | --- | --- | --- |
 | 0 | none | `FixingTapdBugRequest`, including `prior_report` or explicit null | TAPD URL and exact profile are present; named skills are available; a prior report, when supplied, matches the immutable request identity | Return `PAUSED` at `request-validation`; no capability result exists. |
-| 1 | `zan-workflows:resolving-tapd-work` | TAPD URL, resolver-only constraints, user increment | Its producer permits an actionable handoff | Preserve `TapdWorkDefinition`; resolver owns blocked/pending evidence and requested confirmation. |
+| 1 | `zan-workflows:resolving-tapd-work` | Only `tapd_url`, `fixed_project`, `fixed_repo_path`, `fixed_branch`, `branch_mode`, and `scope_increment` | Its producer permits an actionable handoff | Preserve `TapdWorkDefinition`; resolver owns blocked/pending evidence and requested confirmation. `prior_report` remains in the orchestrator. |
 | 2 | `zan-workflows:repairing-tapd-work` | unchanged `TapdWorkDefinition` | `ReviewedChange.terminal_state=REVIEWED` and its review passes | Preserve definition and change; repair owns location, planning, TDD, verification, and review decisions. |
 | 3 | `zan-workflows:submitting-tapd-for-test` | unchanged definition, unchanged reviewed change, exact profile | `TestSubmissionResult.terminal_state=SUBMITTED` | Preserve all three results; submission owns develop, Wiki policy, authorization, writes, and readbacks. |
 | 4 | `zan-workflows:merging-tapd-work-to-master` | unchanged submitted result, exact original repair branch, optional existing-Wiki mark request | `MasterMergeResult.terminal_state=MERGED` | Invoke only for an explicit master request. Preserve all results; master capability owns its authorization and readbacks. |
@@ -28,14 +28,16 @@ Forward the request profile exactly once to submission:
    is waiting for authorization/required user input.
 2. Return the already-produced artifacts unchanged in `FixingTapdBugReport`.
 3. A later invocation must provide that report in `prior_report`, plus an
-   explicit user increment or authorization. Do not read hidden conversation
+   explicit `scope_increment` or authorization. Do not read hidden conversation
    state. Resume at the earliest paused producer; it decides whether
    revalidation is needed. Do not replay later stages first.
-4. If the new information changes an upstream artifact, preserve the earlier
-   artifact as evidence by appending its exact value, replacement reason, and
-   replacement slot to `history.superseded_results`. Rerun the owning producer
-   and leave the new result in the current chain; downstream execution waits
-   for its new eligible handoff. Carry unchanged historical entries forward.
+4. Call resolver with only its declared input fields. After it returns, the
+   orchestrator compares the new definition with
+   `prior_report.result_chain.definition`. If it is a replacement, preserve the
+   earlier exact artifact by appending it with its replacement reason and
+   replacement slot to `history.superseded_results`; leave the new result in
+   the current chain. Downstream execution waits for its new eligible handoff.
+   Carry unchanged historical entries forward.
 
 ## Cleanup boundary
 
