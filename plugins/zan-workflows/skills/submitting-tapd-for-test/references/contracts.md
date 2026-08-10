@@ -22,11 +22,15 @@ TestSubmissionResult:
     result: PASS | FAIL | NOT_ATTEMPTED
   external_effect_reconciliations:
     - operation: COMMIT | PUSH | MR_CREATE_OR_UPDATE | MR_MERGE | WIKI_WRITE | TAPD_COMMENT | TAPD_STATUS | TEST_VERSION
+      target: object
       checked_at: string
       state: EXACT_EFFECT_PRESENT | EFFECT_ABSENT | AMBIGUOUS
       evidence: string
       intended_effect_hash: string
+      actual_effect_hash: string | null
+      matches_intended_effect: true | false | null
       adoption_confirmation: {actor: string, text: string, confirmed_at: string, scope_hash: string} | null
+      adoption_scope_hash: string | null
       disposition: ADOPTED_EXISTING_EFFECT | EXECUTE_NEW_WRITE | BLOCKED
   merge:
     expected_source_branch: string | null
@@ -147,7 +151,7 @@ TestSubmissionResult:
       runs:
         - operation: COMMIT | PUSH | MR_CREATE_OR_UPDATE | MR_MERGE
           sequence: number
-          run_id: string
+          validation_run_id: string
           snapshot_id: string
           facts_hash: string
           payload_hash: string
@@ -164,7 +168,7 @@ TestSubmissionResult:
       runs:
         - operation: WIKI_WRITE | TAPD_COMMENT | TAPD_STATUS | TEST_VERSION
           sequence: number
-          run_id: string
+          validation_run_id: string
           snapshot_id: string
           facts_hash: string
           payload_hash: string
@@ -178,7 +182,7 @@ TestSubmissionResult:
           raw_response_discarded: true
     post_write:
       validation_phase: POST_WRITE
-      run_id: string | null
+      validation_run_id: string | null
       input_artifact_hash: string | null
       final_readback_hash: string | null
       validated_at: string | null
@@ -212,8 +216,9 @@ TestSubmissionResult:
 - `external_effect_reconciliations` is rebuilt from read-only external state on
   every invocation. It is not loaded from an earlier invocation. An exact
   existing effect may use `ADOPTED_EXISTING_EFFECT` only when its complete
-  readback hash matches `intended_effect_hash` and the user confirmation binds
-  that operation, target, effect hash, and evidence. A proved absence selects
+  `actual_effect_hash` equals `intended_effect_hash`,
+  `matches_intended_effect=true`, and `adoption_scope_hash` binds the runtime
+  effect ID, target hash, intended/actual hashes, and confirmation hash. A proved absence selects
   `EXECUTE_NEW_WRITE`; an ambiguous state selects `BLOCKED`.
 
 ## Invariants
@@ -271,7 +276,8 @@ TestSubmissionResult:
   re-read; any change invalidates validation/authorization and requires a new
   display, authorization when required, and validation run. This phase must
   not require a write/readback that has not happened.
-- For every operation, the current invocation first records one
+- For every applicable required operation after `required=false`, profile, and
+  work-type skips, the current invocation first records one
   `external_effect_reconciliations` entry. `EXACT_EFFECT_PRESENT` requires a
   matching readback, an adoption confirmation, a passing current validation,
   null execution fields, no new write, and result `ADOPTED_EXISTING_EFFECT`.
@@ -283,12 +289,12 @@ TestSubmissionResult:
   `WIKI_WRITE -> TAPD_COMMENT -> TAPD_STATUS -> TEST_VERSION` after profile/type
   skips. Every new write has immediate readback before the next operation; every
   adopted effect has its confirming readback before the next operation.
-- An interrupted invocation has no resumable internal transaction state. The
-  next invocation never receives its PASS, execution ID, or events; it rebuilds
-  the intended effect and reconciliation entry from current external state. A
-  proved exact effect may be adopted only with confirmation, a proved absence
-  starts a newly authorized and validated write, and ambiguity returns
-  `BLOCKED`.
+- The workflow runtime persists public effect ID, operation, target/payload
+  hashes, status, actual value, and readback for resumption. It never persists
+  or reuses a private validator line. `EXECUTING|UNKNOWN` resumes by reading the
+  external target before any new call and becomes `VERIFIED` only on proven
+  readback or `BLOCKED` when the outcome cannot be proved. A separately planned
+  exact existing effect may be adopted only with confirmation.
 - Immediately before the remote call, recompute the CAS token and use the
   provider-enforced expected-state guard from the bound payload. A concurrent
   source/target/resource change must reject before effect. If no equivalent

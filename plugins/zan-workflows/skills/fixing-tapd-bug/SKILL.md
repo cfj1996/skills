@@ -13,6 +13,25 @@ Read [contracts.md](references/contracts.md), then
 [workflow.md](references/workflow.md), and finally
 [acceptance-scenarios.md](references/acceptance-scenarios.md) before acting.
 
+## Workflow runtime record
+
+Read [workflow-runtime.md](../../references/workflow-runtime.md). For a fresh
+request without `run_id`, initialize `workflow=fixing-tapd-bug` before invoking
+resolver, persist the exact request, and expose the returned `run_id` in the
+first progress update and final report. Before every capability call, create a
+`begin-skill` record with its exact function input; after every return, call
+`finish-skill` with the complete public output, mapped validation state, and
+next skill only when eligible. For `STANDARD`, submission must record the Wiki
+drafter with `parent_invocation_id=<submission invocation id>`.
+
+For a resumed request, load `resume --run-id <run_id>` before routing. The
+runtime record is the cross-invocation source for completed inputs, outputs,
+current skill, next action, and pending external effects. A supplied
+`prior_report` is optional compatibility evidence and must match the run when
+present; pass it to `resume` for exact validation. It is not required for
+recovery because `resume` returns the last persisted public report. Never edit
+`run.json` manually.
+
 ## Required capability skills
 
 All of these named capabilities must be available before starting. Do not
@@ -33,8 +52,9 @@ Accept a TAPD URL, optional resolver-only hard constraints
 exact `submission_profile` of `STANDARD` or `NO_WIKI`, and an explicit optional
 master-merge request. A resumed non-resolver authorization may be supplied only
 as an exact `authorization_increment` bound to the paused capability/operation;
-it is never implied by “继续”. A fresh invocation has `prior_report=null`; a resumed
-invocation must include the complete immutable prior `FixingTapdBugReport`.
+it is never implied by “继续”. A fresh invocation has `run_id=null`; a resumed
+invocation must provide the existing `run_id`. `prior_report` may be null when
+the runtime already contains the completed producer outputs.
 Do not choose a profile, project, repository, branch, or master merge by
 default. Pass project/repository/branch constraints only to
 `resolving-tapd-work`; they remain hard constraints rather than hints.
@@ -50,18 +70,21 @@ TapdWorkDefinition
 
 Never make, mutate, or rely on a `TapdTaskContext`, an implicit current
 directory, hidden conversation state, or a replacement summary as a handoff.
-Use the supplied `prior_report` as the only cross-invocation recovery source.
-Keep each returned artifact intact and retain its source with the final report.
+Use the persisted workflow run as the cross-invocation recovery source. Keep
+each returned artifact intact in its invocation output and retain its source
+with the final report.
 
 ## Orchestration procedure
 
 1. Validate the request shape in [contracts.md](references/contracts.md). If a
-   required choice is absent or not exact, or a supplied prior report is not
-   compatible with the immutable request identity, pause before calling a
-   capability.
-2. Choose exactly one entry route. For `prior_report=null`, start with
-   `resolving-tapd-work`. For a resume, route strictly by
-   `prior_report.pause.capability` using the table in [workflow.md](references/workflow.md):
+   required choice is absent or not exact, an existing `run_id` cannot be
+   loaded, its stored request conflicts, or a supplied prior report is not
+   compatible with that immutable request identity, persist the blocker and
+   pause before calling a capability.
+2. Choose exactly one entry route. For `run_id=null`, create the run and start
+   with `resolving-tapd-work`. For a resume, route strictly by the runtime's
+   `current_skill`, current invocation output, and pending effects using the
+   table in [workflow.md](references/workflow.md):
    reuse every earlier unchanged artifact and invoke only the paused producer.
    Do not call resolver or repair merely because they are earlier in the fresh
    sequence. A `request-validation` pause invokes no producer.
@@ -107,20 +130,25 @@ Keep each returned artifact intact and retain its source with the final report.
    work, or claim an unperformed effect. When explicit new information causes
    a producer to replace an upstream artifact, preserve the old exact artifact
    in `history.superseded_results` with its replacement reason and new result
-   slot before considering downstream work.
+   slot before considering downstream work. Persist the capability output and
+   paused `next_action` before responding to the user.
 8. Only at the orchestration boundary, produce the final
    `FixingTapdBugReport`. Cleanup is separately optional: identify an eligible
    cleanup target from completed artifacts, show it, obtain specific user
    authorization, perform/read back only the approved cleanup, and record the
    actual outcome. Never hide cleanup inside a capability or make it a
    prerequisite for a truthful report.
+9. Before returning any paused or completed `FixingTapdBugReport`, call
+   `record-report` with that exact public report. This makes its result chain,
+   superseded history, pause route, cleanup state, and summary available to the
+   next invocation even when no `prior_report` is supplied.
 
 ## Resumption and response
 
 The word “继续” is not authorization and does not repair or discard a blocked
-artifact. Resume only from the supplied immutable `prior_report` plus the
-user's explicit new information, routing by `pause.capability` and reusing all
-earlier unchanged artifacts. Represent a resolver delta only as
+artifact. Resume only from the supplied `run_id`, its recorded immutable
+invocation outputs, and the user's explicit new information, routing by
+`current_skill` and reusing all earlier unchanged artifacts. Represent a resolver delta only as
 `scope_increment` and a non-resolver authorization only as the exact
 `authorization_increment`; do not reconstruct a handoff from memory, rerun
 resolver/repair unconditionally, or advance beyond the paused producer.
@@ -133,4 +161,5 @@ into orchestration history.
 Return one `FixingTapdBugReport` as defined in
 [contracts.md](references/contracts.md). It must contain the real result chain,
 the first pause/completion point, the next required action when paused, and
-the cleanup outcome. Stop after that report.
+the cleanup outcome plus `run_id`. Persist that exact report with
+`record-report`, then stop.

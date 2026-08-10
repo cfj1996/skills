@@ -116,7 +116,9 @@ resolving-tapd-work
 
 任一能力阻断、验证失败或等待用户授权时立即暂停。编排技能不复制项目判断、开发、Wiki、提测或合并规则。
 
-恢复时按 `pause.capability` 唯一路由，复用所有更早且未变化的产物并只调用暂停 producer；resolver 只在 resolver 暂停或显式 resolver-owned scope/identity 改变时重跑。非 resolver 的本轮授权以绑定 capability、operation、原文、时间和 scope hash 的 `authorization_increment` 仅传给暂停 producer，由 producer 自行复核；“继续”不构成授权。上游产物替换只失效并重跑依赖它的下游后缀，未受影响的前缀保持不变。
+V1 使用插件脚本维护一个原子替换写入的本地 `run.json`，暂不实现锁、并发接管、数据库或事件溯源。编排在每个技能调用前记录精确入参，在返回后记录完整公共输出、验证映射和下一技能；中断后继续同一 invocation，并保留多次公开返回。重要外部操作记录 `PLANNED -> EXECUTING -> APPLIED -> VERIFIED`，未知结果记录 `UNKNOWN` 后先对账。运行记录保存脱敏后的完整值及 SHA-256，私有 validator 原文不落盘。
+
+恢复时以 `run_id` 加载当前技能、下一动作、完成的不可变输出、最后一份公开编排报告和未完成外部操作，按记录的暂停能力唯一路由并只调用暂停 producer；每次返回公开报告前先用 `record-report` 保存，传入的可选 `prior_report` 必须与其精确匹配。resolver 只在 resolver 暂停或显式 resolver-owned scope/identity 改变时重跑。非 resolver 的本轮授权以绑定 capability、operation、原文、时间和 scope hash 的 `authorization_increment` 仅传给暂停 producer，由 producer 自行复核；“继续”不构成授权。上游产物替换只失效并重跑依赖它的下游后缀，未受影响的前缀保持不变；`STANDARD` 下 Wiki drafter 作为 submission 的嵌套 invocation，草稿失效时连同父 submission 一起失效。
 
 ## 调用方式
 
@@ -127,6 +129,7 @@ $zan-workflows:drafting-tapd-wiki 根据当前会话输出可复制 Wiki
 $zan-workflows:submitting-tapd-for-test 使用 STANDARD 或 NO_WIKI
 $zan-workflows:merging-tapd-work-to-master <TestSubmissionResult>
 $zan-workflows:fixing-tapd-bug <TAPD URL>
+$zan-workflows:fixing-tapd-bug run_id=<已有运行 ID>
 ```
 
 ## 插件目录

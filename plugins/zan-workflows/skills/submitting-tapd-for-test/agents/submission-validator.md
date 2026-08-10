@@ -16,6 +16,12 @@ common invariants:
   diff/current-round commit lists and ref SHAs match; inherited-base
   differences are separate and not claimed as current-round work.
 
+A supplied workflow runtime envelope is execution evidence, not a business
+input. It may contain only the current public invocation/effect IDs, operation,
+target/payload hashes, status, actual value, and readback. Reject a mismatching
+run/invocation binding or any raw private validator response, but allow a
+matching `EXECUTING|UNKNOWN` effect to be reconciled from fresh external state.
+
 For `validation_phase=PRE_FIRST_WRITE`, require
 `operation_under_validation=COMMIT|PUSH|MR_CREATE_OR_UPDATE|MR_MERGE` and check
 only:
@@ -85,7 +91,9 @@ or hidden state as recovery evidence.
 When `disposition=ADOPTED_EXISTING_EFFECT`, validate the intended payload hash,
 exact readback, and bound adoption confirmation instead of requiring a write
 authorization or remote write guard; verify that all execution fields are null
-and no write call is planned. When `disposition=EXECUTE_NEW_WRITE`, retain every
+and no write call is planned. Require non-null equal intended/actual effect
+hashes, `matches_intended_effect=true`, and the matching runtime
+`adoption_scope_hash`. When `disposition=EXECUTE_NEW_WRITE`, retain every
 write-authorization, atomic-guard, snapshot, and ordering requirement above.
 
 Never require a future effect/readback in either pre-write phase. Reject an

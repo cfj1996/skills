@@ -9,6 +9,20 @@ Produce exactly one `TestSubmissionResult` and stop. This skill executes a
 test-submission transaction; it is not a repair, a master merge, or a
 production-release workflow.
 
+## Workflow runtime envelope
+
+When invoked by `fixing-tapd-bug`, require its `run_id` and `invocation_id` as
+execution metadata and follow
+[workflow-runtime.md](../../references/workflow-runtime.md). They are not fields
+of the three business inputs. Under `STANDARD`, create and finish a nested
+`zan-workflows:drafting-tapd-wiki` invocation in the same run with
+`parent_invocation_id=<this submission invocation id>`. Record every
+significant external operation (`COMMIT`, `PUSH`, `MR_CREATE_OR_UPDATE`,
+`MR_MERGE`, `WIKI_WRITE`, `TAPD_COMMENT`, `TAPD_STATUS`, `TEST_VERSION`) as an
+effect before the call, advance it through execution and readback, and never
+finish this invocation `SUCCEEDED` while an effect is nonterminal. A standalone
+call may create a `standalone:submitting-tapd-for-test` run.
+
 ## Inputs, boundary, and result
 
 Read [contracts.md](references/contracts.md), then
@@ -20,12 +34,13 @@ Accept only all of the following:
   `review.verdict=REVIEW_PASSED`; and
 - `profile=STANDARD` or `profile=NO_WIKI` exactly.
 
-This skill has no persistent transaction context and never accepts a hidden or
-previous invocation's attempt ledger. If an earlier invocation ended without
-returning a result, the next call is a new invocation: rebuild the intended
-operation from these immutable inputs and reconcile it from the target
+This skill has no hidden transaction context and never accepts a conversation-
+only or private attempt ledger. The public workflow runtime record owns
+recovery. If an external effect is `EXECUTING|UNKNOWN`, resume the same recorded
+submission invocation, rebuild the intended operation from its immutable
+input, and reconcile it from the exact recorded target/payload plus the target
 system's current read-only state. Never infer success from an old validation
-line, execution ID, conversation summary, or unreturned in-memory event.
+line, conversation summary, or unreturned in-memory event.
 
 The upstream results are evidence, not authorization for a commit, push, MR,
 merge, TAPD write, Wiki write, or test-version publication. Missing, changed,
@@ -175,16 +190,20 @@ After the develop-merge readback and before any Wiki/TAPD write, invoke
    `VALIDATION_PASSED` mapped state permits that Wiki write; this phase must
    not demand a successful Wiki,
    comment, status, or version readback because none exists yet.
-4. Run `WikiWriteGate`, write the smallest confirmed patch, then read the Wiki
-   back. Do not create a replacement Wiki when the TAPD already identifies one.
+4. Run `WikiWriteGate` and branch by the recorded effect disposition.
+   `ADOPTED_EXISTING_EFFECT` stores the matching confirmed readback and performs
+   no Wiki call. `EXECUTE_NEW_WRITE` writes the smallest confirmed patch and
+   reads the Wiki back. `BLOCKED` stops. Do not create a replacement Wiki when
+   the TAPD already identifies one.
    If the expected patch is absent after readback, stop before comment or TAPD
    state update. When this operation created the Wiki, use its read-back real
    Wiki ID to materialize the exact comment, display it, obtain separate exact
    authorization, and run `PRE_SUBMISSION_WRITE(TAPD_COMMENT)` before writing.
-5. For a Bug, write only the exact comment generated from the final Wiki URL:
+5. For a Bug, plan the exact comment generated from the final Wiki URL:
    `提测wiki：[https://www.tapd.cn/{workspace_id}/markdown_wikis/show/#{wiki_id}](https://www.tapd.cn/{workspace_id}/markdown_wikis/show/#{wiki_id})`.
    Record `TAPD_COMMENT_GATE`; any extra text, changed link, or newline blocks
-   the comment. Record comment readback. For a Story/Task, record the
+   the comment. An adopted exact comment records its matching readback and makes
+   no call; only `EXECUTE_NEW_WRITE` writes it. Record comment readback. For a Story/Task, record the
    type-appropriate permitted comment/state payload and its readback.
 
 ## `NO_WIKI`: policy-isolated transaction
@@ -199,7 +218,9 @@ TAPD-status and test-version payloads. Run separate
 `PRE_SUBMISSION_WRITE(TAPD_STATUS)` and
 `PRE_SUBMISSION_WRITE(TEST_VERSION)` gates immediately before their operations,
 without loading or supplying any Wiki material. On each mapped
-`VALIDATION_PASSED`, perform only that write and read it back before the next,
+`VALIDATION_PASSED`, branch by effect disposition: adoption records the exact
+confirmed readback without a call, a new-write disposition performs only that
+write and reads it back, and a blocked disposition stops before the next,
 then run `POST_WRITE` without requiring or loading Wiki evidence. Set
 `wiki.status=SKIPPED_BY_POLICY`, with no Wiki target, draft, write, comment, or
 readback evidence. Return the normal result even though its Wiki fields are

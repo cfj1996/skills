@@ -9,6 +9,17 @@ Produce one read-only `ValidatedWikiDraft`. This skill turns facts already
 present in the conversation or supplied result objects into a TAPD Wiki body;
 it is not a submission or Wiki-write workflow.
 
+## Workflow runtime envelope
+
+When submission invokes this skill, it must first create a nested invocation in
+the same `run_id` and pass only `run_id`/`invocation_id` as execution metadata.
+Record the exact factual input and the complete public `ValidatedWikiDraft`
+before submission consumes it; do not persist the private validator line. Read
+[workflow-runtime.md](../../references/workflow-runtime.md). Runtime recording
+is not a Wiki write and does not change the final direct-call rule: after the
+record is complete, a successful standalone response remains only copyable
+Markdown.
+
 ## Inputs and boundaries
 
 Read [contracts.md](references/contracts.md) and

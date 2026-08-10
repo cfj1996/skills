@@ -10,6 +10,15 @@ work exists, where it belongs, and which branch may later be used; it never
 edits source, creates `raw.md`, changes TAPD, creates branches/worktrees, or
 commits.
 
+## Workflow runtime envelope
+
+When invoked by `fixing-tapd-bug`, accept its `run_id` and `invocation_id` only
+as execution metadata; they are not business inputs and never alter resolution.
+The orchestrator records the exact declared input before this call and the
+complete public `TapdWorkDefinition` after it. Read
+[workflow-runtime.md](../../references/workflow-runtime.md). A standalone call
+may create a `standalone:resolving-tapd-work` run before collecting evidence.
+
 ## Contract and boundaries
 
 Read [contracts.md](references/contracts.md) before collecting evidence. The

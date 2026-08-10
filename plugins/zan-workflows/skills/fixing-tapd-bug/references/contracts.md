@@ -8,6 +8,7 @@ duplicate a producer's business validation.
 
 ```yaml
 FixingTapdBugRequest:
+  run_id: string | null
   tapd_url: string
   resolver_constraints:
     fixed_project: string | null
@@ -42,10 +43,16 @@ FixingTapdBugRequest:
   for the orchestrator or later capabilities.
 - `master_merge.requested=true` must be an explicit user request in the current
   conversation. `false` means the master capability is not invoked.
-- `prior_report=null` identifies a new run. A resume is a fresh invocation
-  whose request carries the complete, immutable report returned by the prior
-  invocation; it must not consume hidden conversation state. TAPD URL, profile,
-  and master request must agree. Resolver constraints may differ only when the
+- `run_id=null` identifies a new run and requires creating the runtime record
+  before resolver. A non-null `run_id` identifies a resume and loads recorded
+  invocation inputs/outputs, current skill, next action, and effects; it must
+  not consume hidden conversation state. `prior_report` is optional compatibility
+  evidence and must equal the run's last recorded public report when supplied.
+  TAPD URL, profile, and master request must agree with the stored request.
+  Request-identity comparison uses TAPD URL, resolver hard constraints, profile,
+  and master request; it excludes `run_id`, `prior_report`, scope/authorization
+  increments, and routing metadata.
+  Resolver constraints may differ only when the
   user explicitly declares the corresponding `upstream_change` field and
   reason; that route invalidates the affected suffix and starts at resolver.
   `scope_increment` or an explicitly declared resolver-owned upstream change
@@ -57,7 +64,7 @@ FixingTapdBugRequest:
   `tapd_url`, `fixed_project`, `fixed_repo_path`, `fixed_branch`,
   `branch_mode`, and `scope_increment`. `prior_report`, a prior definition,
   and history are orchestration-only inputs and are never resolver inputs.
-- `authorization_increment` is the only cross-invocation authorization input.
+- `authorization_increment` is the only new cross-invocation authorization input.
   It must identify the paused non-resolver capability and exact operation, carry
   the current explicit confirmation text/time/scope hash, and is forwarded only
   to that producer for its own verification. A capability mismatch, incomplete
@@ -92,6 +99,7 @@ must not be invoked, inspected, or represented for `NO_WIKI`.
 
 ```yaml
 FixingTapdBugReport:
+  run_id: string
   terminal_state: COMPLETED | PAUSED
   request: FixingTapdBugRequest
   result_chain:
@@ -139,9 +147,10 @@ FixingTapdBugReport:
 - `PAUSED` preserves every returned result exactly as supplied, identifies the
   first incomplete capability or request gate, and names a truthful next
   action. It never contains invented downstream artifacts.
-- A resumed report begins with every `prior_report.history.superseded_results`
-  unchanged. After a producer returns its new artifact, the orchestrator
-  compares it with the matching `prior_report.result_chain` artifact. Only if
+- A resumed report begins with the run's last recorded public report and every
+  `history.superseded_results` entry unchanged. A supplied `prior_report` must
+  match that record. After a producer returns its new artifact, the orchestrator
+  compares it with the matching recorded result-chain artifact. Only if
   it is a replacement does the orchestrator append the old exact artifact once
   with the truthful `reason` and the new producer/slot/terminal state in
   `replaced_by`; the replacement itself occupies the current result chain slot.
@@ -149,8 +158,11 @@ FixingTapdBugReport:
   `disposition=INVALIDATED_BY_UPSTREAM_REPLACEMENT`, cleared from the current
   chain, and recomputed only as part of the affected suffix. An unchanged
   prefix artifact is reused and is not superseded.
+- Every public `FixingTapdBugReport` is persisted with runtime `record-report`
+  before it is returned. The runtime stores its revision and canonical hash;
+  `resume` returns it and rejects a supplied `prior_report` whose hash differs.
 - `resume_route.entry_capability` records only the first producer selected by
-  `pause.capability`; a successful replacement may continue through its
+  the runtime `current_skill` and matching last pause; a successful replacement may continue through its
   affected suffix in the same invocation. `replaced_slots` contains producer
   slots directly replaced in this run. `invalidated_slots` contains only their
   dependent downstream slots, never the replaced root itself. An invalidated
@@ -159,21 +171,28 @@ FixingTapdBugReport:
 - A `BLOCKED`/`PENDING` capability result, non-passing validation, or an authorization
   wait is `PAUSED`; it is not converted into a success and no later capability
   is invoked.
-- Resume uses only `prior_report`, retained immutable artifacts within it, and
-  explicit `scope_increment`/`authorization_increment`. It routes by
-  `pause.capability`: resolver
+- Resume uses only `run_id`, retained immutable invocation outputs within that
+  run, and explicit `scope_increment`/`authorization_increment`. A supplied
+  `prior_report` is checked but is not required. It routes by runtime
+  `current_skill` and the matching recorded pause: resolver
   pause invokes resolver; repair pause invokes repair with the retained
   definition; submission pause invokes submission with retained definition and
   reviewed change; master pause invokes master with the retained submission;
   request validation invokes none. Resolver reruns only for its own pause or an
   explicit resolver-owned scope/identity change. “继续” without required
   information/authorization cannot advance a paused gate.
-- Submission never consumes a prior invocation's private PASS, attempt ledger,
-  or execution ID. Whether resumed from a returned report or re-entered after
-  an interrupted invocation, it rebuilds every intended effect from the
-  retained immutable handoffs and current external readback. Exact existing
+- Submission never consumes a prior invocation's private PASS or raw validator
+  output. It may consume the public runtime effect ID, target, payload hash,
+  status, and recorded readback. Whether resumed from a returned report or
+  re-entered after an interrupted invocation, it reconciles every pending
+  effect from the retained immutable handoffs, recorded effect plan, and current
+  external readback. Exact existing
   effects require bound adoption confirmation, proved absence requires fresh
   validation before one new write, and ambiguity pauses the workflow.
+- An interrupted invocation retains each public return in its runtime
+  `returns`. When an `UNKNOWN` effect is proven `VERIFIED`, the runtime reopens
+  that same owning invocation with its original recorded input; it does not
+  start a replacement invocation or reuse the old private validation.
 - Result-chain and history artifacts contain only producer-owned public mapped
   validation states and normalized business reasons. A raw private validator
   line is invalid orchestration input and is never persisted or copied.

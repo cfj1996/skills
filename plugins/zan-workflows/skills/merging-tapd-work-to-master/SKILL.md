@@ -10,6 +10,17 @@ post-submission transaction. It merges only the original repair branch directly
 to `master`; it is not test submission, production publishing, a smoke-test
 workflow, or a TAPD-update workflow.
 
+## Workflow runtime envelope
+
+When invoked by `fixing-tapd-bug`, accept its `run_id` and `invocation_id` only
+as execution metadata and follow
+[workflow-runtime.md](../../references/workflow-runtime.md). The orchestrator
+records the exact input and public `MasterMergeResult`. Record the master MR
+create/update/merge and optional existing-Wiki marker as effects before their
+external calls, then mark their actual return and readback. Never finish
+`SUCCEEDED` with a nonterminal effect. A standalone call may create a
+`standalone:merging-tapd-work-to-master` run.
+
 ## Inputs, boundary, and result
 
 Read [contracts.md](references/contracts.md), then
