@@ -83,6 +83,11 @@ Keep each returned artifact intact and retain its source with the final report.
    authorization increment. Each producer independently verifies the binding;
    the orchestrator never treats it as proof. No resumed route may
    replay an earlier side-effecting producer whose input artifact is unchanged.
+   Submission never receives a prior attempt ledger or hidden transaction
+   state. If an earlier submission invocation was interrupted or returned an
+   unknown/partial effect, the new submission call reconciles each intended
+   effect from GitLab/TAPD/Wiki/version readback and requires exact adoption
+   confirmation before treating an existing effect as complete.
 5. On a fresh route, or after the routed producer returns an eligible
    replacement, continue only through the affected downstream suffix in
    normal order. If an upstream artifact is replaced, move its old exact value

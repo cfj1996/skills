@@ -168,6 +168,12 @@ FixingTapdBugReport:
   request validation invokes none. Resolver reruns only for its own pause or an
   explicit resolver-owned scope/identity change. “继续” without required
   information/authorization cannot advance a paused gate.
+- Submission never consumes a prior invocation's private PASS, attempt ledger,
+  or execution ID. Whether resumed from a returned report or re-entered after
+  an interrupted invocation, it rebuilds every intended effect from the
+  retained immutable handoffs and current external readback. Exact existing
+  effects require bound adoption confirmation, proved absence requires fresh
+  validation before one new write, and ambiguity pauses the workflow.
 - Result-chain and history artifacts contain only producer-owned public mapped
   validation states and normalized business reasons. A raw private validator
   line is invalid orchestration input and is never persisted or copied.

@@ -20,6 +20,13 @@ Accept only all of the following:
   `review.verdict=REVIEW_PASSED`; and
 - `profile=STANDARD` or `profile=NO_WIKI` exactly.
 
+This skill has no persistent transaction context and never accepts a hidden or
+previous invocation's attempt ledger. If an earlier invocation ended without
+returning a result, the next call is a new invocation: rebuild the intended
+operation from these immutable inputs and reconcile it from the target
+system's current read-only state. Never infer success from an old validation
+line, execution ID, conversation summary, or unreturned in-memory event.
+
 The upstream results are evidence, not authorization for a commit, push, MR,
 merge, TAPD write, Wiki write, or test-version publication. Missing, changed,
 or inconsistent evidence is a blocked result. Never infer a repository,
@@ -88,13 +95,15 @@ line in `TestSubmissionResult` or orchestration history.
    invalidate the mapped validation state and authorization, redisplay the new
    facts, obtain any required fresh authorization, and revalidate. Commit/push,
    create/update the MR, and merge to `develop` only through these per-operation
-   gates. Immediately before the external call, durably append an
-   `ATTEMPT_RESERVED` event that consumes that exact validation run and binds
-   its execution ID/idempotency key, CAS token, payload, authorization, and
-   expected-state guard. Append the write return when observed and the
-   reconciled readback as later events; a crash may legitimately omit the
-   return event, but never permits manufacturing one or filling it retroactively
-   into the reservation. Then read
+   gates. Before validating a new write, read the target system and compare its
+   exact current state with the intended effect. If the exact effect is already
+   present, show that readback and require explicit confirmation to adopt it as
+   `ADOPTED_EXISTING_EFFECT`; do not call the write. If the effect is proved
+   absent, validate and execute one new write with the current atomic guard or
+   idempotency predicate. If presence or absence is ambiguous, return
+   `BLOCKED`. Record only the current invocation's state check, validation,
+   execution return, and readback in the returned result; these records are
+   audit output, not a cross-invocation recovery store. Then read
    back MR/merge state and `origin/develop` containment of
    every current-round commit. A conflict, failed pipeline, failed merge, or
    missing containment blocks all later submission writes. A planned commit's
@@ -103,12 +112,10 @@ line in `TestSubmissionResult` or orchestration history.
    readback proves its actual tree/diff equals the reviewed diff. Any unreviewed
    diff or extra commit is scope drift and blocks rather than becoming
    reauthorizable. The chronologically last validation run before execution
-   must pass and be consumed by that reservation; a later failed run invalidates
-   every older pass. After a crash or unknown write outcome, never replay the
-   operation. Reconcile the reserved attempt by execution ID/idempotency key and
-   exact external state. If no effect is proven, a retry requires a new attempt,
-   new authorization when required, and new validation; if the effect cannot be
-   proven present or absent, return `BLOCKED`.
+   must pass and match that operation's exact snapshot; a later failed run invalidates
+   every older pass in this invocation. A later invocation cannot reuse any
+   validation result from this invocation; it must perform the external-state
+   check and fresh validation again.
 4. Select the profile procedure below. Do not downgrade `STANDARD` to
    `NO_WIKI`, and do not use a missing Wiki to block `NO_WIKI`.
 5. Complete the profile preparation. Immediately before each applicable
@@ -127,11 +134,12 @@ line in `TestSubmissionResult` or orchestration history.
    operation.
    Each validation/execution pair must share canonical snapshot/facts/payload/
    authorization hashes and a compare-and-swap token. The authorization scope
-   includes the snapshot/facts/CAS values. Before the call, reserve and consume
-   the validation run in the same durable append-only attempt ledger used for
-   Git writes. The remote request must enforce the CAS/version predicate or an
-   idempotency key; if neither is available, block. Preserve ordered reservation,
-   execution-return, and readback events and timestamps.
+   includes the snapshot/facts/CAS values. Apply the same external-state check:
+   adopt an already-present exact effect only after explicit confirmation;
+   otherwise validate one new write, or block when presence is ambiguous. The
+   remote request must enforce the CAS/version predicate or an idempotency key;
+   if neither is available, block. Preserve the current invocation's ordered
+   validation, execution-return, and readback timestamps.
 6. After the last readback, hash the complete immutable result/readback bundle
    and run a fresh private `POST_WRITE` validation using that exact hash and
    actual effects. Record the validator run ID/input/final-readback hashes and

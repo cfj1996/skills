@@ -56,6 +56,13 @@ producer still re-reads facts and validates the authorization; the orchestrator
 does not authorize on its behalf. A generic “继续”, stale binding, or capability
 mismatch stays at `request-validation` and invokes no producer.
 
+Do not pass a private attempt ledger, execution ID, or unreturned validator
+state to submission. An interrupted submission is a new producer invocation
+over the retained immutable definition/review/profile. It first reads external
+state; it may adopt an exact existing effect only after explicit bound
+confirmation, may write only after proving absence and fresh validation, and
+must block when presence is ambiguous.
+
 An explicit resolver-owned upstream change overrides the table only by routing
 to resolver and invalidating the affected downstream suffix. It never justifies
 replaying an unchanged prefix producer. Put the actual change in

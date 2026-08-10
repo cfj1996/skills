@@ -57,18 +57,22 @@ re-read the actual SHA/commit list, materialize the exact push payload, then
 repeat for MR create/update and merge. The planned commit's new SHA is expected;
 an extra unreviewed diff/commit is scope drift and blocks.
 
-## C3. Crash recovery cannot replay a write or an old PASS
+## C3. An interrupted invocation is reconciled from external state
 
-Input: an external write returns success but the process crashes before its
-readback is appended, leaving only a durable `ATTEMPT_RESERVED` event whose
-validation run is already consumed.
+Input: the previous invocation ended without returning a
+`TestSubmissionResult`; the caller only knows that a Wiki, TAPD, GitLab, or
+version write might have happened.
 
-Expected: do not call the write again. Reconcile by the reserved execution ID,
-idempotency key, and exact external state, then append write-return/readback
-events that were actually observed; a crash may omit the return event and must
-not manufacture it. If no effect is proven, create a new attempt only after fresh
-authorization when required and fresh validation. If presence or absence cannot
-be proved, return `BLOCKED`; the old PASS cannot authorize a retry.
+Expected: do not load or infer an internal attempt ledger from the interrupted
+invocation and do not automatically repeat the write. Treat this as a new
+invocation, rebuild the exact intended operation from the immutable inputs, and
+read the target system before writing. If the exact intended effect is already
+present, show the readback and require explicit confirmation to adopt it as
+`ADOPTED_EXISTING_EFFECT`; do not write again. If the effect is proved absent,
+use a newly displayed payload, fresh authorization when required, and fresh
+private validation before one new write. If presence or absence is ambiguous,
+return `BLOCKED`. A prior PASS, execution ID, or unreturned in-memory event is
+never a recovery input.
 
 ## C4. Concurrent target movement is stopped by the remote guard
 

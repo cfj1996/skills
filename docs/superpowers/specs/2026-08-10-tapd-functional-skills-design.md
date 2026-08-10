@@ -91,7 +91,7 @@ NO_WIKI  = 合并 develop + 更新 Bug 状态 + 发布测试版本
 
 技能负责实际源/目标分支和 commit 列表确认、提交/推送/MR、合并 `develop`、TAPD 状态、测试版本发布，以及启用 Wiki 时的写入与回读。输出 `TestSubmissionResult`。
 
-在任何 commit/push/MR create-or-update/merge 前，私有 `PRE_FIRST_WRITE` 验证仓库、source/target/ref、精确 diff/commits、操作 payload 与授权，并在每次执行前重读；变化即重新展示、授权和验证。每次外部写在调用前以 durable `ATTEMPT_RESERVED` 消费该次验证，并使用 provider-enforced expected-SHA/lease、resource CAS 或幂等键；崩溃恢复只对账同一 attempt，禁止重放旧 PASS。合并回读后，保留独立的 `PRE_SUBMISSION_WRITE` 验证 Wiki/TAPD/version 计划，最终使用 `POST_WRITE` 验证实际效果与 readback。三个阶段都只持久化公共映射状态。
+在任何 commit/push/MR create-or-update/merge 前，私有 `PRE_FIRST_WRITE` 验证仓库、source/target/ref、精确 diff/commits、操作 payload 与授权，并在每次执行前重读；变化即重新展示、授权和验证。技能不维护跨调用事务状态：每次调用都先读取外部目标的真实状态；精确效果已存在时展示回读并经用户确认后标记 `ADOPTED_EXISTING_EFFECT`、不重复写，确定不存在时才以 fresh 授权和验证执行一次新写入，无法判断时阻断。合并回读后，保留独立的 `PRE_SUBMISSION_WRITE` 验证 Wiki/TAPD/version 计划，最终使用 `POST_WRITE` 验证实际效果与 readback。三个阶段都只持久化公共映射状态。
 
 ### `merging-tapd-work-to-master`
 

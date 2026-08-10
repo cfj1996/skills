@@ -62,9 +62,10 @@ and check only:
   and `TEST_VERSION` are valid operations.
 
 For `validation_phase=POST_WRITE`, check the common invariants plus every
-actual write and readback: merge/develop containment, TAPD status, test
-version, and under `STANDARD` Wiki write/readback and exact Bug-comment
-write/readback. Under `NO_WIKI`, never require or load a Wiki field; require
+actual or adopted effect and readback: merge/develop containment, TAPD status,
+test version, and under `STANDARD` Wiki/readback and exact Bug-comment/readback.
+An adopted effect must have an exact external-state match, bound confirmation,
+and no new write. Under `NO_WIKI`, never require or load a Wiki field; require
 only the common merge/TAPD-status/test-version actual evidence and preserve
 `SKIPPED_BY_POLICY`. For each executed write, require the passing pre-write run
 to share its snapshot/facts/payload/authorization hashes and precede its
@@ -72,14 +73,20 @@ execution timestamp. Require dependency order and immediate readback: Wiki,
 applicable comment, status, then version. Independent unbound PASS claims are
 invalid.
 
-For every pre-write phase, require the execution protocol to reserve one durable
-append-only attempt and consume the passing validation run before the external
-call. The first attempt event is `ATTEMPT_RESERVED`; an observed write return
-and the reconciled readback are separate later events. A crash may omit the
-return event and must not manufacture it. A reserved attempt with unknown outcome
-may only be reconciled by its execution ID/idempotency key and exact external
-state. It may not execute again; a proven absent effect requires a new attempt
-and a new validation, while an indeterminate effect blocks.
+For every pre-write phase, require a fresh read-only comparison between the
+target system and the exact intended effect. `EXACT_EFFECT_PRESENT` may skip the
+write only with readback evidence and an exact user confirmation, and must be
+recorded as `ADOPTED_EXISTING_EFFECT`. `EFFECT_ABSENT` may proceed only through
+fresh authorization when required, fresh validation, and one guarded write.
+`AMBIGUOUS` must block. Validation and execution records belong only to the
+current invocation; reject any prior invocation's PASS, execution ID, attempt,
+or hidden state as recovery evidence.
+
+When `disposition=ADOPTED_EXISTING_EFFECT`, validate the intended payload hash,
+exact readback, and bound adoption confirmation instead of requiring a write
+authorization or remote write guard; verify that all execution fields are null
+and no write call is planned. When `disposition=EXECUTE_NEW_WRITE`, retain every
+write-authorization, atomic-guard, snapshot, and ordering requirement above.
 
 Never require a future effect/readback in either pre-write phase. Reject an
 unknown phase or a missing/unknown `operation_under_validation` for

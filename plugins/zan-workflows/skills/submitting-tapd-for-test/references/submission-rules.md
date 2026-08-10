@@ -23,11 +23,13 @@
    fresh authorization when required, and revalidation. Only a passing public
    mapped state permits that one write. Require a provider-enforced expected
    SHA/ref lease (or equivalent atomic predicate) in the exact payload. Before
-   the call, durably append `ATTEMPT_RESERVED` and consume the passing validation
-   run; append an observed write return and the reconciled readback as later
-   events. A crash may omit the return event; never manufacture it. Never replay
-   a reserved attempt after a crash/unknown outcome—reconcile it by execution
-   ID/idempotency key, or block if presence/absence cannot be proven. Read merge state and every current-round
+   validating a new write, read the target system. If the exact intended effect
+   is already present, display the readback and require an exact confirmation to
+   adopt it as `ADOPTED_EXISTING_EFFECT`; do not write again. If it is proved
+   absent, run the fresh validation and perform one guarded write. If its
+   presence is ambiguous, block. Current-invocation validation/execution records
+   are returned audit output only and are never loaded as cross-invocation
+   recovery state. Read merge state and every current-round
    commit from `origin/develop`. Stop before TAPD, version, or Wiki writes on
    any failed containment/readback.
 
@@ -55,9 +57,11 @@ the write. Bind the fresh facts, payload, authorization, validation run, and
 execution using matching snapshot/payload/authorization hashes and ordered
 timestamps. The submission preflight includes exact source/target ref SHAs and
 reviewed diff hash; authorization binds that snapshot/facts/CAS tuple. Require
-a remote resource-version/CAS predicate or idempotency key, reserve and consume
-the validation run before the call, and append the write/readback as later
-events. Immediately before execution, re-read the immutable repository,
+a remote resource-version/CAS predicate or idempotency key. Before authorizing
+a new write, reconcile the exact intended effect from the external system:
+confirm and adopt an exact existing effect without writing, proceed with a
+freshly validated write only when absence is proved, and block on an
+ambiguous state. Immediately before execution, re-read the immutable repository,
 source/target/commit/profile/target/payload snapshot; any change invalidates
 authorization and validation and requires redisplay and revalidation. Use
 `WikiWriteGate`: target, mode, before hash, expected patch, after hash, and a
