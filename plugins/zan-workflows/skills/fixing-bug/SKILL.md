@@ -77,6 +77,10 @@ Before invoking `implementing-work` or performing any other write:
    unchanged. After interruption, rebuild the checklist rather than relying on
    hidden conversation state.
 
+The visible `分支` field binds the exact branch identity only. It excludes the
+producer-owned `CREATE` or `USE_EXISTING` action. The expected `CREATE` to
+`USE_EXISTING` transition does not invalidate confirmation.
+
 Preflight permits TAPD/project/repository/ref reads only. Before confirmation,
 do not create a branch, change TAPD, write tests, edit source, commit, push, or
 invoke any write-owning capability. Hiding raw handoff objects, validator
@@ -92,11 +96,13 @@ normalized Bug URL in order:
    creation base constraint. When the request starts with `CREATE`, keep
    `CREATE` only until the exact branch is created and read back; use
    `USE_EXISTING` for every later Bug. This switch is current-execution control
-   flow, not persisted state.
-2. Compare the refreshed definition's project/repository, branch, and scope
-   with the confirmed row. If a visible field changed, or preparation returns
-   `PENDING` or `BLOCKED`, show the updated checklist and stop before
-   `implementing-work`; confirmation is no longer current.
+   flow, not persisted state or a visible checklist change.
+2. Compare the refreshed definition's project/repository, exact branch
+   identity, and scope with the confirmed row. If a visible field changed,
+   show the updated checklist and stop before `implementing-work`;
+   confirmation is no longer current. If execution-time `preparing-work`
+   returns `PENDING` or `BLOCKED`, pause the entire queue, show the updated
+   checklist, and perform no later write until the user confirms it.
 3. Only from a matching `READY_FOR_HANDOFF`, call `implementing-work` with the
    returned definition.
 4. If it returns `REVIEWED`, call `submitting-for-test` with the definition,
@@ -104,10 +110,11 @@ normalized Bug URL in order:
 5. If submission returns `SUBMITTED` and go-live was explicitly requested,
    call `going-live` with that exact `TestSubmissionResult`; it owns reading
    the original repair branch from the result.
-6. Record only a concise in-conversation result for this Bug. If an execution
-   capability returns `PENDING` or `BLOCKED`, record the first reason, skip the
-   remaining capabilities for that Bug, and continue with the next confirmed
-   Bug unless a shared project/repository/branch constraint is invalid.
+6. Record only a concise in-conversation result for this Bug. Only
+   `implementing-work`, `submitting-for-test`, or `going-live` may return a
+   per-Bug `PENDING` or `BLOCKED` that skips the remaining capabilities for
+   that Bug and continues with the next confirmed Bug. A shared
+   project/repository/branch failure still stops later writes.
 
 The same existing branch may contain fixes for many Bugs. Under
 `USE_EXISTING`, starting the next Bug must not require that branch to already

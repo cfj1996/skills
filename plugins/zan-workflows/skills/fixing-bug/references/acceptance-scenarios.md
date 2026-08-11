@@ -7,8 +7,10 @@
 | Initial “修复这些 Bug” request | Treat it as item selection, not checklist confirmation. |
 | Preflight item is `PENDING` or `BLOCKED` | Show its reason in `待确认`; perform no writes for the request. |
 | Confirmed checklist with a new fixed branch | Re-prepare the first Bug with `CREATE`; after branch readback re-prepare later Bugs with `USE_EXISTING`. |
+| Effective action changes from `CREATE` to `USE_EXISTING` | Keep the confirmation valid because the exact visible branch identity is unchanged. |
 | Confirmed checklist with an existing fixed branch | Re-prepare every Bug with `USE_EXISTING` before implementation. Do not require prior Bug-specific evidence. |
 | Confirmed checklist field changes during re-prepare | Show the changed checklist and wait for confirmation again. |
+| Execution-time preparation becomes `PENDING` or `BLOCKED` | Pause the entire queue, show the updated checklist, and perform no later writes until reconfirmed. |
 | Second Bug fails repair | Report the second Bug failure, skip its submit/go-live, then begin the third Bug. |
 | Exact duplicate URL | Keep the first occurrence and do not execute the duplicate again. |
 | `NO_WIKI` | Submission never loads or invokes Wiki capability. |

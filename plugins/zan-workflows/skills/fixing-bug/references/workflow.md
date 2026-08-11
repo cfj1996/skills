@@ -32,6 +32,8 @@ updated checklist and wait for confirmation again.
 If the request selected `CREATE`, only the item that actually creates and
 reads back the fixed branch uses `CREATE`; every later item uses
 `USE_EXISTING`. The switch is held only during the current sequential loop.
+Branch action is execution control flow, not a visible checklist field, so the
+expected `CREATE` to `USE_EXISTING` switch does not invalidate confirmation.
 
 ```text
 bug1: re-prepare(CREATE)       -> implement -> submit -> optional go-live
@@ -48,9 +50,14 @@ branch identity and repository only; it does not demand Bug-specific history.
 
 - Store no recovery state.
 - A preflight or confirmation failure performs no writes and stops execution.
+- An execution-time `preparing-work` result of `PENDING` or `BLOCKED` pauses
+  the entire queue, returns the updated checklist, and permits no later write
+  until the checklist is confirmed again.
 - A changed visible checklist field invalidates the prior confirmation.
 - Keep the failure reason only in the current response list.
-- Continue with the next Bug unless the shared project/repository/branch
-  constraint itself is invalid; in that case mark every remaining Bug with the
-  same shared blocker without invoking write capabilities.
+- A per-Bug failure from `implementing-work`, `submitting-for-test`, or
+  `going-live` may continue with the next Bug unless the shared
+  project/repository/branch constraint itself is invalid; in that case mark
+  every remaining Bug with the same shared blocker without invoking write
+  capabilities.
 - After interruption, accept a new list from the user and start from that list.

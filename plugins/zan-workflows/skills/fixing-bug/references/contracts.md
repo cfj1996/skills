@@ -35,7 +35,7 @@ producer-owned preflight snapshot:
 | --- | --- |
 | Bug | TAPD identity or short ID |
 | 项目/仓库 | verified selected project and canonical repository |
-| 分支 | exact fixed branch and planned/current action |
+| 分支 | exact fixed branch identity; exclude `CREATE` or `USE_EXISTING` |
 | 修复范围 | concise producer-derived in-scope work |
 | 待确认 | normalized missing decision/blocker, or `无` |
 
@@ -48,6 +48,8 @@ After explicit confirmation, each Bug is prepared again immediately before
 implementation. Only a `READY_FOR_HANDOFF` whose visible project/repository,
 branch, and scope match the confirmed row may become a handoff. Any changed
 visible field invalidates confirmation and returns the updated checklist.
+The normal effective-action transition from `CREATE` to `USE_EXISTING` is not
+a visible field change and does not invalidate confirmation.
 
 The checklist and confirmation live only in the current conversation. They do
 not add request fields, persistence, runtime IDs, or recovery state.
@@ -76,4 +78,7 @@ The orchestrator retains only enough in the current conversation to report:
 | Last capability | capability name or `未开始` |
 | Reason | first blocker or required confirmation; empty on success |
 
-A failed Bug does not cancel later Bugs. The final list preserves input order.
+Execution-time `preparing-work` returning `PENDING` or `BLOCKED` pauses the entire queue.
+A downstream failure from `implementing-work`, `submitting-for-test`, or `going-live`
+does not cancel later Bugs unless it invalidates a shared constraint. The final list
+preserves input order.
