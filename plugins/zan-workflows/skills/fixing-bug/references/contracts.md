@@ -1,7 +1,8 @@
 # Orchestration contract
 
-`fixing-bug` is a stateless sequential composition. It owns ordering and the
-final summary; producer skills own all business validation and external writes.
+`fixing-bug` is a stateless sequential composition. It owns preflight ordering,
+checklist formatting, execution ordering, and the final summary; producer
+skills own all business validation and external writes.
 
 ## Request
 
@@ -25,6 +26,32 @@ read back. Later items must not repeat `CREATE`. If an item fails before branch
 creation, the next item may still use `CREATE`; if creation occurred before a
 later failure, the next item uses `USE_EXISTING`.
 
+## Preflight checklist
+
+Before any write, the orchestrator derives one user-visible row from each
+producer-owned preflight snapshot:
+
+| Column | Source |
+| --- | --- |
+| Bug | TAPD identity or short ID |
+| 项目/仓库 | verified selected project and canonical repository |
+| 分支 | exact fixed branch and planned/current action |
+| 修复范围 | concise producer-derived in-scope work |
+| 待确认 | normalized missing decision/blocker, or `无` |
+
+The initial repair request is item selection, not checklist confirmation. An
+unconfirmed checklist permits no write capability. A `PENDING` or `BLOCKED`
+snapshot remains producer-owned, appears in `待确认`, and keeps the whole
+request read-only.
+
+After explicit confirmation, each Bug is prepared again immediately before
+implementation. Only a `READY_FOR_HANDOFF` whose visible project/repository,
+branch, and scope match the confirmed row may become a handoff. Any changed
+visible field invalidates confirmation and returns the updated checklist.
+
+The checklist and confirmation live only in the current conversation. They do
+not add request fields, persistence, runtime IDs, or recovery state.
+
 ## In-memory handoffs
 
 | Producer | Successful output | Next consumer |
@@ -34,8 +61,9 @@ later failure, the next item uses `USE_EXISTING`.
 | `submitting-for-test` | `TestSubmissionResult` with `SUBMITTED` | optional `going-live`, as the complete input |
 | `going-live` | `MasterMergeResult` with `MERGED` | final summary |
 
-Handoffs live only for the current execution. They are not serialized or
-written to the repository.
+Preflight snapshots are not handoffs. Handoffs live only for the current
+execution, begin only after checklist confirmation and execution-time
+re-preparation, and are not serialized or written to the repository.
 
 ## Per-Bug result
 
