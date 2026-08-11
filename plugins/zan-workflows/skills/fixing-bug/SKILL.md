@@ -1,6 +1,6 @@
 ---
 name: fixing-bug
-description: Use when one or more TAPD Bugs must be handled sequentially through preparation, repair, test submission, and optional go-live on one fixed project branch.
+description: Use when the user asks to fix one or more TAPD Bugs on one fixed project branch.
 ---
 
 # Fix TAPD Bug
