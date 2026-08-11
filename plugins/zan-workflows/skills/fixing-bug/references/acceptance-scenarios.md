@@ -1,28 +1,16 @@
 # Acceptance scenarios
 
-Replay these composition scenarios before returning a final report. They test
-only orchestration boundaries; producer skills remain the authority for their
-own rules.
-
-| Scenario | Required orchestration result |
+| Scenario | Expected behavior |
 | --- | --- |
-| Project evidence is ambiguous, `fixed_branch=feature/order-refactor`, `submission_profile=NO_WIKI`, no master merge request | Invoke only resolver with the fixed constraint. Preserve its blocked/pending definition and return `PAUSED`; do not select a project, call repair/submission/drafter/master, or create/read/write a Wiki. |
-| First invocation has no `run_id`; project evidence is ambiguous | Create and expose `run_id` before resolver; record resolver input/output, then return a schema-shaped `PAUSED` report containing the resolver artifact and an empty history. No later capability is invoked. |
-| Resume receives the resolver-paused `run_id` and only “继续” | Load runtime state, reuse history, route only to resolver, and request its missing evidence/confirmation. Do not reinterpret “继续” as authorization or advance the chain. |
-| Resume receives `run_id` plus an explicit project-selection `scope_increment` | Call resolver only with its business inputs plus the runtime envelope. After its new definition returns, compare it with the recorded definition; when replaced, append the old exact definition with its reason and replacement slot. Do not invoke repair until the new definition is eligible. |
-| Any capability is invoked in the composed workflow | `begin-skill` contains its exact public input before invocation and `finish-skill` contains its complete public output before the next capability or user response. The recorded output hash is the handoff hash used downstream. |
-| Any public orchestration report is returned | Persist the exact `FixingTapdBugReport` with `record-report` first. A resume without `prior_report` receives it from runtime; a supplied non-matching report is rejected before any producer call. |
-| Definition is eligible, repair returns `REVIEWED`, submission profile is `NO_WIKI`, and no master request exists | Forward `NO_WIKI` verbatim to submission, then report `NOT_REQUESTED` with `master_merge.result=null`. The orchestrator never directly invokes the Wiki drafter or master capability. |
-| Definition is eligible, repair is `BLOCKED` or validation fails | Preserve the definition and blocked reviewed-change result; return `PAUSED` at repair. Do not submit, merge, clean up, or claim a reviewed change. |
-| Submission is `BLOCKED` after an observed partial write | Preserve actual submission facts and return `PAUSED` at submission. Do not roll back, compensate, call master, or hide the partial effect. |
-| A run is paused at submission authorization and definition/reviewed change are unchanged | Require the same `run_id` and exact matching `authorization_increment`, reuse both recorded upstream outputs, and invoke only submission. Do not call resolver or repair. A generic “继续” or stale/mismatched binding invokes no producer. |
-| Submission was interrupted with an `EXECUTING` or `UNKNOWN` runtime effect | Resume the same submission invocation, read its recorded target/payload hash and current external state, then mark the effect `VERIFIED` on proven readback or `BLOCKED`. Do not issue a replacement write or rerun resolver/repair. |
-| An upstream change requests suffix invalidation while that suffix contains an `EXECUTING`, `APPLIED`, or `UNKNOWN` effect | Reject invalidation and keep the effect visible. Reconcile it to `VERIFIED` or `BLOCKED` before invalidating or beginning any replacement invocation. |
-| `STANDARD` submission invokes the Wiki drafter | Create a nested drafter invocation in the same `run_id` with its submission invocation as parent, record its exact factual input and complete public draft result, then consume that output. Invalidating that draft derives submission as the rerun root and invalidates both outputs. `NO_WIKI` creates no drafter invocation or Wiki effect. |
-| Submission is `SUBMITTED` and the user explicitly requests master merge | Call master capability with the exact submitted original repair branch, not `develop`, `dev`, a `merge/*` ref, or a rebuilt branch. Report its result without adding release, smoke test, TAPD, test-version, or Wiki-creation work. |
-| A run is paused at master authorization and definition/review/submission are unchanged | Require the same `run_id` and exact matching `authorization_increment`, reuse all three recorded upstream outputs, and invoke only master. Do not rerun resolver, repair, or submission. |
-| Submission is `SUBMITTED` but no explicit master request exists | Finish at submission. A later generic “继续” does not request master merge. |
-| A capability result changes after a pause | Retain the old artifact and every now-invalid downstream artifact in `history.superseded_results`, reuse the unchanged prefix, clear only affected suffix slots, and recompute only that suffix after the new eligible handoff. |
-| An explicit resolver-owned scope/identity change arrives while paused downstream | Route resolver, require the actual delta in `scope_increment`, preserve the old definition as replaced and only its dependent downstream slots as invalidated, and rerun only the affected suffix. An undeclared immutable request mismatch pauses at request validation instead. |
-| Any result/history artifact contains a raw private validator line | Pause as invalid input; do not retain or propagate the line. Accept only producer-owned public mapped states and normalized reasons. |
-| Cleanup is not requested | Report `cleanup.status=NOT_REQUESTED`; no branch, worktree, file, Wiki, or remote resource is removed. |
+| One Bug URL | Execute one prepare/implement/submit chain and optional go-live. |
+| Three Bug URLs on one existing branch | Execute the same chain three times in order with `USE_EXISTING`. Do not require prior evidence for the next Bug. |
+| Three Bug URLs with a new fixed branch | First actual creation uses `CREATE`; after its ref readback, later Bugs use `USE_EXISTING`. |
+| Second Bug fails repair | Report the second Bug failure, skip its submit/go-live, then begin the third Bug. |
+| Exact duplicate URL | Keep the first occurrence and do not execute the duplicate again. |
+| `NO_WIKI` | Submission never loads or invokes Wiki capability. |
+| No explicit go-live request | Stop each successful Bug after submission. |
+| Interrupted conversation | Create no recovery record; the user supplies remaining Bugs again. |
+| Shared repository or branch mismatch | Perform no writes for affected items and report the shared blocker concisely. |
+
+The final user-facing response contains only the ordered result list, not
+handoff objects, runtime metadata, generated files, or validator protocol.

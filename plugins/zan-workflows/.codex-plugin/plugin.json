@@ -1,7 +1,7 @@
 {
   "name": "zan-workflows",
-  "version": "0.1.0+codex.20260810100101",
-  "description": "Company project and resumable functional TAPD workflows, plus MR review, debug token, identity, and memory skills for Codex.",
+  "version": "0.1.0+codex.20260811072336",
+  "description": "Company project and stateless functional TAPD workflows, plus MR review, debug token, identity, and memory skills for Codex.",
   "author": {
     "name": "Local developer"
   },
@@ -9,7 +9,7 @@
   "interface": {
     "displayName": "Zan Workflows",
     "shortDescription": "Company project and functional TAPD workflows.",
-    "longDescription": "Bundles project context; six function-like TAPD skills with file-backed run progress, recorded inputs and outputs, external-effect checkpoints, and run-id resumption; plus GitLab MR review, debug tokens, team identity, and project memory workflows.",
+    "longDescription": "Bundles project context; six function-like TAPD skills for preparing, implementing, drafting Wiki content, submitting, going live, and sequentially handling one or more Bugs on one fixed branch; plus GitLab MR review, debug tokens, team identity, and project memory workflows.",
     "developerName": "Local developer",
     "category": "Productivity",
     "capabilities": [
@@ -18,8 +18,8 @@
     ],
     "defaultPrompt": [
       "Use the appropriate Zan workflow skill for this task.",
-      "Record composed TAPD progress and resume it with run_id.",
-      "Resolve and scope this TAPD work before changing code.",
+      "Handle one or more TAPD Bugs sequentially on the supplied fixed branch without creating workflow record files.",
+      "Resolve and scope each TAPD work item before changing code.",
       "Repair, draft a TAPD Wiki, submit for test, or merge to master with the matching functional skill."
     ]
   }

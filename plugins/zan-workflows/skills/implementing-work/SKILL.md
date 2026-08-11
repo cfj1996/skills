@@ -1,131 +1,71 @@
 ---
 name: implementing-work
-description: Use when an approved TAPD work definition must be repaired in its verified repository and returned as a tested, independently reviewed change without submitting, merging, or publishing it.
+description: Use when an approved TAPD work definition must be implemented and reviewed directly on its verified fixed branch without submitting or publishing it.
 ---
 
-# Repair TAPD work
+# Implement TAPD Work
 
-Produce one `ReviewedChange` from an approved `TapdWorkDefinition`. This skill
-owns the safe repair loop: re-verifying the target, choosing and confirming the
-actual execution location, implementing with a plan and TDD, recording real
-evidence, and obtaining a private read-only review.
+Produce one in-memory `ReviewedChange` from one approved
+`TapdWorkDefinition`. This skill owns source changes, relevant verification,
+and an independent private review. It does not submit, merge to `develop` or
+`master`, publish a version, or write a Wiki.
 
-It does not submit for test, create or merge an MR, merge branches, publish,
-write a Wiki, or claim a deployment result. Those are separate capabilities.
+Read [contracts.md](references/contracts.md),
+[development-rules.md](references/development-rules.md), and
+[acceptance-scenarios.md](references/acceptance-scenarios.md) before editing.
 
-## Workflow runtime envelope
+## Input gate
 
-When invoked by `fixing-bug`, accept its `run_id` and `invocation_id` only
-as execution metadata; they are not fields of `TapdWorkDefinition` or
-`ReviewedChange`. The orchestrator records the exact input and public output
-using [workflow-runtime.md](../../references/workflow-runtime.md). Before the
-first local source edit, record a `SOURCE_EDIT` effect with the exact repository,
-worktree, branch, and approved scope; mark it `APPLIED` after editing and
-`VERIFIED` only after the required tests and private review pass. A standalone
-call may create a `standalone:implementing-work` run.
+Accept only `terminal_state=READY_FOR_HANDOFF` with:
 
-## Inputs and result
+- a verified project/repository fingerprint;
+- confirmed scope;
+- an exact branch action `CREATE|USE_EXISTING`; and
+- public preparation validation `VALIDATION_PASSED`.
 
-Read [contracts.md](references/contracts.md) before acting. Accept either:
+Re-read actual repository path, Git root, origin, branch refs, HEAD, and
+`git status --short`. A mismatch blocks before edits.
 
-- a `TapdWorkDefinition` with `terminal_state=READY_FOR_HANDOFF`; or
-- a TAPD URL, in which case call `zan-workflows:preparing-work` first and
-  stop unless it returns an approved definition.
+## Fixed-branch execution
 
-Return a schema-shaped `ReviewedChange` only when every pre-edit, development,
-verification, and review gate passes. Otherwise return a schema-shaped
-`ReviewedChange` with `terminal_state=BLOCKED`, the true blocker, and no
-invented changes or evidence.
+- `CREATE`: create the exact approved branch from the definition's exact
+  verified base ref/SHA, then verify the current branch name and ref.
+- `USE_EXISTING`: check out/use the exact approved existing branch and verify
+  its actual ref. Do not require this Bug to have prior commits or generated
+  evidence on the branch.
+- Work directly in the verified repository on that fixed branch. Do not create
+  a temporary branch or worktree, stash unrelated work, or implement on a
+  substitute branch.
 
-## Non-negotiable boundaries
+If pre-existing changes overlap the approved scope or make attribution unsafe,
+return `BLOCKED` and explain the overlap. Do not modify or erase them.
 
-- The input fingerprint is a hard constraint. Re-read Git root and origin from
-  the selected repository; a mismatch, an unresolved value, or a CWD-only
-  assumption blocks the run. Never substitute a similarly named repository.
-- Keep an initial `git status --short` snapshot. Existing or unrelated changes
-  are not this repair and must not be included, overwritten, staged, or
-  attributed to it.
-- An approved scope is not an execution-location choice. Before writing, obtain
-  confirmation of the exact branch and exact worktree/current-project path.
-- Never edit, format, generate code, create a branch/worktree, or update TAPD
-  before `PRE_EDIT_GATE: PASS` is evidenced.
-- A request to "test or review later" cannot waive planning, RED/GREEN evidence,
-  verification, or independent review.
-- Do not commit, push, create/update/merge an MR, merge, submit for test, write
-  a Wiki, or deploy as part of this skill.
+## Implementation
 
-## Repair procedure
+1. After the repository/branch/scope gate passes, display the exact TAPD item,
+   active-state operation, payload, and purpose. Obtain explicit authorization,
+   then call [agents/change-reviewer.md](agents/change-reviewer.md) with
+   `validation_phase=PRE_STATUS_WRITE`. Only a passing private verdict permits
+   the write. Change the item to its active state when required and read it
+   back immediately.
+2. Diagnose the Bug or plan the requested Story/Task within the approved scope.
+3. Implement the smallest coherent change. Add or update ordinary project
+   tests when appropriate and run relevant project verification commands.
+   Verification output stays in the current execution; do not copy it into a
+   workflow evidence directory.
+4. Compare the final diff with the starting status and approved scope. Exclude
+   unrelated paths.
+5. Give the exact diff, scope, repository/branch facts, and verification result
+   to [agents/change-reviewer.md](agents/change-reviewer.md) with
+   `validation_phase=POST_CHANGE_REVIEW`. The reviewer is
+   read-only and returns one private verdict line. Map it to
+   `REVIEW_PASSED|REVIEW_FAILED|NOT_RUN`, retain only a normalized reason, and
+   discard the private line.
+6. Return one in-memory `ReviewedChange`. Do not create a report file, runtime
+   record, raw data file, or generated test-evidence directory.
 
-1. Validate the input is approved: its terminal state is exactly
-   `READY_FOR_HANDOFF`, its response marker matches, project
-   fingerprint is verified, scope is confirmed, branch constraints are
-   satisfied, and its required confirmations are present. Missing input facts
-   are a blocked result, not a reason to reconstruct them by guessing.
-2. In the input's exact repository, capture actual selected project, canonical
-   repository path, Git root, common Git directory, origin remote, current ref,
-   HEAD, worktree list, and dirty-state baseline. Compare every actual value
-   with the input fingerprint. A worktree is equivalent only under the explicit
-   canonical-common-Git-directory rule in `contracts.md`; its matching branch
-   or directory name is insufficient. Record the initial baseline so unrelated
-   changes cannot later be claimed by this work.
-3. Read [development-rules.md](references/development-rules.md). Derive and
-   display the expected branch and expected execution path. Ask for one
-   explicit choice: the existing confirmed worktree/current project path, a
-   new branch plus worktree, or a confirmed reusable branch plus a new
-   worktree. Do not infer the choice from urgency or a generic request to fix.
-4. After confirmation, create or reuse only the selected branch/worktree and
-   immediately capture its actual branch and absolute path. Confirm both equal
-   their expected values (or record `REUSE` for a confirmed reusable branch).
-   A new repair branch must be based on the verified allowed baseline, never
-   `develop`/`dev`; stop on any divergence.
-5. Change the TAPD item to its active repair state only after the preceding
-   checks and authorization are complete: Bug uses `修复中`; Story or Task uses
-   `进行中`. Read it back and record the actual status. A failed write/readback
-   blocks before editing.
-6. Complete the applicable Superpowers planning route, including prototype
-   evidence when the definition cites a prototype: repair work uses systematic
-   debugging then planning; new Story/Task behavior uses brainstorming then
-   planning. Keep the approved in-scope/out-of-scope boundary in the plan.
-7. Implement with `superpowers:test-driven-development`: before the change, run
-   a focused target-behavior **test** command and record its non-zero exit,
-   output proving the target failure, and `EXPECTED_FAILURE` RED result. After
-   the change, run that same command and record its zero-exit GREEN result. A
-   different GREEN command is valid only when the evidence explicitly maps it
-   to the same target behavior; lint, build, setup failures, and passing
-   pre-change commands are never RED evidence. Run project-relevant
-   verification commands and retain actual command, exit code, output excerpt,
-   and blocker reason for every failure or skipped command. Follow
-   [development-rules.md](references/development-rules.md) for evidence and
-   prototype handling.
-8. Compare the final diff and status with the baseline and approved scope.
-   Stop if unrelated changes, an unexpected path, or untracked generated
-   artifacts would be attributed to the repair.
-9. Give the exact diff, scope, baseline comparison, branch/worktree facts, plan,
-   and unmodified evidence bundle to the isolated reviewer described in
-   [agents/change-reviewer.md](agents/change-reviewer.md). It must be read-only
-   and must return exactly one approved Chinese verdict line. At this producer
-   boundary, map a passing private verdict to the public
-   `review.verdict=REVIEW_PASSED`. Map a failing private verdict to
-   `review.verdict=REVIEW_FAILED`, copy only its reason into
-   `review.failure_reason` and `blocker_reason`, and block delivery. Never store
-   the private raw verdict in `ReviewedChange`. Tool unavailability or missing
-   inputs maps to `review.verdict=NOT_RUN` and blocks delivery; the implementing
-   agent may not self-approve.
-10. Re-read [acceptance-scenarios.md](references/acceptance-scenarios.md). Only
-    after the public mapped review state is `REVIEW_PASSED` return the complete
-    `ReviewedChange`, including known risks. A result is reusable evidence for
-    a later skill, not authorization for any further external write.
+## Output rule
 
-## Required response
-
-Return exactly one fenced YAML or JSON `ReviewedChange`, followed by one line:
-
-```text
-REVIEWED_CHANGE_READY
-```
-
-For a blocked run, return the same shape with `terminal_state=BLOCKED`, then:
-
-```text
-REPAIR_BLOCKED: <truthful reason>
-```
+Return `REVIEWED` only when repository, branch, scope, verification, and review
+all pass. Otherwise return `BLOCKED` with the first truthful blocker. Do not
+commit, push, submit, merge, publish, or write a Wiki in this skill.
