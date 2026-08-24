@@ -11,6 +11,7 @@
 | Claims | resolved value and read-only source for each material field |
 | Conflicts | competing values, sources, criticality |
 | Current entry | sequence, service, repository, developer, description, branch, scope, tester, online state, environment |
+| Work mode | `INITIAL|CONTINUE` and incremental-scope evidence when continuing |
 | Placement | `NEW_FRONTEND_SECTION|APPEND_ENTRY|APPEND_RETEST`, `# 前端` evidence, matching-entry evidence, and sequence calculation |
 | Preservation | `NEW_PAGE` or original body/hash, insertion point, expected minimal patch or initial body, resulting body, and preservation result |
 | Validation | `VALIDATION_PASSED|VALIDATION_FAILED|NOT_RUN` and normalized reason |
@@ -30,6 +31,9 @@
   linked page, multiple plausible targets, duplicate related children, or
   conflicting hierarchy evidence blocks creation rather than producing a
   duplicate Wiki.
+- `CONTINUE` reuses the prior matching child/branch entry and appends the
+  incremental re-test note. It never creates a duplicate entry solely because
+  the prior MR was merged.
 - `REUSE_EXISTING` requires the exact current target body and content hash.
   Create modes use `before_content_hash=NEW_PAGE` and a fully specified parent
   plan; the monthly parent never receives the entry body.

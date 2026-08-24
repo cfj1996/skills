@@ -6,12 +6,14 @@
 
 | Section | Required facts |
 | --- | --- |
-| Inputs | source definition, reviewed change, exact profile |
+| Inputs | source definition, reviewed change, `INITIAL|CONTINUE`, exact Wiki profile, and `AUTO|DEPLOY|SKIP` deployment mode |
 | Repository | expected/actual path, Git root, origin, verification result |
-| Git delivery | original source branch, target `develop`, current-round commits, authorization, commit/push/MR/merge results, develop containment |
+| Authorization | one consolidated plan/confirmation, bound facts, deterministic derived values, and any reauthorization reason |
+| Git delivery | original source branch, target `develop`, current-round commits, commit/push/MR/merge results, develop containment |
+| Deployment | `DEPLOYED|SKIPPED_BY_INTENT|FAILED|UNKNOWN|NOT_ATTEMPTED`, Jenkins job/environment/ref/version/channel/purpose and trigger/readback evidence when applicable |
 | Wiki | `WRITTEN|SKIPPED_BY_POLICY|BLOCKED|NOT_ATTEMPTED`, auto-resolved target plan, hierarchy evidence, create/update authorizations and readbacks, actual final child ID/URL, source-branch identity, online-field readback, and final body when applicable |
-| TAPD | exact status operation, optional exact Bug Wiki-link comment, write/readback results |
-| Test version | structured authorized payload, publish result, readback |
+| TAPD | exact status action, optional exact Bug Wiki-link comment, and write/readback results |
+| Test version | `WRITTEN|SKIPPED_ALREADY_WAITING_TEST|BLOCKED|NOT_ATTEMPTED`, structured payload and readback when written |
 | Validation | mapped results for each pre-write operation and final post-write validation |
 | Terminal | `SUBMITTED|BLOCKED` and blocker when applicable |
 
@@ -21,6 +23,9 @@
   source branch, target exactly `develop`, passing authorization and private
   pre-write validation for every executed write, immediate readback, and
   containment of all current-round commits in `origin/develop`.
+- One consolidated submission authorization covers the unchanged Git, Wiki,
+  deployment, comment, and final TAPD plan. Deterministically generated commit,
+  MR, Wiki, queue, and build identifiers do not create new confirmation points.
 - The Git sequence is commit when needed, push when needed, MR create/update,
   then MR merge. Each step is displayed, validated, executed, and read back
   before the next.
@@ -39,10 +44,14 @@
 - A successful `STANDARD` result retains the exact Wiki target and original
   source branch needed for `going-live` to locate and update the same entry.
 - `NO_WIKI` requires `SKIPPED_BY_POLICY`; every Wiki and Wiki-comment operation
-  is omitted. It still requires Git delivery, TAPD status, version, and their
-  validation/readbacks.
-- TAPD status is written/read back before the test version is published/read
-  back.
+  is omitted. It still requires Git delivery, deployment resolution, and
+  applicable TAPD registration/readbacks.
+- `DEPLOY` requires Jenkins terminal `SUCCESS` plus evidence that the expected
+  `origin/develop` SHA was built. `SKIP` performs no Jenkins call and records
+  `SKIPPED_BY_INTENT`. `FAILED|UNKNOWN` forbids later Wiki/status/version writes.
+- `INITIAL` writes `待测试`/test version only after
+  `DEPLOYED|SKIPPED_BY_INTENT`. `CONTINUE` already in `待测试` performs no status
+  or duplicate test-version write.
 - Any failed or unknown action returns `BLOCKED`, reports prior completed
   actions truthfully, and performs no later action.
 - Private validator responses are discarded after mapping to public pass/fail

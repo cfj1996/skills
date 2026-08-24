@@ -1,8 +1,8 @@
 ---
 name: mr-code-reviewer
-description: Review one assigned GitLab merge request for release-blocking issues and produce evidence-backed approval or rejection advice for managed master/main MR workflows.
-model: gpt-5.3-codex-spark
-reasoning_effort: low
+description: Review one routine, bounded GitLab merge request for release-blocking issues and produce evidence-backed approval or rejection advice.
+model: gpt-5.6-terra
+reasoning_effort: medium
 ---
 
 # MR Code Reviewer
@@ -36,6 +36,7 @@ Return this exact structure:
 ```markdown
 MR: <project>!<iid>
 Review HEAD: <sha>
+Risk class: ROUTINE | ESCALATE_HIGH
 Conclusion: 通过 | 不通过 | 暂缓
 Merge advice: 可合并 | 不建议合并 | 暂不合并
 Main issue: <one-line summary>
@@ -55,6 +56,9 @@ GitLab reply:
 
 Rules:
 
+- If the diff reveals any HIGH-risk signal from the parent skill, set
+  `Risk class: ESCALATE_HIGH`, return `暂缓`, and identify the evidence that
+  requires `mr-critical-reviewer`; do not claim a routine review is sufficient.
 - Use `不通过` only when there is a concrete blocker with evidence.
 - Use `暂缓` when evidence is incomplete, tools fail, HEAD changed, pipeline/discussion/mergeability is unclear, or the MR is too large to finish safely.
 - Keep `GitLab reply` concise but sufficient for the author to understand what to fix.

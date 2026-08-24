@@ -5,6 +5,10 @@ description: Use when the user asks to find, review, or remotely merge open GitL
 
 # 管辖项目 MR 审核
 
+模型配置按阶段动态路由：发现阶段默认 `BALANCED`；高风险审核和所有合并决策使用
+`CRITICAL`。选择 reviewer 子代理前读取共享
+[model-routing policy](../../references/model-routing.md)。
+
 ## 定位
 
 这个技能用于管理用户管辖项目的 GitLab MR，固定分成三步：
@@ -115,16 +119,22 @@ description: Use when the user asks to find, review, or remotely merge open GitL
 
 ### 并行审核策略
 
-根据本轮需要审核的 MR 数量自动选择执行方式：
+委派前先根据 MR 元数据、改动文件和 diff 做只读风险分类：
 
-- 1 个 MR：主代理直接审核。
-- 2-3 个 MR：优先为每个 MR 启动一个 `mr-code-reviewer` 角色的 Codex native subagent 并行审核；该角色定义在本技能目录的 `agents/mr-code-reviewer.md`（从当前加载的 `managed-mr-review/SKILL.md` 所在目录解析），模型为 Spark 系列的 `gpt-5.3-codex-spark`。
-- 4 个及以上 MR：最多同时启动 6 个 `mr-code-reviewer` 角色的 Codex native subagents。按 MR 粒度分配；如果 MR 数量超过 6 个，先分配高风险或改动最大的 MR，其他 MR 在第一批返回后继续分配。
-- 如果 `mr-code-reviewer` 角色不可用，使用最接近的 code review / reviewer 角色，并显式指定 Spark 系列模型；如果 subagent 或模型覆盖不可用，主代理按风险顺序串行审核并说明降级原因。
+- `HIGH`：涉及权限/鉴权、租户或站点隔离、支付、订单、账务、库存、优惠券、结算、敏感数据、删除/批量操作、环境/部署配置、跨模块调用链、大型 diff，或者风险暂时无法可靠判断。
+- `ROUTINE`：改动边界清晰的低风险 UI、文案、样式或局部逻辑，且不触及上述边界。
+
+按风险选择本技能目录中的角色：
+
+- `ROUTINE` 使用 `agents/mr-code-reviewer.md`：`gpt-5.6-terra` + `medium`。
+- `HIGH` 使用 `agents/mr-critical-reviewer.md`：`gpt-5.6-sol` + `high`。
+- 只有一个 MR 时，如果 subagent 可用也按风险选择对应角色；不可用时由主代理按相同检查项串行审核。
+- 两个及以上 MR 时按 MR 粒度并行，最多同时启动 6 个 reviewer；超过 6 个时先处理 `HIGH` 和改动最大的 MR，再继续下一批。
+- 不能因为并发额度、模型不可用或成本考虑把 `HIGH` 降为 `ROUTINE`。高配角色不可用时，由主代理按 `HIGH` 规则串行审核并说明模型降级，不降低证据门槛。
 
 并行审核要求：
 
-- 每个 subagent 必须以 code review 为唯一职责，只负责自己分配到的 MR，不合并、不 approve、不修改文件。
+- 每个 subagent 必须以 code review 为唯一职责，只负责自己分配到的 MR，不合并、不 approve、不修改文件；分配内容必须包含风险分类及触发依据。
 - 分配任务时提供项目名、MR iid、target branch、source branch、HEAD SHA、changed files/diff 获取方式和必要上下文；不要把其他 MR 的结论泄漏给它。
 - 子代理输出必须包含：`MR（项目名称+id）`、`结论（通过/不通过/暂缓）`、`主要问题`、`证据`、`审核使用的 HEAD SHA`、`是否可合并建议`。如果结论不是 `通过`，还必须输出可直接作为 GitLab 打回理由的详细说明。
 - 主代理负责汇总、去重、解决结论冲突，并输出最终审核报告表。

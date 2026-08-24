@@ -19,6 +19,27 @@ projects require a user choice before handoff.
 
 ## Branch modes
 
+### Continue gate
+
+Run this before `AUTO|CREATE|USE_EXISTING`. Classify the work as `CONTINUE`
+when the same TAPD item is resumed after incomplete work, test feedback,
+post-deployment reproduction, or an omitted entrypoint is discovered.
+
+Recover the original source branch in this order:
+
+1. current-conversation `TapdWorkDefinition`, `ReviewedChange`, or
+   `TestSubmissionResult`;
+2. an existing提测 Wiki `代码分支名`;
+3. the source branch of a prior MR for this TAPD item;
+4. an exact branch in TAPD comments;
+5. matching verified local/remote `feature/*` or `fixbug/*` refs.
+
+One mutually consistent candidate selects `USE_EXISTING`. No or competing
+candidates are `PENDING` with their evidence. Never derive a second branch
+name, append “后续修复”, or use `CREATE` for `CONTINUE`. If the original remote
+branch was deleted, require an explicit recovery decision rather than
+recreating it from `develop`.
+
 ### `CREATE`
 
 Verify that the exact `fixed_branch` is absent locally and remotely. Return a
@@ -42,6 +63,9 @@ or a previous workflow result.
 Inspect only the exact `fixed_branch`. Choose `USE_EXISTING` when its existing
 ref is verified; choose `CREATE` when local and remote absence is verified.
 Never search for or substitute another branch.
+
+`AUTO` may choose `CREATE` only for `INITIAL`. It must not convert `CONTINUE`
+into `CREATE` merely because a newly derived branch name is absent.
 
 ## Result classification
 

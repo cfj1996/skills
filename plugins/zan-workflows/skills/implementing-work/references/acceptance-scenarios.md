@@ -7,6 +7,8 @@
 | Current branch differs from the prepared fixed branch | `BLOCKED` before editing. |
 | `CREATE` lacks or no longer matches the approved base ref/SHA | `BLOCKED` before branch creation. |
 | TAPD active-state write is not exactly authorized or fails pre-write validation/readback | `BLOCKED` before source editing. |
+| Confirmed fixing-bug checklist already binds the active-state write | Reuse it and do not ask for another status confirmation. |
+| Continue Bug is already `待测试` | Keep the status unchanged and implement on the original branch. |
 | Existing unrelated changes overlap the approved files | `BLOCKED`; do not stash, reset, overwrite, or absorb them. |
 | Relevant verification fails | `BLOCKED` with the actual command/result; do not claim review success. |
 | Reviewer rejects scope or correctness | Map to `REVIEW_FAILED` and return `BLOCKED`. |

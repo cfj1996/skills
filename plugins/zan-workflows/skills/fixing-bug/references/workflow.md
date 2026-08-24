@@ -22,7 +22,7 @@ After explicit confirmation, re-prepare each Bug immediately before its
 single-Bug chain:
 
 ```text
-re-prepare -> implement -> submit(profile; auto-resolve Wiki under STANDARD) -> optional go-live
+re-prepare -> implement -> submit(Wiki profile, DEPLOY|SKIP) -> optional go-live
 ```
 
 Only a matching `READY_FOR_HANDOFF` may reach implementation. If refreshed
@@ -45,6 +45,29 @@ bug4: re-prepare(USE_EXISTING) -> implement -> submit -> optional go-live
 `USE_EXISTING` permits each Bug to start on the already selected branch. The
 branch may contain earlier Bugs from this list. `preparing-work` verifies the
 branch identity and repository only; it does not demand Bug-specific history.
+
+## Continue mode
+
+```text
+same Bug feedback -> recover original branch/Wiki -> implement increment
+                  -> same submit pipeline -> append Wiki retest note
+```
+
+Do not create another branch or reset TAPD status. If the Bug is already
+`待测试`, keep that status throughout. Reuse prior project/branch confirmation
+when unchanged; ask only for unclear incremental scope and the final
+consolidated submission plan.
+
+## Confirmation budget
+
+```text
+INITIAL:  scope/start confirmation -> consolidated submit confirmation
+CONTINUE: optional incremental-scope confirmation -> consolidated submit confirmation
+GO LIVE:  separate master confirmation
+```
+
+Generated commit/MR/Wiki/Jenkins identifiers and successful readbacks do not
+create new confirmation points when they follow the authorized derivation.
 
 ## Failure handling
 

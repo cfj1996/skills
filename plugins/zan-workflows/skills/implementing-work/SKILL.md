@@ -5,6 +5,10 @@ description: Use when an approved TAPD work definition must be implemented and r
 
 # Implement TAPD Work
 
+Preferred lead model profile: `CRITICAL`. Read the shared
+[model-routing policy](../../references/model-routing.md) when model selection
+or delegation is available; do not spawn an agent merely to change models.
+
 Produce one in-memory `ReviewedChange` from one approved
 `TapdWorkDefinition`. This skill owns source changes, relevant verification,
 and an independent private review. It does not submit, merge to `develop` or
@@ -21,6 +25,8 @@ Accept only `terminal_state=READY_FOR_HANDOFF` with:
 - a verified project/repository fingerprint;
 - confirmed scope;
 - an exact branch action `CREATE|USE_EXISTING`; and
+- status action `WRITE_ACTIVE|NO_CHANGE|SKIPPED_ALREADY_WAITING_TEST` with its
+  current-conversation authorization source; and
 - public preparation validation `VALIDATION_PASSED`.
 
 Re-read actual repository path, Git root, origin, branch refs, HEAD, and
@@ -42,12 +48,18 @@ return `BLOCKED` and explain the overlap. Do not modify or erase them.
 
 ## Implementation
 
-1. After the repository/branch/scope gate passes, display the exact TAPD item,
-   active-state operation, payload, and purpose. Obtain explicit authorization,
-   then call [agents/change-reviewer.md](agents/change-reviewer.md) with
-   `validation_phase=PRE_STATUS_WRITE`. Only a passing private verdict permits
-   the write. Change the item to its active state when required and read it
-   back immediately.
+1. After the repository/branch/scope gate passes, handle TAPD status once:
+   - reuse the confirmed `fixing-bug` checklist authorization when it binds the
+     same item, current state, `修复中` payload, purpose, branch, and scope;
+   - for standalone invocation, display those exact facts and obtain one
+     authorization;
+   - for `CONTINUE` already in `待测试`, use
+     `SKIPPED_ALREADY_WAITING_TEST` and perform no status write;
+   - for an item already `修复中`, use `NO_CHANGE`.
+   Call [agents/change-reviewer.md](agents/change-reviewer.md) with
+   `validation_phase=PRE_STATUS_WRITE` only for `WRITE_ACTIVE`. Read the write
+   back immediately. Never ask again merely because authorization came from
+   the confirmed checklist.
 2. Diagnose the Bug or plan the requested Story/Task within the approved scope.
 3. Implement the smallest coherent change. Add or update ordinary project
    tests when appropriate and run relevant project verification commands.

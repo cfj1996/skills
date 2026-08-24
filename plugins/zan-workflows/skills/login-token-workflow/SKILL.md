@@ -5,6 +5,10 @@ description: Retrieve merchant admin tokens and C-end user tokens for the test e
 
 # Login Token Workflow
 
+Default model profile: `FAST`. Read the shared
+[model-routing policy](../../references/model-routing.md) only when the task
+expands beyond deterministic token retrieval and URL assembly.
+
 ## Overview
 
 Use this skill to fetch the two token types used by the project and wire them into local debugging URLs:

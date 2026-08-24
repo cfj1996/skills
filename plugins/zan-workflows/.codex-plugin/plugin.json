@@ -1,6 +1,6 @@
 {
   "name": "zan-workflows",
-  "version": "0.1.0+codex.20260824061836",
+  "version": "0.1.0+codex.20260824090124",
   "description": "Company project and stateless functional TAPD workflows, plus MR review, debug token, identity, and memory skills for Codex.",
   "author": {
     "name": "Local developer"
@@ -9,7 +9,7 @@
   "interface": {
     "displayName": "Zan Workflows",
     "shortDescription": "Company project and functional TAPD workflows.",
-    "longDescription": "Bundles project context; six function-like TAPD skills for preparing, implementing, automatically locating or creating test-submission Wiki content, submitting, going live with Wiki online-state maintenance, and handling one or more Bugs on one fixed branch after a concise scope checklist confirmation; plus GitLab MR review, debug tokens, team identity, and project memory workflows.",
+    "longDescription": "Bundles project context; risk-routed TAPD skills for initial or continued Bug work, implementation, automatic Wiki handling, consolidated test submission with optional Jenkins deployment, and going live with Wiki online-state maintenance; plus risk-routed GitLab MR review, debug tokens, team identity, and project memory workflows.",
     "developerName": "Local developer",
     "category": "Productivity",
     "capabilities": [
@@ -18,7 +18,9 @@
     ],
     "defaultPrompt": [
       "Use the appropriate Zan workflow skill for this task.",
-      "Before handling one or more TAPD Bugs, show a concise project/repository, branch, and scope checklist and wait for confirmation; then handle confirmed Bugs sequentially on the supplied fixed branch.",
+      "Apply the bundled model-routing policy: use CRITICAL reviewers for high-risk code, write, and merge decisions; use BALANCED or FAST profiles for bounded read-only work.",
+      "Before initial Bug work, show a concise project/repository, branch, and scope checklist and wait for confirmation; for CONTINUE work, reuse unchanged bound facts and confirm only unclear incremental scope.",
+      "Reuse original branch, Wiki, and TAPD status for CONTINUE work; use one consolidated submission confirmation and resolve Jenkins deployment as AUTO, DEPLOY, or SKIP.",
       "Resolve and scope each TAPD work item before changing code.",
       "Repair, automatically locate or create the required TAPD Wiki, submit for test, or merge to master and maintain its online field with the matching functional skill."
     ]

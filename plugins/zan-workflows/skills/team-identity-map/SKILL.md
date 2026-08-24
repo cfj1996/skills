@@ -5,6 +5,10 @@ description: Use when a task needs to identify a teammate, translate between rea
 
 # Team Identity Map
 
+Default model profile: `FAST`. Read the shared
+[model-routing policy](../../references/model-routing.md) only when identity
+evidence conflicts or the request expands beyond a bounded lookup.
+
 ## Use This Skill
 
 Use this skill when a request mentions a teammate by one identifier and you need to resolve the matching identity on another platform.

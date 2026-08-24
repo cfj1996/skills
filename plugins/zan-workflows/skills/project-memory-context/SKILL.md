@@ -5,6 +5,10 @@ description: Use before working on a local project when prior AI session memory 
 
 # Project Memory Context
 
+Default model profile: `BALANCED`. Read the shared
+[model-routing policy](../../references/model-routing.md) only when retrieved
+memory conflicts materially with current evidence.
+
 Use this skill before source search or implementation when the task mentions a local project, prior AI work, historical decisions, repeated errors, previous attempts, project memory, confidence of remembered context, context-window pressure, or asks whether something has been done before.
 
 This skill consumes `ai-session-memory` output. That output is fuzzy memory evidence, not a truth database.

@@ -2,17 +2,22 @@
 
 ## Common write rule
 
-For every external write:
+Prepare one consolidated authorization using
+[deployment-and-confirmation.md](deployment-and-confirmation.md). For every
+external write inside that unchanged authorized plan:
 
 1. Read the current target facts.
 2. Display the exact target, payload, operation, and purpose.
-3. Obtain explicit authorization when required.
+3. Reuse the consolidated authorization; obtain a fresh one only when a bound
+   fact or operation changes.
 4. Re-read the facts immediately before execution.
 5. Ask the private validator to check that one planned operation.
 6. Execute only after validation passes.
 7. Read the result back before proceeding.
 
-If any value changed or a result cannot be proved, return `BLOCKED`. This
+Generated IDs and readbacks that follow the authorized derivation are not
+changed plan facts and do not require another prompt. If a bound value changed
+or a result cannot be proved, return `BLOCKED`. This
 simple version does not retry, recover an interrupted operation, or infer that
 an earlier call succeeded.
 
@@ -41,14 +46,15 @@ plan. Discovery order is mandatory:
 3. Reuse one related child, or plan `MM-DD: 中文简述` creation. Create the month
    first only when absent.
 
-Show the complete resulting child Markdown and every exact create/update
-payload, then obtain authorization. Execute only the plan:
+Include the complete resulting child Markdown and every exact create/update
+payload in the consolidated `SubmissionPlan`. After the deployment gate permits
+later writes, execute only that authorized plan:
 
 - `REUSE_EXISTING`: re-read the child and apply the minimal patch.
 - `CREATE_CHILD`: create the child under the verified month with the complete
   initial body.
 - `CREATE_MONTH_AND_CHILD`: create/read the month under `提测文档`, then use its
-  real ID in a separately displayed/authorized child create payload.
+  real ID in the deterministic child create payload without a second prompt.
 
 Never write the canonical entry body into the month page. Read back the final
 child, retain its actual ID/URL and original source branch for `going-live`, and
@@ -76,9 +82,9 @@ For a Bug, write exactly:
 ```
 
 Do not append implementation, MR, build, or verification text. Materialize the
-comment from the final existing-or-created child ID. If creation produced the
-ID during this run, display and authorize the materialized comment after the
-child readback.
+comment from the final existing-or-created child ID. The consolidated plan
+authorizes this deterministic comment derivation; validate and read it back
+without another prompt.
 
 ## No Wiki
 
@@ -86,9 +92,15 @@ child readback.
 Wiki drafter or validator, discover a Wiki target, read/create/update a page,
 or write a Wiki-link comment.
 
-## TAPD status and test version
+## Test deployment and TAPD status
 
-Use the operation appropriate to the TAPD work type. Display and authorize the
-exact status and the structured test-version payload. Validate, write, and
-read back status first; then validate, publish, and read back the version.
-Later failure never erases or disguises an earlier successful write.
+Follow [deployment-and-confirmation.md](deployment-and-confirmation.md).
+Resolve `DEPLOY|SKIP`, finish the deployment gate after develop containment,
+then write Wiki/TAPD data. `DEPLOY` requires Jenkins success and expected SHA
+proof; `SKIP` records `SKIPPED_BY_INTENT` and must not claim a published test
+environment.
+
+Use the status operation appropriate to the work mode. `INITIAL` writes and
+reads `待测试` plus the test-version field once. `CONTINUE` already in `待测试`
+records `SKIPPED_ALREADY_WAITING_TEST` and performs no duplicate status/version
+write. Later failure never erases or disguises an earlier successful action.

@@ -12,13 +12,19 @@ skills own all business validation and external writes.
 | `fixed_project` | yes | Hard constraint shared by every Bug. |
 | `fixed_repo_path` | yes | Canonical repository path shared by every Bug. |
 | `fixed_branch` | yes | Exact repair branch shared by every Bug. |
+| `work_mode` | yes | `INITIAL|CONTINUE`; infer from current and prior work evidence. |
 | `branch_mode` | yes | `AUTO`, `CREATE`, or `USE_EXISTING`. |
 | `create_base_ref` | conditional | Exact base when creation may occur, unless verified workspace policy supplies it. |
 | `submission_profile` | yes | Exactly `STANDARD` or `NO_WIKI`; infer it from an explicit Wiki/no-Wiki request before asking. |
+| `deployment_mode` | yes | `AUTO|DEPLOY|SKIP`; infer explicit publish/direct-submit wording. |
 | `go_live` | yes | `true` only after an explicit current-conversation request. |
 
 `USE_EXISTING` means begin this Bug on the supplied existing branch. It is not
 a resume request and carries no requirement for prior Bug-specific evidence.
+
+`CONTINUE` is the same implementation/submission pipeline with reused context.
+It requires the original branch and Wiki when available, calculates only the
+incremental scope, and never creates a follow-up branch.
 
 A Wiki URL is not a request field. Under `STANDARD`, the submission capability
 derives the target by checking TAPD details/comments and the fixed Wiki
@@ -58,6 +64,16 @@ a visible field change and does not invalidate confirmation.
 The checklist and confirmation live only in the current conversation. They do
 not add request fields, persistence, runtime IDs, or recovery state.
 
+For `INITIAL`, checklist confirmation also authorizes the displayed exact
+branch action/base, active-state transition, and implementation. For
+`CONTINUE`, an already-`待测试` Bug has
+`status_action=SKIPPED_ALREADY_WAITING_TEST`; no active/final status rewrite or
+duplicate test-version write is allowed.
+
+Normal one-Bug execution has at most two confirmation points: initial
+scope/implementation authorization when needed, then one consolidated
+submission authorization. `going-live` remains a separate master confirmation.
+
 ## In-memory handoffs
 
 | Producer | Successful output | Next consumer |
@@ -80,6 +96,7 @@ The orchestrator retains only enough in the current conversation to report:
 | Bug | supplied URL or derived short ID |
 | Status | `成功`, `失败`, `待确认` |
 | Last capability | capability name or `未开始` |
+| Deployment | `DEPLOYED|SKIPPED_BY_INTENT|FAILED|UNKNOWN|未执行` |
 | Reason | first blocker or required confirmation; empty on success |
 
 Execution-time `preparing-work` returning `PENDING` or `BLOCKED` pauses the entire queue.

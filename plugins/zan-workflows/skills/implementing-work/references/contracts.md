@@ -9,7 +9,7 @@
 | Source | TAPD URL/type/short ID and approved scope from the definition |
 | Repository | expected and actual project, path, Git root, origin, starting/final HEAD |
 | Branch | action `CREATE|USE_EXISTING`, expected branch, actual branch, and exact approved base ref/SHA when created |
-| TAPD status | exact target/payload/purpose, authorization, pre-write validation, write, and readback |
+| TAPD status | `WRITE_ACTIVE|NO_CHANGE|SKIPPED_ALREADY_WAITING_TEST`, exact target/payload/purpose, authorization source, validation/write/readback when applicable |
 | Baseline | before/after status, changed paths, unrelated paths, scope comparison |
 | Change | concise summary and exact diff reference available in the current execution |
 | Verification | each relevant command, exit status, concise result, and any blocker |
@@ -35,6 +35,10 @@
 - A required TAPD active-state write requires exact display, authorization,
   `PRE_STATUS_WRITE=VALIDATION_PASSED`, and matching readback before source
   edits. Final review uses a separate `POST_CHANGE_REVIEW` call.
+- A matching current-conversation `fixing-bug` checklist authorization is
+  reusable and must not trigger another prompt. `CONTINUE` with current status
+  `待测试` performs no status write; `NO_CHANGE`/skip states require current
+  status evidence but no write authorization.
 - The result grants no commit, push, MR, submission, Wiki, or release authority.
 - The result contains no run IDs, recovery/history fields, or local record
   paths.

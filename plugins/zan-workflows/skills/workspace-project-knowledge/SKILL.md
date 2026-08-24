@@ -5,6 +5,10 @@ description: Use when a request mentions company projects, business domains, ser
 
 # Workspace Project Knowledge
 
+Default model profile: `BALANCED`. Read the shared
+[model-routing policy](../../references/model-routing.md) and escalate only for
+tied project candidates, conflicting evidence, or cross-project impact.
+
 ## Overview
 
 This is the workspace-level knowledge entrypoint for a local company projects workspace.

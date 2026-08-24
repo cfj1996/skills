@@ -1,3 +1,10 @@
+---
+name: master-merge-validator
+description: Validate an original repair branch to master merge and the post-merge Wiki online-state update before external writes.
+model: gpt-5.6-sol
+reasoning_effort: high
+---
+
 # Master Merge Validator
 
 Act as an isolated read-only validator. Inspect only the proposed

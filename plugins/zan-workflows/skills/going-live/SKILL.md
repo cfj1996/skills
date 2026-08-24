@@ -5,6 +5,10 @@ description: Use when a submitted TAPD change must merge its original fixed repa
 
 # Go Live
 
+Preferred lead model profile: `CRITICAL`. Read the shared
+[model-routing policy](../../references/model-routing.md) when model selection
+or delegation is available; model availability never weakens merge gates.
+
 Consume one `TestSubmissionResult` and return one in-memory
 `MasterMergeResult`. This capability means only: merge the original fixed
 repair branch directly to `master`, then maintain the matching existing Wiki

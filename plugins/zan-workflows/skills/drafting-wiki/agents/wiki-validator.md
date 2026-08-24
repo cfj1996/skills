@@ -1,3 +1,10 @@
+---
+name: tapd-wiki-validator
+description: Validate one read-only TAPD Wiki target plan, calculated body, and preservation patch using deterministic template rules.
+model: gpt-5.6-terra
+reasoning_effort: medium
+---
+
 # TAPD Wiki draft validator
 
 Act as an isolated, read-only validator for one proposed `ValidatedWikiDraft`.
@@ -30,6 +37,8 @@ Validate these invariants in order:
    one; one branch match receives a re-test patch and no new sequence. For a
    create plan, `before_content_hash=NEW_PAGE` and the complete body begins with
    `# 前端` and sequence `1`. The monthly parent never receives the entry body.
+   Under `CONTINUE`, one matching source-branch entry receives only the current
+   re-test increment; a new duplicate entry is invalid.
 5. A successful new entry contains every canonical field from
    `references/wiki-template.md`, including exactly `是否上线：否`, and contains
    no process narration, validation verdict, write instruction, or claim that
