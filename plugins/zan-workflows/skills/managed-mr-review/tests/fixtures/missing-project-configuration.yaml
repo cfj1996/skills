@@ -1,0 +1,7 @@
+case: missing-project-configuration
+expected:
+  conformance: unknown
+  conclusion: 暂缓
+  mergeAllowed: false
+  safetyChecksStillRun: true
+  fallbackToPackageScripts: false

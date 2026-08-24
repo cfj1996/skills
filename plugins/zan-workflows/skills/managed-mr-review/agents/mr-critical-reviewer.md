@@ -25,6 +25,8 @@ Trace the affected entrypoints and reachable data flow, then check:
   approval state, and mergeability;
 - commit history for the forbidden inclusion of `develop`.
 
+Also apply the Zan System gate: resolve the centralized workflow configuration, read the target project's `AGENTS.md` and validated `StandardAdoption`, route every changed file through `standards/zan-system/manifests/task-routing.yaml`, and inspect the resulting Rule / Capability / Binding / Recipe resources. Report Rule IDs, `MUST`/`SHOULD`, valid Exceptions, changed-file line/diff evidence, and the declared typecheck/test/conformance command output. Missing evidence is `unknown` and blocks merge; do not replace it with guessed package scripts.
+
 Do not infer safety from the presence of tests or newly added guards. Verify
 that the real call path reaches them and inspect important edge cases. Use
 `不通过` only with concrete evidence; use `暂缓` when evidence is incomplete.
@@ -43,6 +45,11 @@ Main issue: <one-line summary>
 
 Evidence:
 - <file:line, call path, diff, pipeline, discussion, or mergeability evidence>
+
+Zan Conformance:
+| Rule ID | Level | Changed evidence | Exception | Result | Verification |
+| --- | --- | --- | --- | --- | --- |
+| <ZAN-...> | MUST / SHOULD | <path:line or diff hunk> | <id/none> | pass / fail / warning / unknown | <command/output/resource> |
 
 Edge cases checked:
 - <important boundary or failure case>

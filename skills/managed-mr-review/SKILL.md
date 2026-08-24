@@ -1,6 +1,6 @@
 ---
 name: managed-mr-review
-description: 管理用户管辖项目的 GitLab MR 三段式流程：1. 获取需要用户合并的 open MR，2. 对这些 MR 或指定 MR 做 code review 并输出审核报告，重点详细展开不通过/暂缓 MR 的打回理由，且根据 MR 数量自动启用 Spark 模型的 mr-code-reviewer 角色并行审核，3. 对已审核通过的 MR 或指定 MR 使用 GitLab MCP 远程合并。仅处理目标分支为 master 或 main 的 MR，仓库限定为 admin_menu、jbz_admin、kp_admin、order-admin、poster_admin、statistics_admin、store_admin、supplier-admin-web、ledger_admin、weixin-live、zan-projects、zan-devops。
+description: 管理由 centralized project-knowledge 配置解析的管辖项目 GitLab MR，执行发现、Zan System 合规 code review 和受安全门禁约束的远程合并。
 ---
 
 # 管辖项目 MR 审核
@@ -17,25 +17,30 @@ description: 管理用户管辖项目的 GitLab MR 三段式流程：1. 获取�
 
 默认只执行用户明确要求的步骤。只有用户明确说“合并”“自动合并”“合并通过的”“审核通过就合并”等合并意图时，才进入第 3 步。
 
-## 仓库范围
+## 配置与仓库范围
 
-只处理以下仓库，其他仓库必须列为“范围外”并跳过：
+在第 1 步前必须解析并校验
+`${PROJECT_KNOWLEDGE_ROOT}/workflows/managed-mr-review/config.yaml`（`kind: ManagedMrReviewConfiguration`）。
+`${PROJECT_KNOWLEDGE_ROOT}` 从当前工具的 workspace entry file 或环境配置解析；无法解析时立即标记为“暂缓：project-knowledge 不可用”。
 
-- `admin_menu`
-- `jbz_admin`
-- `kp_admin`
-- `order-admin`
-- `poster_admin`
-- `statistics_admin`
-- `store_admin`
-- `supplier-admin-web`
-- `ledger_admin`
-- `weixin-live`
-- `zan-projects`
-- `zan-devops`
-- `provider-mobile`
+- 管辖项目只来自 `spec.governedProjects.include`，项目路径和 GitLab project path 再从其 `source` 指向的 `data/workspace/project-relations.yaml` 解析。
+- 配置缺失、项目无法解析或配置校验失败时，必须明确报告并跳过该项目；禁止恢复到 skill 文档、历史记忆或任何内置白名单。
+- 只处理解析后目标分支为 `master` 或 `main` 的 open MR。
 
-只处理目标分支为 `master` 或 `main` 的 open MR。
+团队身份同样只来自 `spec.team`。`personId` 用于区分重复或不完整姓名；`gitlabUsername: null` 必须保持未确认，不得从提交人、邮箱或显示名推断。
+
+## Zan System 合规审核门禁
+
+Code review 必须对 changed files 执行 Zan System 路由，详细证据格式见
+[Zan conformance review reference](references/zan-conformance.md)：
+
+1. 读取目标项目根 `AGENTS.md`，再按其声明定位并校验 `kind: StandardAdoption` 的 Adoption 文件；默认文件名为 `standard-adoption.yaml`。
+2. 读取 `${PROJECT_KNOWLEDGE_ROOT}/standards/zan-system/STANDARD_CONTEXT.md` 和 `manifests/task-routing.yaml`。
+3. 以每个 changed file 的路径、diff hunk 中的标识符/import/调用点和项目文档声明的适用范围作为路由输入。只能使用 manifest 中的 route；读取该 route 列出的 Rule / Capability / Binding / Recipe，并记录 route id。
+4. 只执行目标项目 `AGENTS.md` 或 `StandardAdoption.spec.configuration` 明确声明的 `typeCheckCommand`、`testCommand`、`conformanceCommand`。不能用猜测的 package script、默认命令或构建命令替代缺失声明。
+5. 以 Zan Rule ID、`MUST`/`SHOULD`、有效 Exception、changed file 行号/diff hunk 和命令输出作为证据，生成逐条合规结论。`unknown` 不得当作 `pass`。
+
+缺少 `AGENTS.md`、有效 `StandardAdoption`、changed-file route 或任一必需命令/执行证据时，Zan 结论为“暂缓”，`mergeAllowed: false`；但既有安全检查、pipeline、讨论和 mergeability 检查仍必须执行。
 
 **安全硬限制（禁止 develop 合并）**：
 - **绝对不允许** `develop` 分支作为源分支合并到任何目标分支。
@@ -47,7 +52,7 @@ description: 管理用户管辖项目的 GitLab MR 三段式流程：1. 获取�
 “需要我合并”的判定：
 
 - 优先读取 GitLab 当前用户、reviewer、assignee、approval、maintainer/owner 权限和项目成员信息。
-- 如果 GitLab 工具不能判断当前用户身份或权限，则以本技能的仓库白名单作为管辖范围，列出这些仓库中目标分支为 `master` / `main` 的 open MR，并在结果里标注“按管辖仓库范围判定”。
+- 如果 GitLab 工具不能判断当前用户身份或权限，则以 project-knowledge 配置解析出的管辖范围列出目标分支为 `master` / `main` 的 open MR，并在结果里标注“按 project-knowledge 管辖范围判定”。
 - 如果用户指定了 MR，则只处理指定 MR；范围外或目标分支不符的指定 MR 仍需明确标注原因。
 
 ## 工具优先级
@@ -139,6 +144,8 @@ description: 管理用户管辖项目的 GitLab MR 三段式流程：1. 获取�
 - 对业务逻辑分支必须验证真实调用链可达性，不要只凭新增代码存在就下结论。
 - 对阻断问题给出具体文件路径、函数/区域或 diff 依据；证据不足时写明缺口。
 
+每个 MR 还必须附加 Zan 合规矩阵，至少包含 `Rule ID`、`MUST`/`SHOULD`、changed file:line 或 diff hunk、有效 Exception（如有）、`pass/fail/warning/unknown`、验证命令和输出证据。任何 `MUST` 的 `fail` 或 `unknown` 都阻断合并；`SHOULD` 违反应标为 warning，并明确是否存在有效 Exception。
+
 审核报告表头固定为：
 
 ```markdown
@@ -211,6 +218,7 @@ description: 管理用户管辖项目的 GitLab MR 三段式流程：1. 获取�
 - 结论必须是 `通过`。
 - mergeability 不能显示 conflict / cannot merge。
 - 工具可见的 unresolved discussion 或 failed pipeline 如果会阻断合并，不能合并。
+- Zan 合规矩阵不得存在 `MUST` fail/unknown、无效 Exception 或缺少 typecheck/test/conformance 证据；否则标记为 `暂缓`，不能合并。
 
 合并动作优先使用 GitLab MCP：
 
