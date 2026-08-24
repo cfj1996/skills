@@ -23,6 +23,7 @@ Accept:
 - an exact creation base ref when `CREATE` may be selected, unless a verified
   workspace policy already supplies it;
 - `submission_profile=STANDARD|NO_WIKI`; and
+- one exact `target_wiki_url` when `submission_profile=STANDARD`; and
 - an optional explicit request to run `going-live` after submission.
 
 The Bug URLs may come from the user, conversation context, or an MCP query.
@@ -106,7 +107,8 @@ normalized Bug URL in order:
 3. Only from a matching `READY_FOR_HANDOFF`, call `implementing-work` with the
    returned definition.
 4. If it returns `REVIEWED`, call `submitting-for-test` with the definition,
-   reviewed change, and selected submission profile.
+   reviewed change, selected submission profile, and the exact target Wiki URL
+   under `STANDARD`.
 5. If submission returns `SUBMITTED` and go-live was explicitly requested,
    call `going-live` with that exact `TestSubmissionResult`; it owns reading
    the original repair branch from the result.

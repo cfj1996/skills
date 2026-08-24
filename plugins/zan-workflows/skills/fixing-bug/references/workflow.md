@@ -22,7 +22,7 @@ After explicit confirmation, re-prepare each Bug immediately before its
 single-Bug chain:
 
 ```text
-re-prepare -> implement -> submit -> optional go-live
+re-prepare -> implement -> submit(profile, target Wiki when STANDARD) -> optional go-live
 ```
 
 Only a matching `READY_FOR_HANDOFF` may reach implementation. If refreshed

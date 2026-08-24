@@ -28,6 +28,10 @@ Require:
 - current-conversation authorization for each displayed external write that
   requires it.
 
+`STANDARD` additionally requires one exact target Wiki URL. That address is the
+only Wiki content input required from the user; the drafter reads it and
+calculates module, sequence, insertion point, and entry fields.
+
 The source is the original `feature/*` or `fixbug/*` branch. Target is exactly
 `develop`. Never rebuild the change on `develop` or use `merge/*` as the
 business source.
@@ -46,15 +50,19 @@ business source.
 3. Execute only the validated operation, then immediately read it back before
    continuing. After merge, prove every current-round commit is contained in
    `origin/develop`.
-4. Under `STANDARD`, invoke `zan-workflows:drafting-wiki` with supplied factual
-   inputs and consume its complete in-memory `ValidatedWikiDraft`. Require
+4. Under `STANDARD`, invoke `zan-workflows:drafting-wiki` with the exact target
+   Wiki URL plus the work definition, reviewed change, delivery facts, and
+   original source branch. Consume its complete in-memory
+   `ValidatedWikiDraft`. Require
    `terminal_state=VALIDATED`, then show its complete rendered Markdown and
-   exact Wiki target, then
-   obtain authorization. Before Wiki write, call the validator with
-   `PRE_SUBMISSION_WRITE`. Write/create/update only the authorized page and
-   read back the expected patch. For a Bug, materialize the exact Wiki-link
-   comment from the real Wiki ID, display it, authorize it separately when the
-   ID was not known earlier, validate, write, and read back.
+   exact calculated patch/target, then obtain authorization. Before Wiki write,
+   call the validator with
+   `PRE_SUBMISSION_WRITE`. Update only the authorized existing page and
+   read back the expected patch, including `是否上线：否` for a new entry. Retain
+   the exact target, source branch, patch, and readback in
+   `TestSubmissionResult` for `going-live`. For a Bug, materialize the exact Wiki-link
+   comment from the target's real Wiki ID, display it, validate, write, and read
+   it back under the same authorized Standard Wiki operation.
 5. Under `NO_WIKI`, set Wiki to `SKIPPED_BY_POLICY`. Do not load, draft, locate,
    validate, create, update, comment on, or read a Wiki.
 6. Display and authorize the exact TAPD status operation and structured test

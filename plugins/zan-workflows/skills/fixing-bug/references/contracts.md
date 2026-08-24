@@ -15,6 +15,7 @@ skills own all business validation and external writes.
 | `branch_mode` | yes | `AUTO`, `CREATE`, or `USE_EXISTING`. |
 | `create_base_ref` | conditional | Exact base when creation may occur, unless verified workspace policy supplies it. |
 | `submission_profile` | yes | Exactly `STANDARD` or `NO_WIKI`. |
+| `target_wiki_url` | conditional | One exact existing write target when `submission_profile=STANDARD`; omitted under `NO_WIKI`. |
 | `go_live` | yes | `true` only after an explicit current-conversation request. |
 
 `USE_EXISTING` means begin this Bug on the supplied existing branch. It is not

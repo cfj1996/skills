@@ -17,7 +17,10 @@ filesystem, or network write operations.
   response is used as evidence.
 - Under `STANDARD`, any Wiki write consumes a complete in-memory
   `ValidatedWikiDraft` with `terminal_state=VALIDATED`, passing mapped
-  validation, and non-empty rendered Markdown.
+  validation, an exact target/current-body readback, a calculated minimal patch,
+  non-empty rendered Markdown, and no `待补充`. A new entry contains exactly
+  `是否上线：否` and the result retains the source-branch identity for
+  `going-live`.
 
 For `PRE_GIT_WRITE`, accept exactly one operation:
 `COMMIT|PUSH|MR_CREATE_OR_UPDATE|MR_MERGE`. Validate only the current payload

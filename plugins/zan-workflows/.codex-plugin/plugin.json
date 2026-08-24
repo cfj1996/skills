@@ -1,6 +1,6 @@
 {
   "name": "zan-workflows",
-  "version": "0.1.0+codex.20260811102522",
+  "version": "0.1.0+codex.20260824031315",
   "description": "Company project and stateless functional TAPD workflows, plus MR review, debug token, identity, and memory skills for Codex.",
   "author": {
     "name": "Local developer"
@@ -9,7 +9,7 @@
   "interface": {
     "displayName": "Zan Workflows",
     "shortDescription": "Company project and functional TAPD workflows.",
-    "longDescription": "Bundles project context; six function-like TAPD skills for preparing, implementing, drafting Wiki content, submitting, going live, and handling one or more Bugs on one fixed branch after a concise scope checklist confirmation; plus GitLab MR review, debug tokens, team identity, and project memory workflows.",
+    "longDescription": "Bundles project context; six function-like TAPD skills for preparing, implementing, calculating target-aware Wiki content, submitting, going live with Wiki online-state maintenance, and handling one or more Bugs on one fixed branch after a concise scope checklist confirmation; plus GitLab MR review, debug tokens, team identity, and project memory workflows.",
     "developerName": "Local developer",
     "category": "Productivity",
     "capabilities": [
@@ -20,7 +20,7 @@
       "Use the appropriate Zan workflow skill for this task.",
       "Before handling one or more TAPD Bugs, show a concise project/repository, branch, and scope checklist and wait for confirmation; then handle confirmed Bugs sequentially on the supplied fixed branch.",
       "Resolve and scope each TAPD work item before changing code.",
-      "Repair, draft a TAPD Wiki, submit for test, or merge to master with the matching functional skill."
+      "Repair, calculate a TAPD Wiki from its target address, submit for test, or merge to master and maintain its online field with the matching functional skill."
     ]
   }
 }

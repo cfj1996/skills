@@ -13,6 +13,8 @@
 | Execution-time preparation becomes `PENDING` or `BLOCKED` | Pause the entire queue, show the updated checklist, and perform no later writes until reconfirmed. |
 | Second Bug fails repair | Report the second Bug failure, skip its submit/go-live, then begin the third Bug. |
 | Exact duplicate URL | Keep the first occurrence and do not execute the duplicate again. |
+| `STANDARD` with one exact target Wiki URL | Pass that address to every `submitting-for-test` call; the drafter calculates each entry from the current page readback. |
+| `STANDARD` without a target Wiki URL | Keep the request read-only and report the missing shared target. |
 | `NO_WIKI` | Submission never loads or invokes Wiki capability. |
 | No explicit go-live request | Stop each successful Bug after submission. |
 | Interrupted conversation | Create no recovery record; the user supplies remaining Bugs again. |

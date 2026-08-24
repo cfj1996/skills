@@ -31,11 +31,14 @@ TAPD, Wiki, or version write.
 
 ## Standard Wiki
 
-Invoke `zan-workflows:drafting-wiki`, consume its complete in-memory result,
-and require `terminal_state=VALIDATED`. Show its complete rendered Markdown and
-exact target, and obtain exact authorization. Preserve an identified existing Wiki
-and append the smallest patch; otherwise create only the authorized new page.
-Read back the page before continuing.
+Give the exact target Wiki URL and current work handoffs to
+`zan-workflows:drafting-wiki`, consume its complete in-memory result, and
+require `terminal_state=VALIDATED`. The drafter reads the target, resolves all
+entry fields, locates or creates `# 前端`, calculates the next sequence or
+re-test position, and initializes a new entry with `是否上线：否`. Show its
+complete resulting Markdown, minimal patch, and exact target, and obtain exact
+authorization. Apply only that patch and read back the page before continuing.
+Retain the target and original source branch for `going-live`.
 
 For a Bug, write exactly:
 
@@ -43,9 +46,9 @@ For a Bug, write exactly:
 提测wiki：[https://www.tapd.cn/{workspace_id}/markdown_wikis/show/#{wiki_id}](https://www.tapd.cn/{workspace_id}/markdown_wikis/show/#{wiki_id})
 ```
 
-Do not append implementation, MR, build, or verification text. If a new Wiki
-produces the real ID only after creation, display and authorize the materialized
-comment after Wiki readback.
+Do not append implementation, MR, build, or verification text. Materialize the
+comment from the exact existing target Wiki ID and verify it after the Wiki
+readback.
 
 ## No Wiki
 
