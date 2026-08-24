@@ -31,14 +31,43 @@ TAPD, Wiki, or version write.
 
 ## Standard Wiki
 
-Give the exact target Wiki URL and current work handoffs to
-`zan-workflows:drafting-wiki`, consume its complete in-memory result, and
-require `terminal_state=VALIDATED`. The drafter reads the target, resolves all
-entry fields, locates or creates `# 前端`, calculates the next sequence or
-re-test position, and initializes a new entry with `是否上线：否`. Show its
-complete resulting Markdown, minimal patch, and exact target, and obtain exact
-authorization. Apply only that patch and read back the page before continuing.
-Retain the target and original source branch for `going-live`.
+Give current work handoffs—not a user-supplied Wiki URL—to
+`zan-workflows:drafting-wiki`. Require `terminal_state=VALIDATED` and one target
+plan. Discovery order is mandatory:
+
+1. Read TAPD details and all historical comments; reuse any linked 提测 Wiki.
+2. Otherwise inspect root `1150372234001008260`, the current `YYYY-MM` month,
+   and related children by TAPD ID/short ID/original branch.
+3. Reuse one related child, or plan `MM-DD: 中文简述` creation. Create the month
+   first only when absent.
+
+Show the complete resulting child Markdown and every exact create/update
+payload, then obtain authorization. Execute only the plan:
+
+- `REUSE_EXISTING`: re-read the child and apply the minimal patch.
+- `CREATE_CHILD`: create the child under the verified month with the complete
+  initial body.
+- `CREATE_MONTH_AND_CHILD`: create/read the month under `提测文档`, then use its
+  real ID in a separately displayed/authorized child create payload.
+
+Never write the canonical entry body into the month page. Read back the final
+child, retain its actual ID/URL and original source branch for `going-live`, and
+require the expected body including `是否上线：否` before continuing.
+
+Use the TAPD workspace from the current work item for every Wiki operation:
+
+- Month create payload: `name=YYYY-MM`,
+  `parent_wiki_id=1150372234001008260`, resolved `creator`, and no entry body.
+- Child create payload: `name=MM-DD: 中文简述`,
+  `parent_wiki_id=<verified/read-back month ID>`, resolved `creator`, and
+  `markdown_description=<complete validated child body>`.
+- Existing-child update payload: exact child `id` and
+  `markdown_description=<validated resulting body>`; preserve its title and
+  parent unless the user explicitly requested a move or rename.
+
+Immediately read back every created/updated page. A create response without a
+real Wiki ID, a parent mismatch, or a body readback mismatch blocks all later
+Wiki comments, TAPD status changes, and test-version writes.
 
 For a Bug, write exactly:
 
@@ -47,8 +76,9 @@ For a Bug, write exactly:
 ```
 
 Do not append implementation, MR, build, or verification text. Materialize the
-comment from the exact existing target Wiki ID and verify it after the Wiki
-readback.
+comment from the final existing-or-created child ID. If creation produced the
+ID during this run, display and authorize the materialized comment after the
+child readback.
 
 ## No Wiki
 

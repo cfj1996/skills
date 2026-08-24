@@ -20,8 +20,8 @@ target-location, Wiki-ID, TAPD-comment, writeback, merge, or release narration.
 
 ## Field rules
 
-- `序号` is calculated from the visible target Wiki under `# 前端` as defined
-  below; it is never supplied as an unexplained placeholder.
+- `序号` is calculated from the resolved child Wiki under `# 前端`; a new child
+  starts at `1`. It is never supplied as an unexplained placeholder.
 - `服务名称` and `git地址` come from verified project routing/repository
   evidence. Do not equate a project folder with a service name without that
   mapping.
@@ -37,9 +37,34 @@ target-location, Wiki-ID, TAPD-comment, writeback, merge, or release narration.
   `是` after verified `origin/master` containment.
 - `环境` is exactly `联团 老生产`.
 
-## Target calculation and patch rules
+## Wiki target resolution
 
-Operate only on the current body read from `target_wiki_url`:
+Do not request a Wiki URL from the user. Resolve the target in this order:
+
+1. Read the current TAPD item and exhaust pagination for all historical
+   comments. If one matching 提测 Wiki link is associated with this work, use
+   `REUSE_EXISTING`; never create another.
+2. If no link exists, inspect root Wiki `1150372234001008260` (`提测文档`),
+   then the `Asia/Shanghai` submission month's `YYYY-MM` page and all its
+   children, exhausting pagination.
+3. Reuse one related child matched by TAPD ID/short ID, original source branch,
+   or unambiguous existing association.
+4. If no related child exists, use title `MM-DD: {任务标题中文简述}`. Plan
+   `CREATE_CHILD` when the month exists, otherwise
+   `CREATE_MONTH_AND_CHILD`. Derive the required creator from authenticated
+   TAPD/current-work evidence.
+
+Multiple linked/related candidates, an inaccessible linked Wiki, or conflicting
+month hierarchy evidence block instead of asking the user to choose or creating
+a duplicate. Never write the entry template into the `YYYY-MM` month page; it
+belongs in the child Wiki.
+
+## Body calculation and patch rules
+
+For `CREATE_CHILD|CREATE_MONTH_AND_CHILD`, render a complete new child body as
+`# 前端`, one blank line, then the canonical entry above with `序号=1`.
+
+For `REUSE_EXISTING`, operate only on the current child body read from TAPD:
 
 - If `# 前端` is absent, append one `# 前端` section and the canonical entry with
   sequence `1`.
@@ -53,7 +78,7 @@ Operate only on the current body read from `target_wiki_url`:
   its `- 环境` line.
 - Multiple matching entries, duplicate existing sequences,
   duplicate/conflicting online fields, malformed section boundaries, or an
-  unreadable target block instead of guessing.
+  unreadable child block instead of guessing.
 
 The re-test note is:
 
@@ -61,6 +86,7 @@ The re-test note is:
 **[追加提测/二次提测 {日期}]**：{补充功能或修复问题}
 ```
 
-Keep every existing character unchanged outside the calculated patch. Never
-replace a target with a freshly generated page, renumber historical entries,
-or silently change a prior entry's branch, person, content, or online state.
+Keep every reused character unchanged outside the calculated patch. Never
+replace an existing child with a freshly generated page, renumber historical
+entries, or silently change a prior entry's branch, person, content, or online
+state.

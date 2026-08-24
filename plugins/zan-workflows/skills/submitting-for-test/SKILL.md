@@ -28,9 +28,8 @@ Require:
 - current-conversation authorization for each displayed external write that
   requires it.
 
-`STANDARD` additionally requires one exact target Wiki URL. That address is the
-only Wiki content input required from the user; the drafter reads it and
-calculates module, sequence, insertion point, and entry fields.
+`STANDARD` does not require a user-supplied Wiki URL. Wiki discovery and
+creation planning are producer-owned behavior, not an input gate.
 
 The source is the original `feature/*` or `fixbug/*` branch. Target is exactly
 `develop`. Never rebuild the change on `develop` or use `merge/*` as the
@@ -50,19 +49,25 @@ business source.
 3. Execute only the validated operation, then immediately read it back before
    continuing. After merge, prove every current-round commit is contained in
    `origin/develop`.
-4. Under `STANDARD`, invoke `zan-workflows:drafting-wiki` with the exact target
-   Wiki URL plus the work definition, reviewed change, delivery facts, and
-   original source branch. Consume its complete in-memory
-   `ValidatedWikiDraft`. Require
-   `terminal_state=VALIDATED`, then show its complete rendered Markdown and
-   exact calculated patch/target, then obtain authorization. Before Wiki write,
-   call the validator with
-   `PRE_SUBMISSION_WRITE`. Update only the authorized existing page and
-   read back the expected patch, including `是否上线：否` for a new entry. Retain
-   the exact target, source branch, patch, and readback in
-   `TestSubmissionResult` for `going-live`. For a Bug, materialize the exact Wiki-link
-   comment from the target's real Wiki ID, display it, validate, write, and read
-   it back under the same authorized Standard Wiki operation.
+4. Under `STANDARD`, invoke `zan-workflows:drafting-wiki` with the work
+   definition, reviewed change, delivery facts, TAPD identity, and original
+   source branch. Consume its complete in-memory `ValidatedWikiDraft` and
+   require `terminal_state=VALIDATED`. Show the complete target plan, Markdown,
+   and exact create/update payloads, then obtain authorization. Validate each
+   Wiki write with `PRE_SUBMISSION_WRITE`:
+
+   - `REUSE_EXISTING`: update only the calculated minimal patch;
+   - `CREATE_CHILD`: create the child under the verified existing month;
+   - `CREATE_MONTH_AND_CHILD`: create/read back the month under root
+     `1150372234001008260`, then display and authorize the child payload with
+     the real month ID before creating it.
+   Never put the entry body in the month page. Read back the final child and
+   require the expected body including `是否上线：否`. Retain its real Wiki ID,
+   URL, source branch, body, and readback in `TestSubmissionResult` for
+   `going-live`. For a Bug, materialize the fixed Wiki-link comment from the
+   final child ID; when that ID was created during this run, display and
+   authorize the materialized comment before validating, writing, and reading
+   it back.
 5. Under `NO_WIKI`, set Wiki to `SKIPPED_BY_POLICY`. Do not load, draft, locate,
    validate, create, update, comment on, or read a Wiki.
 6. Display and authorize the exact TAPD status operation and structured test

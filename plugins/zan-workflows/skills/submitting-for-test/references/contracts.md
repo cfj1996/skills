@@ -9,7 +9,7 @@
 | Inputs | source definition, reviewed change, exact profile |
 | Repository | expected/actual path, Git root, origin, verification result |
 | Git delivery | original source branch, target `develop`, current-round commits, authorization, commit/push/MR/merge results, develop containment |
-| Wiki | `WRITTEN|SKIPPED_BY_POLICY|BLOCKED|NOT_ATTEMPTED`, exact target, target snapshot, calculated placement, full draft/minimal patch authorization, source-branch identity, online-field readback, and final body when applicable |
+| Wiki | `WRITTEN|SKIPPED_BY_POLICY|BLOCKED|NOT_ATTEMPTED`, auto-resolved target plan, hierarchy evidence, create/update authorizations and readbacks, actual final child ID/URL, source-branch identity, online-field readback, and final body when applicable |
 | TAPD | exact status operation, optional exact Bug Wiki-link comment, write/readback results |
 | Test version | structured authorized payload, publish result, readback |
 | Validation | mapped results for each pre-write operation and final post-write validation |
@@ -26,9 +26,16 @@
   before the next.
 - `STANDARD` requires a complete in-memory `ValidatedWikiDraft` with
   `terminal_state=VALIDATED`, its full rendered Markdown and calculated minimal
-  patch, exact target/body authorization, Wiki write/readback, and for a Bug the
-  exact Wiki-link comment write/readback before TAPD status and version
+  patch or new-page body, an auto-resolved
+  `REUSE_EXISTING|CREATE_CHILD|CREATE_MONTH_AND_CHILD` target plan, exact
+  authorization and readback for each Wiki write, and for a Bug the exact
+  final-child Wiki-link comment write/readback before TAPD status and version
   publication. A newly created entry reads back exactly `是否上线：否`.
+- `STANDARD` never requires a Wiki URL from the user. Existing links in
+  TAPD details/comments are reused; absent links trigger related-child lookup
+  and then month/child creation under root `1150372234001008260` when needed.
+- A month page is structural only. The canonical `# 前端` entry body is written
+  to the child Wiki, never directly to the `YYYY-MM` page.
 - A successful `STANDARD` result retains the exact Wiki target and original
   source branch needed for `going-live` to locate and update the same entry.
 - `NO_WIKI` requires `SKIPPED_BY_POLICY`; every Wiki and Wiki-comment operation

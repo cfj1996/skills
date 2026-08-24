@@ -14,12 +14,15 @@ skills own all business validation and external writes.
 | `fixed_branch` | yes | Exact repair branch shared by every Bug. |
 | `branch_mode` | yes | `AUTO`, `CREATE`, or `USE_EXISTING`. |
 | `create_base_ref` | conditional | Exact base when creation may occur, unless verified workspace policy supplies it. |
-| `submission_profile` | yes | Exactly `STANDARD` or `NO_WIKI`. |
-| `target_wiki_url` | conditional | One exact existing write target when `submission_profile=STANDARD`; omitted under `NO_WIKI`. |
+| `submission_profile` | yes | Exactly `STANDARD` or `NO_WIKI`; infer it from an explicit Wiki/no-Wiki request before asking. |
 | `go_live` | yes | `true` only after an explicit current-conversation request. |
 
 `USE_EXISTING` means begin this Bug on the supplied existing branch. It is not
 a resume request and carries no requirement for prior Bug-specific evidence.
+
+A Wiki URL is not a request field. Under `STANDARD`, the submission capability
+derives the target by checking TAPD details/comments and the fixed Wiki
+hierarchy; absence of a user-supplied Wiki URL never blocks preflight.
 
 For a multi-Bug request that starts with `CREATE`, the effective mode changes
 to `USE_EXISTING` immediately after the exact branch is created and its ref is

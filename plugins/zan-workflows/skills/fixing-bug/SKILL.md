@@ -23,12 +23,17 @@ Accept:
 - an exact creation base ref when `CREATE` may be selected, unless a verified
   workspace policy already supplies it;
 - `submission_profile=STANDARD|NO_WIKI`; and
-- one exact `target_wiki_url` when `submission_profile=STANDARD`; and
 - an optional explicit request to run `going-live` after submission.
 
 The Bug URLs may come from the user, conversation context, or an MCP query.
 After normalization their source is irrelevant. Preserve the supplied order
 and de-duplicate exact duplicate URLs.
+
+Infer `STANDARD` from an explicit request such as `需要提测 Wiki`, and infer
+`NO_WIKI` from an explicit request to omit Wiki. Ask for the profile only when
+the user's intent is genuinely absent or conflicting. Never ask the user for a
+Wiki URL: under `STANDARD`, `submitting-for-test` owns locating an existing
+Wiki or creating the required month/child Wiki from TAPD evidence.
 
 ## Capability composition
 
@@ -87,6 +92,9 @@ do not create a branch, change TAPD, write tests, edit source, commit, push, or
 invoke any write-owning capability. Hiding raw handoff objects, validator
 protocol, JSON, or YAML never permits hiding this user-facing checklist.
 
+Wiki target discovery is intentionally not a preflight field. A missing
+user-supplied Wiki link is never a blocker and must never appear in `待确认`.
+
 ## Execution
 
 Only after explicit confirmation of the current checklist, process each
@@ -107,8 +115,9 @@ normalized Bug URL in order:
 3. Only from a matching `READY_FOR_HANDOFF`, call `implementing-work` with the
    returned definition.
 4. If it returns `REVIEWED`, call `submitting-for-test` with the definition,
-   reviewed change, selected submission profile, and the exact target Wiki URL
-   under `STANDARD`.
+   reviewed change, and selected submission profile. Under `STANDARD`, pass the
+   TAPD identity and full in-memory handoffs; do not request or manufacture a
+   Wiki target in this orchestrator.
 5. If submission returns `SUBMITTED` and go-live was explicitly requested,
    call `going-live` with that exact `TestSubmissionResult`; it owns reading
    the original repair branch from the result.

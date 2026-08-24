@@ -3,10 +3,14 @@
 | Scenario | Expected result |
 | --- | --- |
 | `NO_WIKI` with valid reviewed change | Merge to develop, update/read TAPD status, publish/read test version; never load Wiki capability. |
-| `STANDARD` with an exact existing Wiki target | Automatically resolve fields and placement, display/authorize the minimal patch, update/read back Wiki, write/read Bug link when applicable, then status and version. |
-| Target has no `# 前端` | Add `# 前端` with sequence `1` and `是否上线：否`, then verify the exact readback. |
-| Target has existing front-end entries | Calculate maximum canonical sequence plus one without asking the user for the sequence. |
-| Exact target Wiki ID is available | Materialize the exact Bug comment from that ID and verify it after the Wiki readback. |
+| `STANDARD` without a supplied Wiki URL | Inspect TAPD links and Wiki hierarchy; never stop to request a Wiki target. |
+| TAPD contains an existing Wiki link | Reuse/update/read back that child and never create a duplicate. |
+| No link but one related child exists | Reuse it based on TAPD/branch evidence. |
+| Month exists but no related child | Create `MM-DD: 中文简述` under that month with `# 前端`, sequence `1`, and `是否上线：否`. |
+| Month does not exist | Create/read the `YYYY-MM` month under root `1150372234001008260`, then separately authorize/create/read the child. |
+| Planned payload writes entry body to the month page | Block before write; canonical content belongs only in the child Wiki. |
+| Existing child has front-end entries | Calculate maximum canonical sequence plus one without asking the user for the sequence. |
+| Final child ID is available | Materialize the exact Bug comment from that ID and verify it after child readback. |
 | Source or develop SHA changes before a Git write | Stop, redisplay, and require fresh authorization/validation. |
 | Private validation fails | Execute no current or later operation; return `BLOCKED`. |
 | Merge succeeds but develop containment fails | Return `BLOCKED`; perform no Wiki/TAPD/version write. |
