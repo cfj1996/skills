@@ -26,8 +26,11 @@ Require:
 - verified repository/source/current-round commit facts; and
 - an explicit current-conversation request to go live.
 
-When the upstream profile is `STANDARD`, also require its exact written Wiki
-target and readback. A `NO_WIKI` submission has no Wiki maintenance step.
+When the upstream profile is `STANDARD`, require the exact existing Wiki target
+and readback retained by submission, whether the submission Wiki state is
+`WRITTEN` or `SKIPPED_BY_POLICY`. A policy skip means no test-submission Wiki
+write occurred; it does not remove the historical target needed to maintain
+`是否上线`. A `NO_WIKI` submission has no Wiki maintenance step.
 
 Never substitute `develop`, `dev`, `master`, `merge/*`, a release branch, or a
 rebuilt branch as the source.

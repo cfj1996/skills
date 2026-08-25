@@ -38,7 +38,9 @@ TAPD, Wiki, or version write.
 
 Give current work handoffs—not a user-supplied Wiki URL—to
 `zan-workflows:drafting-wiki`. Require `terminal_state=VALIDATED` and one target
-plan. Discovery order is mandatory:
+plan, or `terminal_state=SKIPPED_BY_POLICY` with
+`skip_reason=NON_FUNCTIONAL_CONTINUE` and no Wiki operation. Discovery order is
+mandatory for the validated path:
 
 1. Read TAPD details and all historical comments; reuse any linked 提测 Wiki.
 2. Otherwise inspect root `1150372234001008260`, the current `YYYY-MM` month,
@@ -47,8 +49,9 @@ plan. Discovery order is mandatory:
    first only when absent.
 
 Include the complete resulting child Markdown and every exact create/update
-payload in the consolidated `SubmissionPlan`. After the deployment gate permits
-later writes, execute only that authorized plan:
+payload in the consolidated `SubmissionPlan` for the validated path. After the
+deployment gate permits later writes, execute only that authorized plan when
+the drafter returned `VALIDATED`:
 
 - `REUSE_EXISTING`: re-read the child and apply the minimal patch.
 - `CREATE_CHILD`: create the child under the verified month with the complete
@@ -56,9 +59,12 @@ later writes, execute only that authorized plan:
 - `CREATE_MONTH_AND_CHILD`: create/read the month under `提测文档`, then use its
   real ID in the deterministic child create payload without a second prompt.
 
-Never write the canonical entry body into the month page. Read back the final
-child, retain its actual ID/URL and original source branch for `going-live`, and
-require the expected body including `是否上线：否` before continuing.
+Never write the canonical entry body into the month page. For the validated
+path, read back the final child, retain its actual ID/URL and original source
+branch for `going-live`, and require the expected body including `是否上线：否`
+before continuing. A policy skip has no child write/readback or Wiki update,
+but retains any existing target readback needed by an explicitly requested
+`going-live` step.
 
 Use the TAPD workspace from the current work item for every Wiki operation:
 
@@ -75,7 +81,7 @@ Immediately read back every created/updated page. A create response without a
 real Wiki ID, a parent mismatch, or a body readback mismatch blocks all later
 Wiki comments, TAPD status changes, and test-version writes.
 
-For a Bug, write exactly:
+For a Bug with a written Wiki, write exactly:
 
 ```text
 提测wiki：[https://www.tapd.cn/{workspace_id}/markdown_wikis/show/#{wiki_id}](https://www.tapd.cn/{workspace_id}/markdown_wikis/show/#{wiki_id})

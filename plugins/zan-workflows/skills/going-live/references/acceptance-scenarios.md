@@ -10,6 +10,7 @@
 | Matching field is already exactly `是` | Record `ALREADY_ONLINE`; perform no Wiki write. |
 | Entry match or online field is ambiguous | `BLOCKED` before the master MR write. |
 | `NO_WIKI` submission | `SKIPPED_NO_WIKI`; merge can still succeed without creating a Wiki. |
+| `STANDARD` submission skipped Wiki because the continue fix was non-functional | Reuse the retained existing Wiki target and maintain `是否上线` after master containment. |
 | Merge/readback/containment fails | `BLOCKED`; do not change `是否上线` or claim go-live success. |
 | Wiki changes after authorization | Preserve the changed page and require a fresh patch/authorization; report any already completed merge truthfully. |
 

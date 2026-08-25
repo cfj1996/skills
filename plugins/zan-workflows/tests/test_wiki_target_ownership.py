@@ -11,6 +11,9 @@ DRAFTING = (PLUGIN_ROOT / "skills/drafting-wiki/SKILL.md").read_text()
 DRAFTING_RULES = (
     PLUGIN_ROOT / "skills/drafting-wiki/references/wiki-template.md"
 ).read_text()
+DRAFTING_CONTRACT = (
+    PLUGIN_ROOT / "skills/drafting-wiki/references/contracts.md"
+).read_text()
 SUBMITTING = (PLUGIN_ROOT / "skills/submitting-for-test/SKILL.md").read_text()
 SUBMISSION_RULES = (
     PLUGIN_ROOT / "skills/submitting-for-test/references/submission-rules.md"
@@ -45,6 +48,16 @@ class WikiTargetOwnershipTests(unittest.TestCase):
         ).read_text())
         self.assertIn("CREATE_MONTH_AND_CHILD", SUBMISSION_RULES)
         self.assertIn("Never write the canonical entry body into the month page", SUBMISSION_RULES)
+
+    def test_continue_wiki_policy_distinguishes_functional_impact(self):
+        drafting = DRAFTING + DRAFTING_RULES + DRAFTING_CONTRACT
+        self.assertIn("FUNCTIONAL_IMPACT|NON_FUNCTIONAL", drafting)
+        self.assertIn("SKIPPED_BY_POLICY", drafting)
+        self.assertIn("NON_FUNCTIONAL_CONTINUE", drafting)
+        self.assertIn("affected module/page", drafting)
+        self.assertIn("影响范围", drafting)
+        self.assertNotIn("re-test note", drafting)
+        self.assertIn("For `SKIPPED_BY_POLICY`, perform no Wiki", SUBMITTING)
 
 
 if __name__ == "__main__":

@@ -36,6 +36,10 @@ target-location, Wiki-ID, TAPD-comment, writeback, merge, or release narration.
 - `是否上线` is exactly `否` for a new entry. Only `going-live` may change it to
   `是` after verified `origin/master` containment.
 - `环境` is exactly `联团 老生产`.
+- For `CONTINUE`, classify the current-round change before patching. If it is
+  `NON_FUNCTIONAL`, do not update the Wiki. If it is `FUNCTIONAL_IMPACT`, the
+  new affected module/page must be appended to the matching entry's
+  `影响范围` list; do not duplicate an identical existing item.
 
 ## Wiki target resolution
 
@@ -73,18 +77,14 @@ For `REUSE_EXISTING`, operate only on the current child body read from TAPD:
   `max(existing canonical top-level sequences) + 1` within that section and
   append the canonical entry before the next level-one section.
 - If exactly one entry under `# 前端` contains the original source branch,
-  preserve its sequence and append only the re-test note below that entry. If
-  the entry predates `是否上线`, also insert `- 是否上线：否` immediately before
-  its `- 环境` line.
+  preserve its sequence. For a `FUNCTIONAL_IMPACT` continuation, append the
+  affected module/page as the next numbered item under that entry's existing
+  `影响范围` field as the only patch. If the entry predates `是否上线`, also
+  insert `- 是否上线：否` immediately before its `- 环境` line. For a
+  `NON_FUNCTIONAL` continuation, produce a policy skip and no patch.
 - Multiple matching entries, duplicate existing sequences,
   duplicate/conflicting online fields, malformed section boundaries, or an
   unreadable child block instead of guessing.
-
-The re-test note is:
-
-```md
-**[追加提测/二次提测 {日期}]**：{补充功能或修复问题}
-```
 
 Keep every reused character unchanged outside the calculated patch. Never
 replace an existing child with a freshly generated page, renumber historical

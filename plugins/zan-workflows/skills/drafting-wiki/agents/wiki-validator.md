@@ -34,11 +34,12 @@ Validate these invariants in order:
 4. For `REUSE_EXISTING`, the current child body/hash is present and placement
    matches its visible `# 前端`: a missing or empty section creates sequence
    `1`; a distinct entry uses the greatest canonical top-level sequence plus
-   one; one branch match receives a re-test patch and no new sequence. For a
+   one; one branch match receives an impact-scope patch and no new sequence. For a
    create plan, `before_content_hash=NEW_PAGE` and the complete body begins with
    `# 前端` and sequence `1`. The monthly parent never receives the entry body.
    Under `CONTINUE`, one matching source-branch entry receives only the current
-   re-test increment; a new duplicate entry is invalid.
+   affected-scope append; a new duplicate entry is invalid. A proven
+   non-functional continuation is skipped before this validator is called.
 5. A successful new entry contains every canonical field from
    `references/wiki-template.md`, including exactly `是否上线：否`, and contains
    no process narration, validation verdict, write instruction, or claim that

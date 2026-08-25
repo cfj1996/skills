@@ -32,10 +32,16 @@ invent a value or render a placeholder.
 
 1. Read the TAPD item and all historical comments. If they contain a matching
    提测 Wiki link for this work, resolve and read that exact Wiki; it must be
-   reused.
-   Under `CONTINUE`, also reuse the current-conversation/final prior Wiki target
-   when it matches the TAPD item and branch.
-2. When no linked Wiki exists, inspect the fixed `提测文档` hierarchy and the
+   reused. Under `CONTINUE`, also reuse the current-conversation/final prior
+   Wiki target when it matches the TAPD item and branch. For `CONTINUE`, before
+   planning any new target or resolving Wiki-only fields, classify the
+   current-round change from the reviewed diff and implementation/verification
+   evidence as `FUNCTIONAL_IMPACT|NON_FUNCTIONAL`; an ambiguous classification
+   blocks. If it is `NON_FUNCTIONAL`, return `SKIPPED_BY_POLICY` with
+   `skip_reason=NON_FUNCTIONAL_CONTINUE` and do not plan or create a Wiki
+   target; retain an already-read existing target only when it is available for
+   a later explicit `going-live` handoff.
+2. When no linked Wiki exists and the change is not policy-skipped, inspect the fixed `提测文档` hierarchy and the
    current `YYYY-MM` month. Reuse one related `MM-DD: 中文简述` child matched by
    TAPD identity, short ID, or original source branch; otherwise plan creation
    of the missing month and/or child Wiki. Never ask the user for the target.
@@ -45,26 +51,26 @@ invent a value or render a placeholder.
 4. Use exactly one evidenced original `feature/*` or `fixbug/*` branch. Never
    use a `merge/*` branch. Use that branch to identify an existing current
    entry.
-5. For a reused child, locate `# 前端`, calculate the sequence or matching
-   re-test position, and apply the smallest patch from
-   [wiki-template.md](references/wiki-template.md). For a new child, render a
-   complete body beginning with `# 前端` and sequence `1`. Initialize each new
-   entry with `是否上线：否`.
-   `CONTINUE` with a matching branch entry appends only the incremental
-   re-test note (and a missing legacy online field when required); it does not
-   create another entry or reset an existing online value.
-6. Give the target plan, hierarchy/readback evidence, normalized facts,
-   calculation, patch, and proposed body to the private read-only
+5. For a `FUNCTIONAL_IMPACT` continuation, locate `# 前端`, reuse the matching
+   branch entry, append the affected scope to that entry's existing `影响范围`
+   list as the only Wiki patch. Never create a second entry for the same branch
+   or reset an existing online value. For `INITIAL`, render
+   a complete body beginning with `# 前端` and sequence `1`, initializing each
+   new entry with `是否上线：否`.
+6. For a policy skip, map validation to `NOT_RUN` with its normalized reason.
+   Otherwise, give the target plan, hierarchy/readback evidence, normalized
+   facts, calculation, patch, and proposed body to the private read-only
    [wiki-validator.md](agents/wiki-validator.md). Map its response to
    `VALIDATION_PASSED|VALIDATION_FAILED|NOT_RUN`, retain only a concise reason,
    and discard the private line.
 7. Form one internal `ValidatedWikiDraft` with
-   `terminal_state=VALIDATED|BLOCKED`, resolved claims, preservation facts,
+   `terminal_state=VALIDATED|SKIPPED_BY_POLICY|BLOCKED`, resolved claims, preservation facts,
    mapped validation state, rendered Markdown, and blocker when applicable.
    `submitting-for-test` consumes this complete in-memory result.
 
-For a standalone user call, project a successful internal result to only the
-complete raw copyable resulting Markdown. The internal result still retains
+For a standalone user call, project a `VALIDATED` result to only the complete
+raw copyable resulting Markdown. Project `SKIPPED_BY_POLICY` as a concise
+non-functional-change skip with no body. The internal result still retains
 whether the page must be reused or created. On failure, return a concise
 blocker and no claimed final body.
 

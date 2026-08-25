@@ -77,6 +77,10 @@
   - 同一个 Wiki 条目只能出现一个代码分支名；禁止同时写“中间分支”和“修复分支”，也禁止只写或重复写 `merge/*` 中间分支。
   - 若无法从合并记录、MR 或 GitLab 读回中确认原开发源分支，必须停止准备 Wiki，不得猜测。
 - `影响范围`：从当前计划的风险评估、验证结果或实现总结中汇总，多条使用序号
+- 同一个需求/功能多次修复时，必须先判断本轮修复是否影响功能行为：
+  - 如果仅是重构、日志、测试、构建或其他对功能无影响的变更，可以不更新 Wiki。
+  - 如果影响功能行为，复用对应项目的已有 Wiki 条目，只在该条目的 `影响范围` 字段下按序追加本轮新增的功能模块或页面，不得新建重复条目。
+  - 无法确认是否影响功能时必须停止并补充证据，不得猜测或直接更新。
 - `测试人员`：Bug 优先使用 `te` 字段；若 `te` 为空或为 Story，必须先通过 `get_entity_custom_fields` 动态解析出代表“测试人员”的自定义字段获取。解析不到时向用户确认并记录到 MEMORY.md，禁止盲目兜底 `reporter`。
 - `环境`：固定写 `联团 老生产`
 - 提测完成后，Bug 评论正文必须固定为 `提测wiki：[https://www.tapd.cn/{workspace_id}/markdown_wikis/show/#{wiki_id}](https://www.tapd.cn/{workspace_id}/markdown_wikis/show/#{wiki_id})`（Markdown 可点击链接），不能写成说明段落、总结段落或多行说明
@@ -103,7 +107,7 @@
 - 如果月目录正文为空，默认创建 `# 前端` 模块并把当前 Wiki 作为第 1 条。
 - 如果正文中已经存在模块，必须采用增量追加，不得整页替换。
 - **影子备份风险控制**：在执行任何 Wiki `update_wiki` 操作前，必须先将读取到的原正文（若存在）缓存到 thought 思考过程中。若写入后用户反馈内容异常或发现逻辑错误，必须能够根据缓存的原正文进行手动回滚。
-- 当处理二次进入（测试打回、继续开发、需求补充）时，找到该条目现有的 Wiki 记录，在已有条目下方增量追加提测说明（如 `**[追加提测/二次提测 MM-DD]**：补充了 xxx 功能 / 修复了 xxx 问题`），严禁覆盖或删除历史提测内容。
+- 当处理二次进入（测试打回、继续开发、需求补充）时，找到该条目现有的 Wiki 记录；如果本轮影响功能，只在对应条目的 `影响范围` 字段下增量追加新增模块或页面，严禁覆盖或删除历史内容；对已确认不影响功能的修复，按上面的策略跳过 Wiki 更新。
 
 ## WikiWriteGate
 
@@ -117,7 +121,7 @@
 - `readback_contains_expected_patch`：写入后读回正文是否包含 `expected_patch`。
 - `write_result`：`PASS` 或 `FAIL`。
 
-`readback_contains_expected_patch` 不是 `true` 时必须停止，不得写 TAPD 评论或更新状态。二次提测或增量开发时，`write_mode` 必须为 `append_existing`，并且 `before_content_hash` 不能等于 `NEW_PAGE`。
+`readback_contains_expected_patch` 不是 `true` 时必须停止，不得写 TAPD 评论或更新状态。功能性增量开发时，`write_mode` 必须为 `append_existing`，并且 `before_content_hash` 不能等于 `NEW_PAGE`。
 
 ## TAPD_COMMENT_GATE
 

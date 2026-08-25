@@ -35,6 +35,11 @@ filesystem, or network write operations.
   `1150372234001008260`; entry content targets only the child. A new entry
   contains exactly `是否上线：否`, and the final result retains the actual child
   ID/URL plus source-branch identity for `going-live`.
+- Under `STANDARD`, a drafter result with
+  `terminal_state=SKIPPED_BY_POLICY` is valid only when
+  `skip_reason=NON_FUNCTIONAL_CONTINUE` is supported by the current reviewed
+  change; it forbids Wiki and Wiki-comment operations and needs no Wiki
+  readback.
 
 For `PRE_GIT_WRITE`, accept exactly one operation:
 `COMMIT|PUSH|MR_CREATE_OR_UPDATE|MR_MERGE`. Validate only the current payload
@@ -64,7 +69,9 @@ resulting body. Reject any canonical entry body aimed at the month page.
 
 For `POST_WRITE`, require successful merge/develop containment and deployment
 state `DEPLOYED|SKIPPED_BY_INTENT`. Under `DEPLOY`, require Jenkins success/SHA
-proof before Wiki/TAPD writes. Require Wiki/comment readbacks under `STANDARD`.
+proof before Wiki/TAPD writes. Require Wiki/comment readbacks under `STANDARD`
+only when the Wiki state is `WRITTEN`; a policy skip requires no such
+readbacks.
 For `INITIAL`, require applicable waiting-test/version readbacks; for
 `CONTINUE` already in `待测试`, require no status/version write and public
 `SKIPPED_ALREADY_WAITING_TEST`. Verify ordering and truthful completed effects.

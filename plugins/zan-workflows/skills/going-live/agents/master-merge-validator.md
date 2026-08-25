@@ -22,11 +22,13 @@ For the proposed merge write or post-merge Wiki write, validate:
    SHAs, commits, operation, and purpose.
 4. The plan excludes `develop/dev -> master`, production publishing, smoke
    tests, TAPD writes, test-version writes, and Wiki creation.
-5. A `STANDARD` submission identifies one existing Wiki page and one unique
-   entry by the original source branch. Its patch only changes
+5. A `STANDARD` submission, including one whose test-submission Wiki state is
+   `SKIPPED_BY_POLICY`, identifies one existing Wiki page and one unique entry
+   by the original source branch. Its patch only changes
    `是否上线：否` to `是否上线：是` or inserts the missing legacy field before
    `环境`, and has separate exact authorization. An already-`是` entry performs
-   no write. Only `NO_WIKI` may skip Wiki maintenance.
+   no write. Only `NO_WIKI` may omit the existing target entirely; a policy
+   skip still permits the separate online-state maintenance step.
 6. A Wiki write is planned only after successful merge readback and containment
    of all current-round commits in `origin/master`; its current page readback
    still matches the authorized patch base.

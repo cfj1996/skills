@@ -50,7 +50,7 @@ branch identity and repository only; it does not demand Bug-specific history.
 
 ```text
 same Bug feedback -> recover original branch/Wiki -> implement increment
-                  -> same submit pipeline -> append Wiki retest note
+                  -> same submit pipeline -> apply Wiki impact policy
 ```
 
 Do not create another branch or reset TAPD status. If the Bug is already

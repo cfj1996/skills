@@ -22,9 +22,10 @@
   successful merge readback, and containment of every current-round commit.
 - `develop -> master`, `dev -> master`, `merge/*`, release branches, or a
   substituted source are always blocked.
-- A `STANDARD` submission requires its pre-existing exact Wiki target and one
-  uniquely matching source-branch entry. A `NO_WIKI` submission yields
-  `SKIPPED_NO_WIKI` and does not prevent `MERGED`; never create a Wiki.
+- A `STANDARD` submission, including `SKIPPED_BY_POLICY`, requires its
+  pre-existing exact Wiki target and one uniquely matching source-branch entry.
+  A `NO_WIKI` submission yields `SKIPPED_NO_WIKI` and does not prevent
+  `MERGED`; never create a Wiki.
 - `UPDATED_ONLINE` requires verified master containment, separate authorization
   for the exact minimal field patch, and a readback of exactly
   `是否上线：是`. A legacy matching entry may insert that field before `环境`.

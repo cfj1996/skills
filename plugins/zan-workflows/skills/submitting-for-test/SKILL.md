@@ -53,11 +53,12 @@ business source.
    test environment, release channel, parameters/version identity, and purpose
    through workspace project knowledge and release-safety rules.
 3. Under `STANDARD`, invoke `zan-workflows:drafting-wiki` read-only and require
-   one validated target/body plan. Under `NO_WIKI`, set Wiki to
-   `SKIPPED_BY_POLICY` without loading Wiki capability.
-4. Build and display one consolidated `SubmissionPlan` containing Git, Wiki,
-   deployment, deterministic comment, and final TAPD actions. Obtain one
-   authorization as defined in
+   either one validated target/body plan or a
+   `SKIPPED_BY_POLICY` result proven to be `NON_FUNCTIONAL_CONTINUE`. Under
+   `NO_WIKI`, set Wiki to `SKIPPED_BY_POLICY` without loading Wiki capability.
+4. Build and display one consolidated `SubmissionPlan` containing Git,
+   applicable Wiki/comment actions, deployment, and final TAPD actions. Obtain
+   one authorization as defined in
    [deployment-and-confirmation.md](references/deployment-and-confirmation.md).
 5. Immediately before each Git write, re-read its bound facts and call the
    private [submission-validator.md](agents/submission-validator.md) with
@@ -71,10 +72,11 @@ business source.
    - `SKIP`: make no Jenkins call and record `SKIPPED_BY_INTENT`.
    `FAILED|UNKNOWN` blocks every later Wiki/TAPD write.
 7. After `DEPLOYED|SKIPPED_BY_INTENT`, execute the authorized Wiki plan under
-   `STANDARD`, validating and reading back each create/update. Derived month,
-   child, and Wiki IDs do not require another prompt when they follow the plan.
-   Materialize, validate, write, and read the deterministic Bug Wiki-link
-   comment. Retain the final Wiki target for `going-live`.
+   `STANDARD` only when the drafter returned `VALIDATED`, validating and
+   reading back each create/update. For `SKIPPED_BY_POLICY`, perform no Wiki
+   or Wiki-comment operation. When a Wiki was written, materialize, validate,
+   write, and read the deterministic Bug Wiki-link comment, and retain the
+   final Wiki target for `going-live`.
 8. Apply the status policy from the work mode: write/read `待测试` and the test
    version only when required; for `CONTINUE` already in `待测试`, record
    `SKIPPED_ALREADY_WAITING_TEST` and perform no duplicate writes. Give all

@@ -22,6 +22,8 @@
 | Status succeeds but version fails | Return `BLOCKED` with truthful status success and version failure. |
 | External outcome is unknown | Return `BLOCKED`; do not retry or infer success. |
 | Continue Bug is already `待测试` | Complete Git/deployment/Wiki increment but skip status and duplicate test-version writes. |
+| `CONTINUE` change is proven non-functional under `STANDARD` | Record `SKIPPED_BY_POLICY`, omit Wiki and Wiki-comment operations, and continue the remaining authorized submission steps. |
+| `CONTINUE` change affects functionality under `STANDARD` | Update the existing Wiki entry's `影响范围` with only the new affected scope. |
 | Normal plan generates commit, MR, Wiki, queue, and build IDs | Treat them as deterministic readbacks; keep one consolidated submission confirmation. |
 
 No scenario creates runtime, recovery, audit-ledger, or generated evidence

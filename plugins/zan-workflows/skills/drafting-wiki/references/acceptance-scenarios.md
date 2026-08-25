@@ -9,8 +9,11 @@
 | Multiple linked or related Wiki candidates | Block rather than ask for an arbitrary URL or create another page. |
 | Reused target without `# 前端` | Append `# 前端` and a sequence `1` entry containing `是否上线：否`. |
 | Existing `# 前端` sequences `1` and `3` | Append the new entry as sequence `4`; do not count sub-list numbers. |
-| Existing unique entry with the same source branch | Keep its sequence, append the re-test note, and add `是否上线：否` before environment only when the field is missing. |
-| Continue work after a prior MR/deployment | Reuse the same Wiki/branch entry and append only the current incremental re-test note. |
+| Existing unique entry with the same source branch and a functional change | Keep its sequence, append only the affected scope, and add `是否上线：否` before environment only when the field is missing. |
+| Continue work after a prior MR/deployment with a functional change | Reuse the same Wiki/branch entry and append only the new affected scope to `影响范围`. |
+| Continue work is proven non-functional by the reviewed diff | Return `SKIPPED_BY_POLICY` with `NON_FUNCTIONAL_CONTINUE`; do not update the Wiki. |
+| Continue work changes functional behavior | Reuse the matching entry and append only the affected module/page to its `影响范围` list without creating a duplicate entry. |
+| Continue impact classification is ambiguous | Block and emit no final body; never guess whether the Wiki needs an update. |
 | Tester or another canonical field cannot be resolved | Block and emit no final body; never render `待补充`. |
 | Two applicable source branches conflict | Block and emit no final Wiki body. |
 | Only a `merge/*` branch is supplied | Block; never substitute it as the code branch. |
