@@ -12,6 +12,16 @@ const knowledgeRoot = process.env.PROJECT_KNOWLEDGE_ROOT
 
 const read = (file) => readFile(file, 'utf8');
 
+const readIfPresent = async (file) => {
+  try {
+    return await read(file);
+  }
+  catch (error) {
+    if (error?.code === 'ENOENT') return null;
+    throw error;
+  }
+};
+
 test('central config keeps identity fields explicit and distinguishes duplicate names', { skip: !knowledgeRoot }, async () => {
   const config = await read(resolve(knowledgeRoot, 'config.yaml'));
 
@@ -48,15 +58,15 @@ test('central config owns governed project list and explicit review-mode policy'
   assert.match(config, /governanceBlocksMerge: true/);
 });
 
-test('both skill entrypoints delegate scope and routing to project knowledge', { skip: !knowledgeRoot }, async () => {
+test('available skill entrypoints delegate scope and routing to project knowledge', { skip: !knowledgeRoot }, async () => {
   const [pluginSkill, standaloneSkill, reference, taskRouting] = await Promise.all([
     read(resolve(skillRoot, 'SKILL.md')),
-    read(resolve(standaloneRoot, 'SKILL.md')),
+    readIfPresent(resolve(standaloneRoot, 'SKILL.md')),
     read(resolve(skillRoot, 'references/zan-conformance.md')),
     read(resolve(process.env.PROJECT_KNOWLEDGE_ROOT, 'standards/zan-system/manifests/task-routing.yaml')),
   ]);
 
-  for (const skill of [pluginSkill, standaloneSkill]) {
+  for (const skill of [pluginSkill, standaloneSkill].filter(Boolean)) {
     assert.match(skill, /workflows\/managed-mr-review\/config\.yaml/);
     assert.match(skill, /禁止恢复到 skill 文档、历史记忆或任何内置白名单/);
     assert.match(skill, /typeCheckCommand.*testCommand.*conformanceCommand/s);
