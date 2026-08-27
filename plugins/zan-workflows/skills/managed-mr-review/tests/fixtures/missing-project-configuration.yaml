@@ -1,7 +1,9 @@
 case: missing-project-configuration
 expected:
-  conformance: unknown
-  conclusion: 暂缓
-  mergeAllowed: false
+  reviewMode: ordinary
+  zanStatus: not-adopted
+  codeReviewContinues: true
+  zanMatrixRequired: false
+  mergeAllowed: subject-to-ordinary-review-gates
   safetyChecksStillRun: true
-  fallbackToPackageScripts: false
+  missingPipelineBlocksByDefault: false

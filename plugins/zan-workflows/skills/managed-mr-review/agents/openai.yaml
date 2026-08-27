@@ -1,4 +1,4 @@
 interface:
   display_name: "管辖 MR 审核"
-  short_description: "发现、并行审核并输出可打回 MR 理由"
-  default_prompt: "使用 $managed-mr-review 分三步处理管辖项目 MR：先获取待合并 MR，再按风险把常规 MR 路由到 BALANCED reviewer、把高风险 MR 路由到 CRITICAL reviewer 并行审核，重点展开不通过 MR 的打回理由，最后按要求合并通过或指定的 MR。"
+  short_description: "普通/Zan 增强 MR 审核与合并门禁"
+  default_prompt: "使用 $managed-mr-review 分三步处理管辖项目 MR：未接入 Zan 的项目走普通审核，已接入项目追加 Zan 增强审核，并分别输出代码结论与合并资格；只展开 MR 自身的阻断理由，最后按要求合并通过项。"

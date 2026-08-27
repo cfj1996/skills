@@ -25,11 +25,11 @@ Trace the affected entrypoints and reachable data flow, then check:
   approval state, and mergeability;
 - commit history for the forbidden inclusion of `develop`.
 
-Also apply the Zan System gate: resolve the centralized workflow configuration, read the target project's `AGENTS.md` and validated `StandardAdoption`, route every changed file through `standards/zan-system/manifests/task-routing.yaml`, and inspect the resulting Rule / Capability / Binding / Recipe resources. Report Rule IDs, `MUST`/`SHOULD`, valid Exceptions, changed-file line/diff evidence, and the declared typecheck/test/conformance command output. Missing evidence is `unknown` and blocks merge; do not replace it with guessed package scripts.
+Consume the leader-provided project preflight and MR review packet; do not reload public workspace/project context already verified there. Apply Zan only for `zan-enhanced/adopted`. For `ordinary/not-adopted`, perform the full critical code review without a Zan matrix and do not treat missing Zan files as a blocker. For `misconfigured/unknown`, continue the code review and keep its conclusion independent while listing `zan-governance` as a merge blocker. Treat an absent pipeline as informational unless the project explicitly requires it.
 
 Do not infer safety from the presence of tests or newly added guards. Verify
 that the real call path reaches them and inspect important edge cases. Use
-`不通过` only with concrete evidence; use `暂缓` when evidence is incomplete.
+`不通过` only with concrete evidence; use `未完成` when code evidence is incomplete.
 
 ## Output
 
@@ -39,14 +39,17 @@ Return exactly:
 MR: <project>!<iid>
 Review HEAD: <sha>
 Risk class: HIGH
-Conclusion: 通过 | 不通过 | 暂缓
-Merge advice: 可合并 | 不建议合并 | 暂不合并
+Review mode: ordinary | zan-enhanced | ordinary-with-zan-warning
+Zan status: not-adopted | adopted | misconfigured | unknown
+Code conclusion: 通过 | 不通过 | 未完成
+Merge eligibility: 可合并 | 不可合并
+Merge blockers: <none or comma-separated blocker ids>
 Main issue: <one-line summary>
 
 Evidence:
 - <file:line, call path, diff, pipeline, discussion, or mergeability evidence>
 
-Zan Conformance:
+Zan Conformance (only for zan-enhanced; otherwise write "不适用"):
 | Rule ID | Level | Changed evidence | Exception | Result | Verification |
 | --- | --- | --- | --- | --- | --- |
 | <ZAN-...> | MUST / SHOULD | <path:line or diff hunk> | <id/none> | pass / fail / warning / unknown | <command/output/resource> |
@@ -61,5 +64,5 @@ Suggested fix:
 - <concrete fix direction, or "无阻断修复项">
 
 GitLab reply:
-<Chinese comment suitable for GitLab when not 通过; otherwise "无需打回说明".>
+<Chinese comment only for an MR-specific actionable blocker; otherwise "无需打回说明".>
 ```

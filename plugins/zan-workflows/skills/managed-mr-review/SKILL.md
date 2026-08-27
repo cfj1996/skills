@@ -1,6 +1,6 @@
 ---
 name: managed-mr-review
-description: Use when the user asks to find, review, or remotely merge open GitLab MRs for governed company repositories resolved from centralized project knowledge, with master/main safety and Zan System conformance gates.
+description: Use when the user asks to find, review, or remotely merge open GitLab MRs for governed company repositories, using ordinary review for projects not adopted into Zan and additional Zan conformance gates only for adopted projects.
 ---
 
 # 管辖项目 MR 审核
@@ -33,18 +33,25 @@ description: Use when the user asks to find, review, or remotely merge open GitL
 
 团队身份同样只来自 `spec.team`。`personId` 用于区分重复或不完整姓名；`gitlabUsername: null` 必须保持未确认，不得从提交人、邮箱或显示名推断。
 
-## Zan System 合规审核门禁
+## 审核模式与结论模型
 
-Code review 必须对 changed files 执行 Zan System 路由，详细证据格式见
+先按项目执行一次 Adoption preflight，再决定审核模式。使用本技能的
+`scripts/review-policy.mjs classify-adoption` 固化分类，详细检查方法见
 [Zan conformance review reference](references/zan-conformance.md)：
 
-1. 读取目标项目根 `AGENTS.md`，再按其声明定位并校验 `kind: StandardAdoption` 的 Adoption 文件；默认文件名为 `standard-adoption.yaml`。
-2. 读取 `${PROJECT_KNOWLEDGE_ROOT}/standards/zan-system/STANDARD_CONTEXT.md` 和 `manifests/task-routing.yaml`。
-3. 以每个 changed file 的路径、diff hunk 中的标识符/import/调用点和项目文档声明的适用范围作为路由输入。只能使用 manifest 中的 route；读取该 route 列出的 Rule / Capability / Binding / Recipe，并记录 route id。
-4. 只执行目标项目 `AGENTS.md` 或 `StandardAdoption.spec.configuration` 明确声明的 `typeCheckCommand`、`testCommand`、`conformanceCommand`。不能用猜测的 package script、默认命令或构建命令替代缺失声明。
-5. 以 Zan Rule ID、`MUST`/`SHOULD`、有效 Exception、changed file 行号/diff hunk 和命令输出作为证据，生成逐条合规结论。`unknown` 不得当作 `pass`。
+- `ordinary` / `not-adopted`：项目没有声明接入 Zan。执行完整普通 code review，不要求 Zan 路由、矩阵或声明命令；未接入本身不阻断代码结论或合并。
+- `zan-enhanced` / `adopted`：根 `AGENTS.md` 与有效 `StandardAdoption` 均存在。普通审核之外执行 Zan changed-file 路由、矩阵及声明的 `typeCheckCommand`、`testCommand`、`conformanceCommand`；`MUST fail/unknown` 阻断合并。
+- `ordinary-with-zan-warning` / `misconfigured`：项目已声明或部分接入 Zan，但 Adoption 无效或缺件。代码审核继续并独立给结论；治理配置异常单独阻断合并。
+- `ordinary-with-zan-warning` / `unknown`：工具或权限导致无法判断接入状态。代码审核继续；在状态可确认前，治理证据不足单独阻断合并。
 
-缺少 `AGENTS.md`、有效 `StandardAdoption`、changed-file route 或任一必需命令/执行证据时，Zan 结论为“暂缓”，`mergeAllowed: false`；但既有安全检查、pipeline、讨论和 mergeability 检查仍必须执行。
+`AGENTS.md` 和 Adoption 都不存在时必须判为 `not-adopted`，不能判为“Zan 配置缺失”。只有“已声明但损坏”或“无法读取”才进入治理暂缓。
+
+代码结论和合并资格必须分开：
+
+- `代码结论`：`通过`、`不通过`、`未完成`，只由 diff、调用链、运行/测试证据和可复现问题决定。
+- `合并资格`：`可合并`、`不可合并`，由代码结论、安全、mergeability、项目明确要求的 pipeline/approval/discussion 门禁，以及适用时的 Zan 门禁共同决定。
+- `pipeline = none` 只是“未观察到 pipeline”。除非项目或 GitLab 规则明确要求 pipeline，否则不能单独阻断。
+- 后端/YApi 契约不可见时，只在它确实导致关键正确性无法判断时将代码结论标为 `未完成`；不得把所有接口改动一律暂缓。
 
 **安全硬限制（禁止 develop 合并）**：
 - **绝对不允许** `develop` 分支作为源分支合并到任何目标分支。
@@ -122,12 +129,26 @@ Code review 必须对 changed files 执行 Zan System 路由，详细证据格�
 - pipeline、approval、未解决讨论、mergeability（工具可用时）
 - 当前 HEAD SHA
 
+### 项目级 Preflight 与证据复用
+
+先按项目分组，再为每个项目读取一次集中配置、项目 AI_CONTEXT、Graphify freshness、目标分支状态、项目审核模式和公共治理证据。生成 project preflight packet，至少包含：
+
+- project id/path、目标分支 SHA、接入模式与判定证据；
+- 项目明确声明的 pipeline/approval/test 要求；
+- 可复用的项目上下文、标准资源路径和 Graphify 状态；
+- 公共缺口与读取时间。
+
+每个 MR 再生成绑定 HEAD SHA 的 review packet，包含 diff、changed files、提交历史、pipeline、discussion、approval 和 mergeability。Reviewer 优先消费 packet，不重复加载 workspace 规则、项目路由、公共配置和无差异的标准资源。
+
+如果 MR 修改了 `AGENTS.md`、Adoption，或其 HEAD 上这些文件与 project preflight 不同，必须为该 MR 重新分类；否则同一项目复用一次 preflight 结果。
+
 ### 并行审核策略
 
 委派前先根据 MR 元数据、改动文件和 diff 做只读风险分类：
 
-- `HIGH`：涉及权限/鉴权、租户或站点隔离、支付、订单、账务、库存、优惠券、结算、敏感数据、删除/批量操作、环境/部署配置、跨模块调用链、大型 diff，或者风险暂时无法可靠判断。
-- `ROUTINE`：改动边界清晰的低风险 UI、文案、样式或局部逻辑，且不触及上述边界。
+- `HIGH`：changed hunk 实际修改权限/鉴权判断、租户或站点标识、支付/订单/账务/库存/结算计算、敏感数据访问、删除/批量写入、环境/部署配置、关键接口 payload/schema，或需要跨模块数据流推理的大型 diff。
+- `ROUTINE`：改动边界清晰的 UI、文案、样式、展示分组或局部逻辑，且不修改上述关键行为。
+- “优惠券”“订单”等业务域名称只能作为初筛信号，不能脱离 changed hunk 的真实行为单独升级为 `HIGH`。ROUTINE reviewer 发现真实高风险信号时必须升级。
 
 按风险选择本技能目录中的角色：
 
@@ -140,11 +161,11 @@ Code review 必须对 changed files 执行 Zan System 路由，详细证据格�
 并行审核要求：
 
 - 每个 subagent 必须以 code review 为唯一职责，只负责自己分配到的 MR，不合并、不 approve、不修改文件；分配内容必须包含风险分类及触发依据。
-- 分配任务时提供项目名、MR iid、target branch、source branch、HEAD SHA、changed files/diff 获取方式和必要上下文；不要把其他 MR 的结论泄漏给它。
-- 子代理输出必须包含：`MR（项目名称+id）`、`结论（通过/不通过/暂缓）`、`主要问题`、`证据`、`审核使用的 HEAD SHA`、`是否可合并建议`。如果结论不是 `通过`，还必须输出可直接作为 GitLab 打回理由的详细说明。
+- 分配任务时提供 project preflight packet、项目名、MR iid、target branch、source branch、HEAD SHA、review packet 和必要上下文；不要要求 reviewer 重读已验证的公共材料，也不要把其他 MR 的代码结论泄漏给它。
+- 子代理输出必须包含：`MR（项目名称+id）`、`审核模式`、`Zan 状态`、`代码结论（通过/不通过/未完成）`、`合并资格（可合并/不可合并）`、`合并阻断项`、`主要问题`、`证据`和`审核使用的 HEAD SHA`。只有存在 MR 自身可操作的阻断时才生成 GitLab 打回说明。
 - 主代理负责汇总、去重、解决结论冲突，并输出最终审核报告表。
-- 如果同一个 MR 有多个审核结论，以更保守结论为准：`不通过` 优先于 `暂缓`，`暂缓` 优先于 `通过`。
-- 如果 subagent 超时或失败，对应 MR 标记为 `暂缓：子代理审核未完成`，除非主代理已经完成等价审核。
+- 如果同一个 MR 有多个代码结论，以更保守结论为准：`不通过` 优先于 `未完成`，`未完成` 优先于 `通过`。
+- 如果 subagent 超时或失败，对应 MR 标记为 `代码结论：未完成；合并资格：不可合并（code-review-incomplete）`，除非主代理已经完成等价审核。
 
 审核重点：
 
@@ -154,33 +175,39 @@ Code review 必须对 changed files 执行 Zan System 路由，详细证据格�
 - 对业务逻辑分支必须验证真实调用链可达性，不要只凭新增代码存在就下结论。
 - 对阻断问题给出具体文件路径、函数/区域或 diff 依据；证据不足时写明缺口。
 
-每个 MR 还必须附加 Zan 合规矩阵，至少包含 `Rule ID`、`MUST`/`SHOULD`、changed file:line 或 diff hunk、有效 Exception（如有）、`pass/fail/warning/unknown`、验证命令和输出证据。任何 `MUST` 的 `fail` 或 `unknown` 都阻断合并；`SHOULD` 违反应标为 warning，并明确是否存在有效 Exception。
+只有 `zan-enhanced` 模式必须附加 Zan 合规矩阵，至少包含 `Rule ID`、`MUST`/`SHOULD`、changed file:line 或 diff hunk、有效 Exception（如有）、`pass/fail/warning/unknown`、验证命令和输出证据。`MUST fail/unknown` 只改变合并资格，不覆盖独立代码结论；`SHOULD` 违反标为 warning。
 
 审核报告表头固定为：
 
 ```markdown
-| MR（项目名称+id） | 结论（是否通过） | 主要问题 |
-| --- | --- | --- |
+| MR（项目名称+id） | 审核模式 | 代码结论 | 合并资格 | 主要问题 |
+| --- | --- | --- | --- | --- |
 ```
 
-结论建议使用：
+代码结论使用：
 
-- `通过`：未发现阻断问题，且 MR 当前可合并或没有证据显示不可合并。
-- `不通过`：存在明确阻断问题、冲突、构建失败、权限/数据风险，或目标分支不符合范围。
-- `暂缓`：证据不足、工具不可用、diff 太大未完成关键路径审核、pipeline/讨论状态不明且影响合并判断。
+- `通过`：完成关键路径审核，未发现代码阻断。
+- `不通过`：存在由本次 diff 引入或暴露的明确阻断问题，并有可定位证据。
+- `未完成`：diff 或关键代码证据不可得、关键路径尚未审完，或必要契约确实使正确性无法判断。
+
+合并资格使用：
+
+- `可合并`：代码通过，安全与适用门禁均通过。
+- `不可合并`：列出精确阻断项，例如 `code`、`safety`、`pipeline-failed`、`mergeability`、`zan-must` 或 `zan-governance`。
 
 主要问题必须简短具体。没有问题时写 `未发现阻断问题`；不要写泛泛的“建议加强测试”当作主要问题。
 
-### 不通过 / 暂缓详情
+### 阻断详情
 
-审核报告必须重点展开 `不通过` 和 `暂缓` 的 MR，因为这些内容会作为打回理由使用。
+重点展开代码 `不通过/未完成` 和 MR 自身的合并阻断。相同项目的公共 Zan 状态、pipeline 策略或项目配置只汇总一次，不为每个 MR 重复生成打回理由。
 
-每个 `不通过` / `暂缓` MR 后追加详情块：
+每个代码 `不通过` / `未完成` 或存在 MR 自身合并阻断的项目后追加详情块：
 
 ```markdown
-#### <项目名>!<iid> 打回理由
+#### <项目名>!<iid> 阻断理由
 
-- 结论：不通过 / 暂缓
+- 代码结论：不通过 / 未完成 / 通过
+- 合并资格：不可合并
 - 审核 HEAD：<sha>
 - 阻断问题：
   1. <问题标题>
@@ -193,16 +220,18 @@ Code review 必须对 changed files 执行 Zan System 路由，详细证据格�
 
 详情要求：
 
-- `不通过` 必须至少有一个明确阻断问题和证据；证据不足时应标为 `暂缓`，不能强行判 `不通过`。
+- `不通过` 必须至少有一个明确阻断问题和证据；证据不足时应标为 `未完成`，不能强行判 `不通过`。
 - 打回理由优先写真实风险，不写空泛建议；例如“可能有问题”不够，必须说明触发条件和影响面。
 - 能定位文件时必须给文件路径和行号或 diff 区域；不能定位时说明证据来自 pipeline、未解决讨论、mergeability 或工具限制。
 - 对同一 MR 的多个问题按严重程度排序，只保留足以支撑打回的关键问题，避免噪音。
-- `通过` MR 可以只保留总表摘要，不需要展开详情，除非用户要求完整报告。
+- `通过` 且只有项目公共治理状态的 MR 只保留总表摘要；公共状态在项目级汇总一次。
+- “项目未接入 Zan”不是作者需要修复的 MR 问题，不生成 GitLab 打回说明。
 
 审核报告后补充摘要：
 
 - 审核 MR 总数
-- 通过数 / 不通过数 / 暂缓数
+- 代码通过数 / 不通过数 / 未完成数
+- 可合并数 / 不可合并数及阻断类别
 - 跳过项及原因
 - 可进入第 3 步合并的 MR 列表
 
@@ -228,7 +257,9 @@ Code review 必须对 changed files 执行 Zan System 路由，详细证据格�
 - 结论必须是 `通过`。
 - mergeability 不能显示 conflict / cannot merge。
 - 工具可见的 unresolved discussion 或 failed pipeline 如果会阻断合并，不能合并。
-- Zan 合规矩阵不得存在 `MUST` fail/unknown、无效 Exception 或缺少 typecheck/test/conformance 证据；否则标记为 `暂缓`，不能合并。
+- `not-adopted` 不要求 Zan 矩阵或 Zan 命令；普通审核门禁通过即可进入合并。
+- `adopted` 的 Zan 合规矩阵不得存在 `MUST fail/unknown`、无效 Exception 或缺少已声明命令证据。
+- `misconfigured/unknown` 的代码结论保持有效，但治理状态阻断合并，直到配置或读取状态恢复。
 
 合并动作优先使用 GitLab MCP：
 
@@ -250,8 +281,8 @@ Code review 必须对 changed files 执行 Zan System 路由，详细证据格�
 根据用户要求的步骤输出对应表格：
 
 - 第 1 步：输出待合并 MR 发现表，不给审核通过结论。
-- 第 2 步：输出审核报告表，再给通过 / 不通过 / 暂缓摘要。
+- 第 2 步：输出代码审核与合并资格双结论表，再给精简摘要。
 - 第 3 步：输出合并结果表，再给成功 / 未合并摘要。
 - 如果用户要求三步一起执行，按第 1 步、第 2 步、第 3 步顺序分段输出。
 
-不要输出长篇代码评审报告，除非用户要求展开某个 MR。对阻断问题需要给出文件路径、函数/区域或 diff 依据；无法定位到具体文件时说明证据来源不足。
+不要输出长篇或重复的代码评审报告，除非用户要求展开某个 MR。对阻断问题给出文件路径、函数/区域或 diff 依据；无法定位时说明证据来源不足。项目级公共信息只输出一次。

@@ -1,0 +1,7 @@
+case: broken-zan-adoption
+expected:
+  reviewMode: ordinary-with-zan-warning
+  zanStatus: misconfigured
+  codeReviewContinues: true
+  governanceBlocksMerge: true
+  codeConclusionIndependent: true

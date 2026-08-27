@@ -1,6 +1,6 @@
 {
   "name": "zan-workflows",
-  "version": "0.1.0+codex.20260824090124",
+  "version": "0.1.0+codex.20260827063454",
   "description": "Company project and stateless functional TAPD workflows, plus MR review, debug token, identity, and memory skills for Codex.",
   "author": {
     "name": "Local developer"
