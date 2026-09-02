@@ -52,7 +52,10 @@
   - 同一个 Wiki 条目只能有一行 `代码分支名`，且只能包含一个分支名；不得同时写“中间分支”和“修复分支”，也不得只写或重复写 `merge/*` 中间分支
   - Wiki 的 `代码分支名` 行必须完全等于 `effective_wiki_branch_name`；不得写入 `merge/*` 中间分支
   - 测试人员来自正确 TAPD 字段映射
-  - 服务名称通过 `company-project-routing` 获取，不是直接复制项目名
+  - Jenkins Job 名称和 Job 地址通过 `workspace-project-knowledge` 从知识库/Jenkins 读回获取，不是直接复制项目名、仓库名或服务别名
+  - 项目名称使用当前项目名称，monorepo 使用 `项目名称/子包名称`
+  - `是否上线` 根据项目类型计算：业务项目提测时为 `未合并`，合入 `master` 后为 `已合并`；工具项目为 `无需上线`
+  - 现行模板的业务条目在新一轮功能性提测时，若原状态为 `已合并`，本轮必须重置为 `未合并`；缺失或非现行状态值必须阻断
   - Wiki 内容没有包含未声明的历史内容
   - Bug 评论使用可点击 Markdown 格式：`提测wiki：[https://www.tapd.cn/{workspace_id}/markdown_wikis/show/#{wiki_id}](https://www.tapd.cn/{workspace_id}/markdown_wikis/show/#{wiki_id})`
   - 已执行 `TAPD_COMMENT_GATE`：记录 `wiki_url`、`expected_comment_body`、`actual_comment_body` 和 `comment_format_result`

@@ -1,6 +1,6 @@
 {
   "name": "zan-workflows",
-  "version": "0.1.0+codex.20260827063656",
+  "version": "0.1.0+codex.20260902112612",
   "description": "Company project and stateless functional TAPD workflows, plus MR review, debug token, identity, and memory skills for Codex.",
   "author": {
     "name": "Local developer"
@@ -9,7 +9,7 @@
   "interface": {
     "displayName": "Zan Workflows",
     "shortDescription": "Company project and functional TAPD workflows.",
-    "longDescription": "Bundles project context; risk-routed TAPD skills for initial or continued Bug work, implementation, automatic Wiki handling, consolidated test submission with optional Jenkins deployment, and going live with Wiki online-state maintenance; plus risk-routed GitLab MR review, debug tokens, team identity, and project memory workflows.",
+    "longDescription": "Bundles project context; risk-routed TAPD skills for initial or continued Bug work, implementation, automatic Wiki handling, consolidated test submission with optional Jenkins deployment, and going live with Wiki master-merge status maintenance; plus risk-routed GitLab MR review, debug tokens, team identity, and project memory workflows.",
     "developerName": "Local developer",
     "category": "Productivity",
     "capabilities": [
@@ -22,7 +22,7 @@
       "Before initial Bug work, show a concise project/repository, branch, and scope checklist and wait for confirmation; for CONTINUE work, reuse unchanged bound facts and confirm only unclear incremental scope.",
       "Reuse original branch, Wiki, and TAPD status for CONTINUE work; use one consolidated submission confirmation and resolve Jenkins deployment as AUTO, DEPLOY, or SKIP.",
       "Resolve and scope each TAPD work item before changing code.",
-      "Repair, automatically locate or create the required TAPD Wiki, submit for test, or merge to master and maintain its online field with the matching functional skill."
+      "Repair, automatically locate or create the required TAPD Wiki, submit for test, or merge to master and maintain its merge-status field with the matching functional skill."
     ]
   }
 }

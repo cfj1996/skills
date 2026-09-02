@@ -6,7 +6,7 @@ allowed-tools:
   - yapi-mcp
   - gitlab-map
   - gitlab-mcp
-  - company-project-routing
+  - workspace-project-knowledge
   - superpowers
   - update_topic
 ---
@@ -39,7 +39,7 @@ allowed-tools:
 - `yapi-mcp`：涉及接口对接时查询接口文档。
 - `gitlab-map`：校验分支基线、提交同步和合并状态。
 - `gitlab-mcp`：创建分支、处理合并请求、合并到 `develop`。
-- `company-project-routing`：根据项目线索解析提测 Wiki 的 `服务名称`。
+- `workspace-project-knowledge`：根据知识库 `jenkins_jobs`、项目分类和包归属解析提测 Wiki 的 Jenkins Job 名称、Job 地址、项目名称及服务类型。
 - `superpowers`：规划、实现、验证和分支收尾工作流。
 
 注意：本节中的 `tapd-mcp`、`gitlab-map`、`gitlab-mcp` 是 MCP 能力/集成职责名，不要求运行时暴露同名可调用 namespace。实际工具名以当前会话暴露为准；只要通过 GitLab MCP 能力完成对应校验职责，即视为满足。
@@ -232,7 +232,7 @@ allowed-tools:
 
 ### 6. 准备提测 Wiki
 - **必须先检查当前 TAPD 详情中是否已经存在提测 Wiki 链接。若已存在，直接在该 Wiki 页面上补充，不得新建。**
-- `服务名称` 必须通过 `company-project-routing` 解析。必须按模板生成完整 Wiki 正文。
+- 必须通过 `workspace-project-knowledge` 解析知识库中的精确 Jenkins Job 名称、Job 地址、当前项目名称和服务类型；不得使用仓库名称或服务别名替代。必须按模板生成完整 Wiki 正文。
 - 同一需求/功能多次修复时，先判断本轮是否影响功能行为：不影响功能的变更可以跳过 Wiki 更新；影响功能的变更只在对应已有条目的 `影响范围` 字段按序补充新增模块或页面；判断不清时不得猜测。
 - 写入 Wiki 时必须执行 `WikiWriteGate`：记录目标 Wiki、写入前正文摘要或 hash、预期补丁、写入后读回结果；读回内容未包含预期补丁时必须停止。
 

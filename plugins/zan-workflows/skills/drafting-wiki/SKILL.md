@@ -45,18 +45,25 @@ invent a value or render a placeholder.
    current `YYYY-MM` month. Reuse one related `MM-DD: 中文简述` child matched by
    TAPD identity, short ID, or original source branch; otherwise plan creation
    of the missing month and/or child Wiki. Never ask the user for the target.
-3. Resolve and reconcile the current TAPD/change, repository, service,
-   developer, tester, description, scope, and original source branch from
-   current read-only evidence. Retain conflicts and block unresolved fields.
+3. Resolve and reconcile the current TAPD/change, repository, exact Jenkins
+   Job name and URL, project name, project category/service type, package
+   classification, developer, tester, description, scope, and original source
+   branch from current read-only evidence. Retain conflicts and block
+   unresolved fields.
 4. Use exactly one evidenced original `feature/*` or `fixbug/*` branch. Never
    use a `merge/*` branch. Use that branch to identify an existing current
    entry.
 5. For a `FUNCTIONAL_IMPACT` continuation, locate `# 前端`, reuse the matching
-   branch entry, append the affected scope to that entry's existing `影响范围`
-   list as the only Wiki patch. Never create a second entry for the same branch
-   or reset an existing online value. For `INITIAL`, render
+   branch entry, and append the affected scope to that entry's existing
+   `影响范围` list. For a business project, also change `已合并` back to
+   `未合并` when the new current-round commits are not contained in
+   `origin/master`; preserve an existing `未合并`. For a tooling project,
+   require and preserve `无需上线`. A missing status or any value outside the
+   current three-state contract blocks. Never create a second entry for the same branch. For
+   `INITIAL`, render
    a complete body beginning with `# 前端` and sequence `1`, initializing each
-   new entry with `是否上线：否`.
+   new entry with the resolved status: `未合并` for a business project or
+   `无需上线` for a tooling/library project.
 6. For a policy skip, map validation to `NOT_RUN` with its normalized reason.
    Otherwise, give the target plan, hierarchy/readback evidence, normalized
    facts, calculation, patch, and proposed body to the private read-only

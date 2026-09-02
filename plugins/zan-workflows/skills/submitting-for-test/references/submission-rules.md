@@ -61,8 +61,10 @@ the drafter returned `VALIDATED`:
 
 Never write the canonical entry body into the month page. For the validated
 path, read back the final child, retain its actual ID/URL and original source
-branch for `going-live`, and require the expected body including `是否上线：否`
-before continuing. A policy skip has no child write/readback or Wiki update,
+branch for `going-live`, and require the expected body including the resolved
+status (`未合并` for a business project or `无需上线` for a tooling/library
+project) before continuing. A policy skip has no
+child write/readback or Wiki update,
 but retains any existing target readback needed by an explicitly requested
 `going-live` step.
 

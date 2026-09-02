@@ -53,14 +53,14 @@
   - `regression-checker` 返回 `FAIL`
   - 阻断原因包含“评论必须使用可点击 Markdown 链接格式”
 
-## 场景 F：服务名称未按技能映射（应阻断）
+## 场景 F：Jenkins Job 未按知识库解析（应阻断）
 
 - 输入场景：
-  - Wiki 正文中的 `服务名称` 直接使用项目名称
-  - 没有 `company-project-routing` 的映射依据
+  - Wiki 正文中的 Jenkins Job 名称直接使用项目名称、仓库名称或服务别名
+  - 没有 `workspace-project-knowledge` 从 `jenkins_jobs` 获取的映射依据，或缺少 Job 地址
 - 期望门禁：
   - `regression-checker` 返回 `FAIL`
-  - 阻断原因包含“服务名称必须通过 company-project-routing 获取”
+  - 阻断原因包含“Jenkins Job 名称和地址必须通过 workspace-project-knowledge 获取”
 
 ## 场景 G：跳过分支门禁直接改代码（应阻断）
 

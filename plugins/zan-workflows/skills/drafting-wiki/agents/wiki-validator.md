@@ -24,7 +24,10 @@ Validate these invariants in order:
    `MM-DD: 中文简述`. Ambiguous/inaccessible existing evidence is blocked rather
    than delegated to the user as a required URL.
 2. Every canonical value has one cited, mutually consistent read-only source;
-   the successful body contains no `待补充`. No person was guessed or copied
+   the successful body contains no `待补充`. The rendered link uses the exact
+   Jenkins Job name and URL from evidence, not a repository name or alias. The
+   red service marker is exactly `更新服务` for a business project and exactly
+   `工具服务-无需上线` for a tooling/library project. No person was guessed or copied
    from `reporter` as a tester.
 3. The current entry has exactly one evidenced
    `effective_wiki_branch_name`, formatted as `feature/*` or `fixbug/*`. It is
@@ -37,13 +40,19 @@ Validate these invariants in order:
    one; one branch match receives an impact-scope patch and no new sequence. For a
    create plan, `before_content_hash=NEW_PAGE` and the complete body begins with
    `# 前端` and sequence `1`. The monthly parent never receives the entry body.
-   Under `CONTINUE`, one matching source-branch entry receives only the current
-   affected-scope append; a new duplicate entry is invalid. A proven
-   non-functional continuation is skipped before this validator is called.
+   Under `CONTINUE`, one matching source-branch entry receives the current
+   affected-scope append; a business entry also resets `已合并` to `未合并`
+   when the new current-round commits are not in `origin/master`, while a
+   tooling entry preserves `无需上线`. Missing or non-current statuses are invalid,
+   and a new duplicate entry is invalid. A proven non-functional continuation
+   is skipped before this validator is called.
 5. A successful new entry contains every canonical field from
-   `references/wiki-template.md`, including exactly `是否上线：否`, and contains
-   no process narration, validation verdict, write instruction, or claim that
-   production was published. An existing online value is not silently reset.
+   `references/wiki-template.md`, including `项目名称`, the exact Jenkins Job
+   link, and exactly one valid status: `未合并` for a business project at test
+   submission or `无需上线` for a tooling/library project. It contains no
+   process narration, validation verdict, write instruction, or unsupported
+   claim that the change is already merged. An existing status value is not
+   silently reset.
 6. A reused body is preserved byte-for-byte outside the recorded minimal patch.
    Historical content is not deleted, reordered, normalized, or silently
    reattributed. A create plan has a complete initial child body and no invented

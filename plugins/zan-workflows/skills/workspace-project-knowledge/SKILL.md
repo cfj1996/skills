@@ -244,6 +244,10 @@ After routing:
 
 9. Return the centralized project knowledge paths that should be read next.
 10. If the routed target is a `zan-projects` subproject, return the subproject path rather than stopping at the monorepo root.
+11. When the consumer is a TAPD Wiki workflow, normalize the routed project to
+    exactly one Wiki service type using the table below and return the
+    corresponding initial merge status. An unmapped category blocks instead of
+    being guessed.
 
 Signal ranking:
 
@@ -263,6 +267,18 @@ Fast category hints:
 | 服务商体系 | `zan-projects/admin/facilitator`, `provider-mobile` |
 | 基础库 / 组件库 | `common`, `zan-lib`, `sim-ui`, `von-ui`, `zan-apps`, `zan-atlas`, `zan-atlas-modules`, `zan-poster` |
 | AI / 工具 / DevOps | `skills`, `zan-skills`, `yapi-mcp`, `jenkinsfile`, `zan-cli` |
+
+Wiki service-type normalization:
+
+| Knowledge category | Normalized type | Red marker | Test-submission status |
+|---|---|---|---|
+| `管理后台`, `管理后台Monorepo`, `商城类`, `服务商`, `仓配系统前端`, `仓配管理系统`, `仓配作业系统`, `仓配移动端` | `BUSINESS` | `更新服务` | `未合并` |
+| `基础库`, `组件库`, `平台库`, `Atlas跨平台基座`, `Atlas模块`, `文档`, `技能库`, `AI技能`, `MCP服务`, `DevOps`, `CLI工具`, `本地CLI工具` | `TOOLING` | `工具服务-无需上线` | `无需上线` |
+
+For a monorepo, classify the matched package/app rather than the repository
+root. `zan-projects/admin/*` applications are `BUSINESS`; packages under
+`zan-lib`, `zan-apps`, and other library/tooling monorepos are `TOOLING`.
+Return `BLOCKED_UNMAPPED_WIKI_SERVICE_TYPE` for any category not listed above.
 
 Important routing examples:
 
@@ -316,7 +332,9 @@ Workflow:
 
 1. Route the project with Function 1.
 2. Read `jenkins_jobs` from the centralized `${project_knowledge_root}/data/workspace/project-relations.yaml`, falling back to `references/project-relations.yaml`.
-3. Return the exact job name and the routing evidence.
+3. Return the exact Job name, the exact Job URL when indexed or read back from
+   Jenkins, and the routing evidence. A consumer that needs a clickable Job
+   link must block when the URL cannot be evidenced; it must not derive one.
 4. If a project is not listed in `jenkins_jobs`, say it is not listed in the workspace index; do not guess a `front-*-test` name.
 5. For public libraries and tooling packages, check whether they map to the shared `npm-tools-test` job.
 
@@ -324,8 +342,8 @@ Output:
 
 - `项目`
 - `路径`
-- `服务名称`
-- `Jenkins Job`
+- `Jenkins Job 名称`
+- `Jenkins Job 地址`（必须来自知识库或 Jenkins 读回，无法解析时不得猜测）
 - `命中依据`
 
 ## Function 4 - Private Package And Library Ownership
@@ -338,13 +356,17 @@ Workflow:
 2. Return owner project and package path.
 3. Return listed consumers from `packages.*.consumers`.
 4. Check `dependencies` for broader cross-project relations.
-5. Only search `package.json` files after the workspace index is read and the package is not listed or needs confirmation.
+5. Resolve the package visibility from explicit package metadata or project
+   knowledge; an `@scope` name alone does not prove that a package is private.
+6. Only search `package.json` files after the workspace index is read and the
+   package is not listed or its visibility needs confirmation.
 
 Output:
 
 - `包名`
 - `归属项目`
 - `包路径`
+- `是否私有包`及其依据
 - `消费者项目`
 - `影响范围`
 - `下一步应读取`
@@ -437,23 +459,27 @@ Project routing:
 - `项目`
 - `路径`
 - `分类`
+- `Wiki 服务类型`：`BUSINESS|TOOLING` when requested by a Wiki workflow
+- `Wiki 服务标识`：`更新服务|工具服务-无需上线` when requested by a Wiki workflow
+- `提测合并状态`：`未合并|无需上线` when requested by a Wiki workflow
 - `命中依据`
 - `置信度`
-- `服务名称` when available
-- `Jenkins Job` when relevant
+- `Jenkins Job 名称` when relevant
+- `Jenkins Job 地址` when relevant
 - `下一步应读取`
 
 Jenkins lookup:
 
 - `项目`
-- `服务名称`
-- `Jenkins Job`
+- `Jenkins Job 名称`
+- `Jenkins Job 地址`
 - `依据`
 
 Package impact:
 
 - `包名`
 - `归属项目`
+- `是否私有包`及其依据
 - `消费者项目`
 - `影响范围`
 - `下一步应读取`

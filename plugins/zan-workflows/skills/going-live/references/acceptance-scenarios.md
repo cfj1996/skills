@@ -5,12 +5,13 @@
 | Submitted original branch with valid authorization | Merge that branch directly to `master` and verify containment. |
 | Source is `develop`, `merge/*`, or another branch | `BLOCKED` before MR write. |
 | Source or master SHA changes after authorization | Stop, display new facts, and require fresh authorization. |
-| `STANDARD` Wiki has one matching `是否上线：否` entry | After merge containment, update only that field to `是` and verify readback. |
-| Matching legacy entry has no online field | After merge containment, insert `是否上线：是` immediately before `环境`. |
-| Matching field is already exactly `是` | Record `ALREADY_ONLINE`; perform no Wiki write. |
-| Entry match or online field is ambiguous | `BLOCKED` before the master MR write. |
+| `STANDARD` Wiki has one matching business entry with `是否上线：未合并` | After merge containment, update only that field to `已合并` and verify readback. |
+| Matching business field is already exactly `已合并` | Record `ALREADY_MERGED`; perform no Wiki write. |
+| Matching business entry is missing the status or contains a non-current value | `BLOCKED`; do not migrate or rewrite an old template. |
+| Matching entry belongs to a tooling project | Verify `是否上线：无需上线`, record `SKIPPED_TOOL_PROJECT`, and perform no Wiki write or Wiki-write authorization. |
+| Entry match or merge-status field is ambiguous | `BLOCKED` before the master MR write. |
 | `NO_WIKI` submission | `SKIPPED_NO_WIKI`; merge can still succeed without creating a Wiki. |
-| `STANDARD` submission skipped Wiki because the continue fix was non-functional | Reuse the retained existing Wiki target and maintain `是否上线` after master containment. |
+| `STANDARD` submission skipped Wiki because the continue fix was non-functional | Reuse the retained existing Wiki target and maintain its business merge status after master containment, or verify the tooling status without writing. |
 | Merge/readback/containment fails | `BLOCKED`; do not change `是否上线` or claim go-live success. |
 | Wiki changes after authorization | Preserve the changed page and require a fresh patch/authorization; report any already completed merge truthfully. |
 

@@ -5,7 +5,8 @@ from current read-only evidence. A valid body contains no `待补充`. Do not ad
 target-location, Wiki-ID, TAPD-comment, writeback, merge, or release narration.
 
 ```md
-{序号}. [{服务名称}]({git地址}) **!!#ff0000 更新服务!!**
+{序号}. [{Jenkins Job 名称}]({Jenkins Job 地址}) **!!#ff0000 {服务类型}!!**
+- 项目名称：[{项目名称}]({Git 仓库地址})
 - 负责人：{开发人员}
 - 开发人员：
   - 前端：{开发人员}
@@ -14,17 +15,31 @@ target-location, Wiki-ID, TAPD-comment, writeback, merge, or release narration.
 - 影响范围：
   1. {影响范围}
 - 测试人员：{测试人员}
-- 是否上线：否
-- 环境：联团 老生产
+- 是否上线：{上线状态}
 ```
 
 ## Field rules
 
 - `序号` is calculated from the resolved child Wiki under `# 前端`; a new child
   starts at `1`. It is never supplied as an unexplained placeholder.
-- `服务名称` and `git地址` come from verified project routing/repository
-  evidence. Do not equate a project folder with a service name without that
-  mapping.
+- `Jenkins Job 名称` is the exact Job name from the workspace knowledge
+  `jenkins_jobs` index. It must not be replaced with a repository name, service
+  alias, or a guessed display name.
+- `Jenkins Job 地址` is the exact clickable URL of that Job, resolved from the
+  workspace knowledge/Jenkins readback. Never use the Git repository URL or
+  construct a URL from the Job name when the address is not evidenced.
+- `项目名称` is the current project name. For a monorepo package, use
+  `项目名称/子包名称`; the Markdown link points to the verified Git
+  repository URL.
+- `Git 仓库地址` is the verified repository URL for the current project. For
+  a monorepo package, link to the monorepo repository, not a guessed package
+  URL.
+- `服务类型` is exactly `更新服务` for a business project and exactly
+  `工具服务-无需上线` for a tooling/library project or package. Resolve it from the
+  project category; do not use `更新服务` for a tool package.
+- Project type must come from explicit project knowledge or package metadata;
+  an `@scope` name alone does not decide whether the project is a tooling
+  project.
 - `开发人员` comes from the reconciled work definition, TAPD developer, or
   reviewed change and is used in both required places. Conflicts block.
 - `内容` summarizes the resolved TAPD work and current reviewed change.
@@ -33,13 +48,18 @@ target-location, Wiki-ID, TAPD-comment, writeback, merge, or release narration.
 - `影响范围` lists resolved current-round scopes in order. Missing scope blocks.
 - `测试人员` comes from the TAPD tester field or its dynamically resolved custom
   field. Never use `reporter` as an implicit substitute; missing tester blocks.
-- `是否上线` is exactly `否` for a new entry. Only `going-live` may change it to
-  `是` after verified `origin/master` containment.
-- `环境` is exactly `联团 老生产`.
+- `上线状态` is derived from the project type: a business project is exactly
+  `未合并` for test submission and becomes `已合并` only after the original
+  branch is verified in `origin/master`; a tooling/library project is exactly
+  `无需上线`. An unresolved project type blocks; never guess. `已合并` also
+  requires the corresponding master-containment evidence.
 - For `CONTINUE`, classify the current-round change before patching. If it is
   `NON_FUNCTIONAL`, do not update the Wiki. If it is `FUNCTIONAL_IMPACT`, the
   new affected module/page must be appended to the matching entry's
-  `影响范围` list; do not duplicate an identical existing item.
+  `影响范围` list; do not duplicate an identical existing item. A business
+  entry already marked `已合并` must also return to `未合并` when this new
+  current round is not contained in `origin/master`. A tooling entry remains
+  `无需上线`.
 
 ## Wiki target resolution
 
@@ -66,7 +86,8 @@ belongs in the child Wiki.
 ## Body calculation and patch rules
 
 For `CREATE_CHILD|CREATE_MONTH_AND_CHILD`, render a complete new child body as
-`# 前端`, one blank line, then the canonical entry above with `序号=1`.
+`# 前端`, one blank line, then the canonical entry above with `序号=1` and the
+resolved `上线状态`.
 
 For `REUSE_EXISTING`, operate only on the current child body read from TAPD:
 
@@ -79,14 +100,18 @@ For `REUSE_EXISTING`, operate only on the current child body read from TAPD:
 - If exactly one entry under `# 前端` contains the original source branch,
   preserve its sequence. For a `FUNCTIONAL_IMPACT` continuation, append the
   affected module/page as the next numbered item under that entry's existing
-  `影响范围` field as the only patch. If the entry predates `是否上线`, also
-  insert `- 是否上线：否` immediately before its `- 环境` line. For a
-  `NON_FUNCTIONAL` continuation, produce a policy skip and no patch.
+  `影响范围` field. For a business project, the same minimal patch also changes
+  `是否上线：已合并` to `是否上线：未合并` when the new current-round commits
+  are not contained in `origin/master`; an existing `未合并` is preserved. A
+  tooling project must preserve `是否上线：无需上线`. A missing status or any
+  value outside the current three-state contract blocks; do not migrate an old
+  template. For a `NON_FUNCTIONAL` continuation, produce a policy skip and no
+  patch.
 - Multiple matching entries, duplicate existing sequences,
-  duplicate/conflicting online fields, malformed section boundaries, or an
+  duplicate/conflicting merge-status fields, malformed section boundaries, or an
   unreadable child block instead of guessing.
 
 Keep every reused character unchanged outside the calculated patch. Never
 replace an existing child with a freshly generated page, renumber historical
-entries, or silently change a prior entry's branch, person, content, or online
-state.
+entries, or silently change a prior entry's branch, person, content, or merge
+status.

@@ -10,7 +10,7 @@
 | Target plan | For `VALIDATED`, `REUSE_EXISTING|CREATE_CHILD|CREATE_MONTH_AND_CHILD`, workspace, root/month/child identity, title, creator, and evidence; exact URL/ID/body/hash when reusing. A policy skip retains an existing target only when available for `going-live`. |
 | Claims | resolved value and read-only source for each material field |
 | Conflicts | competing values, sources, criticality |
-| Current entry | sequence, service, repository, developer, description, branch, scope, tester, online state, environment |
+| Current entry | sequence, Jenkins Job name/URL, project name, project category/service type, repository, developer, description, branch, scope, tester, merge status |
 | Work mode | `INITIAL|CONTINUE`, impact classification, and incremental-scope evidence when continuing |
 | Wiki decision | `UPDATE|SKIP_NON_FUNCTIONAL` and normalized reason |
 | Placement | For `VALIDATED`, `NEW_FRONTEND_SECTION|APPEND_ENTRY|APPEND_IMPACT_SCOPE`, `# 前端` evidence, matching-entry evidence, and sequence calculation; for a policy skip, the skip decision evidence |
@@ -41,7 +41,10 @@
   Create modes use `before_content_hash=NEW_PAGE` and a fully specified parent
   plan; the monthly parent never receives the entry body.
 - Every canonical field must be resolved from read-only evidence. A successful
-  body contains no `待补充`; never use `reporter` as a tester fallback.
+  body contains no `待补充`; never use `reporter` as a tester fallback. The
+  rendered link must use the exact Jenkins Job name and URL, not a repository
+  name or alias. The red service marker is `更新服务` for business projects
+  and `工具服务-无需上线` for tooling/library projects.
 - For `CONTINUE`, classify the current-round change from reviewed diff and
   implementation/verification evidence as `FUNCTIONAL_IMPACT` or
   `NON_FUNCTIONAL`. Ambiguous classification blocks.
@@ -50,9 +53,10 @@
   This policy covers changes that do not alter functional behavior, such as
   refactoring, logging, test-only, or build-only changes.
 - `FUNCTIONAL_IMPACT` continuation reuses the matching existing entry and
-  appends only the new affected module/page to that entry's `影响范围` list.
-  Do not create a duplicate entry or
-  duplicate an identical scope already listed.
+  appends the new affected module/page to that entry's `影响范围` list. A
+  business entry changes `已合并` back to `未合并` when the new current-round
+  commits are not in `origin/master`; a tooling entry preserves `无需上线`. Do
+  not create a duplicate entry or duplicate an identical scope already listed.
 - The effective branch must be exactly one evidenced `feature/*` or `fixbug/*`
   source branch.
 - A newly created child starts with `# 前端` and sequence `1`. A new entry under
@@ -61,14 +65,15 @@
   section is appended as `# 前端` with sequence `1`. A unique entry with the
   same source branch gets an impact-scope patch and no new sequence. Duplicate
   sequences or ambiguous matches block.
-- Every new entry initializes `是否上线：否`. This means its current-round
-  commits have not yet been verified as contained in `origin/master`; it does
-  not describe production publication.
-- The environment is exactly `联团 老生产` unless current read-only evidence
-  establishes a material conflict, which blocks.
+- Every new entry initializes `是否上线` from the project type: `未合并` for a
+  business project or `无需上线` for a tooling/library project. A business
+  entry changes to `已合并` only after the original branch is verified in
+  `origin/master`; it is not a production-publication claim.
 - Reused valid content is immutable outside the declared minimal patch. A
-  matching legacy entry may add a missing `是否上线：否` line; an existing
-  online value is never silently rewritten by this drafting capability.
+  matching entry must already use the current status contract: business
+  `未合并|已合并`, or tooling `无需上线`. Missing or non-current values block.
+  Only the declared current-round scope append and any
+  required business `已合并` to `未合并` reset may change.
 - `VALIDATED` requires passing validation and a non-empty copyable Markdown
   body. `BLOCKED` requires a concise blocker and no rendered final body.
 - The result contains no external-write authority, local path, runtime ID,

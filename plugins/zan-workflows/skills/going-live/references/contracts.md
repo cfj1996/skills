@@ -10,7 +10,7 @@
 | Submission | upstream `SUBMITTED` result and original repair branch |
 | Repository | expected/actual path, Git root, origin, verification result |
 | Merge | source/target branches and SHAs, current-round commits, authorization, MR result, merge readback, master containment |
-| Wiki | `UPDATED_ONLINE|ALREADY_ONLINE|SKIPPED_NO_WIKI|BLOCKED|NOT_ATTEMPTED`, matching branch entry, before/after online value, target/patch authorization, and readback when used |
+| Wiki | `UPDATED_MERGED|ALREADY_MERGED|SKIPPED_TOOL_PROJECT|SKIPPED_NO_WIKI|BLOCKED|NOT_ATTEMPTED`, matching branch entry, project type, before/after merge status, target/patch authorization, and readback when used |
 | Validation | `VALIDATION_PASSED|VALIDATION_FAILED|NOT_RUN` and normalized reason |
 | Terminal | `MERGED|BLOCKED` and blocker when applicable |
 
@@ -24,15 +24,22 @@
   substituted source are always blocked.
 - A `STANDARD` submission, including `SKIPPED_BY_POLICY`, requires its
   pre-existing exact Wiki target and one uniquely matching source-branch entry.
-  A `NO_WIKI` submission yields `SKIPPED_NO_WIKI` and does not prevent
-  `MERGED`; never create a Wiki.
-- `UPDATED_ONLINE` requires verified master containment, separate authorization
+  A tooling project yields `SKIPPED_TOOL_PROJECT` after verifying exactly
+  `是否上线：无需上线` and performs no Wiki write. A `NO_WIKI`
+  submission yields `SKIPPED_NO_WIKI` and does not prevent `MERGED`; never
+  create a Wiki.
+- `UPDATED_MERGED` requires verified master containment, separate authorization
   for the exact minimal field patch, and a readback of exactly
-  `是否上线：是`. A legacy matching entry may insert that field before `环境`.
-- `ALREADY_ONLINE` requires a readback of exactly one matching
-  `是否上线：是` field and performs no Wiki write.
-- The online field denotes verified current-round commit containment in
-  `origin/master`, not production publication.
+  `是否上线：已合并`. The authorized patch must replace exactly one
+  `是否上线：未合并` field. Missing or non-current values block; no migration
+  or insertion is allowed.
+- `ALREADY_MERGED` requires a readback of exactly one matching
+  `是否上线：已合并` field and performs no Wiki write.
+- The merge-status field denotes current-round commit containment in
+  `origin/master`; it does not claim that a production version was published.
+  `无需上线` is reserved for tooling/library projects.
+- `SKIPPED_TOOL_PROJECT` has no Wiki patch and requires no Wiki-write
+  authorization.
 - A failed or unknown external result returns `BLOCKED` and truthfully reports
   completed actions; do not perform later writes.
 - The result contains no production-publish claim, runtime/recovery fields,
