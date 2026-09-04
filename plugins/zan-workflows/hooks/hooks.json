@@ -1,0 +1,31 @@
+{
+  "description": "Portable lifecycle hooks for Zan Workflows.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${PLUGIN_ROOT}/hooks/scripts/session-start-memory.sh\"",
+            "async": true,
+            "statusMessage": "Updating workflow memory"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "^Bash$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/hooks/scripts/git-branch-safety.mjs\"",
+            "timeout": 5,
+            "statusMessage": "Checking workspace Git branch safety"
+          }
+        ]
+      }
+    ]
+  }
+}
