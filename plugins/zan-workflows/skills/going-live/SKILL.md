@@ -16,6 +16,9 @@ entry as `是否上线：已合并` after verified master containment. A tooling
 project keeps `是否上线：无需上线` and requires no master-merge status
 transition.
 
+After verified master delivery, also check associated local branches and
+worktrees and report cleanup advice; this skill does not delete them.
+
 Read [contracts.md](references/contracts.md) and
 [acceptance-scenarios.md](references/acceptance-scenarios.md) before any write.
 
@@ -69,7 +72,11 @@ rebuilt branch as the source.
    authorized facts, stop and re-authorize. Otherwise create/update and merge
    the direct source-to-master MR. Read back the merge and prove all approved
    current-round commits are contained in `origin/master`.
-6. Only after successful merge readback and `origin/master` containment, for a
+6. After successful merge readback and `origin/master` containment, run the
+   read-only [local closeout check](references/local-closeout.md). Retain its
+   result even if subsequent Wiki maintenance fails. A partial or unavailable
+   local check does not block Wiki maintenance or change the confirmed merge.
+7. Only after successful merge readback and `origin/master` containment, for a
    `STANDARD` business submission re-read the Wiki. If the authorized patch
    still applies, validate that Wiki write, apply it, and read back exactly
    `是否上线：已合并`; for `ALREADY_MERGED`, verify the unchanged field instead.
@@ -77,8 +84,10 @@ rebuilt branch as the source.
    `是否上线：无需上线` field and perform no Wiki write. If the page changed,
    stop for a fresh patch and authorization; never overwrite the changed page.
    A `NO_WIKI` submission performs no Wiki read or write.
-7. Return `MERGED` only when all required readbacks pass; otherwise return
-   `BLOCKED` with actual completed effects.
+8. Return `MERGED` only when all required merge and Wiki readbacks pass;
+   otherwise return `BLOCKED` with actual completed effects. Include the local
+   check result separately, with paths/branches, reasons, and cleanup advice.
+   If master delivery was not verified, mark the local check `NOT_TRIGGERED`.
 
 Do not publish a production version, run smoke tests, update TAPD status or
 comments, publish a test version, or write local workflow state. No retry or
