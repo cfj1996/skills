@@ -10,7 +10,7 @@
 | Target plan | For `VALIDATED`, `REUSE_EXISTING|CREATE_CHILD|CREATE_MONTH_AND_CHILD`, workspace, root/month/child identity, title, creator, and evidence; exact URL/ID/body/hash when reusing. A policy skip retains an existing target only when available for `going-live`. |
 | Claims | resolved value and read-only source for each material field |
 | Conflicts | competing values, sources, criticality |
-| Current entry | sequence, Jenkins Job name/URL, project name, project category/service type, repository, developer, description, branch, scope, tester, merge status |
+| Current entry | sequence, Jenkins Job name/URL, selected build/release parameter names and values, project name, project category/service type, repository, developer, description, branch, scope, tester, merge status |
 | Work mode | `INITIAL|CONTINUE`, impact classification, and incremental-scope evidence when continuing |
 | Wiki decision | `UPDATE|SKIP_NON_FUNCTIONAL` and normalized reason |
 | Placement | For `VALIDATED`, `NEW_FRONTEND_SECTION|APPEND_ENTRY|APPEND_IMPACT_SCOPE`, `# 前端` evidence, matching-entry evidence, and sequence calculation; for a policy skip, the skip decision evidence |
@@ -42,8 +42,10 @@
   plan; the monthly parent never receives the entry body.
 - Every canonical field must be resolved from read-only evidence. A successful
   body contains no `待补充`; never use `reporter` as a tester fallback. The
-  rendered link must use the exact Jenkins Job name and URL, not a repository
-  name or alias. The red service marker is `更新服务` for business projects
+  rendered link must derive its display name from the evidenced Jenkins Job
+  name by hiding environment tokens, append the selected build/release parameter
+  names and values according to `wiki-template.md`, and preserve the exact Job URL.
+  Never substitute a repository name or alias. The red service marker is `更新服务` for business projects
   and `工具服务-无需上线` for tooling/library projects.
 - For `CONTINUE`, classify the current-round change from reviewed diff and
   implementation/verification evidence as `FUNCTIONAL_IMPACT` or

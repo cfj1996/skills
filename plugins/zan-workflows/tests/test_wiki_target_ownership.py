@@ -76,7 +76,7 @@ class WikiTargetOwnershipTests(unittest.TestCase):
 
     def test_wiki_template_uses_jenkins_project_and_type_aware_merge_status(self):
         self.assertIn(
-            "[{Jenkins Job 名称}]({Jenkins Job 地址})",
+            "Job：[{Jenkins Job 名称}?{Job 参数}]({Jenkins Job 地址})",
             DRAFTING_RULES,
         )
         self.assertIn("- 项目名称：[{项目名称}]({Git 仓库地址})", DRAFTING_RULES)

@@ -24,8 +24,19 @@ Validate these invariants in order:
    `MM-DD: 中文简述`. Ambiguous/inaccessible existing evidence is blocked rather
    than delegated to the user as a required URL.
 2. Every canonical value has one cited, mutually consistent read-only source;
-   the successful body contains no `待补充`. The rendered link uses the exact
-   Jenkins Job name and URL from evidence, not a repository name or alias. The
+   the successful body contains no `待补充`. The rendered link is derived from
+   the exact evidenced Jenkins Job name, not a repository name or alias. New
+   entry headings use `{序号}. Job：` before the link. Link text hides only
+   environment tokens such as `test` and `master` and their adjoining separator,
+   preserving business-name substrings. The full evidenced Job URL and original
+   lookup name remain unchanged; for example, `front-vantix-system-test` is
+   displayed as `front-vantix-system` while its URL still ends with
+   `/job/front-vantix-system-test/`. After the display name, the link text
+   appends `?{Job 参数}` using selected build/release `name=value` pairs joined
+   by `&`, checked against Jenkins definitions. Omit branch parameters such as
+   `branch` by default. Omit `?` and its suffix when no displayable parameters
+   remain; unresolved required selections block. Never append these display
+   parameters to the actual Job URL. The
    red service marker is exactly `更新服务` for a business project and exactly
    `工具服务-无需上线` for a tooling/library project. No person was guessed or copied
    from `reporter` as a tester.

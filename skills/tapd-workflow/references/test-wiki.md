@@ -42,6 +42,7 @@
 - 模板中的以下字段必须明确可填：
   - 序号
   - Jenkins Job 名称
+  - Job 参数（本次选定的打包目标参数值；无此参数的 Job 除外）
   - Jenkins Job 地址
   - 项目名称
   - Git 仓库地址
@@ -56,7 +57,7 @@
 ## 模板
 
 ```md
-{序号}. [{Jenkins Job 名称}]({Jenkins Job 地址}) **!!#ff0000 {服务类型}!!**
+{序号}. Job：[{Jenkins Job 名称}?{Job 参数}]({Jenkins Job 地址}) **!!#ff0000 {服务类型}!!**
 - 项目名称：[{项目名称}]({Git 仓库地址})
 - 负责人：{开发人员}
 - 开发人员：
@@ -71,7 +72,8 @@
 
 ## 约定
 - `序号`: 第几个wiki
-- `Jenkins Job 名称`：必须使用知识库 `jenkins_jobs` 中与当前项目/子包匹配的精确 Job 名称；不得使用仓库名称、服务别名或自行猜测的名称
+- `Jenkins Job 名称`：必须使用知识库 `jenkins_jobs` 中与当前项目/子包匹配的精确 Job 名称；不得使用仓库名称、服务别名或自行猜测的名称；仅在链接显示文字中隐藏 `test`、`master` 等环境标识及相邻分隔符，例如 `front-vantix-system-test` 显示为 `front-vantix-system`；只删除已确认的独立环境标识，不误删业务名称中的同名子串。查询和证据保留原始完整 Job 名称，Job 地址保持原样
+- `Job 参数`：填写本次选定的打包/发布参数，按 `参数名=参数值` 展示，多项以 `&` 连接，保留真实名称、值及顺序，并与 Jenkins 参数定义核对。包含目标项目、平台、发布类型等选择，默认不展示 `branch` 等分支参数，原开发分支单独填入 `代码分支名`。例如 `front-suppliers?platform=--suppliers`；工具库示例为 `npm-tools?PROJECT_NAME=zan-lib&RELEASE_TYPE=release:canary`。不得从 Job 名称猜测选择或把默认值当作已确认选择；无可展示参数时省略 `?` 和参数后缀，必要选择无法确认时阻断最终正文。查询格式仅用于链接文字，实际 Job 地址保持不变。
 - `Jenkins Job 地址`：必须使用知识库或 Jenkins 读回的精确 Job 地址；不得使用 Git 仓库地址，也不得根据 Job 名称自行拼接
 - `项目名称`：使用当前项目名称；monorepo 项目使用 `项目名称/子包名称`
 - `Git 仓库地址`：使用当前项目或 monorepo 的真实 Git 仓库地址，作为项目名称的 Markdown 链接目标

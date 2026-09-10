@@ -46,7 +46,8 @@ invent a value or render a placeholder.
    TAPD identity, short ID, or original source branch; otherwise plan creation
    of the missing month and/or child Wiki. Never ask the user for the target.
 3. Resolve and reconcile the current TAPD/change, repository, exact Jenkins
-   Job name and URL, project name, project category/service type, package
+   Job name and URL, selected build/release parameter names and values verified against
+   Jenkins definitions, project name, project category/service type, package
    classification, developer, tester, description, scope, and original source
    branch from current read-only evidence. Retain conflicts and block
    unresolved fields.

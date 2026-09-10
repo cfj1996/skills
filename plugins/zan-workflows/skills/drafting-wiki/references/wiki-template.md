@@ -5,7 +5,7 @@ from current read-only evidence. A valid body contains no `待补充`. Do not ad
 target-location, Wiki-ID, TAPD-comment, writeback, merge, or release narration.
 
 ```md
-{序号}. [{Jenkins Job 名称}]({Jenkins Job 地址}) **!!#ff0000 {服务类型}!!**
+{序号}. Job：[{Jenkins Job 名称}?{Job 参数}]({Jenkins Job 地址}) **!!#ff0000 {服务类型}!!**
 - 项目名称：[{项目名称}]({Git 仓库地址})
 - 负责人：{开发人员}
 - 开发人员：
@@ -24,7 +24,24 @@ target-location, Wiki-ID, TAPD-comment, writeback, merge, or release narration.
   starts at `1`. It is never supplied as an unexplained placeholder.
 - `Jenkins Job 名称` is the exact Job name from the workspace knowledge
   `jenkins_jobs` index. It must not be replaced with a repository name, service
-  alias, or a guessed display name.
+  alias, or a guessed display name. For the rendered link text only, hide
+  environment tokens such as `test` and `master` and their adjoining separator
+  (for example, `front-vantix-system-test` displays as `front-vantix-system`).
+  Remove only tokens identified as environment markers, not matching substrings
+  inside business names. Preserve the exact original Job name for lookup and
+  evidence, and leave the full Job URL unchanged.
+- `Job 参数` contains the selected build/release parameter names and values
+  from current delivery facts, checked against Jenkins definitions. Render
+  `name=value` pairs joined by `&`, preserving their names, values, and order.
+  Include target and release-type selections; omit branch parameters such as
+  `branch` by default, since the original source branch has its own Wiki field.
+  Do not infer selections from the Job name or treat defaults as confirmed.
+  If no displayable parameters remain, omit `?` and the parameter suffix;
+  unresolved required selections block a final body. This query-like text is
+  only a display label, never a modification to the actual Job URL.
+  Examples:
+  - `Job：[front-suppliers?platform=--suppliers](http://ops.jubaozan.cn/jenkins/job/front-suppliers-test/)`
+  - `Job：[npm-tools?PROJECT_NAME=zan-lib&RELEASE_TYPE=release:canary](http://ops.jubaozan.cn/jenkins/job/npm-tools-test/)`
 - `Jenkins Job 地址` is the exact clickable URL of that Job, resolved from the
   workspace knowledge/Jenkins readback. Never use the Git repository URL or
   construct a URL from the Job name when the address is not evidenced.
