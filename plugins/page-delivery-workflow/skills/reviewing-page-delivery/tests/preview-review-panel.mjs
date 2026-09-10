@@ -12,6 +12,7 @@ const watchedFiles = [
   "scripts/inject-review-panel.js",
   "tests/fixtures/panel-preview.html",
   "tests/fixtures/review-session.json",
+  "tests/fixtures/module-review-session.json",
 ].map((path) => resolve(skillRoot, path));
 
 const contentTypes = {

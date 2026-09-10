@@ -166,7 +166,7 @@ test("repository exposes the plugin through the canonical marketplace layout", a
     ),
   );
   assert.equal(marketplace.name, "cfj-skills");
-  assert.deepEqual(marketplace.plugins, [
+  assert.deepEqual(marketplace.plugins.filter(plugin => plugin.name === "page-delivery-workflow"), [
     {
       name: "page-delivery-workflow",
       source: {
@@ -207,9 +207,9 @@ test("skill declares the review workflow and required gates", async () => {
 
 test("workflow gates have an enforced order and explicit visible prohibitions", async () => {
   const skill = visibleMarkdown(await read("skills/reviewing-page-delivery/SKILL.md"));
-  const startupConfirmation = skill.indexOf("启动确认");
-  const unifiedReview = skill.indexOf("统一提交评审");
-  const planConfirmation = skill.indexOf("确认更新 Plan");
+  const startupConfirmation = skill.indexOf("## 启动确认");
+  const unifiedReview = skill.indexOf("## 统一提交评审");
+  const planConfirmation = skill.indexOf("## 确认更新 Plan");
   assert.ok(
     startupConfirmation < unifiedReview && unifiedReview < planConfirmation,
     "启动确认、统一提交评审、确认更新 Plan 必须按此顺序出现",
@@ -239,15 +239,15 @@ test("review behavior discovers project rules before resolving ambiguity and rej
   assert.match(standard, /PRD 与原型.*冲突.*单独识别、报告并等待确认.*不得任选其一/);
 });
 
-test("review references define all dimensions, status groups, and artifact gates", async () => {
+test("review references define module contracts, background checks, status groups, and artifact gates", async () => {
   const standard = await read("skills/reviewing-page-delivery/references/page-review-standard.md");
   const statusModel = await read("skills/reviewing-page-delivery/references/status-model.md");
   const apiStages = await read("skills/reviewing-page-delivery/references/api-contract-stages.md");
 
   for (const dimension of dimensions) assert.match(standard, new RegExp(dimension));
   for (const field of [
-    "临时卡片编号", "评审域", "关联", "来源证据", "评审目标", "设计方案",
-    "页面区域、布局和组件", "交互状态", "关联 API", "Mock 场景", "验收标准", "用户备注",
+    "模块稳定编号", "职责与范围", "inputs", "outputs", "rules", "scenarios",
+    "questions", "change", "revision", "父模块", "内部实现",
   ]) assert.match(standard, new RegExp(field));
   for (const rule of [
     "证据优先级", "项目规范发现", "首次全量", "后续复评", "两阶段确认", "展示冲突",
@@ -302,22 +302,20 @@ test("API review is gated by consumer needs and never assigns an API to a page o
   assert.match(scenario, /正式接口来源/);
 });
 
-test("each API consumer gets a dedicated browser review card with visible ownership and relation facts", async () => {
+test("API consumer evidence stays inside module cards without forcing one card per technical dimension", async () => {
   const standard = await read("skills/reviewing-page-delivery/references/page-review-standard.md");
-  assert.match(standard, /每个消费需求生成一张独立的 API 设计卡/);
-  for (const mapping of [
-    "`regionAndComponents`：具体消费点",
-    "`reviewGoal`：API 需求",
-    "`design`：能力归属、运行时范围和本次交付关系",
-    "`relatedApis`：接口事实清单",
-    "`sourceEvidence`：API 判断与正式来源搜索证据",
-  ]) {
-    assert.match(standard, new RegExp(mapping.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(standard, /Agent 后台检查清单/);
+  assert.match(standard, /API 消费点不单独强制成卡/);
+  assert.match(standard, /折叠.*实现依据/);
+  for (const field of ["regionAndComponents", "relatedApis", "sourceEvidence", "能力归属", "运行时范围", "本次交付关系"]) {
+    assert.match(standard, new RegExp(field));
   }
-  assert.match(standard, /不得把 API 维度压缩成一张页面级或模块级汇总卡/);
+  assert.match(standard, /required\/none\/unknown/);
+  assert.match(standard, /不代表每个内部消费点都依赖接口/);
+  assert.doesNotMatch(standard, /每个消费需求生成一张独立的 API 设计卡|首次全量生成全部评审维度/);
 });
 
-test("every feature review card carries a compact evidence-backed implementation contract", async () => {
+test("module behavior and implementation readiness are independent while ready contracts remain evidence-backed", async () => {
   const [skill, standard, runtime, template] = await Promise.all([
     read("skills/reviewing-page-delivery/SKILL.md"),
     read("skills/reviewing-page-delivery/references/page-review-standard.md"),
@@ -343,11 +341,92 @@ test("every feature review card carries a compact evidence-backed implementation
   }
   assert.match(standard, /status.*ready.*blocked/s);
   assert.match(standard, /structure.*linkage.*dataFlow.*acceptanceFocus.*evidenceIds.*blockers/s);
-  assert.match(standard, /只有.*structure.*linkage.*dataFlow.*acceptanceFocus.*齐全.*确认/s);
+  assert.match(standard, /只有.*structure.*linkage.*dataFlow.*acceptanceFocus.*齐全.*ready/s);
+  assert.match(standard, /conclusion.*implementationPlan.status.*独立/s);
+  assert.match(standard, /阶段 Plan 可以保存已确认需求、待修改需求和未决问题/);
+  assert.match(runtime, /仍允许需求选择“已确认”/);
+  assert.doesNotMatch(runtime, /非阻塞结论不可选择/);
   assert.match(runtime, /四块|4\s*块/);
   assert.match(runtime, /折叠|展开/);
   assert.match(template, /一句话实施方案.*怎么实现.*怎么联动.*数据怎么走.*怎么验收.*实现依据/s);
   assert.match(template, /implementationPlan\.status.*ready/s);
+});
+
+test("module review schema and normalized Plan preserve hierarchy, revisions, and separate conclusions", async () => {
+  const [standard, template, status] = await Promise.all([
+    read("skills/reviewing-page-delivery/references/page-review-standard.md"),
+    read("skills/reviewing-page-delivery/assets/page-delivery-plan-template.md"),
+    read("skills/reviewing-page-delivery/references/status-model.md"),
+  ]);
+  assert.match(standard, /ReviewSession.*schemaVersion=2.*schemaVersion=1/s);
+  assert.match(standard, /schemaVersion=3.*features\[\]\.module.*features\[\]\.reviewConclusion/s);
+  assert.match(standard, /schemaVersion=2.*允许.*阶段 blocked 保存/s);
+  assert.match(standard, /questions.*必须为空.*才能进入可实施/s);
+  assert.match(standard, /阶段 Plan 仍可保存这些问题/);
+  for (const field of ["parentId", "inputs", "outputs", "rules", "scenarios", "given", "when", "then", "questions", "impact", "owner", "recommendation", "change", "revision"]) {
+    assert.match(standard, new RegExp(field));
+  }
+  assert.match(standard, /不得悬空、自引用或形成环/);
+  assert.match(template, /需求结论与实现准备度分别保存/);
+  assert.match(status, /需求已确认 · 实现方案待补充 · 评审记录已保存/);
+});
+
+test("dialogue additions use the session update API without losing input or revising submitted snapshots", async () => {
+  const runtime = await read("skills/reviewing-page-delivery/references/feature-review-runtime.md");
+  const additions = sectionContaining(runtime, "## 对话补充功能");
+  assert.match(additions, /updateReviewSession\(nextSession\)/);
+  assert.match(additions, /未提交时保持当前.*reviewRound/s);
+  assert.match(additions, /reviewRound \+ 1.*原提交不可变/s);
+  assert.match(additions, /module\.revision \+ 1/);
+  assert.match(additions, /保留未变化模块的最新意见和现场位置/);
+  assert.match(additions, /遗漏旧模块|不从完整清单静默消失/);
+  assert.doesNotMatch(additions, /没有增量更新 API/);
+  assert.match(additions, /implementationPlan.*owner=agent.*保留需求结论/s);
+  assert.match(additions, /技术变更待复核/);
+  assert.match(additions, /added\/modified\/unchanged.*单独变化不要求递增版本或重开/s);
+  assert.match(additions, /进入或退出 removed.*递增并重开/s);
+});
+
+test("saving requires file readback and a submission-bound receipt after trusted confirmation", async () => {
+  const runtime = await read("skills/reviewing-page-delivery/references/feature-review-runtime.md");
+  const saving = sectionContaining(runtime, "## 确认与回写");
+  for (const required of ["confirmPlan", "已确认，待保存", "markPlanSaved", "savedPlanFingerprint", "submissionId", "artifactRuleFingerprint", "读回"])
+    assert.match(saving, new RegExp(required));
+  assert.ok(saving.indexOf("confirmPlan") < saving.indexOf("markPlanSaved"));
+  assert.match(saving, /不执行磁盘 I\/O/);
+  assert.match(saving, /未经 confirmPlan、身份或指纹不匹配时必须拒绝/);
+  assert.match(runtime, /提交成功必须有可见反馈/);
+  assert.match(saving, /plan-confirm-requested.*收到通知仍执行本节全部\s*校验/s);
+  assert.match(runtime, /不能把已入队显示成 Agent 已开始处理/);
+});
+
+test("automatic notifications bind a temporary local bridge and never replace submission or confirmation evidence", async () => {
+  const skill = await read("skills/reviewing-page-delivery/SKILL.md");
+  const runtime = await read("skills/reviewing-page-delivery/references/feature-review-runtime.md");
+  const bridge = sectionContaining(runtime, "## 连接自动通知");
+  for (const required of [
+    "codex queue --help", "CODEX_THREAD_ID", "review-wake-bridge.mjs", "--thread", "--origin",
+    "--config", "127.0.0.1", "2 小时", "connectWakeBridge(config)", "POST /health",
+    "connection.connected === true", "review-submitted", "plan-confirm-requested",
+    "exportSubmission()", "getPlanConfirmationRequest()",
+  ]) assert.ok(bridge.includes(required), `missing bridge protocol: ${required}`);
+  assert.match(skill, /默认连接/);
+  assert.match(bridge, /禁止进入 ReviewSession、state、draft、\s*submission/);
+  assert.match(bridge, /网页不能指定消息正文、目标任务或命令/);
+  assert.match(bridge, /旧通知丢弃/);
+  assert.match(bridge, /不重复 `applyResult\(\)`，也不清除待确认请求/);
+  assert.match(bridge, /resumeSubmission: exportedSnapshot/);
+  assert.match(bridge, /验证成功才替换旧 runtime/);
+  assert.match(bridge, /`notifyExistingSubmission` 默认为 `false`/);
+  assert.match(bridge, /普通重连不重放历史通知/);
+  assert.match(bridge, /投递结果\s*未知时禁止用它重试/);
+  assert.match(bridge, /不确定失败时不得盲目重试/);
+  assert.match(bridge, /运行中不会中断当前轮/);
+  assert.match(bridge, /不能绕过 CSP 或浏览器安全设置/);
+  const wait = sectionContaining(runtime, "## 刷新、重挂载与等待");
+  assert.match(wait, /先读取现有 API，不要无条件重挂载/);
+  assert.match(wait, /停止本次创建的桥接进程，再删除对应/);
+  assert.match(wait, /普通交回用户等待操作时保留进程/);
 });
 
 test("artifact-location candidates must be confirmed, solidified, reread, and uniquely resolved before review continues", async () => {
@@ -382,7 +461,7 @@ test("a complete artifact candidate is evidence-filled before confirmation but r
 test("plan template keeps stable human-readable sections and prohibits unsafe defaults", async () => {
   const template = await read("skills/reviewing-page-delivery/assets/page-delivery-plan-template.md");
   for (const section of [
-    "页面定义", "路由与参数", "功能点与业务规则", "组件与功能实现方案", "UI 与交互状态",
+    "模块范围与本次变更", "页面定义", "路由与参数", "功能模块与行为契约", "组件与功能实现方案", "UI 与交互状态",
     "API 与 Mock", "权限与安全", "页面依赖", "实施任务", "验收步骤与证据", "评审批次",
     "客观统计", "遗留问题",
   ]) assert.match(template, new RegExp(`^## .*${section}`, "m"));
@@ -626,7 +705,7 @@ test("feature review runtime is ordered and fail-closed", async () => {
     /browserOpened\s*&&\s*hostExists\s*&&\s*shadowRootExists\s*&&\s*reviewApiExists\s*&&\s*currentSubmissionReceived/,
   );
 
-  const submission = sectionContaining(runtime, "统一提交");
+  const submission = sectionContaining(runtime, "## 统一提交");
   for (const identity of [
     "sessionId",
     "submissionVersion",

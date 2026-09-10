@@ -37,6 +37,12 @@ const matchedFingerprints = {
   artifactRuleFingerprint: session.artifactRuleFingerprint,
 };
 
+const resultDetails = state => ({
+  cardIds: state.cards.map(card => card.id),
+  summary: "已逐项核对本轮评审意见和证据",
+  planChangeSummary: "保留已确认方案，将待修改和阻塞事项列为后续处理项",
+});
+
 const approvedCard = (overrides = {}) => ({
   id: "REV-CANONICAL",
   dimension: "页面定义",
@@ -130,7 +136,7 @@ test("approved ReviewSession schema drives canonical state without path-bearing 
 
 test("approved ReviewSession rejects invalid top-level contracts and duplicate cards", () => {
   for (const [patch, code] of [
-    [{ schemaVersion: 2 }, "invalid-review-schema-version"],
+    [{ schemaVersion: 99 }, "invalid-review-schema-version"],
     [{ deliveryUnitKey: "/absolute/login" }, "invalid-delivery-unit-key"],
     [{ deliveryUnitName: "" }, "invalid-delivery-unit-name"],
     [{ deliveryUnitKind: "project" }, "invalid-delivery-unit-kind"],
@@ -148,21 +154,6 @@ test("approved ReviewSession rejects invalid top-level contracts and duplicate c
         },
       })],
     }, "incomplete-implementation-plan"],
-    [{
-      cards: [approvedCard({
-        implementationPlan: {
-          status: "blocked",
-          summary: "项目组件体系尚未确认",
-          structure: [],
-          linkage: [],
-          dataFlow: [],
-          acceptanceFocus: [],
-          evidenceIds: [],
-          blockers: ["缺少适用项目组件规范"],
-        },
-        conclusion: "待修改",
-      })],
-    }, "implementation-blocker-requires-blocked-conclusion"],
     [{
       cards: [approvedCard({
         implementationPlan: {
@@ -371,10 +362,11 @@ test("a matching temporary candidate confirmation permits read-only review but n
   assert.deepEqual(state.lastSubmission.artifactRuleResolution, temporaryResolution);
   state = reduceReviewState(state, {
     type: "APPLY_RESULT",
+    submissionId: state.lastSubmission?.submissionId,
     sessionId: session.sessionId,
     submissionVersion: 1,
     ...matchedFingerprints,
-    results: [{ id: "result", conclusion: "阻塞" }],
+    results: [{ id: "result", ...resultDetails(state), conclusion: "阻塞" }],
   });
   assert.equal(state.mode, "result");
 
@@ -430,10 +422,11 @@ test("forged unresolved review states cannot submit or apply results", () => {
   assert.equal(
     reduceReviewState(reviewingState, {
       type: "APPLY_RESULT",
+    submissionId: reviewingState.lastSubmission?.submissionId,
       sessionId: session.sessionId,
       submissionVersion: 1,
       ...matchedFingerprints,
-      results: [{ id: "result", conclusion: "阻塞" }],
+      results: [{ id: "result", ...resultDetails(reviewingState), conclusion: "阻塞" }],
     }),
     reviewingState,
   );
@@ -590,6 +583,7 @@ test("submission versions increase and stale results are rejected", () => {
 
   state = reduceReviewState(state, {
     type: "APPLY_RESULT",
+    submissionId: state.lastSubmission?.submissionId,
     sessionId: "session-1",
     submissionVersion: 0,
     results: [],
@@ -627,6 +621,7 @@ test("apply result requires both matching session and submission version", () =>
 
   state = reduceReviewState(state, {
     type: "APPLY_RESULT",
+    submissionId: state.lastSubmission?.submissionId,
     sessionId: "other-session",
     submissionVersion: 1,
     results: [],
@@ -636,10 +631,11 @@ test("apply result requires both matching session and submission version", () =>
 
   state = reduceReviewState(state, {
     type: "APPLY_RESULT",
+    submissionId: state.lastSubmission?.submissionId,
     sessionId: "session-1",
     submissionVersion: 1,
     ...matchedFingerprints,
-    results: [{ id: "matched-result", conclusion: "已确认" }],
+    results: [{ id: "matched-result", ...resultDetails(state), conclusion: "已确认" }],
   });
   assert.equal(state.mode, "result");
 });
@@ -648,14 +644,15 @@ test("result cards sort blocking, pending modification, conflict, then other", (
   let state = reduceReviewState(createReviewState(session), { type: "SUBMIT" });
   state = reduceReviewState(state, {
     type: "APPLY_RESULT",
+    submissionId: state.lastSubmission?.submissionId,
     sessionId: "session-1",
     submissionVersion: 1,
     ...matchedFingerprints,
     results: [
-      { id: "other", conclusion: "已确认" },
-      { id: "conflict", conclusion: "冲突" },
-      { id: "pending", conclusion: "待修改" },
-      { id: "blocking", conclusion: "阻塞" },
+      { id: "other", ...resultDetails(state), conclusion: "已确认" },
+      { id: "conflict", ...resultDetails(state), conclusion: "冲突" },
+      { id: "pending", ...resultDetails(state), conclusion: "待修改" },
+      { id: "blocking", ...resultDetails(state), conclusion: "阻塞" },
     ],
   });
 
@@ -674,12 +671,13 @@ test("confirm plan requires the final non-empty result", () => {
   let result = reduceReviewState(input, { type: "SUBMIT" });
   result = reduceReviewState(result, {
     type: "APPLY_RESULT",
+    submissionId: result.lastSubmission?.submissionId,
     sessionId: "session-1",
     submissionVersion: 1,
     ...matchedFingerprints,
     results: [
-      { id: "first", conclusion: "阻塞" },
-      { id: "last", conclusion: "待修改" },
+      { id: "first", ...resultDetails(result), conclusion: "阻塞" },
+      { id: "last", ...resultDetails(result), conclusion: "待修改" },
     ],
   });
   assert.equal(reduceReviewState(result, { type: "CONFIRM_PLAN" }), result);
@@ -701,6 +699,7 @@ test("active-card submission and empty results stay out of confirmable result mo
   const reviewing = reduceReviewState(createReviewState(session), { type: "SUBMIT" });
   const emptyResults = reduceReviewState(reviewing, {
     type: "APPLY_RESULT",
+    submissionId: reviewing.lastSubmission?.submissionId,
     sessionId: "session-1",
     submissionVersion: 1,
     ...matchedFingerprints,
@@ -851,12 +850,13 @@ test("canonical cards and results exclude unknown artifact-location fields", () 
 
   state = reduceReviewState(state, {
     type: "APPLY_RESULT",
+    submissionId: state.lastSubmission?.submissionId,
     sessionId: "session-1",
     submissionVersion: 1,
     ...matchedFingerprints,
     results: [
       {
-        id: "result-1",
+        id: "result-1", ...resultDetails(state),
         conclusion: "待修改",
         artifactPath: "/private/results/result-1.html",
         artifactUrl: "https://artifacts.example.test/results/result-1.html",
@@ -888,16 +888,18 @@ test("state transitions are one-way and reject actions outside their mode", () =
 
   const result = reduceReviewState(reviewing, {
     type: "APPLY_RESULT",
+    submissionId: reviewing.lastSubmission?.submissionId,
     sessionId: "session-1",
     submissionVersion: 1,
     ...matchedFingerprints,
-    results: [{ id: "matched-result", conclusion: "已确认" }],
+    results: [{ id: "matched-result", ...resultDetails(reviewing), conclusion: "已确认" }],
   });
   assert.equal(result.mode, "result");
   const confirmed = reduceReviewState(result, { type: "CONFIRM_PLAN", ...matchedFingerprints });
   assert.equal(confirmed.mode, "confirmed");
   assert.equal(reduceReviewState(confirmed, { type: "SUBMIT" }), confirmed);
-  assert.equal(reduceReviewState(confirmed, { type: "APPLY_RESULT", results: [] }), confirmed);
+  assert.equal(reduceReviewState(confirmed, { type: "APPLY_RESULT",
+    submissionId: confirmed.lastSubmission?.submissionId, results: [] }), confirmed);
   assert.equal(reduceReviewState(confirmed, { type: "CONFIRM_PLAN" }), confirmed);
 });
 
@@ -945,7 +947,7 @@ test("input reducer rejects conclusions outside the fixed reviewer set", () => {
   }
 });
 
-test("an implementation-blocked card cannot be changed to a non-blocked conclusion", () => {
+test("requirement confirmation remains independent of implementation readiness", () => {
   const blockedCard = approvedCard({
     conclusion: "阻塞",
     implementationPlan: {
@@ -965,8 +967,9 @@ test("an implementation-blocked card cannot be changed to a non-blocked conclusi
     patch: { conclusion: "已确认" },
   });
 
-  assert.equal(edited, state);
-  assert.equal(edited.cards[0].conclusion, "阻塞");
+  assert.notEqual(edited, state);
+  assert.equal(edited.cards[0].conclusion, "已确认");
+  assert.equal(edited.cards[0].implementationPlan.status, "blocked");
 });
 
 test("editing a card does not share nested source evidence with the previous state", () => {
@@ -1025,6 +1028,7 @@ test("reviewing results require a non-empty matching session id", () => {
   for (const sessionId of [undefined, "", "   "]) {
     const stale = reduceReviewState(reviewing, {
       type: "APPLY_RESULT",
+    submissionId: reviewing.lastSubmission?.submissionId,
       sessionId,
       submissionVersion: 1,
       results: [],
@@ -1047,13 +1051,14 @@ test("apply result reports invalid results only for the active submission", () =
   ]) {
     const invalid = reduceReviewState(reviewing, {
       type: "APPLY_RESULT",
+    submissionId: reviewing.lastSubmission?.submissionId,
       sessionId: "session-1",
       submissionVersion: 1,
       ...matchedFingerprints,
       results,
     });
     assert.equal(invalid.mode, "reviewing");
-    assert.match(invalid.lastError.message, /结果格式无效/i);
+    assert.match(invalid.lastError.message, /评审结果必须/i);
   }
 });
 
@@ -1165,29 +1170,32 @@ test("results and confirmation require explicit current fingerprint pairs", () =
   const reviewing = reduceReviewState(createReviewState(session), { type: "SUBMIT" });
   const missingPlan = reduceReviewState(reviewing, {
     type: "APPLY_RESULT",
+    submissionId: reviewing.lastSubmission?.submissionId,
     sessionId: session.sessionId,
     submissionVersion: 1,
-    results: [{ id: "result", conclusion: "已确认" }],
+    results: [{ id: "result", ...resultDetails(reviewing), conclusion: "已确认" }],
   });
   assert.equal(missingPlan.mode, "reviewing");
   assert.equal(missingPlan.lastError.code, "missing-plan-fingerprint");
 
   const missingRule = reduceReviewState(reviewing, {
     type: "APPLY_RESULT",
+    submissionId: reviewing.lastSubmission?.submissionId,
     sessionId: session.sessionId,
     submissionVersion: 1,
     planFingerprint: session.planFingerprint,
-    results: [{ id: "result", conclusion: "已确认" }],
+    results: [{ id: "result", ...resultDetails(reviewing), conclusion: "已确认" }],
   });
   assert.equal(missingRule.mode, "reviewing");
   assert.equal(missingRule.lastError.code, "missing-artifact-rule-fingerprint");
 
   const result = reduceReviewState(reviewing, {
     type: "APPLY_RESULT",
+    submissionId: reviewing.lastSubmission?.submissionId,
     sessionId: session.sessionId,
     submissionVersion: 1,
     ...matchedFingerprints,
-    results: [{ id: "result", conclusion: "已确认" }],
+    results: [{ id: "result", ...resultDetails(reviewing), conclusion: "已确认" }],
   });
   const missingConfirmation = reduceReviewState(result, { type: "CONFIRM_PLAN" });
   assert.equal(missingConfirmation.mode, "result");
@@ -1230,11 +1238,12 @@ test("fingerprint guards block conflicting results before they can be confirmed"
   const reviewing = reduceReviewState(createReviewState(session), { type: "SUBMIT" });
   const conflict = reduceReviewState(reviewing, {
     type: "APPLY_RESULT",
+    submissionId: reviewing.lastSubmission?.submissionId,
     sessionId: session.sessionId,
     submissionVersion: 1,
     planFingerprint: "sha256:changed",
     artifactRuleFingerprint: session.artifactRuleFingerprint,
-    results: [{ id: "result", conclusion: "已确认" }],
+    results: [{ id: "result", ...resultDetails(reviewing), conclusion: "已确认" }],
   });
 
   assert.equal(conflict.mode, "reviewing");
@@ -1270,11 +1279,12 @@ test("confirmation gate blocks changed artifact rules even after a matching resu
   let state = reduceReviewState(createReviewState(session), { type: "SUBMIT" });
   state = reduceReviewState(state, {
     type: "APPLY_RESULT",
+    submissionId: state.lastSubmission?.submissionId,
     sessionId: session.sessionId,
     submissionVersion: 1,
     planFingerprint: session.planFingerprint,
     artifactRuleFingerprint: session.artifactRuleFingerprint,
-    results: [{ id: "result", conclusion: "已确认" }],
+    results: [{ id: "result", ...resultDetails(state), conclusion: "已确认" }],
   });
   const blocked = reduceReviewState(state, {
     type: "CONFIRM_PLAN",
@@ -1296,4 +1306,77 @@ test("result prioritization is deterministic for equal-priority results", () => 
     ]).map((result) => result.id),
     ["a-pending", "z-pending", "other"],
   );
+});
+
+
+test("remount restores the submission counter but rejects results for prior input", () => {
+  const first = reduceReviewState(createReviewState(approvedSession()), { type: "SUBMIT" });
+  const draft = sanitizeDraft({ ...first, savedAt: Date.now() });
+  const restored = restoreDraft(createReviewState(approvedSession()), draft);
+  assert.equal(restored.mode, "input");
+  assert.equal(restored.submissionVersion, 1);
+  assert.equal(restored.lastSubmission, null);
+  assert.equal(restored.lastError.code, "resubmission-required");
+  const edited = reduceReviewState(restored, { type: "EDIT_CARD", patch: { userNote: "新的意见" } });
+  const second = reduceReviewState(edited, { type: "SUBMIT" });
+  assert.equal(second.submissionVersion, 2);
+  assert.notEqual(second.lastSubmission.submissionId, first.lastSubmission.submissionId);
+  const action = { type: "APPLY_RESULT", ...first.lastSubmission,
+    results: [{ id: "R-1", ...resultDetails(first), conclusion: "已确认" }] };
+  assert.equal(reduceReviewState(second, action).lastError.code, "stale-result");
+  // Even if a caller substitutes the new counter, the old nonce cannot be replayed.
+  assert.equal(reduceReviewState(second, { ...action, submissionVersion: 2 }).lastError.code, "stale-result");
+});
+
+test("fresh submission identity rejects old results even without draft storage", () => {
+  const first = reduceReviewState(createReviewState(approvedSession()), { type: "SUBMIT" });
+  const second = reduceReviewState(createReviewState(approvedSession()), { type: "SUBMIT" });
+  assert.equal(first.submissionVersion, second.submissionVersion);
+  assert.notEqual(first.lastSubmission.submissionId, second.lastSubmission.submissionId);
+  const stale = reduceReviewState(second, { type: "APPLY_RESULT", ...first.lastSubmission,
+    results: [{ id: "R-1", ...resultDetails(first), conclusion: "已确认" }] });
+  assert.equal(stale.mode, "reviewing");
+  assert.equal(stale.lastError.code, "stale-result");
+});
+
+test("results reject unknown, omitted and duplicate associations and blank proposals", () => {
+  const state = reduceReviewState(createReviewState(approvedSession({ cards: [approvedCard(), approvedCard({ id: "REV-2" })] })), { type: "SUBMIT" });
+  const valid = { id: "R-1", ...resultDetails(state), conclusion: "已确认" };
+  for (const results of [
+    [{ ...valid, cardIds: ["unknown"] }],
+    [{ ...valid, cardIds: ["REV-2"] }],
+    [{ ...valid, cardIds: ["REV-2", "REV-2"] }],
+    [{ ...valid, summary: " " }],
+    [{ ...valid, planChangeSummary: "" }],
+    [valid, valid],
+    [{ id: "unrelated-id", conclusion: "已确认" }],
+  ]) {
+    const next = reduceReviewState(state, { type: "APPLY_RESULT", ...state.lastSubmission, results });
+    assert.equal(next.mode, "reviewing");
+    assert.equal(next.lastError.code, "invalid-results");
+  }
+  const accepted = reduceReviewState(state, { type: "APPLY_RESULT", ...state.lastSubmission, results: [valid] });
+  assert.equal(accepted.mode, "result");
+  assert.deepEqual(accepted.results[0].cardIds, valid.cardIds);
+  assert.equal(accepted.results[0].planChangeSummary, valid.planChangeSummary);
+});
+
+test("confirmation request polling is read-only and cannot grant or retain permission", () => {
+  const gate = createPlanConfirmationGate();
+  const submitted = reduceReviewState(createReviewState(approvedSession()), { type: "SUBMIT" });
+  const state = reduceReviewState(submitted, { type: "APPLY_RESULT", ...submitted.lastSubmission,
+    results: [{ id: "R-1", ...resultDetails(submitted), conclusion: "已确认" }] });
+  assert.equal(gate.peek(), null);
+  assert.equal(gate.consume(state, state).code, "confirmation-request-required");
+  assert.equal(gate.request(state, { isTrusted: false }).code, "untrusted-confirmation-request");
+  assert.equal(gate.peek(), null);
+  // Unit-test the private gate; browser tests verify native event trust separately.
+  assert.equal(gate.request(state, { isTrusted: true }), null);
+  const metadata = gate.peek();
+  assert.equal(metadata.submissionId, state.lastSubmission.submissionId);
+  metadata.sessionId = "tampered";
+  assert.equal(gate.peek().sessionId, state.sessionId);
+  assert.equal(gate.consume(state, state), null);
+  assert.equal(gate.peek(), null);
+  assert.equal(gate.consume(state, state).code, "confirmation-request-required");
 });

@@ -1,0 +1,207 @@
+{
+  "schemaVersion": 2,
+  "sessionId": "module-preview-session",
+  "deliveryUnitKey": "sample/login-modules",
+  "deliveryUnitKind": "page",
+  "deliveryUnitName": "登录模块",
+  "artifactRuleFingerprint": "sha256:rule-fixture",
+  "artifactRuleResolution": {
+    "status": "resolved",
+    "source": "agents"
+  },
+  "reviewRound": 1,
+  "planFingerprint": "sha256:fixture",
+  "submissionVersion": 0,
+  "mode": "input",
+  "currentCardIndex": 0,
+  "viewScope": "all",
+  "cards": [
+    {
+      "id": "M-001",
+      "module": {
+        "name": "登录",
+        "parentId": null,
+        "purpose": "让用户通过凭据进入系统",
+        "inputs": [
+          "用户提交的账号与密码"
+        ],
+        "outputs": [
+          "登录成功进入目标页面；失败保留表单并说明原因"
+        ],
+        "rules": [
+          "账号密码均有值才能提交",
+          "重复提交应被拦截"
+        ],
+        "scenarios": [
+          {
+            "id": "S-001",
+            "given": "用户已填入有效凭据",
+            "when": "点击登录",
+            "then": "进入目标页面"
+          }
+        ],
+        "questions": [],
+        "change": {
+          "kind": "modified",
+          "summary": "补齐登录流程的边界反馈"
+        },
+        "revision": 1
+      },
+      "sourceEvidence": [
+        {
+          "id": "E-001",
+          "kind": "example",
+          "label": "示例登录模块说明",
+          "selector": "#login-form"
+        }
+      ],
+      "implementationPlan": {
+        "status": "ready",
+        "summary": "在登录页面复用登录相关的既有表单能力",
+        "structure": [
+          "复用现有登录表单及消息组件"
+        ],
+        "linkage": [
+          "用户提交 → 本地校验 → 发起请求 → 更新页面反馈"
+        ],
+        "dataFlow": [
+          "表单数据与登录响应由登录页面持有"
+        ],
+        "acceptanceFocus": [
+          "进入目标页面"
+        ],
+        "evidenceIds": [
+          "E-001"
+        ],
+        "blockers": []
+      },
+      "conclusion": "未评审",
+      "userNote": ""
+    },
+    {
+      "id": "M-002",
+      "module": {
+        "name": "凭据输入",
+        "parentId": "M-001",
+        "purpose": "收集并校验账号密码",
+        "inputs": [
+          "账号输入、密码输入"
+        ],
+        "outputs": [
+          "有效凭据或字段级错误提示"
+        ],
+        "rules": [
+          "必填为空时不请求登录接口"
+        ],
+        "scenarios": [
+          {
+            "id": "S-002",
+            "given": "账号为空",
+            "when": "点击登录",
+            "then": "账号字段显示必填提示"
+          }
+        ],
+        "questions": [],
+        "change": {
+          "kind": "unchanged",
+          "summary": "保留现有字段校验"
+        },
+        "revision": 1
+      },
+      "sourceEvidence": [
+        {
+          "id": "E-002",
+          "kind": "example",
+          "label": "示例登录模块说明",
+          "selector": "#login-form"
+        }
+      ],
+      "implementationPlan": {
+        "status": "ready",
+        "summary": "在登录页面复用凭据输入相关的既有表单能力",
+        "structure": [
+          "复用现有登录表单及消息组件"
+        ],
+        "linkage": [
+          "用户提交 → 本地校验 → 发起请求 → 更新页面反馈"
+        ],
+        "dataFlow": [
+          "表单数据与登录响应由登录页面持有"
+        ],
+        "acceptanceFocus": [
+          "账号字段显示必填提示"
+        ],
+        "evidenceIds": [
+          "E-002"
+        ],
+        "blockers": []
+      },
+      "conclusion": "未评审",
+      "userNote": ""
+    },
+    {
+      "id": "M-003",
+      "module": {
+        "name": "登录结果反馈",
+        "parentId": "M-001",
+        "purpose": "说明登录成功或失败的结果",
+        "inputs": [
+          "登录接口成功结果或错误结果"
+        ],
+        "outputs": [
+          "成功进入系统；失败展示可理解的原因"
+        ],
+        "rules": [
+          "请求失败后可以重试",
+          "失败不清空用户账号"
+        ],
+        "scenarios": [
+          {
+            "id": "S-003",
+            "given": "登录接口返回错误",
+            "when": "处理请求结果",
+            "then": "显示错误原因并允许重试"
+          }
+        ],
+        "questions": [
+          {
+            "id": "Q-003",
+            "question": "接口有哪些可区分的登录失败原因？",
+            "impact": "影响具体错误提示，不影响确认失败可重试的需求",
+            "owner": "agent",
+            "recommendation": "查证正式错误码，在此之前保留统一错误提示方案"
+          }
+        ],
+        "change": {
+          "kind": "added",
+          "summary": "新增服务端错误的反馈约定"
+        },
+        "revision": 1
+      },
+      "sourceEvidence": [
+        {
+          "id": "E-003",
+          "kind": "example",
+          "label": "示例登录模块说明",
+          "selector": "#login-form"
+        }
+      ],
+      "implementationPlan": {
+        "status": "blocked",
+        "summary": "错误码映射待查证，先确认用户可见行为",
+        "structure": [],
+        "linkage": [],
+        "dataFlow": [],
+        "acceptanceFocus": [
+          "显示错误原因并允许重试"
+        ],
+        "evidenceIds": [],
+        "blockers": [
+          "需要查证正式接口错误码与消息映射"
+        ]
+      },
+      "conclusion": "未评审",
+      "userNote": ""
+    }
+  ]
+}

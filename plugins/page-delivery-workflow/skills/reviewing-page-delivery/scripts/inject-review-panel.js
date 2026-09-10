@@ -1,11 +1,5 @@
 (function initPageDeliveryReview(globalObject, factory) {
-  if (globalObject?.__PAGE_DELIVERY_REVIEW__?.destroy) {
-    try {
-      globalObject.__PAGE_DELIVERY_REVIEW__.destroy();
-    } catch {
-      // A stale page-global must not prevent a fresh injected panel from mounting.
-    }
-  }
+  // Preserve the live review until a replacement session has been validated by mountReviewPanel.
   const api = factory();
   if (typeof module === "object" && module.exports) module.exports = api;
   if (globalObject) globalObject.PageDeliveryReviewPanel = api;
@@ -109,11 +103,15 @@
     return {
       ...normalized,
       cards,
+      allCards: normalized.cards,
+      previousSubmissions: [],
       currentCardIndex: 0,
       currentResultIndex: 0,
       mode: "input",
       submissionVersion: 0,
       lastSubmission: null,
+      saveState: "unsaved",
+      savedPlanFingerprint: null,
       results: [],
       lastError: null,
     };
@@ -123,8 +121,8 @@
     if (!isNormalizedObject(session) || !Array.isArray(session.cards) || !isNonEmptyString(session.sessionId)) {
       throw createCodedError(TypeError, "invalid-review-session", "ReviewSession must include a sessionId and cards array");
     }
-    if (session.schemaVersion !== 1) {
-      throw createCodedError(TypeError, "invalid-review-schema-version", "ReviewSession schemaVersion must be 1");
+    if (![1, 2].includes(session.schemaVersion)) {
+      throw createCodedError(TypeError, "invalid-review-schema-version", "ReviewSession schemaVersion must be 1 or 2");
     }
     if (!isDeliveryUnitKey(session.deliveryUnitKey)) {
       throw createCodedError(TypeError, "invalid-delivery-unit-key", "ReviewSession deliveryUnitKey must be a safe relative key");
@@ -160,7 +158,7 @@
         "Artifact rule candidate must be explicitly confirmed for the current fingerprint before review",
       );
     }
-    const cards = session.cards.map(normalizeReviewCard);
+    let cards = session.cards.map(card => normalizeReviewCard(card, session.schemaVersion));
     const ids = new Set();
     for (const card of cards) {
       if (ids.has(card.id)) {
@@ -168,8 +166,17 @@
       }
       ids.add(card.id);
     }
+    if (session.schemaVersion === 2) {
+      validateModuleTree(cards);
+      const ordered = [];
+      const visit = parentId => cards.filter(card => card.module.parentId === parentId).forEach(card => {
+        ordered.push(card); visit(card.id);
+      });
+      visit(null);
+      cards = ordered;
+    }
     return {
-      schemaVersion: 1,
+      schemaVersion: session.schemaVersion,
       sessionId: session.sessionId,
       deliveryUnitKey: session.deliveryUnitKey,
       deliveryUnitKind: session.deliveryUnitKind,
@@ -186,7 +193,28 @@
     };
   }
 
-  function normalizeReviewCard(card) {
+  function normalizeReviewCard(card, schemaVersion = 1) {
+    let module;
+    if (schemaVersion === 2) {
+      module = normalizeModule(card?.module);
+      card = {
+        ...card,
+        dimension: "功能模块",
+        reviewGoal: module.name,
+        design: module.purpose,
+        regionAndComponents: module.name,
+        interactionStates: card.interactionStates ?? [],
+        relatedApis: card.relatedApis ?? [],
+        mockScenarios: card.mockScenarios ?? [],
+        acceptanceCriteria: module.scenarios.map(item => `${item.given}；${item.when}；${item.then}`),
+        reopened: card.reopened ?? false,
+        evidenceChanged: card.evidenceChanged ?? false,
+        reviewResult: card.reviewResult ?? null,
+        userNote: card.userNote ?? "",
+        conclusion: card.conclusion ?? "未评审",
+        links: card.links ?? Object.fromEntries(LINK_FIELDS.map(field => [field, []])),
+      };
+    }
     const valid = (
       isNormalizedObject(card) &&
       isNonEmptyString(card.id) &&
@@ -219,6 +247,7 @@
     );
     return {
       id: card.id,
+      ...(module ? { module } : {}),
       dimension: card.dimension,
       links: Object.fromEntries(LINK_FIELDS.map((field) => [field, [...card.links[field]]])),
       sourceEvidence: card.sourceEvidence.map(normalizeSourceEvidence),
@@ -281,13 +310,6 @@
         "Blocked implementation plans require explicit blockers",
       );
     }
-    if (value.status === "blocked" && conclusion !== "阻塞") {
-      throw createCodedError(
-        TypeError,
-        "implementation-blocker-requires-blocked-conclusion",
-        "Blocked implementation plans require a blocked review conclusion",
-      );
-    }
     const availableEvidenceIds = new Set(sourceEvidence.map((evidence) => evidence.id));
     if (value.evidenceIds.some((evidenceId) => !availableEvidenceIds.has(evidenceId))) {
       throw createCodedError(
@@ -308,9 +330,111 @@
     };
   }
 
+  function normalizeModule(value) {
+    const fail = () => { throw createCodedError(TypeError, "invalid-module", "Module requires a name, purpose, inputs, outputs, rules, examples, questions, change and revision"); };
+    if (!isNormalizedObject(value) || !isNonEmptyString(value.name) || !isNonEmptyString(value.purpose) ||
+      !(value.parentId === null || isNonEmptyString(value.parentId)) ||
+      !Number.isSafeInteger(value.revision) || value.revision < 1) fail();
+    for (const field of ["inputs", "outputs", "rules"]) {
+      if (!isStringArray(value[field]) || !value[field].length) fail();
+    }
+    if (!Array.isArray(value.scenarios) || !value.scenarios.length ||
+      !value.scenarios.every(item => isNormalizedObject(item) && ["id", "given", "when", "then"].every(key => isNonEmptyString(item[key])))) fail();
+    if (!Array.isArray(value.questions) || !value.questions.every(item =>
+      isNormalizedObject(item) && ["id", "question", "impact", "recommendation"].every(key => isNonEmptyString(item[key])) && ["user", "agent"].includes(item.owner))) fail();
+    for (const items of [value.scenarios, value.questions]) {
+      if (new Set(items.map(item => item.id)).size !== items.length) fail();
+    }
+    if (!isNormalizedObject(value.change) || !["added", "modified", "removed", "unchanged"].includes(value.change.kind) || !isNonEmptyString(value.change.summary)) fail();
+    return {
+      name: value.name, parentId: value.parentId, purpose: value.purpose, revision: value.revision,
+      inputs: [...value.inputs], outputs: [...value.outputs], rules: [...value.rules],
+      scenarios: value.scenarios.map(({ id, given, when, then }) => ({ id, given, when, then })),
+      questions: value.questions.map(({ id, question, impact, owner, recommendation }) => ({ id, question, impact, owner, recommendation })),
+      change: { kind: value.change.kind, summary: value.change.summary },
+    };
+  }
+
+  function validateModuleTree(cards) {
+    const byId = new Map(cards.map(card => [card.id, card]));
+    for (const collection of ["scenarios", "questions"]) {
+      const ids = cards.flatMap(card => card.module[collection].map(item => item.id));
+      if (new Set(ids).size !== ids.length) throw createCodedError(TypeError, "duplicate-module-item-id", "Scenario and question ids must be unique within the module tree");
+    }
+    for (const card of cards) {
+      const seen = new Set([card.id]);
+      let parent = card.module.parentId;
+      while (parent !== null) {
+        if (!byId.has(parent) || seen.has(parent)) {
+          throw createCodedError(TypeError, "invalid-module-tree", "Module parent must exist and hierarchy must be acyclic");
+        }
+        seen.add(parent);
+        parent = byId.get(parent).module.parentId;
+      }
+    }
+  }
+
+  function moduleContent(card) {
+    const { conclusion, userNote, reviewResult, reopened, evidenceChanged, ...content } = card;
+    const { revision, change, ...module } = content.module;
+    return JSON.stringify({ ...content, module: { ...module, removed: change.kind === "removed" } });
+  }
+
+  function requirementContent(card) {
+    const { revision, questions, change, ...module } = card.module;
+    return JSON.stringify({ ...module, removed: change.kind === "removed", questions: questions.filter(question => question.owner === "user") });
+  }
+
+  function mergeReviewSession(state, nextSession) {
+    const next = normalizeReviewSession(nextSession);
+    if (next.schemaVersion !== 2 || state.schemaVersion !== 2 || next.sessionId === state.sessionId ||
+      next.deliveryUnitKey !== state.deliveryUnitKey || next.planFingerprint !== (state.savedPlanFingerprint || state.planFingerprint) ||
+      next.artifactRuleFingerprint !== state.artifactRuleFingerprint ||
+      next.reviewRound !== state.reviewRound + (state.mode === "input" ? 0 : 1)) {
+      throw createCodedError(TypeError, "invalid-session-update", "Update requires a new session for this module, current fingerprints and the correct round");
+    }
+    const oldById = new Map((state.allCards || state.cards).map(card => [card.id, card]));
+    state.cards.forEach(card => oldById.set(card.id, card));
+    const nextIds = new Set(next.cards.map(card => card.id));
+    if ([...oldById.keys()].some(id => !nextIds.has(id))) {
+      throw createCodedError(TypeError, "missing-module-update", "Keep existing modules; represent removals explicitly in change.kind");
+    }
+    next.cards = next.cards.map(card => {
+      const old = oldById.get(card.id);
+      if (!old) return { ...card, conclusion: "未评审", userNote: "", reopened: false };
+      const changed = moduleContent(old) !== moduleContent(card);
+      if (card.module.revision < old.module.revision) {
+        throw createCodedError(TypeError, "module-revision-required", "Module revisions cannot move backwards");
+      }
+      if (!changed) return { ...card, conclusion: old.conclusion, userNote: old.userNote, reviewResult: old.reviewResult, reopened: old.reopened, evidenceChanged: old.evidenceChanged };
+      if (card.module.revision <= old.module.revision) {
+        throw createCodedError(TypeError, "module-revision-required", "Changed modules must increment their revision");
+      }
+      const requirementChanged = requirementContent(old) !== requirementContent(card);
+      return { ...card, conclusion: requirementChanged ? "未评审" : old.conclusion, userNote: old.userNote,
+        reopened: true, evidenceChanged: true,
+        reviewResult: { ...(old.reviewResult || {}), previousConclusion: old.conclusion } };
+    });
+    const created = createReviewState(next);
+    const currentId = state.cards[state.currentCardIndex]?.id;
+    const selectedIndex = created.cards.findIndex(card => card.id === currentId);
+    return { ...created, currentCardIndex: Math.max(0, selectedIndex),
+      previousSubmissions: [...(state.previousSubmissions || []), ...(state.lastSubmission ? [state.lastSubmission] : [])] };
+  }
+
   function reduceReviewState(state, action) {
     if (!isReviewState(state) || !action || typeof action !== "object") {
       return state;
+    }
+
+    if (state.mode === "confirmed" && action.type === "MARK_PLAN_SAVED") {
+      if (
+        action.sessionId !== state.sessionId ||
+        action.submissionId !== state.lastSubmission?.submissionId ||
+        assertCurrentFingerprints(state, action) ||
+        !isFingerprint(action.savedPlanFingerprint)
+      ) return { ...state, lastError: reviewError("invalid-save-receipt", "保存回执与当前评审不匹配，请核对实际文件。") };
+      return { ...state, saveState: "saved", savedPlanFingerprint: action.savedPlanFingerprint, lastError: null };
     }
 
     if (state.mode === "input") {
@@ -367,7 +491,7 @@
           action.artifactRuleFingerprint,
         );
         if (resolutionError) return { ...state, lastError: resolutionError };
-        return { ...state, mode: "confirmed" };
+        return { ...state, mode: "confirmed", saveState: "pending", lastError: null };
       }
     }
 
@@ -380,6 +504,7 @@
     return validCards.filter(
       (card) =>
         !RESOLVED_CONCLUSIONS.has(card.conclusion) ||
+        (card.reviewResult?.conclusion && !RESOLVED_CONCLUSIONS.has(card.reviewResult.conclusion)) ||
         card.reopened === true ||
         card.evidenceChanged === true,
     );
@@ -402,8 +527,63 @@
     ));
   }
 
+  function createWakeNotifier(config, fetchImpl = globalThis.fetch) {
+    let endpoint;
+    try { endpoint = new URL(config?.endpoint); } catch { throw new Error("Invalid wake bridge endpoint"); }
+    if (endpoint.protocol !== "http:" || endpoint.hostname !== "127.0.0.1" ||
+      !endpoint.port || endpoint.pathname !== "/notify" || endpoint.search || endpoint.hash ||
+      endpoint.username || endpoint.password || !isNonEmptyString(config.token) ||
+      !Number.isFinite(Date.parse(config.expiresAt)) || Date.parse(config.expiresAt) <= Date.now() ||
+      typeof fetchImpl !== "function") throw new Error("Invalid or expired wake bridge configuration");
+    const token = config.token;
+    const expiresAt = Date.parse(config.expiresAt);
+    async function request(path, payload) {
+      if (Date.now() >= expiresAt) throw new Error("Wake bridge expired");
+      const abort = new AbortController();
+      const timer = setTimeout(() => abort.abort(), 12000);
+      try {
+        const response = await fetchImpl(new URL(path, endpoint).href, {
+          method: "POST", mode: "cors", credentials: "omit", cache: "no-store", referrerPolicy: "no-referrer",
+          headers: { "Content-Type": "text/plain" },
+          body: JSON.stringify({ token, ...payload }), signal: abort.signal,
+        });
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.error || "Wake bridge request failed");
+        return body;
+      } finally { clearTimeout(timer); }
+    }
+    return {
+      async check() {
+        const response = await request("/health", {});
+        if (response.ready !== true) throw new Error("Wake bridge unavailable");
+      },
+      async notify(event, submission) {
+        const payload = Object.fromEntries(["sessionId", "submissionId", "submissionVersion", "planFingerprint", "artifactRuleFingerprint"].map(key => [key, submission[key]]));
+        const response = await request("/notify", { event, ...payload });
+        if (response.queued !== true) throw new Error("Notification was not queued");
+        return response;
+      },
+    };
+  }
+
+  function restoreSubmittedReview(state, snapshot) {
+    if (!isNormalizedObject(snapshot) || snapshot.sessionId !== state.sessionId ||
+      snapshot.planFingerprint !== state.planFingerprint || snapshot.artifactRuleFingerprint !== state.artifactRuleFingerprint ||
+      !isNonEmptyString(snapshot.submissionId) || !Number.isSafeInteger(snapshot.submissionVersion) || snapshot.submissionVersion < 1 ||
+      !Array.isArray(snapshot.cards)) throw createCodedError(TypeError, "invalid-submission-restore", "Only the matching exported submission can be restored");
+    const cards = snapshot.cards.map(card => normalizeReviewCard(card, state.schemaVersion));
+    if (JSON.stringify(cards) !== JSON.stringify(state.cards)) {
+      throw createCodedError(TypeError, "invalid-submission-restore", "Restored submission must match the current review content and opinions");
+    }
+    const lastSubmission = deepFreeze({ sessionId: state.sessionId, submissionId: snapshot.submissionId,
+      submissionVersion: snapshot.submissionVersion, planFingerprint: state.planFingerprint,
+      artifactRuleFingerprint: state.artifactRuleFingerprint, artifactRuleResolution: deepClone(state.artifactRuleResolution), cards });
+    return { ...state, mode: "reviewing", submissionVersion: snapshot.submissionVersion, lastSubmission, lastError: null };
+  }
+
   function mountReviewPanel(session, options = {}) {
     let state = createReviewState(session);
+    if (options.resumeSubmission) state = restoreSubmittedReview(state, options.resumeSubmission);
     if (typeof document === "undefined" || !document?.body) {
       throw createCodedError(Error, "browser-document-unavailable", "Review panel requires a browser document");
     }
@@ -416,7 +596,7 @@
     const rawDraft = loadDraft(storageKey);
     const validatedDraft = isFreshMatchingDraft(state, rawDraft, now) ? rawDraft : null;
     const safeUiDraft = isFreshSafeUiDraft(state, rawDraft, now) ? rawDraft : validatedDraft;
-    state = restoreDraft(state, validatedDraft, now);
+    if (!options.resumeSubmission) state = restoreDraft(state, validatedDraft, now);
 
     if (activeRuntime) activeRuntime.destroy({ removeHost: false });
 
@@ -446,6 +626,10 @@
     let drag = null;
     let evidenceStatus = null;
     const confirmationGate = createPlanConfirmationGate();
+    let wakeNotifier = null;
+    let notification = { status: "manual", event: null };
+    let wakeGeneration = 0;
+    let pendingWake = null;
 
     setHostPosition(host, panelPosition, panelWidth);
 
@@ -466,6 +650,7 @@
       deliveryUnitKey: state.deliveryUnitKey,
       sessionId: state.sessionId,
       reviewRound: state.reviewRound,
+      submissionVersion: state.submissionVersion,
       planFingerprint: state.planFingerprint,
       artifactRuleFingerprint: state.artifactRuleFingerprint,
       artifactRuleResolution: state.artifactRuleResolution,
@@ -507,6 +692,7 @@
       panelPosition: { ...panelPosition },
       panelWidth,
       dockSide,
+      notification: { ...notification },
     });
     const removeOverlay = () => {
       document.querySelectorAll("[data-review-evidence-overlay]").forEach((overlay) => overlay.remove());
@@ -528,7 +714,10 @@
       if (nextState === state) return state;
       state = nextState;
       persistDraft();
-      render();
+      // Keep the live textarea (and its IME composition/selection) intact while typing.
+      const noteOnly = action.type === "EDIT_CARD" &&
+        Object.keys(action.patch || {}).every((key) => key === "userNote");
+      if (!noteOnly) render();
       return state;
     };
     const setRuntimeError = (error) => {
@@ -546,12 +735,69 @@
       if (confirmationError) return setRuntimeError(confirmationError);
       return dispatch({ type: "CONFIRM_PLAN", ...fingerprints });
     };
+    const notifyAgent = async (event) => {
+      if (!state.lastSubmission) return;
+      if (!wakeNotifier) {
+        if (notification.status === "connecting") pendingWake = { event, sessionId: state.sessionId, submissionId: state.lastSubmission.submissionId };
+        return;
+      }
+      const notifier = wakeNotifier;
+      const sessionId = state.sessionId;
+      const generation = ++wakeGeneration;
+      notification = { status: "sending", event };
+      render();
+      try {
+        await notifier.notify(event, state.lastSubmission);
+        if (!destroyed && state.sessionId === sessionId && generation === wakeGeneration) {
+          notification = { status: "queued", event };
+          render();
+        }
+      } catch {
+        if (!destroyed && state.sessionId === sessionId && generation === wakeGeneration) {
+          notification = { status: "failed", event };
+          render();
+        }
+      }
+    };
+    const connectWakeBridge = async (config, { notifyExistingSubmission = false } = {}) => {
+      const generation = ++wakeGeneration;
+      wakeNotifier = null;
+      pendingWake = null;
+      notification = { status: "connecting", event: null };
+      if (notifyExistingSubmission && state.mode === "reviewing" && state.lastSubmission) {
+        pendingWake = { event: "review-submitted", sessionId: state.sessionId, submissionId: state.lastSubmission.submissionId };
+      }
+      render();
+      try {
+        const notifier = createWakeNotifier(config);
+        await notifier.check();
+        if (destroyed || generation !== wakeGeneration) return { connected: false };
+        wakeNotifier = notifier;
+        notification = { status: "ready", event: null };
+        render();
+        const waiting = pendingWake;
+        pendingWake = null;
+        if (waiting?.sessionId === state.sessionId && waiting.submissionId === state.lastSubmission?.submissionId) {
+          void notifyAgent(waiting.event);
+        }
+        return { connected: true };
+      } catch {
+        if (!destroyed && generation === wakeGeneration) {
+          wakeNotifier = null;
+          pendingWake = null;
+          notification = { status: "failed", event: null };
+          render();
+        }
+        return { connected: false };
+      }
+    };
     const requestPlanConfirmation = (event) => {
       const requestError = confirmationGate.request(state, event);
       if (requestError) {
         if (requestError.code !== "untrusted-confirmation-request") setRuntimeError(requestError);
         return;
       }
+      void notifyAgent("plan-confirm-requested");
       console.debug("PAGE_DELIVERY_PLAN_CONFIRM_REQUESTED", {
         sessionId: state.sessionId,
         submissionVersion: state.submissionVersion,
@@ -562,6 +808,8 @@
     const destroy = ({ removeHost = true } = {}) => {
       if (destroyed) return;
       destroyed = true;
+      wakeGeneration += 1;
+      wakeNotifier = null;
       removeRenderListeners();
       cleanups.cleanup();
       removeOverlay();
@@ -574,9 +822,23 @@
     };
     const pageApi = {
       getState: runtimeState,
+      connectWakeBridge,
+      markPlanSaved: (receipt) => dispatch({ ...receipt, type: "MARK_PLAN_SAVED" }),
+      updateReviewSession: (nextSession) => {
+        const merged = mergeReviewSession(state, nextSession);
+        confirmationGate.invalidate();
+        state = merged;
+        wakeGeneration += 1;
+        pendingWake = null;
+        notification = { status: wakeNotifier ? "ready" : "manual", event: null };
+        persistDraft();
+        render();
+        return runtimeState();
+      },
       exportSubmission: () => state.lastSubmission,
       applyResult: applyResultFromPage,
       confirmPlan,
+      getPlanConfirmationRequest: () => confirmationGate.peek(),
       destroy,
     };
     const render = () => {
@@ -587,7 +849,7 @@
       const shell = document.createElement("section");
       shell.setAttribute("data-review-panel", "");
       shell.toggleAttribute("data-collapsed", collapsed);
-      shell.innerHTML = panelMarkup(state, collapsed, evidenceStatus, { dockSide });
+      shell.innerHTML = panelMarkup({ ...state, notification }, collapsed, evidenceStatus, { dockSide });
       shadowRoot.append(style, shell);
 
       const listen = (selector, type, listener) => {
@@ -610,6 +872,7 @@
         const before = state;
         dispatch({ type: "SUBMIT" });
         if (state !== before && state.mode === "reviewing") {
+          void notifyAgent("review-submitted");
           console.debug("PAGE_DELIVERY_REVIEW_SUBMITTED", {
             sessionId: state.sessionId,
             submissionVersion: state.submissionVersion,
@@ -693,6 +956,7 @@
     activeRuntime = { destroy };
     globalThis.__PAGE_DELIVERY_REVIEW__ = pageApi;
     render();
+    if (options.wakeBridge) void connectWakeBridge(options.wakeBridge);
     return pageApi;
   }
 
@@ -744,6 +1008,8 @@
       ...(isNonEmptyString(draft.deliveryUnitKey) ? { deliveryUnitKey: draft.deliveryUnitKey } : {}),
       ...(isNonEmptyString(draft.sessionId) ? { sessionId: draft.sessionId } : {}),
       ...(Number.isInteger(draft.reviewRound) ? { reviewRound: draft.reviewRound } : {}),
+      ...(Number.isSafeInteger(draft.submissionVersion) && draft.submissionVersion >= 0
+        ? { submissionVersion: draft.submissionVersion } : {}),
       ...(isNonEmptyString(draft.planFingerprint) ? { planFingerprint: draft.planFingerprint } : {}),
       ...(isNonEmptyString(draft.artifactRuleFingerprint) ? { artifactRuleFingerprint: draft.artifactRuleFingerprint } : {}),
       ...(artifactRuleResolution ? { artifactRuleResolution } : {}),
@@ -822,11 +1088,18 @@
     return {
       ...state,
       currentCardIndex,
+      submissionVersion: Number.isSafeInteger(draft.submissionVersion) && draft.submissionVersion >= 0
+        ? draft.submissionVersion : state.submissionVersion,
+      lastError: draft.submissionVersion > 0
+        ? reviewError("resubmission-required", "页面已重新挂载，已恢复评审输入；请重新提交，旧结果与确认请求已失效。")
+        : state.lastError,
       cards: state.cards.map((card) => {
         const saved = edits.get(card.id);
         if (!saved) return card;
         const patch = {};
-        if (USER_CONCLUSIONS.has(saved.conclusion)) patch.conclusion = saved.conclusion;
+        if (
+          USER_CONCLUSIONS.has(saved.conclusion)
+        ) patch.conclusion = saved.conclusion;
         if (typeof saved.userNote === "string") patch.userNote = saved.userNote;
         return Object.keys(patch).length ? { ...deepClone(card), ...patch } : card;
       }),
@@ -1059,6 +1332,29 @@
       }
       [data-review-card-header] { align-items: center; display: flex; gap: 8px; justify-content: space-between; }
       [data-review-card-title] { font-size: 20px; font-weight: 500; line-height: 1.4; margin: 0; }
+      [data-module-content] { display: grid; gap: 20px; }
+      [data-module-section] { display: grid; gap: 8px; }
+      [data-module-section] h3 { font-size: 14px; margin: 0; color: #26364b; }
+      [data-module-section] p { margin: 0; line-height: 1.65; font-size: 14px; }
+      [data-module-section] ul { margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.7; }
+      [data-module-io] { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+      [data-module-io] > section { background: #f6f8fb; border: 1px solid #e5eaf1; border-radius: 8px; padding: 14px; }
+      [data-module-change] { background: #eef5ff; border-left: 3px solid #1976d2; padding: 12px 14px; border-radius: 4px; }
+      [data-module-scenario] { padding: 12px 14px; border: 1px solid #e5eaf1; border-radius: 8px; }
+      [data-module-scenario] p + p { margin-top: 6px; }
+      [data-module-scenario] b { display: inline-block; width: 44px; color: #62718a; font-weight: 500; }
+      [data-module-question] { background: #fff8e8; border-radius: 8px; padding: 12px 14px; }
+      [data-module-question] p + p { margin-top: 6px; }
+      [data-review-readiness] { border-radius: 12px; padding: 4px 8px; font-size: 11px; white-space: nowrap; background: #eef1f6; color: #586579; }
+      [data-review-readiness="ready"] { background: #e8f5e9; color: #2e7d32; }
+      [data-review-readiness="blocked"] { background: #fff3e0; color: #ae6500; }
+      [data-review-list-item][data-child-module] { margin-left: calc(14px * var(--review-depth, 1)); width: calc(100% - 14px * var(--review-depth, 1)); border-left: 2px solid #d8e2ef; border-radius: 0 6px 6px 0; }
+      [data-review-list-item] [data-review-readiness] { margin-top: 2px; width: fit-content; }
+      [data-review-save-status] { color: #62718a; font-size: 12px; }
+      [data-review-workflow-status] { background: #eef5ff; padding: 12px 16px; font-size: 13px; line-height: 1.5; border-radius: 6px; }
+      [data-module-technical] { border-top: 1px solid #e5eaf1; padding-top: 12px; }
+      [data-module-technical] > summary { color: #1976d2; cursor: pointer; font-size: 14px; padding: 8px 0; }
+      [data-module-technical] > div { display: grid; gap: 12px; padding-top: 12px; }
       [data-review-implementation-blocked] {
         background: #ffebee;
         border-radius: 4px;
@@ -1202,7 +1498,7 @@
         [data-review-panel-titlebar] { gap: 8px; grid-template-columns: minmax(160px, 1fr) auto; }
         [data-review-status-summary] { display: none; }
         [data-review-layout] { grid-template-columns: minmax(180px, 35%) minmax(0, 1fr); }
-        [data-review-implementation-grid] { grid-template-columns: 1fr; }
+        [data-review-implementation-grid], [data-module-io] { grid-template-columns: 1fr; }
         [data-review-detail-scroll], [data-review-footer] { padding-left: 16px; padding-right: 16px; }
       }
     `;
@@ -1224,14 +1520,29 @@
     const statusSummary = `<div data-review-status-summary aria-label="评审状态统计">${REVIEW_CONCLUSIONS
       .map((status) => statusBadgeMarkup(status, counts[status]))
       .join("")}</div>`;
-    const header = `<header data-review-panel-titlebar><div data-review-heading><strong data-review-title>${escape(state.deliveryUnitName)} 功能评审</strong><span data-review-context>${escape(reviewDomain)} · ${displayIndex}/${contextLength} · 会话 ${sessionCount} · 目标 ${objectiveCount}</span></div>${statusSummary}<button type="button" data-action="toggle-collapse">${collapsed ? "展开" : "收起"}</button></header>`;
+    const contextLabel = state.schemaVersion === 2
+      ? `第 ${state.reviewRound} 轮 · ${displayIndex}/${contextLength} 个模块`
+      : `${escape(reviewDomain)} · ${displayIndex}/${contextLength} · 会话 ${sessionCount} · 目标 ${objectiveCount}`;
+    const header = `<header data-review-panel-titlebar><div data-review-heading><strong data-review-title>${escape(state.deliveryUnitName)} 功能评审</strong><span data-review-context>${contextLabel}</span></div>${statusSummary}<button type="button" data-action="toggle-collapse">${collapsed ? "展开" : "收起"}</button></header>`;
     const handles = resizeHandlesMarkup(options.dockSide);
     if (collapsed) return `${handles}${header}`;
     const errorMarkup = state.lastError ? `<p data-review-error>${escape(state.lastError.message)}</p>` : "";
     const evidenceMarkup = evidenceStatus ? `<p data-review-evidence-status>${escape(evidenceStatus.message)}</p>` : "";
-    const alerts = errorMarkup || evidenceMarkup
-      ? `<div data-review-alerts>${errorMarkup}${evidenceMarkup}</div>`
-      : "";
+    const savedLabel = state.saveState === "saved" ? "文档已保存" : state.saveState === "pending" ? "内容已确认，等待保存" : "文档未保存";
+    let workflowLabel = state.mode === "reviewing"
+      ? "意见已提交，等待 Agent 处理。请回到对话发送“已提交”；页面暂不支持自动唤醒。"
+      : state.mode === "result" ? "Agent 已整理本轮意见，请核对拟更新内容后确认保存。"
+      : state.mode === "confirmed" ? (state.saveState === "saved" ? "已读取保存回执。" : "已确认本轮内容，正在等待 Agent 写入并读回验证。")
+      : "发现遗漏？直接在 Agent 对话中补充，这里保留逐项评审意见。";
+    const notice = state.notification;
+    if (notice?.status === "connecting") workflowLabel = "正在连接当前任务的自动通知通道。";
+    if (state.mode === "input" && notice?.status === "ready") workflowLabel = "自动通知已连接。提交评审后，Agent 会自动继续处理；补充功能仍在对话中进行。";
+    if (notice?.status === "sending") workflowLabel = "意见已保留，正在通知 Agent。";
+    if (notice?.status === "queued" && state.mode !== "confirmed") workflowLabel = notice.event === "plan-confirm-requested"
+      ? "保存确认已通知 Agent，等待读取当前确认并写入。"
+      : state.mode === "reviewing" ? "意见已提交，已自动通知 Agent，等待处理。" : workflowLabel;
+    if (notice?.status === "failed") workflowLabel = "自动通知未确认成功，评审意见仍已保留。请回到对话发送“已提交”或“已确认保存”。";
+    const alerts = `<div data-review-alerts>${errorMarkup}${evidenceMarkup}<p data-review-workflow-status>${workflowLabel}</p><span data-review-save-status>${savedLabel}</span></div>`;
     if (!isResultMode && state.cards.length === 0) {
       return `${handles}${header}<div data-review-body>${alerts}<p data-review-empty>本轮没有需要评审的卡片</p></div>`;
     }
@@ -1246,7 +1557,7 @@
         state.artifactRuleFingerprint,
       );
       const resultMarkup = result
-        ? `<article data-review-result data-result-id="${escape(result.id)}"><div data-review-card-header><h2 data-review-card-title>${escape(result.id)}</h2>${statusBadgeMarkup(result.conclusion)}</div>${result.summary ? `<p data-result-summary>${escape(result.summary)}</p>` : ""}${result.planChangeSummary ? `<p data-result-plan-change-summary>${escape(result.planChangeSummary)}</p>` : ""}</article>`
+        ? `<article data-review-result data-result-id="${escape(result.id)}"><div data-review-card-header><h2 data-review-card-title>${escape(result.moduleName || result.id)}</h2>${statusBadgeMarkup(result.conclusion)}</div>${result.summary ? `<p data-result-summary>${escape(result.summary)}</p>` : ""}${result.planChangeSummary ? `<p data-result-plan-change-summary>${escape(result.planChangeSummary)}</p>` : ""}</article>`
         : "<p>没有返回项</p>";
       const confirmationMarkup = lastResult
         ? `<div data-review-actions><button type="button" data-action="confirm-plan"${state.mode === "confirmed" || confirmationError ? " disabled" : ""}>确认更新 Plan</button>${confirmationError ? `<p data-review-confirm-blocked>${escape(confirmationError.message)}</p>` : ""}</div>`
@@ -1259,12 +1570,12 @@
     const lastCard = state.currentCardIndex >= state.cards.length - 1;
     const conclusionGroup = `<div data-review-conclusion-label><span>评审结论</span><div data-review-conclusion-group role="radiogroup" aria-label="评审结论">${REVIEW_CONCLUSIONS
       .map((value) => {
-        const implementationBlocked = card.implementationPlan?.status === "blocked" && value !== "阻塞";
-        return `<button type="button" data-action="select-conclusion" data-value="${value}" role="radio" aria-checked="${value === card.conclusion}" aria-pressed="${value === card.conclusion}"${disabled || implementationBlocked ? " disabled" : ""}>${value}</button>`;
+        return `<button type="button" data-action="select-conclusion" data-value="${value}" role="radio" aria-checked="${value === card.conclusion}" aria-pressed="${value === card.conclusion}"${disabled}>${value}</button>`;
       })
       .join("")}</div></div>`;
-    const cardMarkup = `<article data-review-card data-card-id="${escape(card.id)}"><div data-review-card-header><h2 data-review-card-title>${escape(card.id)}</h2>${statusBadgeMarkup(card.conclusion)}</div>${implementationPlanMarkup(card)}<details data-review-implementation-evidence><summary>实现依据</summary><div data-card-fields>${cardFieldsMarkup(card)}</div></details>${conclusionGroup}<label>评审备注<textarea data-field="userNote"${disabled}>${escape(card.userNote || "")}</textarea></label>${state.mode === "reviewing" ? "<p>评审提交中</p>" : ""}</article>`;
-    const cardList = reviewListMarkup(state.cards, state.currentCardIndex, "card");
+    const moduleBody = card.module ? moduleMarkup(card) : `${implementationPlanMarkup(card)}<details data-review-implementation-evidence><summary>实现依据</summary><div data-card-fields>${cardFieldsMarkup(card)}</div></details>`;
+    const cardMarkup = `<article data-review-card data-card-id="${escape(card.id)}"><div data-review-card-header><h2 data-review-card-title>${escape(card.module?.name || card.id)}</h2>${readinessMarkup(card)}${statusBadgeMarkup(card.conclusion)}</div>${moduleBody}${conclusionGroup}<label>评审备注<textarea data-field="userNote"${disabled}>${escape(card.userNote || "")}</textarea></label></article>`;
+    const cardList = reviewListMarkup(state.cards, state.currentCardIndex, "card", state.allCards);
     const footer = `<footer data-review-footer><div data-review-navigation><button type="button" data-action="previous"${disabled || state.currentCardIndex === 0 ? " disabled" : ""}>上一个</button><button type="button" data-action="next"${disabled || lastCard ? " disabled" : ""}>下一个</button></div><div data-review-actions><button type="button" data-action="highlight-evidence"${disabled}>查看证据</button>${lastCard ? `<button type="button" data-action="submit"${disabled}>统一提交评审</button>` : ""}</div></footer>`;
     return `${handles}${header}<div data-review-body>${alerts}<div data-review-layout>${cardList}<main data-review-detail><div data-review-detail-scroll>${cardMarkup}</div>${footer}</main></div></div>`;
   }
@@ -1274,15 +1585,25 @@
     return `<span data-review-status data-status="${escapeHtml(status)}">${escapeHtml(status)}${suffix}</span>`;
   }
 
-  function reviewListMarkup(items, currentIndex, kind) {
+  function reviewListMarkup(items, currentIndex, kind, allCards = items) {
+    const byId = new Map(allCards.map(card => [card.id, card]));
+    const visibleIds = new Set(items.map(card => card.id));
     const indexAttribute = kind === "result" ? "data-result-index" : "data-card-index";
     const action = kind === "result" ? "select-result" : "select-card";
     const buttons = items.map((item, index) => {
-      const title = item.reviewGoal || item.id;
-      const meta = item.dimension || "未分类";
-      return `<button type="button" data-review-list-item data-action="${action}" ${indexAttribute}="${index}" aria-current="${index === currentIndex}"><span data-review-item-title>${escapeHtml(title)}</span><span data-review-item-meta><span>${escapeHtml(meta)}</span>${statusBadgeMarkup(item.conclusion)}</span></button>`;
+      const title = item.module?.name || item.moduleName || item.reviewGoal || item.id;
+      let parent = item.module?.parentId;
+      let depth = 0;
+      const visited = new Set();
+      while (parent && !visited.has(parent)) {
+        visited.add(parent); depth += 1; parent = byId.get(parent)?.module?.parentId;
+      }
+      const hiddenParent = item.module?.parentId && !visibleIds.has(item.module.parentId)
+        ? ` · 属于${byId.get(item.module.parentId)?.module?.name || item.module.parentId}` : "";
+      const meta = item.module ? `${item.id} · 第 ${item.module.revision} 版${hiddenParent}` : item.dimension || "未分类";
+      return `<button type="button" data-review-list-item style="--review-depth:${depth}"${item.module?.parentId ? " data-child-module" : ""} data-action="${action}" ${indexAttribute}="${index}" aria-current="${index === currentIndex}"><span data-review-item-title>${escapeHtml(title)}</span><span data-review-item-meta><span>${escapeHtml(meta)}</span>${statusBadgeMarkup(item.conclusion)}</span>${item.module ? readinessMarkup(item) : ""}</button>`;
     }).join("");
-    return `<nav data-review-list aria-label="评审功能列表"><span data-review-list-label>评审功能</span>${buttons}</nav>`;
+    return `<nav data-review-list aria-label="评审功能列表"><span data-review-list-label>功能模块</span>${buttons}</nav>`;
   }
 
   function resizeHandlesMarkup(dockSide) {
@@ -1292,11 +1613,26 @@
     return '<div data-review-resize-edge="left" aria-hidden="true"></div><div data-review-resize-edge="right" aria-hidden="true"></div>';
   }
 
+  function readinessMarkup(card) {
+    const status = card.implementationPlan?.status;
+    if (!status) return "";
+    return `<span data-review-readiness="${status}">${status === "ready" ? "实现方案已就绪" : "实现方案待补充"}</span>`;
+  }
+
+  function moduleMarkup(card) {
+    const m = card.module;
+    const changes = { added: "新增", modified: "修改", removed: "移除", unchanged: "保留" };
+    const section = (title, values) => `<section data-module-section><h3>${title}</h3>${listMarkup(values)}</section>`;
+    const scenarios = m.scenarios.map(item => `<div data-module-scenario><p><b>给定</b>${escapeHtml(item.given)}</p><p><b>当</b>${escapeHtml(item.when)}</p><p><b>则</b>${escapeHtml(item.then)}</p></div>`).join("");
+    const questions = m.questions.length ? m.questions.map(item => `<div data-module-question><p><strong>${escapeHtml(item.question)}</strong></p><p>影响：${escapeHtml(item.impact)}</p><p>${item.owner === "agent" ? "Agent 查证" : "需要你决定"}：${escapeHtml(item.recommendation)}</p></div>`).join("") : "<p>暂无待确认问题</p>";
+    return `<div data-module-content><section data-module-section><h3>职责与范围</h3><p>${escapeHtml(m.purpose)}</p></section><section data-module-section data-module-change><h3>本次${changes[m.change.kind]}</h3><p>${escapeHtml(m.change.summary)}</p></section><div data-module-io>${section("输入", m.inputs)}${section("输出", m.outputs)}</div>${section("行为规则", m.rules)}<section data-module-section><h3>验收例子</h3>${scenarios}</section><section data-module-section><h3>待确认问题</h3>${questions}</section><details data-module-technical data-review-implementation-evidence><summary>内部实现与依据 · ${card.implementationPlan.status === "ready" ? "已就绪" : "待补充"}</summary><div>${implementationPlanMarkup(card)}<div data-card-fields>${cardFieldsMarkup(card)}</div></div></details></div>`;
+  }
+
   function implementationPlanMarkup(card) {
     const plan = card.implementationPlan;
     if (!plan) return "";
     const blocked = plan.status === "blocked"
-      ? `<div data-review-implementation-blocked><strong>实现阻塞</strong>${listMarkup(plan.blockers)}</div>`
+      ? `<div data-review-implementation-blocked><strong>实现方案待补充（不影响需求确认）</strong>${listMarkup(plan.blockers)}</div>`
       : "";
     const sections = [
       ["structure", "怎么实现", plan.structure],
@@ -1360,8 +1696,7 @@
     const editablePatch = {};
     if (
       Object.hasOwn(patch, "conclusion") &&
-      USER_CONCLUSIONS.has(patch.conclusion) &&
-      (currentCard.implementationPlan.status !== "blocked" || patch.conclusion === "阻塞")
+      USER_CONCLUSIONS.has(patch.conclusion)
     ) {
       editablePatch.conclusion = patch.conclusion;
     }
@@ -1413,9 +1748,15 @@
     if (state.cards.length === 0) {
       return { ...state, lastError: reviewError("no-active-cards", "没有可提交的本轮评审卡。") };
     }
+    if (!Number.isSafeInteger(state.submissionVersion + 1)) {
+      return { ...state, lastError: reviewError("submission-version-exhausted", "请使用新的评审会话重新挂载。") };
+    }
+    // A fresh nonce also protects against legacy/missing/disabled draft storage.
+    const submissionId = globalThis.crypto.randomUUID();
     const submissionVersion = state.submissionVersion + 1;
     const snapshot = deepFreeze({
       sessionId: state.sessionId,
+      submissionId,
       submissionVersion,
       planFingerprint: state.planFingerprint,
       artifactRuleFingerprint: state.artifactRuleFingerprint,
@@ -1437,7 +1778,8 @@
       state.submissionVersion === 0 ||
       !isNonEmptyString(action.sessionId) ||
       action.sessionId !== state.sessionId ||
-      action.submissionVersion !== state.submissionVersion
+      action.submissionVersion !== state.submissionVersion ||
+      action.submissionId !== state.lastSubmission?.submissionId
     ) {
       return { ...state, lastError: reviewError("stale-result", "已忽略过期的评审结果。") };
     }
@@ -1446,7 +1788,7 @@
     if (fingerprintError) return { ...state, lastError: fingerprintError };
 
     if (!Array.isArray(action.results)) {
-      return { ...state, lastError: reviewError("invalid-results", "评审结果格式无效。") };
+      return { ...state, lastError: reviewError("invalid-results", "评审结果必须覆盖本轮全部卡片，包含有效卡片关联、唯一结果编号、结论说明和 Plan 变更摘要。") };
     }
     if (action.results.length === 0) {
       return { ...state, lastError: reviewError("empty-results", "空评审结果不能确认更新 Plan。") };
@@ -1454,14 +1796,36 @@
     let results;
     try {
       results = action.results.map(normalizeReviewResult);
+      const cardIds = new Set(state.lastSubmission.cards.map((card) => card.id));
+      const covered = new Set();
+      const resultIds = new Set();
+      for (const result of results) {
+        if (resultIds.has(result.id)) throw new Error("Duplicate result id");
+        resultIds.add(result.id);
+        for (const cardId of result.cardIds) {
+          if (!cardIds.has(cardId)) throw new Error("Unknown review card");
+          covered.add(cardId);
+        }
+      }
+      if (covered.size !== cardIds.size) throw new Error("Incomplete result coverage");
     } catch {
-      return { ...state, lastError: reviewError("invalid-results", "评审结果格式无效。") };
+      return { ...state, lastError: reviewError("invalid-results", "评审结果必须覆盖本轮全部卡片，包含有效卡片关联、唯一结果编号、结论说明和 Plan 变更摘要。") };
     }
 
     return {
       ...state,
       mode: "result",
-      results: prioritizeReviewResults(results),
+      cards: state.cards.map(card => {
+        const matches = prioritizeReviewResults(results.filter(result => result.cardIds.includes(card.id)));
+        const result = matches[0];
+        return { ...card, reviewResult: normalizeEmbeddedReviewResult(result),
+          reopened: RESOLVED_CONCLUSIONS.has(result.conclusion) ? false : card.reopened,
+          evidenceChanged: RESOLVED_CONCLUSIONS.has(result.conclusion) ? false : card.evidenceChanged };
+      }),
+      results: prioritizeReviewResults(results).map(result => ({
+        ...result,
+        moduleName: result.cardIds.map(id => state.cards.find(card => card.id === id)?.module?.name).filter(Boolean).join("、"),
+      })),
       currentResultIndex: 0,
       lastError: null,
     };
@@ -1482,7 +1846,10 @@
     if (
       !isNormalizedObject(result) ||
       !isNonEmptyString(result.id) ||
-      !RESULT_CONCLUSIONS.has(result.conclusion)
+      !RESULT_CONCLUSIONS.has(result.conclusion) ||
+      !isStringArray(result.cardIds) || result.cardIds.length === 0 ||
+      new Set(result.cardIds).size !== result.cardIds.length ||
+      !isNonEmptyString(result.summary) || !isNonEmptyString(result.planChangeSummary)
     ) {
       throw createCodedError(TypeError, "invalid-review-result", "Review result is invalid");
     }
@@ -1505,6 +1872,7 @@
     }
     return {
       id: result.id,
+      cardIds: [...result.cardIds],
       conclusion: result.conclusion,
       dimension,
       ...(typeof result.summary === "string" ? { summary: result.summary } : {}),
@@ -1569,12 +1937,14 @@
     const identity = (state) => ({
       sessionId: state.sessionId,
       submissionVersion: state.submissionVersion,
+      submissionId: state.lastSubmission?.submissionId,
       planFingerprint: state.planFingerprint,
       artifactRuleFingerprint: state.artifactRuleFingerprint,
     });
     const sameIdentity = (left, right) => (
       left.sessionId === right.sessionId &&
       left.submissionVersion === right.submissionVersion &&
+      left.submissionId === right.submissionId &&
       left.planFingerprint === right.planFingerprint &&
       left.artifactRuleFingerprint === right.artifactRuleFingerprint
     );
@@ -1608,6 +1978,9 @@
           return reviewError("stale-confirmation-request", "确认请求已过期，请重新发起。");
         }
         return assertCurrentFingerprints(state, fingerprints);
+      },
+      peek() {
+        return pending ? { ...pending } : null;
       },
       invalidate() {
         pending = null;
@@ -1774,6 +2147,8 @@
     createCleanupRegistry,
     createPlanConfirmationGate,
     createReviewState,
+    createWakeNotifier,
+    restoreSubmittedReview,
     DRAFT_TTL_MS,
     highlightEvidence,
     loadDraft,
@@ -1788,5 +2163,7 @@
     saveDraft,
     selectRoundCards,
     mountReviewPanel,
+    mergeReviewSession,
+    normalizeModule,
   };
 });

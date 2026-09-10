@@ -20,6 +20,48 @@ function deepFreeze(value) {
   return value;
 }
 
+function moduleModel() {
+  const model = structuredClone(validModel);
+  model.schemaVersion = 3;
+  model.deliveryUnit.kind = "module";
+  model.features[0].reviewConclusion = "已确认";
+  model.features[0].module = {
+    name: "登录表单",
+    parentId: null,
+    purpose: "让用户建立登录会话",
+    inputs: ["用户输入的账号和密码"],
+    outputs: ["登录成功建立会话并跳转；失败展示原因"],
+    rules: ["字段校验通过后才请求登录；提交期间阻止重复提交"],
+    scenarios: [{ id: "F-001-S-001", given: "用户填写有效凭证", when: "点击登录", then: "建立会话并进入目标页" }],
+    questions: [],
+    change: { kind: "modified", summary: "补充失败反馈和重复提交保护" },
+    revision: 1,
+  };
+  return model;
+}
+
+function addChildModule(model) {
+  const child = structuredClone(model.features[0]);
+  child.id = "F-002";
+  child.module.name = "登录失败反馈";
+  child.module.parentId = "F-001";
+  child.module.scenarios[0].id = "F-002-S-001";
+  child.apiNeed = "none";
+  child.apiRefs = [];
+  child.taskRefs = [];
+  model.features.push(child);
+  return child;
+}
+
+function markImplementationBlocked(feature) {
+  feature.implementationPlan = {
+    status: "blocked",
+    summary: "行为已明确，待核实登录错误码及对应文案",
+    structure: [], linkage: [], dataFlow: [], acceptanceFocus: [], evidenceIds: [],
+    blockers: ["需查证正式接口中登录失败的错误码含义"],
+  };
+}
+
 test("accepts a normalized model with reciprocal links", () => {
   assert.deepEqual(validatePagePlanModel(validModel), { valid: true, errors: [] });
 });
@@ -63,7 +105,7 @@ test("requires every feature to classify its own API need with decision evidence
   assert.match(errorMessages(validatePagePlanModel(leakedModuleConclusion)), /apiNeed none.*apiRefs/i);
 });
 
-test("requires every Plan feature to preserve a ready evidence-backed implementation contract", () => {
+test("requires a complete implementation contract when ready and permits documented blockers during review", () => {
   const missing = structuredClone(validModel);
   delete missing.features[0].implementationPlan;
   assert.match(errorMessages(validatePagePlanModel(missing)), /implementationPlan is required/);
@@ -75,6 +117,8 @@ test("requires every Plan feature to preserve a ready evidence-backed implementa
   const blocked = structuredClone(validModel);
   blocked.features[0].implementationPlan.status = "blocked";
   blocked.features[0].implementationPlan.blockers = ["组件体系尚未确认"];
+  assert.deepEqual(validatePagePlanModel(blocked), { valid: true, errors: [] });
+  blocked.deliveryUnit.status = "可实施";
   assert.match(errorMessages(validatePagePlanModel(blocked)), /implementationPlan\.status must be ready/);
 
   const unsupportedEvidence = structuredClone(validModel);
@@ -304,4 +348,229 @@ test("artifact location rule guard uses a stable code and actionable AGENTS mess
     assertArtifactLocationRule(validModel.artifactLocationRule, validModel.artifactLocationRule.ruleFingerprint),
     null,
   );
+});
+
+
+test("Plan-only review does not require choosing a future Draft directory", () => {
+  const model = structuredClone(validModel);
+  delete model.artifactLocationRule.draftOpenApiPattern;
+  model.apis.forEach(api => { api.status = "已有正式契约"; });
+  assert.equal(validatePagePlanModel(model).valid, true);
+  model.apis[0].status = "Draft已确认";
+  assert.match(errorMessages(validatePagePlanModel(model)), /draftOpenApiPattern/);
+});
+
+test("saves confirmed module requirements independently from blocked implementation preparation", () => {
+  const model = moduleModel();
+  markImplementationBlocked(model.features[0]);
+  for (const status of ["评审中", "阻塞"]) {
+    model.deliveryUnit.status = status;
+    assert.deepEqual(validatePagePlanModel(model), { valid: true, errors: [] });
+  }
+  assert.equal(model.features[0].reviewConclusion, "已确认");
+
+  for (const status of ["可实施", "开发中", "待对接", "待验收", "已交付"]) {
+    model.deliveryUnit.status = status;
+    const result = validatePagePlanModel(model);
+    assert.ok(result.errors.some(error => error.code === "feature-implementation-not-ready"), status);
+    assert.ok(!result.errors.some(error => error.code === "feature-review-not-confirmed"), status);
+  }
+});
+
+test("requires actionable blockers without inventing evidence or implementation detail", () => {
+  const model = moduleModel();
+  markImplementationBlocked(model.features[0]);
+  const feature = model.features[0];
+  for (const blockers of [undefined, [], [" "], [12]]) {
+    feature.implementationPlan.blockers = blockers;
+    assert.match(errorMessages(validatePagePlanModel(model)), /blockers must describe at least one unresolved blocker/);
+  }
+  feature.implementationPlan.blockers = ["待 API 负责人确认错误码"];
+  feature.implementationPlan.evidenceIds = ["E-missing"];
+  assert.match(errorMessages(validatePagePlanModel(model)), /references missing evidence id: E-missing/);
+  feature.implementationPlan.evidenceIds = [];
+  feature.implementationPlan.status = "almost-ready";
+  assert.match(errorMessages(validatePagePlanModel(model)), /status must be ready or blocked/);
+});
+
+test("only confirmed applicable modules can enter implementation stages", () => {
+  const model = moduleModel();
+  model.deliveryUnit.status = "可实施";
+  assert.equal(validatePagePlanModel(model).valid, true);
+  for (const conclusion of ["未评审", "待修改", "阻塞"]) {
+    model.features[0].reviewConclusion = conclusion;
+    assert.match(errorMessages(validatePagePlanModel(model)), /reviewConclusion must be 已确认/);
+  }
+  model.features[0].reviewConclusion = "不适用";
+  markImplementationBlocked(model.features[0]);
+  assert.equal(validatePagePlanModel(model).valid, true);
+
+  model.features[0].status = "不适用";
+  model.features[0].reviewConclusion = "未评审";
+  assert.match(errorMessages(validatePagePlanModel(model)), /reviewConclusion must be 已确认/);
+});
+
+test("unresolved user or agent questions block implementation stages even for confirmed ready modules", () => {
+  for (const owner of ["user", "agent"]) {
+    const model = moduleModel();
+    model.features[0].module.questions = [{
+      id: "Q-001", question: "失败提示何时消失？", impact: "影响失败交互及验收", owner,
+      recommendation: "核实需求和现有行为后确定保留至下次提交",
+    }];
+    assert.equal(model.features[0].reviewConclusion, "已确认");
+    assert.equal(model.features[0].implementationPlan.status, "ready");
+    for (const status of ["评审中", "阻塞"]) {
+      model.deliveryUnit.status = status;
+      assert.equal(validatePagePlanModel(model).valid, true, `${owner} questions can be saved during ${status}`);
+    }
+    for (const status of ["可实施", "开发中", "待对接", "待验收", "已交付"]) {
+      model.deliveryUnit.status = status;
+      const result = validatePagePlanModel(model);
+      assert.ok(result.errors.some(error => error.code === "feature-module-questions-unresolved"), `${owner} questions block ${status}`);
+    }
+    model.features[0].reviewConclusion = "不适用";
+    assert.equal(validatePagePlanModel(model).valid, true, "excluded modules do not block delivery readiness");
+    model.features[0].reviewConclusion = "已确认";
+    model.features[0].module.questions = [];
+    assert.equal(validatePagePlanModel(model).valid, true, "resolved questions no longer block readiness");
+  }
+});
+
+test("accepts every module review conclusion without changing implementation or delivery status", () => {
+  const model = moduleModel();
+  for (const reviewConclusion of ["未评审", "已确认", "待修改", "阻塞", "不适用"]) {
+    model.features[0].reviewConclusion = reviewConclusion;
+    assert.equal(validatePagePlanModel(model).valid, true, reviewConclusion);
+  }
+  for (const reviewConclusion of [undefined, "开发中", " "]) {
+    model.features[0].reviewConclusion = reviewConclusion;
+    assert.match(errorMessages(validatePagePlanModel(model)), /reviewConclusion is unsupported/);
+  }
+});
+
+test("validates a module tree and rejects missing parents, self references, and ancestor cycles", () => {
+  const model = moduleModel();
+  const child = addChildModule(model);
+  assert.deepEqual(validatePagePlanModel(model), { valid: true, errors: [] });
+  child.module.parentId = "F-404";
+  assert.match(errorMessages(validatePagePlanModel(model)), /parentId references missing module: F-404/);
+  child.module.parentId = child.id;
+  assert.match(errorMessages(validatePagePlanModel(model)), /parent cycle/);
+  child.module.parentId = "F-001";
+  model.features[0].module.parentId = "F-002";
+  assert.match(errorMessages(validatePagePlanModel(model)), /parent cycle/);
+  model.features[0].module.parentId = null;
+  assert.equal(validatePagePlanModel(model).valid, true);
+});
+
+test("keeps module, example, and question identities unique across the delivery unit", () => {
+  const model = moduleModel();
+  const child = addChildModule(model);
+  child.module.scenarios[0].id = model.features[0].module.scenarios[0].id;
+  const question = { id: "Q-001", question: "错误是否自动消失？", impact: "影响失败提示交互", owner: "user", recommendation: "保留至下次提交" };
+  model.features[0].module.questions = [question];
+  child.module.questions = [structuredClone(question)];
+  const errors = errorMessages(validatePagePlanModel(model));
+  assert.match(errors, /scenarios duplicate id: F-001-S-001/);
+  assert.match(errors, /questions duplicate id: Q-001/);
+  child.id = "F-001";
+  assert.match(errorMessages(validatePagePlanModel(model)), /features duplicate id: F-001/);
+});
+
+test("requires meaningful module contracts, acceptance examples, question ownership, and revisions", () => {
+  const changes = [
+    [module => { module.name = " "; }, /module\.name/],
+    [module => { delete module.parentId; }, /module\.parentId/],
+    [module => { module.purpose = ""; }, /module\.purpose/],
+    [module => { module.inputs = []; }, /module\.inputs/],
+    [module => { module.outputs = [" "]; }, /module\.outputs/],
+    [module => { module.rules = "描述"; }, /module\.rules/],
+    [module => { module.scenarios = []; }, /at least one acceptance example/],
+    [module => { module.scenarios = [null]; }, /scenarios item requires a normalized object/],
+    [module => { module.scenarios[0].then = " "; }, /\.then requires non-empty text/],
+    [module => { module.questions = null; }, /questions requires an array/],
+    [module => { module.questions = [{ id: "Q-001", question: "谁查证？", impact: "阻塞错误展示", owner: "nobody", recommendation: "读取契约" }]; }, /owner must be user or agent/],
+    [module => { module.change = { kind: "pending", summary: "" }; }, /change\.kind/],
+    [module => { module.change.summary = " "; }, /change\.summary/],
+    [module => { module.revision = 0; }, /revision requires a positive safe integer/],
+    [module => { module.revision = 1.5; }, /revision requires a positive safe integer/],
+  ];
+  for (const [change, expected] of changes) {
+    const model = moduleModel();
+    change(model.features[0].module);
+    assert.match(errorMessages(validatePagePlanModel(model)), expected);
+  }
+  const model = moduleModel();
+  delete model.features[0].module;
+  assert.match(errorMessages(validatePagePlanModel(model)), /module requires a normalized object/);
+  model.features = [];
+  assert.match(errorMessages(validatePagePlanModel(model)), /features requires at least one reviewed module/);
+});
+
+test("saves unknown API requirements with explicit gaps while preserving declared reference checks", () => {
+  const model = moduleModel();
+  const feature = model.features[0];
+  feature.apiNeed = "unknown";
+  feature.apiDecisionEvidenceRefs = [];
+  markImplementationBlocked(feature);
+  assert.match(errorMessages(validatePagePlanModel(model)), /unknown requires a module question or non-empty apiEvidenceGap/);
+  feature.module.questions = [{ id: "Q-001", question: "错误反馈是否需要补充接口字段？", impact: "无法确定错误文案来源", owner: "agent", recommendation: "先读取正式契约与已有消费代码" }];
+  assert.deepEqual(validatePagePlanModel(model), { valid: true, errors: [] });
+  feature.module.questions = [];
+  feature.apiEvidenceGap = "尚未获得 API 契约访问权限，无法确认错误文案字段";
+  assert.equal(validatePagePlanModel(model).valid, true);
+  feature.apiDecisionEvidenceRefs = ["E-404"];
+  assert.match(errorMessages(validatePagePlanModel(model)), /references missing evidence id: E-404/);
+  feature.apiDecisionEvidenceRefs = [];
+  feature.apiRefs = ["API-404"];
+  assert.match(errorMessages(validatePagePlanModel(model)), /references missing apis id: API-404/);
+
+  feature.apiRefs = [];
+  model.apis = [];
+  model.tasks[0].apiRefs = [];
+  assert.equal(validatePagePlanModel(model).valid, true, "unknown API need can be saved before any API is identified");
+});
+
+test("unresolved API needs cannot be marked ready for development even when the implementation claims readiness", () => {
+  const model = moduleModel();
+  model.features[0].apiNeed = "unknown";
+  model.features[0].apiEvidenceGap = "等待核实字段是否由宿主注入";
+  for (const status of ["可实施", "开发中", "待对接", "待验收", "已交付"]) {
+    model.deliveryUnit.status = status;
+    assert.match(errorMessages(validatePagePlanModel(model)), /apiNeed must be resolved/);
+  }
+  model.deliveryUnit.status = "评审中";
+  assert.equal(validatePagePlanModel(model).valid, true);
+  model.schemaVersion = 2;
+  assert.match(errorMessages(validatePagePlanModel(model)), /apiNeed must be required or none/);
+});
+
+test("one module may combine API consumption and inherited dependencies without weakening traceability", () => {
+  const model = moduleModel();
+  const inherited = structuredClone(model.apis[0]);
+  inherited.id = "API-002";
+  inherited.status = "已有正式契约";
+  inherited.deliveryRelations[0].relation = "继承依赖";
+  inherited.taskRefs = [];
+  model.apis.push(inherited);
+  model.features[0].apiRefs.push(inherited.id);
+  assert.equal(validatePagePlanModel(model).valid, true);
+  inherited.formalSourceEvidenceRefs = [];
+  assert.match(errorMessages(validatePagePlanModel(model)), /formalSourceEvidenceRefs requires formal source search evidence/);
+  inherited.formalSourceEvidenceRefs = ["E-001"];
+  inherited.featureRefs = [];
+  assert.match(errorMessages(validatePagePlanModel(model)), /reciprocal feature\/API link missing/);
+});
+
+test("module validation remains non-mutating with deterministic malformed-contract diagnostics", () => {
+  const model = moduleModel();
+  addChildModule(model);
+  const frozen = deepFreeze(model);
+  assert.deepEqual(validatePagePlanModel(frozen), { valid: true, errors: [] });
+  const malformed = structuredClone(model);
+  malformed.features[0].module = false;
+  malformed.features[1].module.parentId = "F-002";
+  const first = validatePagePlanModel(malformed);
+  assert.equal(first.valid, false);
+  assert.deepEqual(first, validatePagePlanModel(malformed));
 });

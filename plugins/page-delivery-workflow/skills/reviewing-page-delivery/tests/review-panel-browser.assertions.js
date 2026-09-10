@@ -6,6 +6,11 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
   const click = (element) => element?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
   const pointer = (target, type, x, y, pointerId = 1) =>
     target?.dispatchEvent(new PointerEvent(type, { bubbles: true, clientX: x, clientY: y, pointerId }));
+  const resultDetails = () => ({
+    cardIds: globalThis.__PAGE_DELIVERY_REVIEW__.exportSubmission().cards.map(card => card.id),
+    summary: "已核对本轮意见",
+    planChangeSummary: "保留已确认方案并列出待处理事项",
+  });
   const panel = () => document.querySelector("[data-page-delivery-review-host]")?.shadowRoot;
   const state = () => globalThis.__PAGE_DELIVERY_REVIEW__?.getState?.();
   const canonicalCard = (overrides = {}) => {
@@ -107,6 +112,20 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
     check(legacyDestroyCalls === 1, "mount should destroy a previous script instance API before adding listeners");
     check(document.querySelectorAll("[data-page-delivery-review-host]").length === 1, "mount should be idempotent and retain one host");
 
+    const liveNote = panel()?.querySelector('[data-field="userNote"]');
+    liveNote.focus();
+    liveNote.value = "a";
+    liveNote.dispatchEvent(new InputEvent("input", { bubbles: true, data: "a", inputType: "insertText" }));
+    check(panel()?.querySelector('[data-field="userNote"]') === liveNote, "typing must preserve the textarea node");
+    check(panel()?.activeElement === liveNote, "typing must preserve focus");
+    liveNote.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }));
+    liveNote.value = "a中文";
+    liveNote.setSelectionRange(2, 2);
+    liveNote.dispatchEvent(new InputEvent("input", { bubbles: true, data: "中文", isComposing: true }));
+    check(panel()?.activeElement === liveNote && liveNote.selectionStart === 2, "IME input must preserve focus and selection");
+    liveNote.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, data: "中文" }));
+    check(state()?.cards?.[state().currentCardIndex]?.userNote === "a中文", "IME edits must reach state");
+
     click(panel()?.querySelector('[data-action="next"]'));
     check(panel()?.querySelectorAll("[data-review-card]").length === 1, "next should still render one card");
     check(panel()?.querySelector("[data-review-card]")?.getAttribute("data-card-id") === "REV-003", "next should change the current card");
@@ -179,13 +198,14 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
     globalThis.__PAGE_DELIVERY_REVIEW__.applyResult({
       sessionId: submission.sessionId,
       submissionVersion: submission.submissionVersion,
+      submissionId: submission.submissionId,
       planFingerprint: submission.planFingerprint,
       artifactRuleFingerprint: submission.artifactRuleFingerprint,
       results: [
-        { id: "other", conclusion: "已确认", summary: "全部接受", planChangeSummary: "无需调整 Plan" },
-        { id: "conflict", conclusion: "冲突" },
-        { id: "pending", conclusion: "待修改" },
-        { id: "blocking", conclusion: "阻塞", dimension: "结果域", nested: { artifactPath: "/private/result" } },
+        { id: "other", ...resultDetails(), conclusion: "已确认", summary: "全部接受", planChangeSummary: "无需调整 Plan" },
+        { id: "conflict", ...resultDetails(), conclusion: "冲突" },
+        { id: "pending", ...resultDetails(), conclusion: "待修改" },
+        { id: "blocking", ...resultDetails(), conclusion: "阻塞", dimension: "结果域", nested: { artifactPath: "/private/result" } },
       ],
     });
     check(state()?.mode === "result", "matching result should enter result mode");
@@ -365,9 +385,10 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
     globalThis.__PAGE_DELIVERY_REVIEW__.applyResult({
       sessionId: unresolvedSubmission.sessionId,
       submissionVersion: unresolvedSubmission.submissionVersion,
+      submissionId: unresolvedSubmission.submissionId,
       planFingerprint: unresolvedSubmission.planFingerprint,
       artifactRuleFingerprint: unresolvedSubmission.artifactRuleFingerprint,
-      results: [{ id: "unresolved-rule-result", conclusion: "阻塞" }],
+      results: [{ id: "unresolved-rule-result", ...resultDetails(), conclusion: "阻塞" }],
     });
     const unresolvedConfirm = panel()?.querySelector('[data-action="confirm-plan"]');
     check(unresolvedConfirm?.disabled === true, "unresolved artifact rules should disable Plan confirmation");
@@ -433,9 +454,10 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
     globalThis.__PAGE_DELIVERY_REVIEW__.applyResult({
       sessionId: conflictSubmission.sessionId,
       submissionVersion: conflictSubmission.submissionVersion,
+      submissionId: conflictSubmission.submissionId,
       planFingerprint: "sha256:changed-plan",
       artifactRuleFingerprint: conflictSubmission.artifactRuleFingerprint,
-      results: [{ id: "conflict-result", conclusion: "已确认" }],
+      results: [{ id: "conflict-result", ...resultDetails(), conclusion: "已确认" }],
     });
     check(state()?.mode === "reviewing" && state()?.lastError?.code === "plan-conflict", "plan fingerprint conflicts must stay out of result mode");
     check(panel()?.querySelector("[data-review-error]")?.textContent.includes("Plan 已变化"), "plan conflicts should show an actionable visible message");

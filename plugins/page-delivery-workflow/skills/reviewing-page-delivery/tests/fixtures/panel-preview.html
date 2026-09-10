@@ -87,18 +87,21 @@
     </main>
     <script src="../../scripts/inject-review-panel.js"></script>
     <script src="../review-panel-browser.assertions.js"></script>
+    <script src="../module-review-browser.assertions.js"></script>
+    <script src="../review-wake-browser.assertions.js"></script>
     <script>
       async function mountPreview() {
-        const response = await fetch("./review-session.json", { cache: "no-store" });
+        const query = new URLSearchParams(location.search);
+        const fixture = (query.has("modules") || query.has("wake")) ? "./module-review-session.json" : "./review-session.json";
+        const response = await fetch(fixture, { cache: "no-store" });
         if (!response.ok) throw new Error(`ReviewSession 加载失败：${response.status}`);
         globalThis.reviewSession = await response.json();
-        const query = new URLSearchParams(location.search);
         if (query.has("assert")) {
           localStorage.removeItem(`page-delivery-review:v1:${globalThis.reviewSession.deliveryUnitKey}`);
         }
         globalThis.PageDeliveryReviewPanel.mountReviewPanel(globalThis.reviewSession);
         if (query.has("assert")) {
-          const result = await globalThis.runPageDeliveryBrowserAssertions();
+          const result = await (query.has("wake") ? globalThis.runReviewWakeBrowserAssertions() : query.has("modules") ? globalThis.runModuleReviewBrowserAssertions() : globalThis.runPageDeliveryBrowserAssertions());
           const output = document.createElement("pre");
           output.setAttribute("data-browser-assertions", result.valid ? "passed" : "failed");
           output.textContent = result.valid
