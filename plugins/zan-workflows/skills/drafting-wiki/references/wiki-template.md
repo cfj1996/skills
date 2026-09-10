@@ -37,7 +37,12 @@ target-location, Wiki-ID, TAPD-comment, writeback, merge, or release narration.
   `branch` by default, since the original source branch has its own Wiki field.
   Do not infer selections from the Job name or treat defaults as confirmed.
   If no displayable parameters remain, omit `?` and the parameter suffix;
-  unresolved required selections block a final body. This query-like text is
+  under `DEPLOY`, unresolved required selections block a final body. Under
+  `SKIP`, render only parameters already evidenced in the current work context;
+  missing build/release selections do not block the Wiki. Do not call Jenkins
+  or request deployment-only selections to complete a skipped deployment.
+  Still require an evidenced Job name/URL and the other canonical Wiki fields.
+  This query-like text is
   only a display label, never a modification to the actual Job URL.
   Examples:
   - `Job：[front-suppliers?platform=--suppliers](http://ops.jubaozan.cn/jenkins/job/front-suppliers-test/)`

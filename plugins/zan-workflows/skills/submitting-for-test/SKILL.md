@@ -52,7 +52,8 @@ business source.
 2. Resolve `deployment_mode` and, for `DEPLOY`, resolve the exact Jenkins Job,
    test environment, release channel, parameters/version identity, and purpose
    through workspace project knowledge and release-safety rules.
-3. Under `STANDARD`, invoke `zan-workflows:drafting-wiki` read-only and require
+3. Under `STANDARD`, pass the resolved `DEPLOY|SKIP` and available parameter
+   evidence to `zan-workflows:drafting-wiki`, invoke it read-only, and require
    either one validated target/body plan or a
    `SKIPPED_BY_POLICY` result proven to be `NON_FUNCTIONAL_CONTINUE`. Under
    `NO_WIKI`, set Wiki to `SKIPPED_BY_POLICY` without loading Wiki capability.

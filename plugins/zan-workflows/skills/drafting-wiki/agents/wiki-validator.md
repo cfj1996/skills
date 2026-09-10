@@ -35,7 +35,11 @@ Validate these invariants in order:
    appends `?{Job 参数}` using selected build/release `name=value` pairs joined
    by `&`, checked against Jenkins definitions. Omit branch parameters such as
    `branch` by default. Omit `?` and its suffix when no displayable parameters
-   remain; unresolved required selections block. Never append these display
+   remain. Under `DEPLOY`, unresolved required selections block. Under `SKIP`
+   or a standalone Wiki-only request, absent deployment selections are valid;
+   only already-evidenced parameters may be shown, with no Jenkins calls or
+   deployment-only input requests. Job name/URL and other canonical fields
+   remain required. Never append these display
    parameters to the actual Job URL. The
    red service marker is exactly `更新服务` for a business project and exactly
    `工具服务-无需上线` for a tooling/library project. No person was guessed or copied

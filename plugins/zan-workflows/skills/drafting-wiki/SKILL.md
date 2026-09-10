@@ -22,7 +22,9 @@ Read [contracts.md](references/contracts.md),
 
 For a standalone call, use the current TAPD work identifier from the request or
 conversation. For an orchestrated call, accept the work definition, reviewed
-change, `INITIAL|CONTINUE`, delivery facts, and original source branch. Do not
+change, `INITIAL|CONTINUE`, resolved `DEPLOY|SKIP`, delivery facts, and original
+source branch. For a standalone call, use explicit deployment intent or existing
+delivery facts; a Wiki-only request has no deployment selection requirement. Do not
 require the user to provide a Wiki URL, month page, sequence, module, or entry fields. Resolve them
 from read-only sources and retain the source of every material value. An
 ambiguous existing target or unresolved required fact blocks the draft; never
@@ -50,7 +52,11 @@ invent a value or render a placeholder.
    Jenkins definitions, project name, project category/service type, package
    classification, developer, tester, description, scope, and original source
    branch from current read-only evidence. Retain conflicts and block
-   unresolved fields.
+   unresolved required fields. Under `SKIP` (including a standalone Wiki-only
+   request), use only existing parameter evidence and omit unknown selections;
+   do not call Jenkins or ask for deployment-only inputs. Missing selections
+   are allowed under `SKIP`, but the Job name/URL and other Wiki facts remain
+   required.
 4. Use exactly one evidenced original `feature/*` or `fixbug/*` branch. Never
    use a `merge/*` branch. Use that branch to identify an existing current
    entry.
