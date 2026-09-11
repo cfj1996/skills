@@ -1,11 +1,12 @@
 {
   "name": "zan-workflows",
-  "version": "0.1.0+codex.20260904103852",
+  "version": "0.1.0+codex.20260911032319",
   "description": "Company project and stateless functional TAPD workflows, plus MR review, debug token, identity, and memory skills for Codex.",
   "author": {
     "name": "Local developer"
   },
   "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
   "interface": {
     "displayName": "Zan Workflows",
     "shortDescription": "Company project and functional TAPD workflows.",

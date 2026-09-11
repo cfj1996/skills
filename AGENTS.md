@@ -12,6 +12,7 @@ There is no global build step in this repository. Use targeted commands instead:
 npx --package=@zan/tapd-cli@canary zan-tapd-cli <bug|story> <id> --json
 git log --oneline -5 -- skills/tapd-workflow
 git status --short
+node --test plugins/zan-workflows/tests/mcp-launcher.test.mjs
 node --test plugins/page-delivery-workflow/skills/reviewing-page-delivery/tests/*.test.mjs
 python3 /Users/cfj/.codex/skills/.system/skill-creator/scripts/quick_validate.py \
   plugins/page-delivery-workflow/skills/reviewing-page-delivery

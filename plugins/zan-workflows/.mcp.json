@@ -1,0 +1,32 @@
+{
+  "mcpServers": {
+    "gitlab-mcp": {
+      "command": "node",
+      "args": ["./scripts/start-mcp.mjs", "gitlab-mcp"],
+      "cwd": ".",
+      "env_vars": ["ZAN_WORKFLOWS_CONFIG"],
+      "startup_timeout_sec": 120
+    },
+    "jenkins-mcp": {
+      "command": "node",
+      "args": ["./scripts/start-mcp.mjs", "jenkins-mcp"],
+      "cwd": ".",
+      "env_vars": ["ZAN_WORKFLOWS_CONFIG"],
+      "startup_timeout_sec": 120
+    },
+    "tapd-mcp": {
+      "command": "node",
+      "args": ["./scripts/start-mcp.mjs", "tapd-mcp"],
+      "cwd": ".",
+      "env_vars": ["ZAN_WORKFLOWS_CONFIG"],
+      "startup_timeout_sec": 120
+    },
+    "yapi-mcp": {
+      "command": "node",
+      "args": ["./scripts/start-mcp.mjs", "yapi-mcp"],
+      "cwd": ".",
+      "env_vars": ["ZAN_WORKFLOWS_CONFIG"],
+      "startup_timeout_sec": 120
+    }
+  }
+}
