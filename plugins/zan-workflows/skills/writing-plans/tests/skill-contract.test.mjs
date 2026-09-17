@@ -616,7 +616,7 @@ test("generic core does not hardcode the acceptance project", async () => {
 
 test("skill root follows the standard skill layout", async () => {
   const yaml = await readFile(path.join(skillRoot, "agents", "openai.yaml"), "utf8");
-  assert.match(yaml, /display_name:\s*"Writing Plans"/);
+  assert.match(yaml, /display_name:\s*"zan:可视化编写计划"/);
   assert.match(yaml, /\$writing-plans/);
 });
 

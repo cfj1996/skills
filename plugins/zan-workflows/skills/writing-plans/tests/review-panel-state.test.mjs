@@ -9,6 +9,7 @@ const {
   clampPanelWidth,
   clampPanelPosition,
   countReviewConclusions,
+  createSubmissionId,
   createPlanConfirmationGate,
   createReviewState,
   DRAFT_TTL_MS,
@@ -36,6 +37,10 @@ const matchedFingerprints = {
   planFingerprint: session.planFingerprint,
   artifactRuleFingerprint: session.artifactRuleFingerprint,
 };
+
+test("submission ID generation works without Web Crypto", () => {
+  assert.match(createSubmissionId(null), /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+});
 
 const resultDetails = state => ({
   cardIds: state.cards.map(card => card.id),
