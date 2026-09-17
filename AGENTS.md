@@ -13,14 +13,14 @@ npx --package=@zan/tapd-cli@canary zan-tapd-cli <bug|story> <id> --json
 git log --oneline -5 -- skills/tapd-workflow
 git status --short
 node --test plugins/zan-workflows/tests/mcp-launcher.test.mjs
-node --test plugins/page-delivery-workflow/skills/reviewing-page-delivery/tests/*.test.mjs
+node --test plugins/zan-workflows/skills/writing-plans/tests/*.test.mjs
 python3 /Users/cfj/.codex/skills/.system/skill-creator/scripts/quick_validate.py \
-  plugins/page-delivery-workflow/skills/reviewing-page-delivery
+  plugins/zan-workflows/skills/writing-plans
 python3 /Users/cfj/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py \
-  plugins/page-delivery-workflow
+  plugins/zan-workflows
 ```
 
-The `npx` command fetches TAPD data for workflow execution. Run Git commands from this repository root; use a pathspec such as `-- skills/tapd-workflow` when history should be limited to one standalone skill. The remaining commands run the page-delivery plugin's complete Node test suite and official Skill/Plugin validators. For browser checks, run `node plugins/page-delivery-workflow/skills/reviewing-page-delivery/tests/preview-review-panel.mjs`, then open the printed preview URL with `?assert` for legacy sessions or `?modules&assert` for module sessions and `?wake&assert` for notification races; `?modules` shows the interactive module preview.
+The `npx` command fetches TAPD data for workflow execution. Run Git commands from this repository root; use a pathspec such as `-- skills/tapd-workflow` when history should be limited to one standalone skill. The remaining commands run the Zan plugin's complete Node test suite and official Skill/Plugin validators. For browser checks, run `node plugins/zan-workflows/skills/writing-plans/tests/preview-review-panel.mjs`, then open the printed preview URL with `?assert` for legacy sessions or `?modules&assert` for module sessions and `?wake&assert` for notification races; `?modules` shows the interactive module preview.
 
 ## Coding Style & Naming Conventions
 
@@ -28,7 +28,7 @@ Write skill docs in concise Markdown with clear `#`/`##` headings, short rule li
 
 ## Testing Guidelines
 
-The `page-delivery-workflow` plugin currently has 161 Node tests under `plugins/page-delivery-workflow/skills/reviewing-page-delivery/tests/`; run the complete suite and both official validators for every plugin change. For a standalone skill, run its owning workflow's targeted command, validate `skills/<skill-name>` with `skill-creator/scripts/quick_validate.py`, inspect generated artifacts when applicable, and confirm documented paths and commands still match the repository layout. Keep new scripts and tests inside their owning skill or plugin directory and document the exact command here.
+The `zan-workflows` plugin includes the Writing Plans skill's Node tests under `plugins/zan-workflows/skills/writing-plans/tests/`; run the complete suite and both official validators for every plugin change. For a standalone skill, run its owning workflow's targeted command, validate `skills/<skill-name>` with `skill-creator/scripts/quick_validate.py`, inspect generated artifacts when applicable, and confirm documented paths and commands still match the repository layout. Keep new scripts and tests inside their owning skill or plugin directory and document the exact command here.
 
 ## Commit & Pull Request Guidelines
 

@@ -5,18 +5,6 @@
   },
   "plugins": [
     {
-      "name": "page-delivery-workflow",
-      "source": {
-        "source": "local",
-        "path": "./plugins/page-delivery-workflow"
-      },
-      "policy": {
-        "installation": "AVAILABLE",
-        "authentication": "ON_INSTALL"
-      },
-      "category": "Productivity"
-    },
-    {
       "name": "zan-workflows",
       "source": {
         "source": "local",

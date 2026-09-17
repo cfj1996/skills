@@ -1,0 +1,7 @@
+interface:
+  display_name: "zan:编写计划"
+  short_description: "Review pages or modules and maintain Plans"
+  default_prompt: "Use $writing-plans to review this page or module against its PRD, prototype, project rules, and Plan."
+
+policy:
+  allow_implicit_invocation: false

@@ -1,0 +1,7 @@
+interface:
+  display_name: "zan:提交测试"
+  short_description: "交付变更并登记 TAPD 测试"
+  default_prompt: "使用 $submitting-for-test 将已审查变更交付到 develop，按意图部署测试环境并登记测试。"
+
+policy:
+  allow_implicit_invocation: true

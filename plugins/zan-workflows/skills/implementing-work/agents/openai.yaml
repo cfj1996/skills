@@ -1,0 +1,7 @@
+interface:
+  display_name: "zan:实施 TAPD 工作"
+  short_description: "在固定分支实施已批准的 TAPD 工作"
+  default_prompt: "使用 $implementing-work 在已验证的固定分支上实施批准的 TAPD 工作并完成审查。"
+
+policy:
+  allow_implicit_invocation: true

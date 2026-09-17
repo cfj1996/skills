@@ -1,0 +1,7 @@
+interface:
+  display_name: "zan:准备 TAPD 工作"
+  short_description: "解析范围并绑定项目与分支"
+  default_prompt: "使用 $preparing-work 只读解析 TAPD 工作项，确认项目、仓库、范围和固定分支。"
+
+policy:
+  allow_implicit_invocation: true

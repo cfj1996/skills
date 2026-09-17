@@ -1,0 +1,7 @@
+interface:
+  display_name: "zan:上线发布"
+  short_description: "合并到 master 并维护上线状态"
+  default_prompt: "使用 $going-live 将已提测变更按原始修复分支合并到 master，并维护对应 Wiki 上线状态。"
+
+policy:
+  allow_implicit_invocation: true

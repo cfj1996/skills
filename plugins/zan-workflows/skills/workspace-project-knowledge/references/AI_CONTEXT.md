@@ -65,12 +65,15 @@
 
 - `zan-atlas`
 
+### Atlas 业务模块
+
+- `zan-atlas-modules`：业务项目，不是工具库；为商家、运营商、供应商和服务商场景提供可交付 Atlas 模块。
+
 ### 组件库和 UI 库
 
 - `sim-ui`
 - `von-ui`
 - `zan-apps`
-- `zan-atlas-modules`
 - `zan-poster`
 
 ### 基础库

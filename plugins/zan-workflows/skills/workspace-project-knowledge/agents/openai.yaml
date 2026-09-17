@@ -1,0 +1,7 @@
+interface:
+  display_name: "zan:项目知识"
+  short_description: "解析公司项目与代码归属"
+  default_prompt: "使用 $workspace-project-knowledge 先解析公司项目、代码入口、服务归属及跨项目关系，再进行后续工作。"
+
+policy:
+  allow_implicit_invocation: true

@@ -265,19 +265,25 @@ Fast category hints:
 | `zan-projects` 子系统 | `admin/facilitator`, `admin/factory`, `admin/insight`, `admin/live-monitor`, `admin/siqian` |
 | 商城类 / C 端 | `Ucenter`, `jbz_shop`, `shop_mp`, `zan-mini`, `instant-apps` |
 | 服务商体系 | `zan-projects/admin/facilitator`, `provider-mobile` |
-| 基础库 / 组件库 | `common`, `zan-lib`, `sim-ui`, `von-ui`, `zan-apps`, `zan-atlas`, `zan-atlas-modules`, `zan-poster` |
+| Atlas 业务模块 | `zan-atlas-modules` |
+| 基础库 / 组件库 / 平台库 | `common`, `zan-lib`, `sim-ui`, `von-ui`, `zan-apps`, `zan-atlas`, `zan-poster` |
 | AI / 工具 / DevOps | `skills`, `zan-skills`, `yapi-mcp`, `jenkinsfile`, `zan-cli` |
 
 Wiki service-type normalization:
 
 | Knowledge category | Normalized type | Red marker | Test-submission status |
 |---|---|---|---|
+| `Atlas业务模块` | `BUSINESS` | `更新服务` | `未合并` |
 | `管理后台`, `管理后台Monorepo`, `商城类`, `服务商`, `仓配系统前端`, `仓配管理系统`, `仓配作业系统`, `仓配移动端` | `BUSINESS` | `更新服务` | `未合并` |
-| `基础库`, `组件库`, `平台库`, `Atlas跨平台基座`, `Atlas模块`, `文档`, `技能库`, `AI技能`, `MCP服务`, `DevOps`, `CLI工具`, `本地CLI工具` | `TOOLING` | `工具服务-无需上线` | `无需上线` |
+| `基础库`, `组件库`, `平台库`, `Atlas跨平台基座`, `文档`, `技能库`, `AI技能`, `MCP服务`, `DevOps`, `CLI工具`, `本地CLI工具` | `TOOLING` | `工具服务-无需上线` | `无需上线` |
 
 For a monorepo, classify the matched package/app rather than the repository
 root. `zan-projects/admin/*` applications are `BUSINESS`; packages under
 `zan-lib`, `zan-apps`, and other library/tooling monorepos are `TOOLING`.
+When a project entry explicitly declares `project_type`, `wiki_service_type`,
+or `wiki_service_marker`, those fields take precedence over a broad category
+label. `zan-atlas-modules` is an Atlas business-module project: use
+`BUSINESS`, `更新服务`, and `未合并` for test submission.
 Return `BLOCKED_UNMAPPED_WIKI_SERVICE_TYPE` for any category not listed above.
 
 Important routing examples:
@@ -331,8 +337,9 @@ Use this when the user asks to run, trigger, deploy, package, test environment, 
 Workflow:
 
 1. Route the project with Function 1.
-2. Read `jenkins_jobs` from the centralized `${project_knowledge_root}/data/workspace/project-relations.yaml`, falling back to `references/project-relations.yaml`.
-3. Return the exact Job name, the exact Job URL when indexed or read back from
+2. Read `jenkins_jobs` and, when present, `jenkins_job_urls` from the centralized `${project_knowledge_root}/data/workspace/project-relations.yaml`, falling back to `references/project-relations.yaml`.
+3. Return the exact Job name and the exact Job URL indexed under that Job name or
+   read back from
    Jenkins, and the routing evidence. A consumer that needs a clickable Job
    link must block when the URL cannot be evidenced; it must not derive one.
 4. If a project is not listed in `jenkins_jobs`, say it is not listed in the workspace index; do not guess a `front-*-test` name.
@@ -458,6 +465,8 @@ Project routing:
 
 - `项目`
 - `路径`
+- `项目定位`
+- `仓库地址`
 - `分类`
 - `Wiki 服务类型`：`BUSINESS|TOOLING` when requested by a Wiki workflow
 - `Wiki 服务标识`：`更新服务|工具服务-无需上线` when requested by a Wiki workflow

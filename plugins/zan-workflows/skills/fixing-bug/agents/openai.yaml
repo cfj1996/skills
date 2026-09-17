@@ -1,0 +1,7 @@
+interface:
+  display_name: "zan:修复 TAPD 缺陷"
+  short_description: "按固定项目分支修复 TAPD 缺陷"
+  default_prompt: "使用 $fixing-bug 按确认后的项目、仓库、分支和范围修复 TAPD Bug。"
+
+policy:
+  allow_implicit_invocation: true

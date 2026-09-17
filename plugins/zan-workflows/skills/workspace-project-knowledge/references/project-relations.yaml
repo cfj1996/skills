@@ -309,8 +309,17 @@ projects:
     graph_report: ${project_knowledge_root}/data/projects/zan-atlas/graphify-out/GRAPH_REPORT.md
   zan-atlas-modules:
     path: ${workspace_root}/zan-atlas-modules
-    category: Atlas模块
-    domain: [Atlas组件, atlas modules]
+    repo_url: http://git.jubaozan.cn/webgroup/zan-atlas-modules.git
+    web_url: https://git.jubaozan.cn/webgroup/zan-atlas-modules
+    category: Atlas业务模块
+    domain: [Atlas业务模块, 商家业务模块, 运营商业务模块, 供应商业务模块, 服务商业务模块]
+    knowledge_project: zan-atlas-modules
+    project_type: BUSINESS
+    project_positioning: zan-atlas 的业务模块仓库，提供面向商家、运营商、供应商和服务商场景的可交付 Atlas 模块。
+    wiki_service_type: BUSINESS
+    wiki_service_marker: 更新服务
+    wiki_test_submission_status: 未合并
+    jenkins_job_key: zan-atlas-modules
     ai_context: ${project_knowledge_root}/data/projects/zan-atlas-modules/AI_CONTEXT.md
     graph_report: ${project_knowledge_root}/data/projects/zan-atlas-modules/graphify-out/GRAPH_REPORT.md
   zan-poster:
@@ -432,7 +441,8 @@ domains:
   商城C端: [Ucenter, jbz_shop, shop_mp, zan-mini, instant-apps]
   老系统重构: [zan-projects.factory, zan-atlas]
   基础库: [common, zan-lib, zan-apps]
-  组件库: [sim-ui, von-ui, zan-poster, zan-atlas-modules]
+  Atlas业务模块: [zan-atlas-modules]
+  组件库: [sim-ui, von-ui, zan-poster]
   AI工具: [skills, yapi-mcp, zan-skills]
 
 dependencies:
@@ -544,7 +554,12 @@ jenkins_jobs:
   shop_mp: shop_mp_test
   instant-apps: front-instant-apps-test
   report-ui: report-ui-test
+  zan-atlas-modules: front-atlasmodules-test
   public_libraries: npm-tools-test
+
+jenkins_job_urls:
+  npm-tools-test: http://ops.jubaozan.cn/jenkins/job/npm-tools-test/
+  front-atlasmodules-test: http://ops.jubaozan.cn/jenkins/job/front-atlasmodules-test/
 
 excluded_or_secondary:
   reason: "这些项目可存在于 workspace，但不是当前核心公司业务知识库的默认路由入口；除非用户明确提到，不优先检索。"
