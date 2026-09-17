@@ -58,10 +58,12 @@ repository, or branch with a more plausible candidate.
    creation;
    `USE_EXISTING` verifies and selects the exact existing branch;
    `AUTO` selects one of those outcomes only from the exact supplied branch.
-6. Derive and display the status plan with the scope and branch facts:
-   `WRITE_ACTIVE` for an initial item that must enter `修复中`, `NO_CHANGE` when
-   already active, or `SKIPPED_ALREADY_WAITING_TEST` for `CONTINUE` already in
-   `待测试`. Display the derived incremental scope, work mode, selected
+6. Derive and display the status plan with the scope and branch facts. For a
+   Bug, use `WRITE_ACTIVE` for an initial item that must enter `修复中`,
+   `NO_CHANGE` when already active, or `SKIPPED_ALREADY_WAITING_TEST` for
+   `CONTINUE` already in `待测试`. For a Story or Task, use exactly
+   `NOT_APPLICABLE_NON_BUG` with no target status, payload, authorization, or
+   planned status write. Display the derived incremental scope, work mode, selected
    project/repository, selected/planned branch, and confidence/missing facts.
    For `CONTINUE`, reuse still-valid project/branch confirmation and ask only
    when incremental scope is not explicit or a bound fact changed.
@@ -84,5 +86,7 @@ repository, or branch with a more plausible candidate.
   pass before `READY_FOR_HANDOFF`.
 - A `CREATE` handoff must include the exact verified base ref and SHA. Never
   guess a base in `implementing-work`.
+- Only Bug definitions may carry a `WRITE_ACTIVE` status plan or target
+  `修复中`; Story/Task definitions must use `NOT_APPLICABLE_NON_BUG`.
 - Do not create `raw.md`, `raw.json`, `__test___`, `.zan-workflows`, or any
   other preparation artifact.

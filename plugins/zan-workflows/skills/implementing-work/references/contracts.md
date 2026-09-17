@@ -9,7 +9,7 @@
 | Source | TAPD URL/type/short ID and approved scope from the definition |
 | Repository | expected and actual project, path, Git root, origin, starting/final HEAD |
 | Branch | action `CREATE|USE_EXISTING`, expected branch, actual branch, and exact approved base ref/SHA when created |
-| TAPD status | `WRITE_ACTIVE|NO_CHANGE|SKIPPED_ALREADY_WAITING_TEST`, exact target/payload/purpose, authorization source, validation/write/readback when applicable |
+| TAPD status | item type and `WRITE_ACTIVE|NO_CHANGE|SKIPPED_ALREADY_WAITING_TEST|NOT_APPLICABLE_NON_BUG`; exact target/payload/purpose, authorization source, validation/write/readback only for a Bug `WRITE_ACTIVE` |
 | Baseline | before/after status, changed paths, unrelated paths, scope comparison |
 | Change | concise summary and exact diff reference available in the current execution |
 | Verification | each relevant command, exit status, concise result, and any blocker |
@@ -39,6 +39,8 @@
   reusable and must not trigger another prompt. `CONTINUE` with current status
   `待测试` performs no status write; `NO_CHANGE`/skip states require current
   status evidence but no write authorization.
+- Story/Task requires `NOT_APPLICABLE_NON_BUG` and has no Bug status payload,
+  authorization, validation, write, or readback.
 - The result grants no commit, push, MR, submission, Wiki, or release authority.
 - The result contains no run IDs, recovery/history fields, or local record
   paths.

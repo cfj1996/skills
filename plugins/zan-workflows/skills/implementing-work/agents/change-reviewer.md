@@ -19,9 +19,9 @@ match and require no future write/readback evidence. Reject a missing or
 different target, payload, purpose, or authorization.
 
 A current-conversation `fixing-bug` checklist confirmation is valid
-authorization when it binds those exact facts. `NO_CHANGE` and
-`SKIPPED_ALREADY_WAITING_TEST` are read-only status actions and must not be sent
-as `PRE_STATUS_WRITE` operations.
+authorization when it binds those exact facts. `NO_CHANGE`,
+`SKIPPED_ALREADY_WAITING_TEST`, and `NOT_APPLICABLE_NON_BUG` are read-only
+status actions and must not be sent as `PRE_STATUS_WRITE` operations.
 
 For `POST_CHANGE_REVIEW`, inspect the supplied approved scope,
 repository/branch facts, starting baseline, exact final diff, TAPD status

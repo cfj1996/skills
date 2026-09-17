@@ -13,7 +13,7 @@
 | Scope | in-scope work, excluded work, acceptance criteria, confirmation state |
 | Project | selected project, canonical repository path, Git root, origin remote, verification result |
 | Branch | requested mode, fixed branch, action `CREATE|USE_EXISTING`, selected/planned branch, local/remote ref facts, and for `CREATE` exact verified base ref/SHA |
-| TAPD status plan | current status, `WRITE_ACTIVE|NO_CHANGE|SKIPPED_ALREADY_WAITING_TEST`, exact target/payload/purpose when writing, and confirmation source |
+| TAPD status plan | item type, current status, `WRITE_ACTIVE|NO_CHANGE|SKIPPED_ALREADY_WAITING_TEST|NOT_APPLICABLE_NON_BUG`; exact target/payload/purpose and confirmation source only for a Bug `WRITE_ACTIVE` |
 | Validation | public mapped state and normalized failure reason |
 | Terminal | `READY_FOR_HANDOFF|PENDING|BLOCKED` and blocker/next decision when needed |
 
@@ -34,6 +34,8 @@
 - `CONTINUE` requires `USE_EXISTING` on the recovered original source branch.
   It never yields `CREATE`; missing/competing recovery evidence yields
   `PENDING`.
+- Story/Task always uses `NOT_APPLICABLE_NON_BUG`; it carries no `修复中`
+  target, payload, authorization, validation, write, or readback.
 
 ## Terminal invariants
 
@@ -44,7 +46,7 @@
 - an explicit initial scope or an evidence-backed incremental scope under
   `CONTINUE`;
 - one exact branch action and passing branch checks; and
-- one status plan consistent with work mode/current TAPD status; and
+- one status plan consistent with TAPD type, work mode and current status; and
 - private validation mapped to `VALIDATION_PASSED`.
 
 Use `PENDING` only for missing evidence or a named user choice that could make

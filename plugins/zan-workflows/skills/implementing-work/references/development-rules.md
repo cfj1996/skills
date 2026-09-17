@@ -11,10 +11,10 @@ Do not edit until all are true:
 - branch creation, when selected, uses the definition's exact verified base
   ref/SHA;
 - current branch equals that fixed branch; and
-- required TAPD active-state payload was displayed and authorized in the
+- required Bug active-state payload was displayed and authorized in the
   current standalone call or confirmed `fixing-bug` checklist, then privately
   validated/written/read back; or the evidence-backed status action is
-  `NO_CHANGE|SKIPPED_ALREADY_WAITING_TEST`;
+  `NO_CHANGE|SKIPPED_ALREADY_WAITING_TEST|NOT_APPLICABLE_NON_BUG`;
 - overlapping pre-existing changes have been reconciled or block the work.
 
 ## Direct branch rule

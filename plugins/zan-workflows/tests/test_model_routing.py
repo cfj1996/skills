@@ -30,12 +30,14 @@ class ModelRoutingTests(unittest.TestCase):
 
     def test_skill_default_profiles_match_risk(self):
         expected = {
+            "developing-requirement": "CRITICAL",
             "fixing-bug": "CRITICAL",
             "preparing-work": "CRITICAL",
             "implementing-work": "CRITICAL",
             "submitting-for-test": "CRITICAL",
             "going-live": "CRITICAL",
             "drafting-wiki": "BALANCED",
+            "writing-plans": "BALANCED",
             "workspace-project-knowledge": "BALANCED",
             "project-memory-context": "BALANCED",
             "login-token-workflow": "FAST",

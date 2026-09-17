@@ -870,7 +870,12 @@
       listen('[data-action="highlight-evidence"]', "click", showEvidence);
       listen('[data-action="submit"]', "click", () => {
         const before = state;
-        dispatch({ type: "SUBMIT" });
+        try {
+          dispatch({ type: "SUBMIT" });
+        } catch {
+          setRuntimeError(reviewError("submit-failed", "提交评审失败，意见已保留，请刷新页面后重试。"));
+          return;
+        }
         if (state !== before && state.mode === "reviewing") {
           void notifyAgent("review-submitted");
           console.debug("PAGE_DELIVERY_REVIEW_SUBMITTED", {

@@ -25,8 +25,8 @@ Accept only `terminal_state=READY_FOR_HANDOFF` with:
 - a verified project/repository fingerprint;
 - confirmed scope;
 - an exact branch action `CREATE|USE_EXISTING`; and
-- status action `WRITE_ACTIVE|NO_CHANGE|SKIPPED_ALREADY_WAITING_TEST` with its
-  current-conversation authorization source; and
+- status action `WRITE_ACTIVE|NO_CHANGE|SKIPPED_ALREADY_WAITING_TEST|NOT_APPLICABLE_NON_BUG`,
+  with a current-conversation authorization source only for `WRITE_ACTIVE`; and
 - public preparation validation `VALIDATION_PASSED`.
 
 Re-read actual repository path, Git root, origin, branch refs, HEAD, and
@@ -48,7 +48,10 @@ return `BLOCKED` and explain the overlap. Do not modify or erase them.
 
 ## Implementation
 
-1. After the repository/branch/scope gate passes, handle TAPD status once:
+1. After the repository/branch/scope gate passes, handle TAPD status by item type:
+   - for Story/Task, require `NOT_APPLICABLE_NON_BUG` and perform no status
+     validation, authorization request, write, or readback;
+   - only for Bug, apply the remaining status rules below;
    - reuse the confirmed `fixing-bug` checklist authorization when it binds the
      same item, current state, `修复中` payload, purpose, branch, and scope;
    - for standalone invocation, display those exact facts and obtain one

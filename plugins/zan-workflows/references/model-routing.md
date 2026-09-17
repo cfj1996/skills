@@ -23,6 +23,7 @@ standard to compensate for model availability.
 
 | Skill | Default profile | Reason |
 | --- | --- | --- |
+| `developing-requirement` | `CRITICAL` | Orchestrates project routing, remote-master scope, branch binding, Plan writes, implementation, and review |
 | `fixing-bug` | `CRITICAL` | Coordinates multiple capability handoffs, confirmation state, and optional writes across one or more Bugs |
 | `preparing-work` | `CRITICAL` | Resolves ambiguous project ownership, scope, repository fingerprints, and branch identity |
 | `implementing-work` | `CRITICAL` | Changes code, verifies behavior, and performs independent change review |
@@ -30,6 +31,7 @@ standard to compensate for model availability.
 | `going-live` | `CRITICAL` | Merges an original repair branch to `master` and maintains Wiki online state |
 | `managed-mr-review` | Conditional | Discovery is `BALANCED`; code review/merge decisions are `CRITICAL` for high-risk MRs and `BALANCED` for routine MRs |
 | `drafting-wiki` | `BALANCED` | Read-only target resolution and deterministic Markdown/sequence calculation |
+| `writing-plans` | `BALANCED` | Resolves remote-master scope, chooses dialogue or panel review, and writes branch-bound Plans |
 | `workspace-project-knowledge` | `BALANCED` | Read-heavy routing and graph/knowledge lookup |
 | `project-memory-context` | `BALANCED` | Bounded retrieval and evidence-aware memory synthesis |
 | `login-token-workflow` | `FAST` | Explicit, repeatable token retrieval and URL assembly |

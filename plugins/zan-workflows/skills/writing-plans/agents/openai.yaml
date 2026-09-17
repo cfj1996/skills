@@ -1,7 +1,7 @@
 interface:
   display_name: "zan:可视化编写计划"
-  short_description: "Review pages or modules and maintain Plans"
-  default_prompt: "Use $writing-plans to review this page or module against its PRD, prototype, project rules, and Plan."
+  short_description: "根据远程 master 收敛范围并编写分支绑定的 Plan"
+  default_prompt: "使用 $writing-plans 根据需求或原型定位项目，以远程 master 收敛范围，按复杂度选择对话或面板评审，并编写绑定开发分支的 Plan。"
 
 policy:
   allow_implicit_invocation: false

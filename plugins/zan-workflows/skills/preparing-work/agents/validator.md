@@ -29,9 +29,12 @@ Validate in order:
 5. `USE_EXISTING` is evaluated only by repository/ref identity. Reject any
    requirement for Bug-specific commits, raw documents, generated test
    evidence, or prior workflow state.
-6. Status plan matches work mode/current TAPD evidence: initial work may use
-   `WRITE_ACTIVE`; already-active work uses `NO_CHANGE`; `CONTINUE` already in
-   `待测试` uses `SKIPPED_ALREADY_WAITING_TEST` and proposes no status write.
+6. Status plan matches TAPD type and work mode/current evidence. Only a Bug may
+   use `WRITE_ACTIVE` to enter `修复中`; an already-active Bug uses `NO_CHANGE`,
+   and `CONTINUE` Bug already in `待测试` uses
+   `SKIPPED_ALREADY_WAITING_TEST`. Story/Task uses exactly
+   `NOT_APPLICABLE_NON_BUG` and proposes no status target, payload,
+   authorization, or write.
 7. `READY_FOR_HANDOFF` has confirmed scope, passing project/branch checks, and
    no required user decision. `PENDING`/`BLOCKED` has a concrete reason and no
    claimed write.
