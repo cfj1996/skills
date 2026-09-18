@@ -1,7 +1,7 @@
 interface:
   display_name: "zan:需求开发"
   short_description: "从 TAPD Story/Task 定位项目、绑定分支并编排计划实施"
-  default_prompt: "使用 $developing-requirement 根据 TAPD Story/Task 及其 PRD 或原型定位项目，以远程 master 收敛范围，选择对话或面板评审，绑定开发分支，编写并按授权执行 Plan。"
+  default_prompt: "使用 $developing-requirement 根据 TAPD Story/Task 及其 PRD 或原型定位项目，以远程 master 收敛范围，绑定分支、编写并按授权执行 Plan；每次交回时展示进度清单、推荐下一步和可直接回复的操作。"
 
 policy:
   allow_implicit_invocation: true

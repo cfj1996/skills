@@ -34,8 +34,9 @@ class RequirementDevelopmentFlowTests(unittest.TestCase):
         ordered = [
             "根据需求、PRD 或原型确定受影响项目",
             "获取并验证最新远程 `origin/master`",
+            "生成需求确认前检查清单",
             "根据范围复杂度选择评审模式",
-            "输出 `ConfirmedRequirementScope`",
+            "交由分支绑定能力",
             "消费已验证的分支定义",
             "输出 branch-bound Plan",
         ]
@@ -81,6 +82,85 @@ class RequirementDevelopmentFlowTests(unittest.TestCase):
         implementing = (PLUGIN_ROOT / "skills/implementing-work/SKILL.md").read_text()
         self.assertIn("confirmation_source", preparing)
         self.assertIn("Do not ask again", implementing)
+
+    def test_progress_guidance_always_explains_the_next_action(self):
+        skill = (PLUGIN_ROOT / "skills/developing-requirement/SKILL.md").read_text()
+        guidance = (
+            PLUGIN_ROOT
+            / "skills/developing-requirement/references/progress-guidance.md"
+        ).read_text()
+        self.assertIn("references/progress-guidance.md", skill)
+        for field in [
+            "current_stage",
+            "stage_status",
+            "completed_stages",
+            "recommended_next_action",
+            "available_actions",
+            "resume_prompt",
+        ]:
+            self.assertIn(field, skill)
+        for stage in [
+            "DISCOVERY",
+            "SCOPE_BLOCKED",
+            "AWAITING_CHECKLIST_CONFIRMATION",
+            "IMPLEMENTATION_EVIDENCE_BLOCKED",
+            "BRANCH_READY",
+            "PLAN_READY",
+            "REVIEW_BLOCKED",
+            "REVIEWED",
+            "PAUSED",
+            "STOPPED",
+        ]:
+            self.assertIn(stage, guidance)
+        self.assertIn("推荐下一步", guidance)
+        self.assertIn("你可以选择", guidance)
+        self.assertIn("可直接复制的短句", guidance)
+
+    def test_blocked_review_does_not_guide_user_to_submission(self):
+        guidance = (
+            PLUGIN_ROOT
+            / "skills/developing-requirement/references/progress-guidance.md"
+        ).read_text()
+        blocked = guidance[
+            guidance.index("## 阻塞决策"):guidance.index("## 多项目进度")
+        ]
+        self.assertIn("推荐先完善当前阶段", blocked)
+        self.assertIn("不能推荐提交测试", blocked)
+        self.assertIn("解决当前阻塞后继续验证", guidance)
+
+    def test_requirement_readiness_checklist_separates_confirmation_and_implementation(self):
+        writing = (PLUGIN_ROOT / "skills/writing-plans/SKILL.md").read_text()
+        orchestrator = (PLUGIN_ROOT / "skills/developing-requirement/SKILL.md").read_text()
+        checklist = (
+            PLUGIN_ROOT
+            / "skills/writing-plans/references/requirement-readiness-checklist.md"
+        ).read_text()
+        branch_checklist = (
+            PLUGIN_ROOT
+            / "skills/developing-requirement/references/branch-checklist.md"
+        ).read_text()
+        self.assertIn("references/requirement-readiness-checklist.md", writing)
+        self.assertIn("requirement-readiness-checklist.md", orchestrator)
+        for gate in ["REQUIREMENT_BLOCKER", "IMPLEMENTATION_BLOCKER", "NON_BLOCKING"]:
+            self.assertIn(gate, checklist)
+        for field in [
+            "项目/模块",
+            "类别",
+            "检查项",
+            "状态",
+            "当前证据",
+            "责任方",
+            "影响",
+            "门禁",
+            "建议动作",
+        ]:
+            self.assertIn(field, checklist)
+        self.assertIn("requirement_blocker_count=0", checklist)
+        self.assertIn("implementation_blocker_count=0", checklist)
+        self.assertIn("不额外提问", checklist)
+        self.assertIn("需求确认", branch_checklist)
+        self.assertIn("实施准备", branch_checklist)
+        self.assertIn("改成 `PLAN_ONLY`", branch_checklist)
 
 
 if __name__ == "__main__":

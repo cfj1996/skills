@@ -28,10 +28,11 @@ checklist and must not ask a separate dialogue scope-confirmation question.
 
 1. 根据需求、PRD 或原型确定受影响项目；多项目时区分主项目、协同项目及各自责任边界。
 2. 对每个项目获取并验证最新远程 `origin/master`，以远程代码和项目规则为基线收敛需求范围、功能点、现有能力、缺口及排除项；不得用当前本地开发分支替代基线。
-3. 根据范围复杂度选择评审模式：简单需求直接在对话中确认，复杂需求才开启评审面板。
-4. 需求范围和上下文确认后，输出 `ConfirmedRequirementScope`，交由分支绑定能力确定每个项目的 `CREATE|USE_EXISTING`、固定分支和基准。
-5. 消费已验证的分支定义，基于确认范围、远程基线和项目上下文编写并确认 Plan。
-6. 输出 branch-bound Plan；本技能不直接修改业务源码，端到端请求交回 `zan-workflows:developing-requirement` 编排执行。
+3. 生成需求确认前检查清单，区分 `REQUIREMENT_BLOCKER`、`IMPLEMENTATION_BLOCKER` 和 `NON_BLOCKING`。
+4. 根据范围复杂度选择评审模式：简单需求直接在对话中确认，复杂需求才开启评审面板。
+5. 需求范围和上下文确认后，输出配置对应的 confirmed/proposed scope，交由分支绑定能力确定每个项目的 `CREATE|USE_EXISTING`、固定分支和基准。
+6. 消费已验证的分支定义，基于确认范围、远程基线和项目上下文编写并确认 Plan。
+7. 输出 branch-bound Plan；本技能不直接修改业务源码，端到端请求交回 `zan-workflows:developing-requirement` 编排执行。
 
 以一个页面或模块为主要交付单元；模块必须具备可独立开发、对接和验收的内聚边界。拒绝项目级“大 Plan”；
 跨项目需求允许一个协调范围，但每个项目必须有独立的仓库证据、分支绑定、交付单元 Plan、任务和验证方式。
@@ -93,6 +94,11 @@ Read an existing Plan semantically when present; scripts must not parse Markdown
 
 Agent 根据 [API 契约阶段](references/api-contract-stages.md) 建立消费需求清单，对已知消费点分类并开展正式来源搜索，形成接口事实清单。尚未查清的事实进入模块的待确认问题与实现阻塞项，不阻止用户评审已明确的功能行为。Treat 能力归属、运行时范围 and 本次交付关系 as separate facts; never assign an API to a page or module.
 
+在任何范围确认或 `READY_FOR_CHECKLIST` 输出前，按
+[需求确认前检查清单](references/requirement-readiness-checklist.md) 汇总所有已确认、缺失和冲突项。
+`REQUIREMENT_BLOCKER` 未清零时范围保持 `PENDING|BLOCKED`；仅有
+`IMPLEMENTATION_BLOCKER` 时允许确认需求，但实现方案必须保持 blocked，禁止进入实施。
+
 For every module card, build the canonical `implementationPlan` from applicable 项目规范、依赖、现有源码、PRD、原型和 API 证据. Use the compact four-block contract in [产物规则与评审卡规范](references/page-review-standard.md). 实现证据不足时设 `implementationPlan.status=blocked` 并说明缺口；需求 `conclusion` 独立，允许需求“已确认”同时实现方案待补充，不自动把需求改为“阻塞”。需要用户决定的行为问题和 Agent 能自行查证的技术问题分别标明责任方。
 
 Keep the page state only as “评审中” or “阻塞” while reviewing. 不得生成 Draft OpenAPI. Use [状态模型](references/status-model.md) for evidence gates and objective counts; never report a single page completion percentage.
@@ -109,7 +115,7 @@ Keep the page state only as “评审中” or “阻塞” while reviewing. 不
 
 ## 简单需求：对话模式
 
-在对话中给出受影响项目与 `origin/master` SHA、范围、功能点、排除项、实现摘要、未决问题和推荐分支动作。
+在对话中给出受影响项目与 `origin/master` SHA、范围、功能点、排除项、实现摘要，以及完整的需求确认前检查清单和推荐分支动作。
 `STANDALONE` 由用户确认该摘要后进入“开发分支与 Plan”；
 `DEFER_TO_ORCHESTRATOR` 不单独提问，把摘要交给需求开发清单统一确认。两者都无需打开
 in-app 浏览器、注入 Shadow DOM、启动通知桥或要求统一提交。
@@ -158,7 +164,9 @@ Use the human-readable [页面交付 Plan 模板](assets/page-delivery-plan-temp
 ## 输出契约与交接
 
 `SCOPE_REVIEW` 返回需求身份、受影响项目、每个项目的 origin/master SHA、范围、功能点、
-排除项、代码证据、评审模式、风险和未决问题。`STANDALONE` 返回
+排除项、代码证据、评审模式、风险、未决问题、检查清单、
+`requirement_blocker_count`、`implementation_blocker_count` 和 `implementation_ready`。
+`STANDALONE` 返回
 `ConfirmedRequirementScope`，终态为 `CONFIRMED|PENDING|BLOCKED`；
 `DEFER_TO_ORCHESTRATOR` 返回 `ProposedRequirementScope`，终态为
 `READY_FOR_CHECKLIST|PENDING|BLOCKED`。

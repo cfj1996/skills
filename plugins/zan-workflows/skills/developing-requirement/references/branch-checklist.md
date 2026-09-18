@@ -35,8 +35,14 @@ feature/cfj.0918.1080800.supplier-split-bill-restrictions
 
 将范围与分支合并为一张表，每个项目一行：
 
-| TAPD | 项目/仓库 | `origin/master` | 当前分支 | 需求范围/排除项 | 评审模式 | 目标开发分支 | 动作与基准 | 本次执行 | 待确认 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| TAPD | 项目/仓库 | `origin/master` | 当前分支 | 需求范围/排除项 | 需求确认 | 实施准备 | 目标开发分支 | 动作与基准 | 本次执行 | 待确认 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+
+- `需求确认`：显示 `READY|BLOCKED` 及 `requirement_blocker_count`。
+- `实施准备`：显示 `READY|BLOCKED` 及 `implementation_blocker_count`；缺口行来自需求确认前检查清单。
+- `requirement_blocker_count > 0` 时不得询问执行确认；先解决或修改需求范围。
+- `implementation_blocker_count > 0` 时可确认范围或生成阶段 Plan，但 `IMPLEMENT` 必须保持阻塞。
+- 本次执行为 `IMPLEMENT` 且 `implementation_blocker_count > 0` 时，不问“是否按此清单执行”；改为引导解决技术缺口，或由用户明确将本次执行改成 `PLAN_ONLY`。
 
 清单后展示一次授权摘要，必须包含：
 

@@ -65,6 +65,14 @@ resolved projects and their exact `origin/master` SHAs. It must derive the
 function list, current behavior, required changes, exclusions, dependencies,
 acceptance criteria, code evidence, and missing decisions.
 
+Require the user-visible
+[需求确认前检查清单](../writing-plans/references/requirement-readiness-checklist.md)
+covering business behavior, data fields, API facts, permissions, state and
+acceptance. Continue toward the execution checklist only when
+`requirement_blocker_count=0`. Preserve any implementation-only gaps with
+`implementation_ready=false`; they do not invalidate confirmed business scope
+but they block `IMPLEMENT` until resolved.
+
 Reuse its complexity routing:
 
 - `DIALOGUE` for one bounded project/module with a small, clear function set;
@@ -92,7 +100,8 @@ an unconfirmed scope may remain `PENDING` and is not a downstream handoff.
 
 Build one combined checklist from all project rows using
 [需求开发分支与单次确认](references/branch-checklist.md), show one authorization
-summary, ask exactly `是否按此清单执行？`, then stop. Do not ask separately for
+summary, include requirement/implementation blocker counts and unresolved rows,
+ask exactly `是否按此清单执行？`, then stop. Do not ask separately for
 scope or branch confirmation. The initial Story/Task request selects the work;
 it does not confirm derived checklist fields.
 
@@ -151,12 +160,27 @@ an unrelated branch or silently continue. Return `REVIEWED` only when every
 project is `REVIEWED` with `REVIEW_PASSED` and the combined changed paths remain
 within the confirmed Plan.
 
+## Progress and next-step guidance
+
+Before every final response, pause, blocker handoff, branch-only completion,
+Plan-only completion, or reviewed completion, apply
+[需求开发进度与下一步引导](references/progress-guidance.md). Always show the
+completed-stage checklist, current stage/status, one recommended next action,
+relevant alternatives, and short reply phrases the user can copy.
+
+Recommend improving the current stage whenever it is `PENDING|BLOCKED|FAILED`;
+recommend the next stage only after the current gate passes. A recommendation
+never authorizes the next write-owning workflow.
+
 ## Output
 
 Return one in-memory `RequirementDevelopmentResult` containing requirement
 identity, affected-project evidence, confirmed scope, review mode, remote-master
 SHAs, branch definitions, Plan paths/fingerprints, per-project ReviewedChanges,
-verification results, and `BRANCH_READY|PLAN_READY|REVIEWED|PENDING|BLOCKED`.
+verification results, requirement-readiness checklist and blocker counts,
+`implementation_ready`, `current_stage`, `stage_status`, `completed_stages`,
+`blockers`, `recommended_next_action`, `available_actions`, `resume_prompt`, and
+`BRANCH_READY|PLAN_READY|REVIEWED|PENDING|BLOCKED|PAUSED|STOPPED`.
 
 Do not create a workflow report, runtime ledger, raw requirement dump, or
 generated evidence directory.
