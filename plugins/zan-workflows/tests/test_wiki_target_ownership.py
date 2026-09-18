@@ -38,7 +38,7 @@ PROJECT_RELATIONS = (
 class WikiTargetOwnershipTests(unittest.TestCase):
     def test_fixing_bug_never_requires_user_wiki_target(self):
         self.assertNotIn("target_wiki_url", FIXING + FIXING_CONTRACT)
-        self.assertIn("Never ask the user for a\nWiki URL", FIXING)
+        self.assertRegex(FIXING, r"Never ask the user for (?:a\s+)?Wiki URL")
         self.assertIn(
             "absence of a user-supplied Wiki URL never blocks preflight",
             FIXING_CONTRACT,

@@ -19,7 +19,9 @@ yes/no question.
 ## Consolidated submission authorization
 
 After `ReviewedChange` passes, prepare one complete `SubmissionPlan` before the
-first submission write. Display it once and obtain one authorization covering:
+first submission write. `submission_phase=PLAN` displays it and returns
+`AWAITING_CONFIRMATION`; it must stop before all writes. A later
+`submission_phase=EXECUTE` obtains one authorization covering:
 
 - repository, reviewed paths/diff identity, original source branch, target
   `develop`, and commit/push/MR create-or-update/merge intent;
@@ -30,6 +32,14 @@ first submission write. Display it once and obtain one authorization covering:
   test release channel, and purpose;
 - deterministic Wiki-link comment and final TAPD status/test-version actions;
 - status behavior from `work_mode`.
+
+The plan must show the exact profile as `STANDARD（Wiki）` or
+`NO_WIKI（无 Wiki 调用）`, never “标准流程”. For `NO_WIKI`, list Wiki discovery,
+read, create, update and comment as omitted operations.
+
+Initial Bug checklist confirmation, implementation authorization, “修复完成就
+提测”, or a generic confirmation that did not answer this displayed plan does
+not authorize submission writes.
 
 The same authorization remains valid while those bound facts are unchanged.
 Generated commit SHA, MR ID, Wiki/month/child ID, Jenkins queue/build ID, and

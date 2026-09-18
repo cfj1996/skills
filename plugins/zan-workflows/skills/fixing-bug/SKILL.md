@@ -15,7 +15,8 @@ only after checklist confirmation execute the single-Bug composition once per
 item.
 
 Read [contracts.md](references/contracts.md), [workflow.md](references/workflow.md),
-and [acceptance-scenarios.md](references/acceptance-scenarios.md) before acting.
+[acceptance-scenarios.md](references/acceptance-scenarios.md), and the shared
+[tool-routing policy](../../references/tool-routing.md) before acting.
 
 ## Inputs
 
@@ -27,7 +28,7 @@ Accept:
 - `branch_mode=AUTO|CREATE|USE_EXISTING`;
 - an exact creation base ref when `CREATE` may be selected, unless a verified
   workspace policy already supplies it;
-- `submission_profile=STANDARD|NO_WIKI`;
+- `submission_profile=AUTO|STANDARD|NO_WIKI`;
 - `deployment_mode=AUTO|DEPLOY|SKIP`; and
 - an optional explicit request to run `going-live` after submission.
 
@@ -41,10 +42,13 @@ original project/repository/branch and existing Wiki; it is not a separate
 repair workflow. Never create a “follow-up” branch for it.
 
 Infer `STANDARD` from an explicit request such as `需要提测 Wiki`, and infer
-`NO_WIKI` from an explicit request to omit Wiki. Ask for the profile only when
-the user's intent is genuinely absent or conflicting. Never ask the user for a
-Wiki URL: under `STANDARD`, `submitting-for-test` owns locating an existing
-Wiki or creating the required month/child Wiki from TAPD evidence.
+`NO_WIKI` from an explicit request to omit Wiki. Under `AUTO`, use only a named
+project policy; when no such policy resolves the profile, mark
+`PENDING_SUBMISSION_PROFILE` in the initial checklist and show the exact choices
+`STANDARD（会创建/更新 Wiki）` and `NO_WIKI（不调用任何 Wiki 能力）`. Do not
+hide this choice behind “标准流程”. Never ask the user for a Wiki URL: under
+`STANDARD`, `submitting-for-test` owns locating an existing Wiki or creating
+the required month/child Wiki from TAPD evidence.
 
 Infer `DEPLOY` from explicit test-environment publication wording and `SKIP`
 from “直接提测/跳过发布”. With no deployment wording, keep `AUTO`; the
@@ -84,8 +88,12 @@ Before invoking `implementing-work` or performing any other write:
    one Bug at a time.
 2. Build one ordered checklist with exactly these columns:
 
-   | Bug | 项目/仓库 | 分支 | 修复范围 | 待确认 |
-   | --- | --- | --- | --- | --- |
+   | Bug | 项目/仓库 | 分支 | 修复范围 | 提测策略 | 部署 | 待确认 |
+   | --- | --- | --- | --- | --- | --- | --- |
+
+   `提测策略` 必须显示精确 `STANDARD（Wiki）|NO_WIKI（无 Wiki 调用）`；
+   `部署` 必须显示解析后的 `DEPLOY|SKIP`。未解析的 profile 进入 `待确认`，
+   整个请求保持只读。
 
 3. For `INITIAL`, show one authorization summary below the checklist:
    include exact branch action and verified base ref/SHA when creating, the
@@ -141,15 +149,22 @@ order:
    returned definition and reusable implementation/status authorization from
    the confirmed checklist. `implementing-work` must not ask again while those
    exact facts still match.
-4. If it returns `REVIEWED`, call `submitting-for-test` with the definition,
-   reviewed change, work mode, selected submission profile, and deployment
-   mode. Under `STANDARD`, pass the
-   TAPD identity and full in-memory handoffs; do not request or manufacture a
-   Wiki target in this orchestrator.
-5. If submission returns `SUBMITTED` and go-live was explicitly requested,
+4. If it returns `REVIEWED`, call `submitting-for-test` with
+   `submission_phase=PLAN`, the definition, reviewed change, work mode,
+   selected submission profile, and deployment mode. Surface the complete
+   `SubmissionPlan`, set `AWAITING_SUBMISSION_CONFIRMATION`, and stop. Do not
+   perform commit, push, MR, deployment, Wiki or TAPD writes in this turn.
+   Under `STANDARD`, pass the TAPD identity and full in-memory handoffs; do not
+   request or manufacture a Wiki target in this orchestrator.
+5. Only after a later user message explicitly confirms that exact current
+   `SubmissionPlan`, call `submitting-for-test` with
+   `submission_phase=EXECUTE`. A generic “确定/继续” is valid only when it
+   immediately answers the displayed unchanged plan; initial repair-checklist
+   confirmation never authorizes submission writes.
+6. If submission returns `SUBMITTED` and go-live was explicitly requested,
    call `going-live` with that exact `TestSubmissionResult`; it owns reading
    the original repair branch from the result.
-6. Record only a concise in-conversation result for this Bug. Only
+7. Record only a concise in-conversation result for this Bug. Only
    `implementing-work`, `submitting-for-test`, or `going-live` may return a
    per-Bug `PENDING` or `BLOCKED` that skips the remaining capabilities for
    that Bug and continues with the next confirmed Bug. A shared

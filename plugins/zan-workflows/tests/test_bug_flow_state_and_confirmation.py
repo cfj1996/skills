@@ -54,6 +54,16 @@ class BugFlowStateAndConfirmationTests(unittest.TestCase):
         self.assertIn("do not require another confirmation", DEPLOYMENT)
         self.assertIn("commit SHA, MR ID, Wiki/month/child ID", DEPLOYMENT)
 
+    def test_submission_profile_is_explicit_and_submission_plan_stops_before_writes(self):
+        self.assertIn("submission_profile=AUTO|STANDARD|NO_WIKI", FIXING)
+        self.assertIn("PENDING_SUBMISSION_PROFILE", FIXING)
+        self.assertIn("STANDARD（会创建/更新 Wiki）", FIXING)
+        self.assertIn("NO_WIKI（不调用任何 Wiki 能力）", FIXING)
+        self.assertIn("submission_phase=PLAN", FIXING)
+        self.assertIn("AWAITING_SUBMISSION_CONFIRMATION", FIXING)
+        self.assertIn("submission_phase=EXECUTE", FIXING)
+        self.assertIn("perform no write", SUBMITTING)
+
 
 if __name__ == "__main__":
     unittest.main()

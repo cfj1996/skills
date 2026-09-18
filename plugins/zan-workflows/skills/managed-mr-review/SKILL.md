@@ -8,6 +8,8 @@ description: Use when the user asks to find, review, or remotely merge open GitL
 模型配置按阶段动态路由：发现阶段默认 `BALANCED`；高风险审核和所有合并决策使用
 `CRITICAL`。选择 reviewer 子代理前读取共享
 [model-routing policy](../../references/model-routing.md)。
+所有 GitLab 读写同时遵循共享
+[tool-routing policy](../../references/tool-routing.md)：GitLab MCP 优先，浏览器不是默认降级路径。
 
 ## 定位
 

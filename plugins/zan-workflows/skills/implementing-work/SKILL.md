@@ -16,7 +16,9 @@ and an independent private review. It does not submit, merge to `develop` or
 
 Read [contracts.md](references/contracts.md),
 [development-rules.md](references/development-rules.md), and
-[acceptance-scenarios.md](references/acceptance-scenarios.md) before editing.
+[acceptance-scenarios.md](references/acceptance-scenarios.md), plus the shared
+[tool-routing policy](../../references/tool-routing.md) before editing. Any
+authorized TAPD status write uses `tapd-mcp`, never browser automation by default.
 
 ## Input gate
 

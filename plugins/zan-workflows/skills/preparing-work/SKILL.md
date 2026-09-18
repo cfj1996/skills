@@ -15,7 +15,9 @@ write workflow records.
 
 Read [contracts.md](references/contracts.md),
 [collection-and-branch.md](references/collection-and-branch.md), and
-[acceptance-scenarios.md](references/acceptance-scenarios.md) before acting.
+[acceptance-scenarios.md](references/acceptance-scenarios.md), plus the shared
+[tool-routing policy](../../references/tool-routing.md) before acting. Fetch
+TAPD through `tapd-mcp`; do not open a browser merely because a TAPD page is available.
 
 ## Inputs
 

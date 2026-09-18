@@ -2,6 +2,9 @@
 
 | Scenario | Expected result |
 | --- | --- |
+| First invocation after `ReviewedChange=REVIEWED` | Run `submission_phase=PLAN`, display the complete plan, return `AWAITING_CONFIRMATION`, and perform no writes. |
+| Initial Bug checklist was confirmed but no SubmissionPlan was shown | Do not commit, push, create/merge MR, deploy, write Wiki, or change TAPD; render the plan first. |
+| User confirms the exact unchanged displayed SubmissionPlan in a later message | Run `submission_phase=EXECUTE` and reuse that one submission authorization. |
 | `NO_WIKI` with valid reviewed change | Merge to develop, resolve optional deployment, then perform applicable TAPD registration; never load Wiki capability. |
 | User requests “发布测试环境后提测” | Select `DEPLOY`; require Jenkins `SUCCESS` and expected develop SHA proof before Wiki/TAPD waiting-test writes. |
 | User requests “直接提测” or “跳过发布” | Select `SKIP`, make no Jenkins call, record `SKIPPED_BY_INTENT`, and continue direct提测. |

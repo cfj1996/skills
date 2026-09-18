@@ -20,7 +20,9 @@ After verified master delivery, also check associated local branches and
 worktrees and report cleanup advice; this skill does not delete them.
 
 Read [contracts.md](references/contracts.md) and
-[acceptance-scenarios.md](references/acceptance-scenarios.md) before any write.
+[acceptance-scenarios.md](references/acceptance-scenarios.md), plus the shared
+[tool-routing policy](../../references/tool-routing.md) before any write.
+GitLab operations use `gitlab-mcp`; Wiki operations use `tapd-mcp`.
 
 ## Input gate
 

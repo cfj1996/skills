@@ -15,7 +15,7 @@ skills own all business validation and external writes.
 | `work_mode` | yes | `INITIAL|CONTINUE`; infer from current and prior work evidence. |
 | `branch_mode` | yes | `AUTO`, `CREATE`, or `USE_EXISTING`. |
 | `create_base_ref` | conditional | Exact base when creation may occur, unless verified workspace policy supplies it. |
-| `submission_profile` | yes | Exactly `STANDARD` or `NO_WIKI`; infer it from an explicit Wiki/no-Wiki request before asking. |
+| `submission_profile` | yes | `AUTO|STANDARD|NO_WIKI`; resolve AUTO only from named policy, otherwise show `PENDING_SUBMISSION_PROFILE` and both exact choices. |
 | `deployment_mode` | yes | `AUTO|DEPLOY|SKIP`; infer explicit publish/direct-submit wording. |
 | `go_live` | yes | `true` only after an explicit current-conversation request. |
 
@@ -47,6 +47,8 @@ producer-owned preflight snapshot:
 | 项目/仓库 | verified selected project and canonical repository |
 | 分支 | exact fixed branch identity; exclude `CREATE` or `USE_EXISTING` |
 | 修复范围 | concise producer-derived in-scope work |
+| 提测策略 | exact `STANDARD（Wiki）` or `NO_WIKI（无 Wiki 调用）` |
+| 部署 | exact resolved `DEPLOY` or `SKIP` |
 | 待确认 | normalized missing decision/blocker, or `无` |
 
 The initial repair request is item selection, not checklist confirmation. An
@@ -73,6 +75,8 @@ duplicate test-version write is allowed.
 Normal one-Bug execution has at most two confirmation points: initial
 scope/implementation authorization when needed, then one consolidated
 submission authorization. `going-live` remains a separate master confirmation.
+The second authorization must answer the complete current `SubmissionPlan`;
+the first confirmation never authorizes submission writes.
 
 ## In-memory handoffs
 

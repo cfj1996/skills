@@ -2,6 +2,12 @@
 
 `TestSubmissionResult` is an in-memory handoff to optional `going-live`.
 
+`submission_phase=PLAN` returns an in-memory `PlannedTestSubmission` with the
+complete visible `SubmissionPlan`, bound-fact fingerprint, exact
+`STANDARD|NO_WIKI`, resolved `DEPLOY|SKIP`, and
+`terminal_state=AWAITING_CONFIRMATION`. It has effects `NONE` and is not a
+`TestSubmissionResult`.
+
 ## Required content
 
 | Section | Required facts |
@@ -18,6 +24,12 @@
 | Terminal | `SUBMITTED|BLOCKED` and blocker when applicable |
 
 ## Invariants
+
+- `PLAN` performs no commit, push, MR, deployment, Wiki, TAPD, status or test
+  version write. It always returns and stops at `AWAITING_CONFIRMATION`.
+- `EXECUTE` requires the exact current `PlannedTestSubmission` plus a later
+  confirmation that answers its visible plan. Initial repair authorization or
+  implementation completion cannot be reused as submission authorization.
 
 - `SUBMITTED` requires matching upstream inputs, exact repository and original
   source branch, target exactly `develop`, passing authorization and private

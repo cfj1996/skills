@@ -22,7 +22,7 @@ After explicit confirmation, re-prepare each Bug immediately before its
 single-Bug chain:
 
 ```text
-re-prepare -> implement -> submit(Wiki profile, DEPLOY|SKIP) -> optional go-live
+re-prepare -> implement -> submit PLAN -> confirmation -> submit EXECUTE -> optional go-live
 ```
 
 Only a matching `READY_FOR_HANDOFF` may reach implementation. If refreshed
@@ -68,6 +68,12 @@ GO LIVE:  separate master confirmation
 
 Generated commit/MR/Wiki/Jenkins identifiers and successful readbacks do not
 create new confirmation points when they follow the authorized derivation.
+
+The initial checklist must visibly resolve `STANDARD|NO_WIKI` and
+`DEPLOY|SKIP`, but its confirmation authorizes repair execution only. After a
+`ReviewedChange` exists, always render the exact consolidated `SubmissionPlan`
+and stop. Initial confirmation, implementation completion, “修复完成就提测”,
+or a prior generic “可以” cannot substitute for confirmation of that plan.
 
 ## Failure handling
 

@@ -19,7 +19,10 @@ filesystem, or network write operations.
 - Profile is exactly `STANDARD|NO_WIKI`; target is exactly `develop` for Git
   delivery; current-round diff/commits contain no unrelated work.
 - The current operation's displayed facts, current re-read facts, target,
-  payload, purpose, and required authorization all match.
+  payload, purpose, `tool_route`, and required authorization all match.
+- Browser automation is invalid for GitLab MR, Jenkins, TAPD, Wiki, comment,
+  status, test-version, or YApi operations unless the authorized plan explicitly
+  records an approved browser fallback under the shared tool-routing policy.
 - One consolidated `SubmissionPlan` authorization binds Git, Wiki, deployment,
   deterministic comment, and final TAPD actions. Generated commit/MR/Wiki/
   Jenkins IDs are valid without another prompt only when they follow the exact
@@ -47,6 +50,9 @@ For `PRE_GIT_WRITE`, accept exactly one operation:
 and the prerequisites already available before that operation. Do not require
 future write/readback results.
 
+- `COMMIT|PUSH` requires `tool_route=local-git-cli`.
+- `MR_CREATE_OR_UPDATE|MR_MERGE` requires `tool_route=gitlab-mcp`.
+
 For `PRE_SUBMISSION_WRITE`, accept exactly one operation:
 `JENKINS_TEST_DEPLOY|WIKI_MONTH_CREATE|WIKI_CHILD_CREATE|WIKI_UPDATE|TAPD_COMMENT|TAPD_STATUS|TEST_VERSION`.
 Require successful prior dependencies and validate only that operation. A
@@ -56,11 +62,13 @@ no Wiki material.
 
 For `JENKINS_TEST_DEPLOY`, require `deployment_mode=DEPLOY`, the release-safety
 fields, exact Jenkins Job/parameters, test environment/channel, and expected
-`origin/develop` SHA. A later `DEPLOYED` result requires terminal `SUCCESS` and
+`origin/develop` SHA, plus `tool_route=jenkins-mcp`. A later `DEPLOYED` result requires terminal `SUCCESS` and
 build evidence for that SHA. `deployment_mode=SKIP` permits no Jenkins
 operation and records `SKIPPED_BY_INTENT`.
 
 For Wiki operations, require the TAPD workspace from the current work item.
+Require `tool_route=tapd-mcp` for every Wiki, TAPD comment, TAPD status and
+test-version operation.
 `WIKI_MONTH_CREATE` uses title `YYYY-MM`, parent
 `1150372234001008260`, a resolved creator, and no entry body.
 `WIKI_CHILD_CREATE` uses title `MM-DD: 中文简述`, the verified/read-back month

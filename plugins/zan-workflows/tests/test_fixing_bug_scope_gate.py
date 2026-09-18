@@ -13,7 +13,7 @@ SCENARIOS = (
 
 class FixingBugScopeGateTests(unittest.TestCase):
     def test_preflight_has_exact_visible_contract(self):
-        self.assertIn("| Bug | 项目/仓库 | 分支 | 修复范围 | 待确认 |", SKILL)
+        self.assertIn("| Bug | 项目/仓库 | 分支 | 修复范围 | 提测策略 | 部署 | 待确认 |", SKILL)
         self.assertIn("`是否按此清单执行？`", SKILL)
         self.assertIn("Before confirmation", SKILL)
         self.assertIn("do not create a branch", SKILL)

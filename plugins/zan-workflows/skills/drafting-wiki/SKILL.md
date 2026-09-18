@@ -16,7 +16,9 @@ updates Wiki, TAPD, Git, release, or local state.
 
 Read [contracts.md](references/contracts.md),
 [wiki-template.md](references/wiki-template.md), and
-[acceptance-scenarios.md](references/acceptance-scenarios.md) before drafting.
+[acceptance-scenarios.md](references/acceptance-scenarios.md), plus the shared
+[tool-routing policy](../../references/tool-routing.md) before drafting. TAPD
+and Wiki reads use `tapd-mcp`; browser automation is not a discovery fallback.
 
 ## Inputs
 

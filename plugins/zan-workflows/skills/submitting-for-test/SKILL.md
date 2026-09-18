@@ -21,7 +21,12 @@ one in-memory `TestSubmissionResult`. Execute exactly one profile:
 Read [contracts.md](references/contracts.md),
 [submission-rules.md](references/submission-rules.md),
 [deployment-and-confirmation.md](references/deployment-and-confirmation.md), and
-[acceptance-scenarios.md](references/acceptance-scenarios.md) before writing.
+[acceptance-scenarios.md](references/acceptance-scenarios.md), plus the shared
+[tool-routing policy](../../references/tool-routing.md) before writing.
+
+Accept `submission_phase=PLAN|EXECUTE`. The first invocation is always `PLAN`:
+it is read-only, returns the complete plan and stops. `EXECUTE` requires that
+exact current plan plus a later current-conversation confirmation.
 
 ## Input gate
 
@@ -32,6 +37,10 @@ Require:
 - exact repository fingerprint and original fixed repair branch;
 - one explicit profile `STANDARD|NO_WIKI`; and
 - `deployment_mode=AUTO|DEPLOY|SKIP`.
+
+For `EXECUTE`, also require one `PlannedTestSubmission` with
+`terminal_state=AWAITING_CONFIRMATION` and confirmation of its exact visible
+operation set. Initial repair/scope authorization is not sufficient.
 
 Before the first submission write, require one current-conversation
 consolidated authorization binding every displayed submission operation. A
@@ -58,27 +67,31 @@ business source.
    `SKIPPED_BY_POLICY` result proven to be `NON_FUNCTIONAL_CONTINUE`. Under
    `NO_WIKI`, set Wiki to `SKIPPED_BY_POLICY` without loading Wiki capability.
 4. Build and display one consolidated `SubmissionPlan` containing Git,
-   applicable Wiki/comment actions, deployment, and final TAPD actions. Obtain
-   one authorization as defined in
-   [deployment-and-confirmation.md](references/deployment-and-confirmation.md).
-5. Immediately before each Git write, re-read its bound facts and call the
+   applicable Wiki/comment actions, deployment, and final TAPD actions. Under
+   `NO_WIKI`, explicitly list that no Wiki discovery/read/write/comment tool
+   will be called. Return `PlannedTestSubmission` with
+   `terminal_state=AWAITING_CONFIRMATION` and stop; perform no write.
+5. In a later `EXECUTE` invocation, verify the user's confirmation answers the
+   exact unchanged plan, then re-read every bound fact. If anything changed,
+   return the updated plan and stop for fresh confirmation.
+6. Immediately before each Git write, re-read its bound facts and call the
    private [submission-validator.md](agents/submission-validator.md) with
-   `PRE_GIT_WRITE`. Commit when needed, push, create/update and merge the MR,
-   reading back each result. Prove every current-round commit is contained in
-   `origin/develop`.
-6. Resolve the deployment gate:
+   `PRE_GIT_WRITE`. Use local Git CLI for commit/push; use `gitlab-mcp` for
+   remote MR create/update/conflict/merge operations. Read back each result and
+   prove every current-round commit is contained in `origin/develop`.
+7. Resolve the deployment gate through `jenkins-mcp`:
    - `DEPLOY`: validate `JENKINS_TEST_DEPLOY`, trigger the authorized Jenkins
      Job, follow the real queue/build, require terminal `SUCCESS`, and prove the
      build used the expected `origin/develop` SHA;
    - `SKIP`: make no Jenkins call and record `SKIPPED_BY_INTENT`.
    `FAILED|UNKNOWN` blocks every later Wiki/TAPD write.
-7. After `DEPLOYED|SKIPPED_BY_INTENT`, execute the authorized Wiki plan under
+8. After `DEPLOYED|SKIPPED_BY_INTENT`, execute the authorized Wiki plan under
    `STANDARD` only when the drafter returned `VALIDATED`, validating and
    reading back each create/update. For `SKIPPED_BY_POLICY`, perform no Wiki
    or Wiki-comment operation. When a Wiki was written, materialize, validate,
    write, and read the deterministic Bug Wiki-link comment, and retain the
    final Wiki target for `going-live`.
-8. Apply the status policy from the work mode: write/read `待测试` and the test
+9. Apply the status policy from the work mode through `tapd-mcp`: write/read `待测试` and the test
    version only when required; for `CONTINUE` already in `待测试`, record
    `SKIPPED_ALREADY_WAITING_TEST` and perform no duplicate writes. Give all
    readbacks to the validator with `POST_WRITE`; return `SUBMITTED` only on a

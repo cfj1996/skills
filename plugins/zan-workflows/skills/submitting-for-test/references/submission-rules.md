@@ -21,6 +21,10 @@ or a result cannot be proved, return `BLOCKED`. This
 simple version does not retry, recover an interrupted operation, or infer that
 an earlier call succeeded.
 
+All TAPD, Wiki, GitLab and Jenkins operations follow the shared
+[tool-routing policy](../../../references/tool-routing.md). Browser state is never the default
+transport for these systems.
+
 ## Git delivery
 
 Use the original fixed business branch as source and exactly `develop` as
