@@ -12,11 +12,15 @@ remain unchanged at every profile.
 
 Turn a requirement or prototype into verified project scope and a branch-bound Plan ready for an implementation workflow. Do not turn uncertainty into implementation commitments.
 
-Accept `phase=SCOPE_REVIEW|PLAN_WRITE|AUTO`. `SCOPE_REVIEW` stops after scope
-confirmation, `PLAN_WRITE` requires a confirmed scope plus validated branch
+Accept `phase=SCOPE_REVIEW|PLAN_WRITE|AUTO`. `SCOPE_REVIEW` stops after producing
+the configured confirmed or proposed scope, `PLAN_WRITE` requires a confirmed scope plus validated branch
 definitions, and `AUTO` may run both only when those branch definitions are
 already available. End-to-end requirement implementation is orchestrated by
 `zan-workflows:developing-requirement`.
+
+Accept `confirmation_mode=STANDALONE|DEFER_TO_ORCHESTRATOR`, defaulting to
+`STANDALONE`. Deferred mode returns a proposed scope for a combined downstream
+checklist and must not ask a separate dialogue scope-confirmation question.
 
 ## 固定主流程
 
@@ -41,7 +45,8 @@ already available. End-to-end requirement implementation is orchestrated by
 5. 展示项目列表、远程基线、范围摘要和推荐评审模式。Resolve unresolved matters from evidence and ask only for missing decisions. If available, `superpowers:brainstorming` may assist; it is optional and must not launch a separate workflow.
 
 在项目、远程基线和范围证据齐全前保持只读；此时不得创建分支、写 Plan 或改源码。
-`phase=SCOPE_REVIEW` 在用户确认范围后返回，不自行创建或选择分支。
+`phase=SCOPE_REVIEW` 不自行创建或选择分支。`STANDALONE` 在用户确认范围后返回；
+`DEFER_TO_ORCHESTRATOR` 返回待清单确认的提案。
 
 用户在 Agent 对话中说“漏了某功能”、追加需求或修正原描述时，继续当前评审，
 不要求用户重新提供整份需求。Agent 对照完整功能清单识别新增、补充和受影响项，
@@ -105,7 +110,9 @@ Keep the page state only as “评审中” or “阻塞” while reviewing. 不
 ## 简单需求：对话模式
 
 在对话中给出受影响项目与 `origin/master` SHA、范围、功能点、排除项、实现摘要、未决问题和推荐分支动作。
-用户确认该摘要后，直接进入“开发分支与 Plan”；无需打开 in-app 浏览器、注入 Shadow DOM、启动通知桥或要求统一提交。
+`STANDALONE` 由用户确认该摘要后进入“开发分支与 Plan”；
+`DEFER_TO_ORCHESTRATOR` 不单独提问，把摘要交给需求开发清单统一确认。两者都无需打开
+in-app 浏览器、注入 Shadow DOM、启动通知桥或要求统一提交。
 用户的增量修正只重开受影响项；没有冲突时不重复确认整份范围。
 
 ## 复杂需求：功能评审运行协议
@@ -127,7 +134,8 @@ in-app Browser 打开；本地文件才启动临时 loopback 服务。使用运�
 ## 统一提交评审
 
 `PANEL` 模式仅在用户统一提交后处理本轮输入；展示拟更新内容、保留评审状态且不写文件。
-`DIALOGUE` 模式以用户对范围摘要的明确确认作为等价门禁，不要求统一提交按钮。两种模式均不得在范围确认前写 Plan。
+`DIALOGUE` 的 `STANDALONE` 模式以用户对范围摘要的明确确认作为等价门禁；
+`DEFER_TO_ORCHESTRATOR` 由组合清单确认，不要求单独的统一提交按钮。两种模式均不得在范围确认前写 Plan。
 不得在确认前写 Plan。
 
 ## 开发分支与 Plan
@@ -149,9 +157,11 @@ Use the human-readable [页面交付 Plan 模板](assets/page-delivery-plan-temp
 
 ## 输出契约与交接
 
-`SCOPE_REVIEW` 返回一个内存中的 `ConfirmedRequirementScope`：需求身份、受影响项目、每个项目的
-origin/master SHA、范围、功能点、排除项、代码证据、评审模式、确认状态、风险和未决问题，
-终态为 `CONFIRMED|PENDING|BLOCKED`。
+`SCOPE_REVIEW` 返回需求身份、受影响项目、每个项目的 origin/master SHA、范围、功能点、
+排除项、代码证据、评审模式、风险和未决问题。`STANDALONE` 返回
+`ConfirmedRequirementScope`，终态为 `CONFIRMED|PENDING|BLOCKED`；
+`DEFER_TO_ORCHESTRATOR` 返回 `ProposedRequirementScope`，终态为
+`READY_FOR_CHECKLIST|PENDING|BLOCKED`。
 
 `PLAN_WRITE` 返回一个 branch-bound `ConfirmedRequirementPlan`：上述范围、每个项目的已验证
 `TapdWorkDefinition`、Plan 路径/指纹、任务顺序、验证方式和 `PLAN_READY|PENDING|BLOCKED`。

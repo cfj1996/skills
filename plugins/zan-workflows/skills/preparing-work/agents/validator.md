@@ -26,6 +26,9 @@ Validate in order:
    For `CONTINUE`, require one original branch recovered from the declared
    evidence order and action exactly `USE_EXISTING`; reject `CREATE`, a newly
    derived slug, or any proposed branch based on `develop`.
+   The current-conversation confirmation source binds the same project,
+   repository, scope, fixed branch, source/base, target branch, operation and
+   purpose; a missing or changed bound fact is not `READY_FOR_HANDOFF`.
 5. `USE_EXISTING` is evaluated only by repository/ref identity. Reject any
    requirement for Bug-specific commits, raw documents, generated test
    evidence, or prior workflow state.

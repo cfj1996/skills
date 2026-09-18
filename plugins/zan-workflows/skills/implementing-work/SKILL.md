@@ -25,6 +25,8 @@ Accept only `terminal_state=READY_FOR_HANDOFF` with:
 - a verified project/repository fingerprint;
 - confirmed scope;
 - an exact branch action `CREATE|USE_EXISTING`; and
+- a current-conversation confirmation source binding repository, scope, fixed
+  branch, source/base, target branch, operation and purpose; and
 - status action `WRITE_ACTIVE|NO_CHANGE|SKIPPED_ALREADY_WAITING_TEST|NOT_APPLICABLE_NON_BUG`,
   with a current-conversation authorization source only for `WRITE_ACTIVE`; and
 - public preparation validation `VALIDATION_PASSED`.
@@ -35,7 +37,8 @@ Re-read actual repository path, Git root, origin, branch refs, HEAD, and
 ## Fixed-branch execution
 
 - `CREATE`: create the exact approved branch from the definition's exact
-  verified base ref/SHA, then verify the current branch name and ref.
+  verified base ref/SHA using the matching confirmation source, then verify
+  the current branch name and ref. Do not ask again while the bound facts match.
 - `USE_EXISTING`: check out/use the exact approved existing branch and verify
   its actual ref. Do not require this Bug to have prior commits or generated
   evidence on the branch.

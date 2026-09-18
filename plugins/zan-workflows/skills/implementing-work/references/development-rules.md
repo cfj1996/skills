@@ -10,6 +10,8 @@ Do not edit until all are true:
 - the exact fixed branch is created or selected according to the definition;
 - branch creation, when selected, uses the definition's exact verified base
   ref/SHA;
+- branch creation/selection has a matching current-conversation confirmation
+  source for repository, scope, source/base, target branch, operation and purpose;
 - current branch equals that fixed branch; and
 - required Bug active-state payload was displayed and authorized in the
   current standalone call or confirmed `fixing-bug` checklist, then privately

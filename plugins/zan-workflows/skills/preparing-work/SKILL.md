@@ -28,7 +28,10 @@ Accept exactly one TAPD URL plus optional hard constraints:
   workspace policy supplies it;
 - `branch_mode=AUTO|CREATE|USE_EXISTING`;
 - `work_mode=AUTO|INITIAL|CONTINUE`; and
-- additive `scope_increment` supplied in the current conversation.
+- additive `scope_increment` supplied in the current conversation; and
+- `confirmation_source`, when a current-conversation checklist or standalone
+  confirmation binds the exact project/repository, scope, fixed branch,
+  source/base, target branch, operation and purpose.
 
 Constraints are requirements, not hints. Never replace a supplied project,
 repository, or branch with a more plausible candidate.
@@ -58,7 +61,10 @@ repository, or branch with a more plausible candidate.
    creation;
    `USE_EXISTING` verifies and selects the exact existing branch;
    `AUTO` selects one of those outcomes only from the exact supplied branch.
-6. Derive and display the status plan with the scope and branch facts. For a
+6. Validate the confirmation source against every visible project, scope and
+   branch fact. Missing or changed confirmation keeps the definition `PENDING`;
+   never ask again when the current-conversation confirmation still matches.
+7. Derive and display the status plan with the scope and branch facts. For a
    Bug, use `WRITE_ACTIVE` for an initial item that must enter `修复中`,
    `NO_CHANGE` when already active, or `SKIPPED_ALREADY_WAITING_TEST` for
    `CONTINUE` already in `待测试`. For a Story or Task, use exactly
@@ -67,10 +73,10 @@ repository, or branch with a more plausible candidate.
    project/repository, selected/planned branch, and confidence/missing facts.
    For `CONTINUE`, reuse still-valid project/branch confirmation and ask only
    when incremental scope is not explicit or a bound fact changed.
-7. Run the private read-only validator in [agents/validator.md](agents/validator.md).
+8. Run the private read-only validator in [agents/validator.md](agents/validator.md).
    Map its result to `VALIDATION_PASSED` or `VALIDATION_FAILED` and discard the
    private protocol line.
-8. Return one in-memory `TapdWorkDefinition`. Do not write it to disk.
+9. Return one in-memory `TapdWorkDefinition`. Do not write it to disk.
 
 ## Hard rules
 
@@ -82,7 +88,8 @@ repository, or branch with a more plausible candidate.
   propose a new branch from `develop`, `master`, or another base.
 - If local and remote refs both exist, their SHAs must match. A mismatch is
   `BLOCKED`; never choose one silently.
-- Repository fingerprint, scope confirmation, and exact branch decision must
+- Repository fingerprint, scope confirmation, exact branch decision, and a
+  matching current-conversation branch/implementation confirmation must
   pass before `READY_FOR_HANDOFF`.
 - A `CREATE` handoff must include the exact verified base ref and SHA. Never
   guess a base in `implementing-work`.

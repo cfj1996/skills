@@ -24,8 +24,9 @@ If only a standalone PRD or prototype is available, route to
 `PENDING_TAPD_STORY_OR_TASK` before a branch-bound Plan or implementation. Do not
 advertise the standalone artifact as an end-to-end requirement-development run.
 
-Accept `delivery_mode=PLAN_ONLY|IMPLEMENT`, defaulting from the user's explicit
-request. A review or planning request is `PLAN_ONLY`; do not infer implementation.
+Accept `delivery_mode=PLAN_ONLY|BRANCH_ONLY|IMPLEMENT`, defaulting from the
+user's explicit request. A review or planning request is `PLAN_ONLY`; “创建开发
+分支” is `BRANCH_ONLY`; do not infer source implementation.
 
 Bug repair belongs to `zan-workflows:fixing-bug`. This skill does not commit,
 push, create or merge an MR, submit for test, deploy, publish, update a Wiki, or
@@ -36,7 +37,8 @@ merge to master. Those are later explicit workflows.
 Use the skills in this order:
 
 1. `zan-workflows:workspace-project-knowledge`
-2. `zan-workflows:writing-plans` with `phase=SCOPE_REVIEW`
+2. `zan-workflows:writing-plans` with `phase=SCOPE_REVIEW` and
+   `confirmation_mode=DEFER_TO_ORCHESTRATOR`
 3. `zan-workflows:preparing-work` for exact TAPD project and branch binding
 4. `zan-workflows:writing-plans` with `phase=PLAN_WRITE`
 5. `zan-workflows:implementing-work` when `delivery_mode=IMPLEMENT`
@@ -69,38 +71,49 @@ Reuse its complexity routing:
 - `PANEL` for multi-project/module work, many independent functions, complex
   states/dependencies, or decisions requiring item-by-item review.
 
-Continue only with `ConfirmedRequirementScope.terminal_state=CONFIRMED`. Keep
-all unresolved critical conflicts as `PENDING|BLOCKED`; do not turn them into
-Plan assumptions.
+Require `ProposedRequirementScope.terminal_state=READY_FOR_CHECKLIST`. Keep all
+unresolved critical conflicts as `PENDING|BLOCKED`; do not turn them into Plan
+assumptions. Do not ask for a separate scope confirmation—the orchestrator
+combines it with branch and execution facts below.
 
 ## 3. Bind development branches
 
-For every confirmed project partition, resolve one exact `fixed_branch` before
-invoking `preparing-work`:
+For every proposed project partition, derive the exact initial Story/Task
+branch as `feature/cfj.<MMDD>.<短ID>.<描述slug>` and complete the read-only
+existence/base checks in [需求开发分支与单次确认](references/branch-checklist.md).
+For `CONTINUE`, reuse the evidenced original branch instead of generating a
+new name. Pass the exact `fixed_branch` with
+`branch_mode=AUTO|CREATE|USE_EXISTING`; `preparing-work` verifies the action
+but never invents or substitutes the branch name.
 
-1. reuse an explicitly supplied branch or a single evidenced original branch
-   for continued work;
-2. otherwise derive one candidate only from a named workspace branch policy,
-   show the exact branch, project, `origin/master` base and purpose, and obtain
-   the required current-conversation confirmation; and
-3. when neither explicit input nor a governing policy can produce one exact
-   branch, return `PENDING_FIXED_BRANCH` with the missing decision.
+Before confirmation, invoke `zan-workflows:preparing-work` read-only with the
+exact TAPD URL, proposed scope and branch constraints to obtain preflight facts;
+an unconfirmed scope may remain `PENDING` and is not a downstream handoff.
 
-Pass that exact value with `branch_mode=AUTO|CREATE|USE_EXISTING`.
-`preparing-work` may verify whether the branch exists and choose the action; it
-must never be asked to invent or substitute the branch name.
+Build one combined checklist from all project rows using
+[需求开发分支与单次确认](references/branch-checklist.md), show one authorization
+summary, ask exactly `是否按此清单执行？`, then stop. Do not ask separately for
+scope or branch confirmation. The initial Story/Task request selects the work;
+it does not confirm derived checklist fields.
 
-After scope confirmation, invoke `zan-workflows:preparing-work` with the exact
-TAPD URL and hard constraints from each confirmed project partition. Require a
-validated `TapdWorkDefinition` with `terminal_state=READY_FOR_HANDOFF`, exact
-`CREATE|USE_EXISTING`, fixed branch, repository fingerprint, and verified base
-ref/SHA when creating.
+After confirmation, re-invoke `preparing-work` with the same visible facts and
+the current-conversation checklist authorization. Require a validated
+`TapdWorkDefinition` with `terminal_state=READY_FOR_HANDOFF`, exact
+`CREATE|USE_EXISTING`, fixed branch, repository fingerprint, verified base
+ref/SHA when creating, and reusable branch authorization. Any visible change
+invalidates the confirmation and returns the updated full checklist.
 
 For multi-project requirements, preflight every project before editing and
 refresh the definition immediately before each later implementation. Because
 this workflow accepts only Story/Task, every definition must carry
 `status_action=NOT_APPLICABLE_NON_BUG`; it must not request authorization for,
 construct, or write the Bug-only `修复中` status.
+
+For `BRANCH_ONLY`, after refreshed preparation succeeds, execute only the
+confirmed branch action. `CREATE` creates the exact branch from the confirmed
+`origin/master` SHA without upstream tracking; `USE_EXISTING` selects the exact
+verified branch. Read back repository root, current branch, HEAD and status,
+return `BRANCH_READY`, and stop before Plan writing or source edits.
 
 ## 4. Write the branch-bound Plan
 
@@ -119,7 +132,8 @@ The Plan is executable only after its configured write/readback gate passes
 and every project partition remains bound to the same repository, remote
 baseline, scope, and branch definition.
 
-For `PLAN_ONLY`, return the confirmed Plan and stop.
+For `PLAN_ONLY`, return the confirmed Plan and stop. `BRANCH_ONLY` has already
+stopped after branch readback and never enters this phase.
 
 ## 5. Execute and review
 
@@ -127,7 +141,9 @@ For `IMPLEMENT`, preflight all project partitions, then execute in dependency
 order. Immediately before each project, refresh its actual repository, remote
 baseline, fixed branch, worktree status, TAPD status action, and preparation
 validation. Invoke `zan-workflows:implementing-work` with the matching
-`TapdWorkDefinition` and that project's Plan tasks.
+`TapdWorkDefinition`, that project's Plan tasks, and the reusable branch and
+implementation authorization from the confirmed checklist. Do not ask again
+while every visible checklist field still matches.
 
 Collect one `ReviewedChange` per project. Stop on the first `BLOCKED` result and
 report any already-completed project changes truthfully; do not roll them into
@@ -140,7 +156,7 @@ within the confirmed Plan.
 Return one in-memory `RequirementDevelopmentResult` containing requirement
 identity, affected-project evidence, confirmed scope, review mode, remote-master
 SHAs, branch definitions, Plan paths/fingerprints, per-project ReviewedChanges,
-verification results, and `PLAN_READY|REVIEWED|PENDING|BLOCKED`.
+verification results, and `BRANCH_READY|PLAN_READY|REVIEWED|PENDING|BLOCKED`.
 
 Do not create a workflow report, runtime ledger, raw requirement dump, or
 generated evidence directory.

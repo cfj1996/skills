@@ -12,7 +12,7 @@
 | Work mode | `INITIAL|CONTINUE`, trigger evidence, reused confirmation facts, and original-branch recovery evidence when applicable |
 | Scope | in-scope work, excluded work, acceptance criteria, confirmation state |
 | Project | selected project, canonical repository path, Git root, origin remote, verification result |
-| Branch | requested mode, fixed branch, action `CREATE|USE_EXISTING`, selected/planned branch, local/remote ref facts, and for `CREATE` exact verified base ref/SHA |
+| Branch | requested mode, fixed branch, action `CREATE|USE_EXISTING`, selected/planned branch, local/remote ref facts, for `CREATE` exact verified base ref/SHA, and matching current-conversation confirmation source |
 | TAPD status plan | item type, current status, `WRITE_ACTIVE|NO_CHANGE|SKIPPED_ALREADY_WAITING_TEST|NOT_APPLICABLE_NON_BUG`; exact target/payload/purpose and confirmation source only for a Bug `WRITE_ACTIVE` |
 | Validation | public mapped state and normalized failure reason |
 | Terminal | `READY_FOR_HANDOFF|PENDING|BLOCKED` and blocker/next decision when needed |
@@ -31,6 +31,10 @@
   branch exists, otherwise `CREATE` when absence is verified. An unavailable
   ref check is `PENDING`; conflicting refs are `BLOCKED`.
 - No mode may select or plan a branch different from `fixed_branch`.
+- The confirmation source binds project/repository, scope, fixed branch,
+  source/base ref/SHA, target branch, operation and purpose. A visible-field
+  change invalidates it; the expected post-creation `CREATE` to `USE_EXISTING`
+  transition for the same branch does not.
 - `CONTINUE` requires `USE_EXISTING` on the recovered original source branch.
   It never yields `CREATE`; missing/competing recovery evidence yields
   `PENDING`.
@@ -46,6 +50,7 @@
 - an explicit initial scope or an evidence-backed incremental scope under
   `CONTINUE`;
 - one exact branch action and passing branch checks; and
+- one matching current-conversation branch/scope confirmation source; and
 - one status plan consistent with TAPD type, work mode and current status; and
 - private validation mapped to `VALIDATION_PASSED`.
 

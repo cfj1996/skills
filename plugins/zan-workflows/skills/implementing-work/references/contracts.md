@@ -8,7 +8,7 @@
 | --- | --- |
 | Source | TAPD URL/type/short ID and approved scope from the definition |
 | Repository | expected and actual project, path, Git root, origin, starting/final HEAD |
-| Branch | action `CREATE|USE_EXISTING`, expected branch, actual branch, and exact approved base ref/SHA when created |
+| Branch | action `CREATE|USE_EXISTING`, expected branch, actual branch, exact approved base ref/SHA when created, and reusable current-conversation confirmation source |
 | TAPD status | item type and `WRITE_ACTIVE|NO_CHANGE|SKIPPED_ALREADY_WAITING_TEST|NOT_APPLICABLE_NON_BUG`; exact target/payload/purpose, authorization source, validation/write/readback only for a Bug `WRITE_ACTIVE` |
 | Baseline | before/after status, changed paths, unrelated paths, scope comparison |
 | Change | concise summary and exact diff reference available in the current execution |
@@ -22,6 +22,9 @@
   definition and the actual current branch to equal the fixed branch.
 - `CREATE` uses only the definition's verified base ref/SHA; missing or changed
   base evidence blocks before branch creation.
+- Branch creation/selection requires the definition's matching confirmation
+  source. A changed visible project, scope, base, branch, operation or purpose
+  blocks; matching facts must not trigger another prompt.
 - `USE_EXISTING` does not require prior association with the current Bug. It
   requires only the approved repository/ref identity and a usable scope
   baseline.

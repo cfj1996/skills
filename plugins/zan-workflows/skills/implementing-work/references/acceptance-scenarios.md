@@ -6,6 +6,8 @@
 | Existing branch contains earlier Bugs from the same request | Preserve them and implement the next Bug on the same branch. |
 | Current branch differs from the prepared fixed branch | `BLOCKED` before editing. |
 | `CREATE` lacks or no longer matches the approved base ref/SHA | `BLOCKED` before branch creation. |
+| Confirmed checklist matches project, scope, base and fixed branch | Reuse it for branch creation/selection and implementation; do not ask again. |
+| A visible checklist field changed | `BLOCKED` before branch action and return the updated checklist for confirmation. |
 | TAPD active-state write is not exactly authorized or fails pre-write validation/readback | `BLOCKED` before source editing. |
 | Confirmed fixing-bug checklist already binds the active-state write | Reuse it and do not ask for another status confirmation. |
 | Continue Bug is already `待测试` | Keep the status unchanged and implement on the original branch. |

@@ -19,9 +19,8 @@ class RequirementDevelopmentFlowTests(unittest.TestCase):
         offsets = [composition.index(marker) for marker in ordered]
         self.assertEqual(offsets, sorted(offsets))
         self.assertIn("origin/master", text)
-        self.assertIn("delivery_mode=PLAN_ONLY|IMPLEMENT", text)
+        self.assertIn("delivery_mode=PLAN_ONLY|BRANCH_ONLY|IMPLEMENT", text)
         self.assertIn("PENDING_TAPD_STORY_OR_TASK", text)
-        self.assertIn("PENDING_FIXED_BRANCH", text)
         self.assertIn("fixed_branch", text)
 
     def test_orchestrator_stops_before_delivery_workflows(self):
@@ -64,6 +63,24 @@ class RequirementDevelopmentFlowTests(unittest.TestCase):
         text = (PLUGIN_ROOT / "skills/writing-plans/SKILL.md").read_text()
         self.assertIn("`SCOPE_REVIEW` 只读取现有规则", text)
         self.assertIn("不得写 `AGENTS.md`", text)
+
+    def test_requirement_branch_format_and_single_checklist_confirmation(self):
+        skill = (PLUGIN_ROOT / "skills/developing-requirement/SKILL.md").read_text()
+        branch_rules = (
+            PLUGIN_ROOT
+            / "skills/developing-requirement/references/branch-checklist.md"
+        ).read_text()
+        self.assertIn("feature/cfj.<MMDD>.<短ID>.<描述slug>", skill)
+        self.assertIn("feature/cfj.0918.1080800.supplier-split-bill-restrictions", branch_rules)
+        self.assertIn("是否按此清单执行？", skill)
+        self.assertIn("Do not ask separately", skill)
+        self.assertIn("git switch --no-track -c", branch_rules)
+
+    def test_checklist_confirmation_is_reused_by_prepare_and_implement(self):
+        preparing = (PLUGIN_ROOT / "skills/preparing-work/SKILL.md").read_text()
+        implementing = (PLUGIN_ROOT / "skills/implementing-work/SKILL.md").read_text()
+        self.assertIn("confirmation_source", preparing)
+        self.assertIn("Do not ask again", implementing)
 
 
 if __name__ == "__main__":
