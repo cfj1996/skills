@@ -18,7 +18,7 @@ complete visible `SubmissionPlan`, bound-fact fingerprint, exact
 | Git delivery | original source branch, target `develop`, current-round commits, commit/push/MR/merge results, develop containment |
 | Deployment | `DEPLOYED|SKIPPED_BY_INTENT|FAILED|UNKNOWN|NOT_ATTEMPTED`, Jenkins job/environment/ref/version/channel/purpose and trigger/readback evidence when applicable |
 | Wiki | `WRITTEN|SKIPPED_BY_POLICY|BLOCKED|NOT_ATTEMPTED`, auto-resolved target plan when written or retained for `going-live`, hierarchy evidence, create/update authorizations and readbacks when written, actual final child ID/URL and source-branch identity when available, merge-status readback, and final body when applicable |
-| TAPD | exact status action, optional exact Bug Wiki-link comment, and write/readback results |
+| TAPD | exact status action, exact `Bug|Story|Task` Wiki-link result when applicable, duplicate/conflict evidence, and write/readback results |
 | Test version | `WRITTEN|SKIPPED_ALREADY_WAITING_TEST|BLOCKED|NOT_ATTEMPTED`, structured payload and readback when written |
 | Validation | mapped results for each pre-write operation and final post-write validation |
 | Terminal | `SUBMITTED|BLOCKED` and blocker when applicable |
@@ -45,9 +45,9 @@ complete visible `SubmissionPlan`, bound-fact fingerprint, exact
   `terminal_state=VALIDATED`, its full rendered Markdown and calculated minimal
   patch or new-page body, an auto-resolved
   `REUSE_EXISTING|CREATE_CHILD|CREATE_MONTH_AND_CHILD` target plan, exact
-  authorization and readback for each Wiki write, and for a Bug the exact
-  final-child Wiki-link comment write/readback before TAPD status and version
-  publication; or a `SKIPPED_BY_POLICY` draft with
+  authorization and readback for each Wiki write, and for the originating
+  `Bug|Story|Task` the exact final-child Wiki-link `LINKED|ALREADY_LINKED`
+  result before TAPD status and version publication; or a `SKIPPED_BY_POLICY` draft with
   `skip_reason=NON_FUNCTIONAL_CONTINUE`, no rendered body, and no Wiki/comment
   operation. A newly created entry reads back the exact status derived from
   project type: `未合并` for a business project or `无需上线` for a

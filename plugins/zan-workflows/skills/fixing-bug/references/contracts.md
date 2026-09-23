@@ -72,9 +72,11 @@ branch action/base, active-state transition, and implementation. For
 `status_action=SKIPPED_ALREADY_WAITING_TEST`; no active/final status rewrite or
 duplicate test-version write is allowed.
 
-Normal one-Bug execution has at most two confirmation points: initial
+Normal repair and submission have at most two confirmation points: initial
 scope/implementation authorization when needed, then one consolidated
-submission authorization. `going-live` remains a separate master confirmation.
+submission authorization. `going-live` remains a separate master/Wiki
+confirmation, and local cleanup is another separate exact confirmation only
+when verified candidates exist.
 The second authorization must answer the complete current `SubmissionPlan`;
 the first confirmation never authorizes submission writes.
 
@@ -85,7 +87,8 @@ the first confirmation never authorizes submission writes.
 | `preparing-work` | `TapdWorkDefinition` with `READY_FOR_HANDOFF` | `implementing-work` |
 | `implementing-work` | `ReviewedChange` with `REVIEWED` | `submitting-for-test` |
 | `submitting-for-test` | `TestSubmissionResult` with `SUBMITTED` | optional `going-live`, as the complete input |
-| `going-live` | `MasterMergeResult` with `MERGED` | final summary |
+| `going-live` `DELIVER` | `MasterMergeResult` with `MERGED` and cleanup state/plan | final summary or deferred cleanup confirmation |
+| `going-live` `CLEANUP` | updated cleanup result with `CLEANED|PARTIAL|BLOCKED` | final summary |
 
 Preflight snapshots are not handoffs. Handoffs live only for the current
 execution, begin only after checklist confirmation and execution-time
@@ -101,6 +104,7 @@ The orchestrator retains only enough in the current conversation to report:
 | Status | `成功`, `失败`, `待确认` |
 | Last capability | capability name or `未开始` |
 | Deployment | `DEPLOYED|SKIPPED_BY_INTENT|FAILED|UNKNOWN|未执行` |
+| Cleanup | `NO_CANDIDATE|AWAITING_CONFIRMATION|CLEANED|PARTIAL|BLOCKED|未执行` |
 | Reason | first blocker or required confirmation; empty on success |
 
 Execution-time `preparing-work` returning `PENDING` or `BLOCKED` pauses the entire queue.

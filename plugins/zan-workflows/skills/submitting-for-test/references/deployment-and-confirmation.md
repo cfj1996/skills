@@ -30,7 +30,7 @@ first submission write. `submission_phase=PLAN` displays it and returns
 - `DEPLOY|SKIP`; for `DEPLOY`, target project, release target, test environment,
   Jenkins Job, expected `develop` ref/SHA identity, version/build parameter,
   test release channel, and purpose;
-- deterministic Wiki-link comment and final TAPD status/test-version actions;
+- deterministic `Bug|Story|Task` Wiki-link comment and final TAPD status/test-version actions;
 - status behavior from `work_mode`.
 
 The plan must show the exact profile as `STANDARD（Wiki）` or
@@ -61,7 +61,7 @@ Git commit/push/MR -> develop containment
   -> DEPLOY: Jenkins SUCCESS + expected ref/SHA proof
      SKIP: no Jenkins call + SKIPPED_BY_INTENT
   -> Wiki create/update/readback when STANDARD
-  -> deterministic Bug Wiki-link comment when applicable
+  -> idempotent Bug/Story/Task Wiki-link comment when applicable
   -> TAPD waiting-test/test-version writes when status policy requires them
 ```
 

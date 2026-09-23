@@ -1,6 +1,6 @@
 ---
 name: going-live
-description: Use when a submitted TAPD change must merge its original fixed repair branch directly to master and then maintain its existing Wiki merge status; tooling projects do not require a master-merge status transition.
+description: Use when a submitted TAPD change must merge its original fixed branch directly to master, maintain its existing Wiki merge status, and optionally remove the exact verified local development branch and worktree after a separate cleanup confirmation.
 ---
 
 # Go Live
@@ -9,24 +9,29 @@ Preferred lead model profile: `CRITICAL`. Read the shared
 [model-routing policy](../../references/model-routing.md) when model selection
 or delegation is available; model availability never weakens merge gates.
 
-Consume one `TestSubmissionResult` and return one in-memory
-`MasterMergeResult`. This capability means only: merge the original fixed
-repair branch directly to `master`, then maintain the matching existing Wiki
-entry as `是否上线：已合并` after verified master containment. A tooling
+Accept `operation=DELIVER|CLEANUP`. `DELIVER` consumes one
+`TestSubmissionResult` and returns one in-memory `MasterMergeResult`: merge the
+original fixed branch directly to `master`, then maintain the matching existing
+Wiki entry as `是否上线：已合并` after verified master containment. A tooling
 project keeps `是否上线：无需上线` and requires no master-merge status
 transition.
 
-After verified master delivery, also check associated local branches and
-worktrees and report cleanup advice; this skill does not delete them.
+After verified master delivery, `DELIVER` also checks associated local branches
+and worktrees and creates an exact `CleanupPlan` for safe candidates. It never
+deletes them in the delivery turn. `CLEANUP` consumes the prior merged result
+and a separate exact cleanup confirmation, revalidates every candidate, and may
+remove only those confirmed local resources.
 
 Read [contracts.md](references/contracts.md) and
 [acceptance-scenarios.md](references/acceptance-scenarios.md), plus the shared
 [tool-routing policy](../../references/tool-routing.md) before any write.
 GitLab operations use `gitlab-mcp`; Wiki operations use `tapd-mcp`.
+Confirmed local cleanup uses only ordinary local Git CLI commands described
+below.
 
 ## Input gate
 
-Require:
+For `operation=DELIVER`, require:
 
 - `TestSubmissionResult.terminal_state=SUBMITTED`;
 - the exact original `feature/*` or `fixbug/*` repair branch from that result;
@@ -43,7 +48,19 @@ write occurred; it does not remove the historical target needed to maintain
 Never substitute `develop`, `dev`, `master`, `merge/*`, a release branch, or a
 rebuilt branch as the source.
 
-## Procedure
+For `operation=CLEANUP`, require:
+
+- the exact prior `MasterMergeResult.terminal_state=MERGED`;
+- `cleanup_state=AWAITING_CONFIRMATION` with one exact displayed `CleanupPlan`;
+- a current-conversation confirmation binding `intended_operation`, `purpose`,
+  current branch, every `branch_to_delete`, and every
+  `worktree_to_remove`; and
+- the same verified repository and association evidence used by that plan.
+
+A request to go live, a merge authorization, or a generic earlier “继续” never
+authorizes cleanup. `CLEANUP` never repeats the master MR or Wiki operations.
+
+## Delivery procedure
 
 1. Re-read repository fingerprint, original source ref, `master` ref, existing
    MR state, and current-round commits.
@@ -90,6 +107,41 @@ rebuilt branch as the source.
    otherwise return `BLOCKED` with actual completed effects. Include the local
    check result separately, with paths/branches, reasons, and cleanup advice.
    If master delivery was not verified, mark the local check `NOT_TRIGGERED`.
+   For a merged result, convert only `CANDIDATE` resources into one exact
+   `CleanupPlan`. Use `NO_CANDIDATE` only when the check completed and found no
+   safe candidates; use `BLOCKED` when cleanup evidence is partial or
+   unavailable. Otherwise set `cleanup_state=AWAITING_CONFIRMATION`, display
+   the plan and ask exactly `是否删除以上本地开发环境？`, then stop without
+   deleting anything.
+
+## Cleanup procedure
+
+Run only for `operation=CLEANUP` after its exact confirmation:
+
+1. Re-read the repository, current task path and branch, `git worktree list`,
+   every planned worktree status/ignored/lock/occupancy fact, local branch tips,
+   and refreshed target refs. Re-prove full-tip containment and association.
+2. If any path, branch, SHA, dirty state, lock, occupancy, or candidate set
+   differs from the confirmed plan, perform no deletion. Return the refreshed
+   plan with `AWAITING_CONFIRMATION` or classify the resource
+   `RETAIN|VERIFY`; never silently narrow or expand the confirmed target set.
+3. Reject protected/baseline branches (`main|master|develop|dev`), the current
+   checked-out branch, the current task's worktree, active or locked worktrees,
+   dirty/untracked worktrees, unpreserved ignored data, undelivered tips, and
+   uncertain occupancy. Remote branches are outside cleanup scope.
+4. For each unchanged confirmed candidate, remove its associated worktree first
+   with ordinary `git worktree remove <exact-absolute-path>` and no force flag;
+   read back that the path and worktree registration are gone. Then delete the
+   exact local branch from a safe remaining worktree with
+   `git branch -d -- <exact-branch>` and read back that the local ref is absent.
+   A branch without an associated worktree skips the first operation.
+5. Never use `rm -rf`, `git branch -D`, `git worktree remove --force`, broad
+   pruning, branch switching, process termination, or remote branch deletion.
+   Stop on the first failure and preserve every unprocessed resource.
+6. Return cleanup state `CLEANED` only when every confirmed operation and
+   readback succeeds. Otherwise return `PARTIAL|BLOCKED` with completed and
+   retained resources separately. Cleanup failure never reverses or disguises
+   an already verified `MERGED` delivery.
 
 Do not publish a production version, run smoke tests, update TAPD status or
 comments, publish a test version, or write local workflow state. No retry or

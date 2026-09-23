@@ -26,6 +26,9 @@ GOING_LIVE_VALIDATOR = (
 GOING_LIVE_CONTRACT = (
     PLUGIN_ROOT / "skills/going-live/references/contracts.md"
 ).read_text()
+LOCAL_CLOSEOUT = (
+    PLUGIN_ROOT / "skills/going-live/references/local-closeout.md"
+).read_text()
 PROJECT_KNOWLEDGE = (
     PLUGIN_ROOT / "skills/workspace-project-knowledge/SKILL.md"
 ).read_text()
@@ -121,6 +124,19 @@ class WikiTargetOwnershipTests(unittest.TestCase):
         drafting = DRAFTING + DRAFTING_RULES + DRAFTING_CONTRACT
         self.assertIn("`已合并` back to `未合并`", drafting)
         self.assertIn("tooling entry preserves `无需上线`", drafting)
+
+    def test_going_live_cleanup_requires_a_fresh_exact_confirmation(self):
+        going_live = GOING_LIVE + GOING_LIVE_CONTRACT + LOCAL_CLOSEOUT
+        self.assertIn("operation=DELIVER|CLEANUP", GOING_LIVE)
+        self.assertIn("AWAITING_CONFIRMATION", going_live)
+        self.assertIn("是否删除以上本地开发环境？", going_live)
+        self.assertIn("git worktree remove", going_live)
+        self.assertIn("git branch -d", going_live)
+        self.assertIn("never delete a remote branch", LOCAL_CLOSEOUT)
+        self.assertIn("git branch -D", going_live)
+        self.assertIn("git worktree remove --force", GOING_LIVE)
+        self.assertIn("authorizes cleanup", GOING_LIVE)
+        self.assertIn("cleanup failure", GOING_LIVE.lower())
 
 
 if __name__ == "__main__":

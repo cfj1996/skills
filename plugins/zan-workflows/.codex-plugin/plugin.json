@@ -1,7 +1,7 @@
 {
   "name": "zan-workflows",
-  "version": "0.1.0+codex.20260918073037",
-  "description": "Company requirement development, stateless TAPD workflows, page review, MR review, debug token, identity, and memory skills for Codex.",
+  "version": "0.1.0+codex.20260923045521",
+  "description": "Company requirement development, stateless TAPD and Wiki-link workflows, page review, MR review, debug token, identity, and memory skills for Codex.",
   "author": {
     "name": "Local developer"
   },
@@ -10,7 +10,7 @@
   "interface": {
     "displayName": "Zan Workflows",
     "shortDescription": "Requirement development and company workflows.",
-    "longDescription": "Bundles end-to-end requirement development from project routing and remote-master scope through conditional dialogue/panel review, fixed-branch Plan writing, implementation and review; plus TAPD Bug handling, Wiki, test submission, going live, GitLab MR review, debug tokens, team identity, and project memory workflows.",
+    "longDescription": "Bundles end-to-end requirement development from project routing and remote-master scope through fixed-branch Plan writing, implementation, optional test submission, master delivery, and confirmed local cleanup; plus TAPD Bug handling, Wiki drafting, standalone work-item Wiki-link backfill, GitLab MR review, debug tokens, team identity, and project memory workflows.",
     "developerName": "Local developer",
     "category": "Productivity",
     "capabilities": [
@@ -25,7 +25,8 @@
       "Resolve and scope each TAPD work item before changing code.",
       "Repair, automatically locate or create the required TAPD Wiki, submit for test, or merge to master and maintain its merge-status field with the matching functional skill.",
       "Use $writing-plans to scope requirements against remote master, choose dialogue or panel review by complexity, and write a branch-bound Plan.",
-      "Use $developing-requirement to orchestrate project routing, remote-master scope, conditional review, branch binding, Plan writing, and implementation without test submission or release."
+      "Use $developing-requirement to orchestrate project routing, remote-master scope, conditional review, branch binding, Plan writing, implementation, and explicitly requested test submission or master delivery with separate cleanup confirmation.",
+      "Use $linking-tapd-wiki to safely backfill or verify an existing \u63d0\u6d4b Wiki link in a TAPD Bug, Story, or Task comment without rerunning submission."
     ]
   }
 }

@@ -15,19 +15,25 @@ class RequirementDevelopmentFlowTests(unittest.TestCase):
             "zan-workflows:preparing-work",
             "zan-workflows:writing-plans` with `phase=PLAN_WRITE",
             "zan-workflows:implementing-work",
+            "zan-workflows:submitting-for-test",
+            "zan-workflows:going-live",
         ]
         offsets = [composition.index(marker) for marker in ordered]
         self.assertEqual(offsets, sorted(offsets))
         self.assertIn("origin/master", text)
-        self.assertIn("delivery_mode=PLAN_ONLY|BRANCH_ONLY|IMPLEMENT", text)
+        self.assertIn("delivery_mode=PLAN_ONLY|BRANCH_ONLY|IMPLEMENT|SUBMIT|GO_LIVE", text)
         self.assertIn("PENDING_TAPD_STORY_OR_TASK", text)
         self.assertIn("fixed_branch", text)
 
-    def test_orchestrator_stops_before_delivery_workflows(self):
+    def test_orchestrator_delegates_delivery_writes_with_separate_confirmations(self):
         text = (PLUGIN_ROOT / "skills/developing-requirement/SKILL.md").read_text()
-        self.assertIn("does not commit", text)
-        self.assertIn("submit for test", text)
-        self.assertIn("merge to master", text)
+        self.assertIn("performs delivery writes directly", text)
+        self.assertIn("submission_phase=PLAN", text)
+        self.assertIn("submission_phase=EXECUTE", text)
+        self.assertIn("AWAITING_GO_LIVE_CONFIRMATION", text)
+        self.assertIn("AWAITING_CLEANUP_CONFIRMATION", text)
+        self.assertIn("operation=CLEANUP", text)
+        self.assertIn("No mode publishes a production version", text)
 
     def test_writing_plans_routes_simple_and_complex_scope_before_branch_plan(self):
         text = (PLUGIN_ROOT / "skills/writing-plans/SKILL.md").read_text()
@@ -71,8 +77,14 @@ class RequirementDevelopmentFlowTests(unittest.TestCase):
             PLUGIN_ROOT
             / "skills/developing-requirement/references/branch-checklist.md"
         ).read_text()
-        self.assertIn("feature/cfj.<MMDD>.<短ID>.<描述slug>", skill)
-        self.assertIn("feature/cfj.0918.1080800.supplier-split-bill-restrictions", branch_rules)
+        self.assertIn("feature/<branch-owner>.<MMDD>.<短ID>.<描述slug>", skill)
+        self.assertIn("scripts/resolve-branch-owner.mjs", skill)
+        self.assertIn("feature/alice.0918.1080800.supplier-split-bill-restrictions", branch_rules)
+        self.assertIn("git config user.name", branch_rules)
+        self.assertIn("git config user.email", branch_rules)
+        self.assertIn("本机用户名", branch_rules)
+        self.assertNotIn("feature/cfj.", skill)
+        self.assertNotIn("feature/cfj.", branch_rules)
         self.assertIn("是否按此清单执行？", skill)
         self.assertIn("Do not ask separately", skill)
         self.assertIn("git switch --no-track -c", branch_rules)
@@ -108,6 +120,11 @@ class RequirementDevelopmentFlowTests(unittest.TestCase):
             "PLAN_READY",
             "REVIEW_BLOCKED",
             "REVIEWED",
+            "AWAITING_SUBMISSION_CONFIRMATION",
+            "SUBMITTED",
+            "AWAITING_GO_LIVE_CONFIRMATION",
+            "MERGED",
+            "AWAITING_CLEANUP_CONFIRMATION",
             "PAUSED",
             "STOPPED",
         ]:

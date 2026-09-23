@@ -36,6 +36,7 @@ class ModelRoutingTests(unittest.TestCase):
             "implementing-work": "CRITICAL",
             "submitting-for-test": "CRITICAL",
             "going-live": "CRITICAL",
+            "linking-tapd-wiki": "CRITICAL",
             "drafting-wiki": "BALANCED",
             "writing-plans": "BALANCED",
             "workspace-project-knowledge": "BALANCED",
@@ -62,6 +63,7 @@ class ModelRoutingTests(unittest.TestCase):
             "skills/implementing-work/agents/change-reviewer.md",
             "skills/submitting-for-test/agents/submission-validator.md",
             "skills/going-live/agents/master-merge-validator.md",
+            "skills/linking-tapd-wiki/agents/comment-validator.md",
             "skills/managed-mr-review/agents/mr-critical-reviewer.md",
         ]
         for agent in critical_agents:

@@ -162,9 +162,18 @@ order:
    immediately answers the displayed unchanged plan; initial repair-checklist
    confirmation never authorizes submission writes.
 6. If submission returns `SUBMITTED` and go-live was explicitly requested,
-   call `going-live` with that exact `TestSubmissionResult`; it owns reading
-   the original repair branch from the result.
-7. Record only a concise in-conversation result for this Bug. Only
+   call `going-live` with `operation=DELIVER` and that exact
+   `TestSubmissionResult`; it owns reading the original repair branch from the
+   result. Its master merge and Wiki facts require their own confirmation.
+   Preserve any returned `CleanupPlan`, but do not execute cleanup inside the
+   per-Bug loop or while another confirmed Bug still uses the shared branch.
+7. After every Bug in the confirmed queue has reached its truthful terminal
+   result, de-duplicate cleanup candidates by repository, worktree and branch.
+   If candidates remain, display the exact combined cleanup plan and stop at
+   `AWAITING_CLEANUP_CONFIRMATION`. A later exact confirmation calls
+   `going-live` with `operation=CLEANUP`; merge, submission, or generic
+   continuation confirmation is never cleanup authorization.
+8. Record only a concise in-conversation result for this Bug. Only
    `implementing-work`, `submitting-for-test`, or `going-live` may return a
    per-Bug `PENDING` or `BLOCKED` that skips the remaining capabilities for
    that Bug and continues with the next confirmed Bug. A shared
@@ -195,6 +204,9 @@ After execution, return a concise ordered list with one row per Bug:
 - last completed capability;
 - test deployment result `DEPLOYED|SKIPPED_BY_INTENT|FAILED|UNKNOWN` when
   submission was attempted;
+- master result and cleanup state
+  `NO_CANDIDATE|AWAITING_CONFIRMATION|CLEANED|PARTIAL|BLOCKED` when go-live was
+  attempted;
 - failure/confirmation reason when applicable.
 
 Do not expose internal handoff objects, validator protocol lines, JSON/YAML, or

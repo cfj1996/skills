@@ -13,8 +13,8 @@ Consume one `TapdWorkDefinition` and one matching `ReviewedChange`, then return
 one in-memory `TestSubmissionResult`. Execute exactly one profile:
 
 - `STANDARD`: Git delivery, optional Jenkins test deployment, Wiki
-  draft/write/readback, Bug Wiki-link comment when applicable, and final TAPD
-  test registration.
+  draft/write/readback, idempotent Wiki-link comment for the originating
+  `Bug|Story|Task`, and final TAPD test registration.
 - `NO_WIKI`: Git delivery, optional Jenkins test deployment, and final TAPD
   test registration; never load or invoke Wiki capability.
 
@@ -88,9 +88,12 @@ business source.
 8. After `DEPLOYED|SKIPPED_BY_INTENT`, execute the authorized Wiki plan under
    `STANDARD` only when the drafter returned `VALIDATED`, validating and
    reading back each create/update. For `SKIPPED_BY_POLICY`, perform no Wiki
-   or Wiki-comment operation. When a Wiki was written, materialize, validate,
-   write, and read the deterministic Bug Wiki-link comment, and retain the
-   final Wiki target for `going-live`.
+   or Wiki-comment operation. When a validated final Wiki target is available,
+   invoke `zan-workflows:linking-tapd-wiki` with
+   `confirmation_mode=DEFER_TO_ORCHESTRATOR`, the originating
+   `Bug|Story|Task`, and the exact consolidated-plan authorization. Require
+   `LINKED|ALREADY_LINKED`; a conflict or failed readback blocks later TAPD
+   actions. Retain the final Wiki target for `going-live`.
 9. Apply the status policy from the work mode through `tapd-mcp`: write/read `待测试` and the test
    version only when required; for `CONTINUE` already in `待测试`, record
    `SKIPPED_ALREADY_WAITING_TEST` and perform no duplicate writes. Give all
@@ -101,7 +104,7 @@ business source.
 
 On any mismatch, missing authorization, failed validation, failed call, or
 missing readback, return `BLOCKED` with actual completed actions and stop this
-Bug. Do not retry automatically, adopt an earlier unknown effect, roll back,
+TAPD item. Do not retry automatically, adopt an earlier unknown effect, roll back,
 or continue later writes.
 
 No run/attempt/effect ledger, input/output JSON, report file, or interruption

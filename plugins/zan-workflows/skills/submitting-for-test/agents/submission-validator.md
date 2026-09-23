@@ -76,11 +76,17 @@ ID, a resolved creator, and the complete validated child body.
 `WIKI_UPDATE` targets the exact reused child ID and changes only its validated
 resulting body. Reject any canonical entry body aimed at the month page.
 
+For `TAPD_COMMENT`, require the originating item type `Bug|Story|Task`, the
+exact canonical final Wiki target, a complete historical-comment check, no
+different 提测 Wiki conflict, and the exact deterministic payload owned by
+`linking-tapd-wiki`. Accept `ALREADY_LINKED` as a no-write result only with
+same-ID historical-comment evidence.
+
 For `POST_WRITE`, require successful merge/develop containment and deployment
 state `DEPLOYED|SKIPPED_BY_INTENT`. Under `DEPLOY`, require Jenkins success/SHA
-proof before Wiki/TAPD writes. Require Wiki/comment readbacks under `STANDARD`
-only when the Wiki state is `WRITTEN`; a policy skip requires no such
-readbacks.
+proof before Wiki/TAPD writes. Require Wiki readback and work-item link state
+`LINKED|ALREADY_LINKED` under `STANDARD` whenever the Wiki target is validated;
+a policy skip requires no such readbacks.
 For `INITIAL`, require applicable waiting-test/version readbacks; for
 `CONTINUE` already in `待测试`, require no status/version write and public
 `SKIPPED_ALREADY_WAITING_TEST`. Verify ordering and truthful completed effects.

@@ -1,6 +1,6 @@
 ---
 name: developing-requirement
-description: Use when one TAPD Story or Task and its PRD or prototype evidence must be developed end-to-end by routing affected projects, scoping against remote master, choosing dialogue or panel review, binding fixed branches, writing branch-bound Plans, and implementing reviewed changes without submitting or releasing them.
+description: Use when one TAPD Story or Task and its PRD or prototype evidence must be developed end-to-end by routing affected projects, scoping against remote master, binding fixed branches, writing branch-bound Plans, implementing reviewed changes, and optionally submitting or taking them live with separate confirmations.
 ---
 
 # Develop Requirement
@@ -10,9 +10,9 @@ Preferred lead model profile: `CRITICAL`. Read the shared
 or delegation is available; model availability never weakens project, branch,
 write, or review gates.
 
-Orchestrate one requirement from evidence to reviewed source changes. This
-skill coordinates existing Zan skills and does not duplicate or weaken their
-contracts.
+Orchestrate one requirement from evidence to its explicitly requested terminal
+stage. This skill coordinates existing Zan skills and does not duplicate or
+weaken their contracts.
 
 ## Inputs and boundary
 
@@ -24,13 +24,24 @@ If only a standalone PRD or prototype is available, route to
 `PENDING_TAPD_STORY_OR_TASK` before a branch-bound Plan or implementation. Do not
 advertise the standalone artifact as an end-to-end requirement-development run.
 
-Accept `delivery_mode=PLAN_ONLY|BRANCH_ONLY|IMPLEMENT`, defaulting from the
-user's explicit request. A review or planning request is `PLAN_ONLY`; “创建开发
-分支” is `BRANCH_ONLY`; do not infer source implementation.
+Accept `delivery_mode=PLAN_ONLY|BRANCH_ONLY|IMPLEMENT|SUBMIT|GO_LIVE`,
+defaulting from the user's explicit request. A review or planning request is
+`PLAN_ONLY`; “创建开发分支” is `BRANCH_ONLY`; “开发/实现” is `IMPLEMENT`;
+“提测” is `SUBMIT`; and an explicit “上线/合并 master” request is `GO_LIVE`.
+Do not infer a later delivery mode from an earlier-stage request.
 
-Bug repair belongs to `zan-workflows:fixing-bug`. This skill does not commit,
-push, create or merge an MR, submit for test, deploy, publish, update a Wiki, or
-merge to master. Those are later explicit workflows.
+For `SUBMIT|GO_LIVE`, also accept
+`submission_profile=AUTO|STANDARD|NO_WIKI` and
+`deployment_mode=AUTO|DEPLOY|SKIP` under the contracts of
+`submitting-for-test`. `GO_LIVE` means the bounded `going-live` capability—an
+original source-branch merge to `master` plus Wiki maintenance—not production
+version publication.
+
+Bug repair belongs to `zan-workflows:fixing-bug`. This orchestrator never
+performs delivery writes directly: only `submitting-for-test` may own its
+confirmed commit/push/MR/deployment/Wiki/TAPD operations, and only
+`going-live` may own its separately confirmed master merge, Wiki maintenance,
+and local cleanup. No mode publishes a production version.
 
 ## Composition contract
 
@@ -41,7 +52,11 @@ Use the skills in this order:
    `confirmation_mode=DEFER_TO_ORCHESTRATOR`
 3. `zan-workflows:preparing-work` for exact TAPD project and branch binding
 4. `zan-workflows:writing-plans` with `phase=PLAN_WRITE`
-5. `zan-workflows:implementing-work` when `delivery_mode=IMPLEMENT`
+5. `zan-workflows:implementing-work` when
+   `delivery_mode=IMPLEMENT|SUBMIT|GO_LIVE`
+6. `zan-workflows:submitting-for-test` when
+   `delivery_mode=SUBMIT|GO_LIVE`
+7. `zan-workflows:going-live` only when `delivery_mode=GO_LIVE`
 
 Do not skip ahead because the user supplied a plausible repository or branch.
 Exact user constraints are preserved and verified, not replaced.
@@ -86,9 +101,13 @@ combines it with branch and execution facts below.
 
 ## 3. Bind development branches
 
-For every proposed project partition, derive the exact initial Story/Task
-branch as `feature/cfj.<MMDD>.<短ID>.<描述slug>` and complete the read-only
+For every proposed project partition, resolve the branch owner with the bundled
+`scripts/resolve-branch-owner.mjs` against that repository, then derive the
+exact initial Story/Task branch as
+`feature/<branch-owner>.<MMDD>.<短ID>.<描述slug>` and complete the read-only
 existence/base checks in [需求开发分支与单次确认](references/branch-checklist.md).
+Record both the normalized owner and its resolution source. If no safe owner
+can be resolved, return `PENDING` instead of inventing or reusing an identity.
 For `CONTINUE`, reuse the evidenced original branch instead of generating a
 new name. Pass the exact `fixed_branch` with
 `branch_mode=AUTO|CREATE|USE_EXISTING`; `preparing-work` verifies the action
@@ -146,19 +165,62 @@ stopped after branch readback and never enters this phase.
 
 ## 5. Execute and review
 
-For `IMPLEMENT`, preflight all project partitions, then execute in dependency
-order. Immediately before each project, refresh its actual repository, remote
-baseline, fixed branch, worktree status, TAPD status action, and preparation
-validation. Invoke `zan-workflows:implementing-work` with the matching
-`TapdWorkDefinition`, that project's Plan tasks, and the reusable branch and
-implementation authorization from the confirmed checklist. Do not ask again
-while every visible checklist field still matches.
+For `IMPLEMENT|SUBMIT|GO_LIVE`, preflight all project partitions, then execute
+in dependency order. Immediately before each project, refresh its actual
+repository, remote baseline, fixed branch, worktree status, TAPD status action,
+and preparation validation. Invoke `zan-workflows:implementing-work` with the
+matching `TapdWorkDefinition`, that project's Plan tasks, and the reusable
+branch and implementation authorization from the confirmed checklist. Do not
+ask again while every visible checklist field still matches.
 
 Collect one `ReviewedChange` per project. Stop on the first `BLOCKED` result and
 report any already-completed project changes truthfully; do not roll them into
 an unrelated branch or silently continue. Return `REVIEWED` only when every
 project is `REVIEWED` with `REVIEW_PASSED` and the combined changed paths remain
 within the confirmed Plan.
+
+For `IMPLEMENT`, return after all projects are `REVIEWED`. The initial combined
+checklist authorizes implementation only; it never authorizes submission,
+master merge, Wiki delivery maintenance, or local cleanup.
+
+## 6. Submit reviewed changes
+
+For `SUBMIT|GO_LIVE`, call `submitting-for-test` with
+`submission_phase=PLAN` for every `ReviewedChange` in dependency order. Collect
+and display every complete current `SubmissionPlan`, set
+`AWAITING_SUBMISSION_CONFIRMATION`, and stop before any commit, push, MR,
+deployment, Wiki, or TAPD write.
+
+A later confirmation is valid only when it explicitly answers the displayed
+unchanged plan set. Then call `submitting-for-test` with
+`submission_phase=EXECUTE` for each project in the same order. Re-read bound
+facts as required by that capability and stop on the first failed or changed
+plan, reporting already completed submissions truthfully. Return `SUBMITTED`
+for `SUBMIT` only when every project returns
+`TestSubmissionResult.terminal_state=SUBMITTED`.
+
+## 7. Go live and close out
+
+For `GO_LIVE`, after every project is `SUBMITTED`, invoke `going-live` with
+`operation=DELIVER` for each exact `TestSubmissionResult` in dependency order.
+Its source-to-master merge facts and any Wiki patch require their own current
+confirmations; neither the implementation checklist nor submission confirmation
+may be reused. When those exact facts are displayed, set
+`AWAITING_GO_LIVE_CONFIRMATION` and stop for that confirmation.
+
+After a project returns `MasterMergeResult.terminal_state=MERGED`, preserve its
+local closeout result and any `CleanupPlan`, but do not clean it while another
+project still awaits delivery. After every project reaches its truthful
+go-live result, de-duplicate and surface the exact cleanup plans, then stop at
+`AWAITING_CLEANUP_CONFIRMATION`. A later exact cleanup confirmation invokes
+`going-live` with `operation=CLEANUP`; it must revalidate and may remove only
+the confirmed local worktree and local branch resources. Never infer cleanup
+authorization from `GO_LIVE` or merge confirmation.
+
+Return `MERGED` only when every project has a verified master delivery and all
+required Wiki readbacks. Cleanup is reported separately as
+`NO_CANDIDATE|AWAITING_CONFIRMATION|CLEANED|PARTIAL|BLOCKED` and cannot undo a
+verified merge result.
 
 ## Progress and next-step guidance
 
@@ -177,10 +239,11 @@ never authorizes the next write-owning workflow.
 Return one in-memory `RequirementDevelopmentResult` containing requirement
 identity, affected-project evidence, confirmed scope, review mode, remote-master
 SHAs, branch definitions, Plan paths/fingerprints, per-project ReviewedChanges,
-verification results, requirement-readiness checklist and blocker counts,
+per-project `TestSubmissionResult` and `MasterMergeResult` values when requested,
+cleanup plans/results, verification results, requirement-readiness checklist and blocker counts,
 `implementation_ready`, `current_stage`, `stage_status`, `completed_stages`,
 `blockers`, `recommended_next_action`, `available_actions`, `resume_prompt`, and
-`BRANCH_READY|PLAN_READY|REVIEWED|PENDING|BLOCKED|PAUSED|STOPPED`.
+`BRANCH_READY|PLAN_READY|REVIEWED|AWAITING_SUBMISSION_CONFIRMATION|SUBMITTED|AWAITING_GO_LIVE_CONFIRMATION|AWAITING_CLEANUP_CONFIRMATION|MERGED|PENDING|BLOCKED|PAUSED|STOPPED`.
 
 Do not create a workflow report, runtime ledger, raw requirement dump, or
 generated evidence directory.

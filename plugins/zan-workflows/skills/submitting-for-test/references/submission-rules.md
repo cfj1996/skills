@@ -87,7 +87,8 @@ Immediately read back every created/updated page. A create response without a
 real Wiki ID, a parent mismatch, or a body readback mismatch blocks all later
 Wiki comments, TAPD status changes, and test-version writes.
 
-For a Bug with a written Wiki, write exactly:
+For a `Bug|Story|Task` with a validated final Wiki target, invoke
+`zan-workflows:linking-tapd-wiki` to write or verify exactly:
 
 ```text
 提测wiki：[https://www.tapd.cn/{workspace_id}/markdown_wikis/show/#{wiki_id}](https://www.tapd.cn/{workspace_id}/markdown_wikis/show/#{wiki_id})
@@ -95,8 +96,10 @@ For a Bug with a written Wiki, write exactly:
 
 Do not append implementation, MR, build, or verification text. Materialize the
 comment from the final existing-or-created child ID. The consolidated plan
-authorizes this deterministic comment derivation; validate and read it back
-without another prompt.
+authorizes this deterministic comment derivation; pass it as the orchestrator
+confirmation, check historical comments by canonical Wiki ID, and require
+`LINKED|ALREADY_LINKED` without another prompt. A different existing 提测 Wiki
+link is a blocking conflict.
 
 ## No Wiki
 

@@ -2,7 +2,8 @@
 
 Run after successful merge readback and verified `origin/master` containment,
 before Wiki maintenance can stop the workflow. This is an automatic read-only
-check and reminder under the workspace Git rules, not cleanup authorization.
+check under the workspace Git rules. It may produce a cleanup plan but never
+cleanup authorization.
 
 ## Scope and evidence
 
@@ -58,5 +59,40 @@ reasons, separately from merge/Wiki status. When candidates exist, remind the
 user they can confirm cleanup of that exact list. If none exist after a complete
 check, say there are no related cleanup candidates. For incomplete checks, state
 what was checked and what remains unknown. Always make clear no deletion was
-performed. Do not create local workflow state or change the merge outcome to
-`BLOCKED` solely because this inspection could not complete.
+performed during this check. Do not create local workflow state or change the
+merge outcome to `BLOCKED` solely because this inspection could not complete.
+
+## Cleanup plan
+
+After the delivery and required Wiki readbacks succeed, turn only `CANDIDATE`
+resources into a user-visible plan. Each row contains repository, current
+branch, exact worktree path or `无`, exact local branch, observed local tip,
+verified containment target/SHA, intended operations in order, and purpose.
+
+The authorization summary must bind:
+
+- intended operation: remove the listed local worktrees, then delete the listed
+  local branches;
+- purpose: remove fully delivered, clean and idle local development resources;
+- current branch;
+- every exact `worktree_to_remove`; and
+- every exact `branch_to_delete`.
+
+Ask exactly `是否删除以上本地开发环境？` and stop. The merge confirmation does
+not authorize this plan.
+
+## Confirmed cleanup
+
+On a later exact confirmation, repeat the complete candidate check. A changed
+fact invalidates the plan and permits no deletion. For each unchanged row:
+
+1. Remove the registered worktree first with ordinary `git worktree remove`;
+   never use `--force` or raw filesystem deletion.
+2. Verify the worktree path and registration are absent.
+3. Delete the exact local branch with ordinary `git branch -d`; never use
+   `-D`, and never delete a remote branch.
+4. Verify the local ref is absent.
+
+The current task path/branch, protected branches, dirty or occupied worktrees,
+unpreserved data, and any `RETAIN|VERIFY` resource are never executable cleanup
+targets. Stop on the first failure and report partial effects truthfully.

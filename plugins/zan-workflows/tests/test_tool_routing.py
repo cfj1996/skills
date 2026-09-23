@@ -22,6 +22,7 @@ class ToolRoutingTests(unittest.TestCase):
             "submitting-for-test",
             "drafting-wiki",
             "going-live",
+            "linking-tapd-wiki",
             "managed-mr-review",
         ]
         for skill in skills:

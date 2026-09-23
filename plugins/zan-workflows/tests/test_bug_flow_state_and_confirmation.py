@@ -64,6 +64,15 @@ class BugFlowStateAndConfirmationTests(unittest.TestCase):
         self.assertIn("submission_phase=EXECUTE", FIXING)
         self.assertIn("perform no write", SUBMITTING)
 
+    def test_go_live_cleanup_is_deferred_and_separately_confirmed(self):
+        self.assertIn("operation=DELIVER", FIXING)
+        self.assertIn("operation=CLEANUP", FIXING)
+        self.assertIn("do not execute cleanup inside the\n   per-Bug loop", FIXING)
+        self.assertIn("AWAITING_CLEANUP_CONFIRMATION", FIXING)
+        self.assertIn("another separate exact confirmation", (
+            PLUGIN_ROOT / "skills/fixing-bug/references/contracts.md"
+        ).read_text())
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -22,7 +22,7 @@ After explicit confirmation, re-prepare each Bug immediately before its
 single-Bug chain:
 
 ```text
-re-prepare -> implement -> submit PLAN -> confirmation -> submit EXECUTE -> optional go-live
+re-prepare -> implement -> submit PLAN -> confirmation -> submit EXECUTE -> optional go-live DELIVER
 ```
 
 Only a matching `READY_FOR_HANDOFF` may reach implementation. If refreshed
@@ -63,7 +63,8 @@ consolidated submission plan.
 ```text
 INITIAL:  scope/start confirmation -> consolidated submit confirmation
 CONTINUE: optional incremental-scope confirmation -> consolidated submit confirmation
-GO LIVE:  separate master confirmation
+GO LIVE:  separate master/Wiki confirmation
+CLEANUP:  separate exact local worktree/branch confirmation after the queue finishes
 ```
 
 Generated commit/MR/Wiki/Jenkins identifiers and successful readbacks do not
@@ -74,6 +75,9 @@ The initial checklist must visibly resolve `STANDARD|NO_WIKI` and
 `ReviewedChange` exists, always render the exact consolidated `SubmissionPlan`
 and stop. Initial confirmation, implementation completion, “修复完成就提测”,
 or a prior generic “可以” cannot substitute for confirmation of that plan.
+Go-live confirmation never authorizes cleanup. Cleanup candidates are retained
+until the entire confirmed queue finishes, then de-duplicated and displayed;
+no per-Bug cleanup may remove the shared branch while later Bugs still use it.
 
 ## Failure handling
 

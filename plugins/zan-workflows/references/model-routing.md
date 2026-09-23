@@ -29,6 +29,7 @@ standard to compensate for model availability.
 | `implementing-work` | `CRITICAL` | Changes code, verifies behavior, and performs independent change review |
 | `submitting-for-test` | `CRITICAL` | Executes Git, Wiki, TAPD, and test-version writes with ordered readbacks |
 | `going-live` | `CRITICAL` | Merges an original repair branch to `master` and maintains Wiki online state |
+| `linking-tapd-wiki` | `CRITICAL` | Plans or writes an exact TAPD work-item comment with conflict and readback gates |
 | `managed-mr-review` | Conditional | Discovery is `BALANCED`; code review/merge decisions are `CRITICAL` for high-risk MRs and `BALANCED` for routine MRs |
 | `drafting-wiki` | `BALANCED` | Read-only target resolution and deterministic Markdown/sequence calculation |
 | `writing-plans` | `BALANCED` | Resolves remote-master scope, chooses dialogue or panel review, and writes branch-bound Plans |

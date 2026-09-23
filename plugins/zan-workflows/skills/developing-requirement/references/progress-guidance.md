@@ -23,14 +23,19 @@
 | `IMPLEMENTING` | 尚有任务未完成 | 继续当前任务 | `继续实施` |
 | `REVIEW_BLOCKED` | 实现或必需验证未通过 | 解决当前阻塞并重新验证 | `解决当前阻塞后继续验证` |
 | `REVIEWED` | 所有项目均 `REVIEW_PASSED` | 进入提测流程或检查当前实现 | `提交测试` / `查看当前实现` |
+| `AWAITING_SUBMISSION_CONFIRMATION` | 已展示全部精确 `SubmissionPlan` | 确认提测计划或修改计划 | `确认提交测试` / `修改提测计划：...` |
 | `SUBMITTED` | `TestSubmissionResult=SUBMITTED` | 按明确意图上线或暂停 | `上线` / `暂停` |
+| `AWAITING_GO_LIVE_CONFIRMATION` | 已展示 source-to-master 与 Wiki 精确变更 | 确认上线计划或暂停 | `确认上线` / `暂停` |
+| `MERGED` | master 包含性与必需 Wiki 读回通过 | 确认清理候选或结束 | `清理已确认的开发环境` / `保留开发环境` |
+| `AWAITING_CLEANUP_CONFIRMATION` | 已展示精确本地分支/worktree 清理计划 | 确认、修改或保留 | `确认删除以上本地开发环境` / `保留开发环境` |
 | `PAUSED` | 用户要求暂停 | 从记录的当前阶段恢复 | `继续需求开发` |
 | `STOPPED` | 用户取消或工作已由他人接手 | 保留或按确认清理本地资源 | `检查并清理本地资源` |
 
 `BRANCH_ONLY` 在 `BRANCH_READY` 结束，但仍提示可以继续编写 Plan。
 `PLAN_ONLY` 在 `PLAN_READY` 结束，但仍提示可以开始实施。
-`developing-requirement` 自身在 `REVIEWED` 结束；“提交测试”会进入
-`zan-workflows:submitting-for-test`，不是本技能自动执行的隐式步骤。
+`IMPLEMENT` 在 `REVIEWED` 结束；`SUBMIT` 在 `SUBMITTED` 结束；
+`GO_LIVE` 继续进入 `going-live`，但每个下游写阶段都必须由用户明确选择
+并确认该阶段刚展示的精确计划，不能由最初的模式选择隐式授权。
 
 ## 阻塞决策
 
@@ -66,6 +71,9 @@
 - [ ] Plan
 - [ ] 实施
 - [ ] 验证与评审
+- [ ] 提测（仅 `SUBMIT|GO_LIVE`）
+- [ ] 合并 master / Wiki（仅 `GO_LIVE`）
+- [ ] 本地开发环境清理（仅存在已确认候选时）
 
 当前阶段：`<stage>`
 当前状态：`<READY|PENDING|BLOCKED|PAUSED|COMPLETE>`

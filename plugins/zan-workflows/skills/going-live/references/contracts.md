@@ -12,7 +12,8 @@
 | Merge | source/target branches and SHAs, current-round commits, authorization, MR result, merge readback, master containment |
 | Wiki | `UPDATED_MERGED|ALREADY_MERGED|SKIPPED_TOOL_PROJECT|SKIPPED_NO_WIKI|BLOCKED|NOT_ATTEMPTED`, matching branch entry, project type, before/after merge status, target/patch authorization, and readback when used |
 | Validation | `VALIDATION_PASSED|VALIDATION_FAILED|NOT_RUN` and normalized reason |
-| Local closeout | `CHECKED|PARTIAL|UNAVAILABLE|NOT_TRIGGERED`; related branch/worktree paths, association and delivery evidence, observed tip/target SHAs, dirty/ignored/occupancy findings, per-resource `CANDIDATE|RETAIN|VERIFY` with reasons, and reminder/limitations; no deletion performed |
+| Local closeout | `CHECKED|PARTIAL|UNAVAILABLE|NOT_TRIGGERED`; related branch/worktree paths, association and delivery evidence, observed tip/target SHAs, dirty/ignored/occupancy findings, and per-resource `CANDIDATE|RETAIN|VERIFY` with reasons |
+| Cleanup | `NO_CANDIDATE|AWAITING_CONFIRMATION|CLEANED|PARTIAL|BLOCKED|NOT_TRIGGERED`; exact plan and confirmation when applicable, refreshed evidence, worktree-removal and local-branch-deletion readbacks, and completed/retained resources |
 | Terminal | `MERGED|BLOCKED` and blocker when applicable |
 
 ## Invariants
@@ -49,8 +50,20 @@
   of merge/Wiki success; it does not alone change the terminal state or block
   Wiki maintenance. `NOT_TRIGGERED` applies only before verified delivery.
 - Cleanup candidacy requires evidence for the entire current local tip, not
-  only the approved current-round commits. No closeout result authorizes
-  deletion, switching branches, removing/pruning worktrees, or stopping tasks.
+  only the approved current-round commits. A closeout result creates only a
+  plan; deletion requires a separate exact current-conversation confirmation
+  and a fresh unchanged recheck.
+- `NO_CANDIDATE` requires a complete check with no safe candidates. A partial
+  or unavailable check yields cleanup `BLOCKED`, never a clean/no-candidate
+  claim.
+- Cleanup may remove only confirmed local worktrees followed by their exact
+  local branches. It never removes the current task path/branch, protected
+  branches, dirty/active/locked/uncertain resources, remote branches, or any
+  resource not classified `CANDIDATE` in the unchanged confirmed plan.
+- Cleanup uses ordinary `git worktree remove` and `git branch -d` only. Force
+  deletion, raw filesystem deletion, broad pruning, branch switching, process
+  termination, and remote deletion are forbidden. A cleanup failure is
+  reported separately and never changes a verified merge into an unmerged one.
 - The result contains no production-publish claim, runtime/recovery fields,
   persisted local workflow record paths, or private validator response. Inspected
   worktree paths are allowed as read-only closeout evidence.
