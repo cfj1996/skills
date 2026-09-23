@@ -331,21 +331,25 @@
   }
 
   function normalizeModule(value) {
-    const fail = () => { throw createCodedError(TypeError, "invalid-module", "Module requires a name, purpose, inputs, outputs, rules, examples, questions, change and revision"); };
-    if (!isNormalizedObject(value) || !isNonEmptyString(value.name) || !isNonEmptyString(value.purpose) ||
-      !(value.parentId === null || isNonEmptyString(value.parentId)) ||
-      !Number.isSafeInteger(value.revision) || value.revision < 1) fail();
+    const fail = (field) => {
+      throw createCodedError(TypeError, "invalid-module", `Module field "${field}" is missing or invalid`);
+    };
+    if (!isNormalizedObject(value)) fail("module");
+    if (!isNonEmptyString(value.name)) fail("name");
+    if (!isNonEmptyString(value.purpose)) fail("purpose");
+    if (!(value.parentId === null || isNonEmptyString(value.parentId))) fail("parentId");
+    if (!Number.isSafeInteger(value.revision) || value.revision < 1) fail("revision");
     for (const field of ["inputs", "outputs", "rules"]) {
-      if (!isStringArray(value[field]) || !value[field].length) fail();
+      if (!isStringArray(value[field]) || !value[field].length) fail(field);
     }
     if (!Array.isArray(value.scenarios) || !value.scenarios.length ||
-      !value.scenarios.every(item => isNormalizedObject(item) && ["id", "given", "when", "then"].every(key => isNonEmptyString(item[key])))) fail();
+      !value.scenarios.every(item => isNormalizedObject(item) && ["id", "given", "when", "then"].every(key => isNonEmptyString(item[key])))) fail("scenarios");
     if (!Array.isArray(value.questions) || !value.questions.every(item =>
-      isNormalizedObject(item) && ["id", "question", "impact", "recommendation"].every(key => isNonEmptyString(item[key])) && ["user", "agent"].includes(item.owner))) fail();
+      isNormalizedObject(item) && ["id", "question", "impact", "recommendation"].every(key => isNonEmptyString(item[key])) && ["user", "agent"].includes(item.owner))) fail("questions");
     for (const items of [value.scenarios, value.questions]) {
-      if (new Set(items.map(item => item.id)).size !== items.length) fail();
+      if (new Set(items.map(item => item.id)).size !== items.length) fail(items === value.scenarios ? "scenarios.id" : "questions.id");
     }
-    if (!isNormalizedObject(value.change) || !["added", "modified", "removed", "unchanged"].includes(value.change.kind) || !isNonEmptyString(value.change.summary)) fail();
+    if (!isNormalizedObject(value.change) || !["added", "modified", "removed", "unchanged"].includes(value.change.kind) || !isNonEmptyString(value.change.summary)) fail("change");
     return {
       name: value.name, parentId: value.parentId, purpose: value.purpose, revision: value.revision,
       inputs: [...value.inputs], outputs: [...value.outputs], rules: [...value.rules],

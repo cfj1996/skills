@@ -49,21 +49,34 @@
    git clone http://git.jubaozan.cn/chenfangjie/project-knowledge.git project-knowledge
    ```
 
-2. 打开项目中的 `WORKSPACE_RULE_LOADING_RULE.md` 模板，将 `WORKSPACE_ROOT` 和 `PROJECT_KNOWLEDGE_ROOT` 替换为本机实际工作区和知识库的绝对路径，再把完整内容复制到个人级别的提示词文件中。
-3. 在知识库项目目录同步安装当前平台的工作区开发规范。首次使用先执行 `npm install`：
+2. 首次使用时，在知识库项目目录安装依赖：
 
    ```bash
    cd /path/to/workspace/project-knowledge
    npm install
+   ```
+
+3. 运行统一初始化命令：
+
+   ```bash
+   cd /path/to/workspace/project-knowledge
+   npm run init
+   ```
+
+   按提示选择 Codex、Claude Code、Gemini CLI 中一个或多个平台，并输入本机 `WORKSPACE_ROOT`。初始化会把 `WORKSPACE_RULE_LOADING_RULE.md` 中的路径写入对应的用户级提示词文件，再同步工作区开发规范；Codex 还会安装 Git 安全 Hook。执行前会展示目标路径和处理方式。提示词文件已存在时，可选择覆盖、追加或跳过。
+
+   只需要重新同步工作区开发规范时，也可以单独运行：
+
+   ```bash
    npm run agent-rules:install -- --workspace /path/to/workspace --platform codex
    ```
 
-   使用 Claude Code 或 Gemini CLI 时，将 `--platform` 分别改为 `claude` 或 `gemini`。后续更新知识库规则后，再执行一次同步命令。
-
-4. 经常更新本地知识库，保持项目归属、上下文和团队规范与当前仓库状态一致：
+4. 经常更新本地知识库，保持项目归属、上下文和团队规范与当前仓库状态一致；拉取更新后，如果用户提示词模板或工作区规则有变化，再运行 `npm run init` 同步：
 
    ```bash
    git -C /path/to/workspace/project-knowledge pull --ff-only
+   cd /path/to/workspace/project-knowledge
+   npm run init
    ```
 
 ## 2. 需求开发流程
