@@ -20,13 +20,23 @@ one in-memory `TestSubmissionResult`. Execute exactly one profile:
 
 Read [contracts.md](references/contracts.md),
 [submission-rules.md](references/submission-rules.md),
-[deployment-and-confirmation.md](references/deployment-and-confirmation.md), and
-[acceptance-scenarios.md](references/acceptance-scenarios.md), plus the shared
+[deployment-and-confirmation.md](references/deployment-and-confirmation.md), plus the shared
 [tool-routing policy](../../references/tool-routing.md) before writing.
+Read [acceptance-scenarios.md](references/acceptance-scenarios.md) only for an
+edge case or regression check.
 
 Accept `submission_phase=PLAN|EXECUTE`. The first invocation is always `PLAN`:
 it is read-only, returns the complete plan and stops. `EXECUTE` requires that
 exact current plan plus a later current-conversation confirmation.
+
+Carry the `ReviewedChange`, work definition, Git snapshot, TAPD item and Wiki
+target through both phases. `PLAN` does not repeat implementation review or
+project routing. `EXECUTE` refreshes only mutable facts that bind an authorized
+write (source/develop refs, current diff, TAPD state, Wiki body/comment and
+deployment target); unchanged skill text, knowledge files and unrelated
+history do not need another read. Batch independent read-only checks, then
+stop on the first actual mismatch. Never rerun the full Wiki discovery after
+the exact target was identified in `PLAN`.
 
 ## Input gate
 
@@ -66,13 +76,16 @@ business source.
    either one validated target/body plan or a
    `SKIPPED_BY_POLICY` result proven to be `NON_FUNCTIONAL_CONTINUE`. Under
    `NO_WIKI`, set Wiki to `SKIPPED_BY_POLICY` without loading Wiki capability.
+   Reuse the item's current details/comments and the original source branch;
+   do not start an independent Wiki search in this skill.
 4. Build and display one consolidated `SubmissionPlan` containing Git,
    applicable Wiki/comment actions, deployment, and final TAPD actions. Under
    `NO_WIKI`, explicitly list that no Wiki discovery/read/write/comment tool
    will be called. Return `PlannedTestSubmission` with
    `terminal_state=AWAITING_CONFIRMATION` and stop; perform no write.
 5. In a later `EXECUTE` invocation, verify the user's confirmation answers the
-   exact unchanged plan, then re-read every bound fact. If anything changed,
+   exact unchanged plan, then re-read each mutable bound fact at its write
+   boundary. If anything changed,
    return the updated plan and stop for fresh confirmation.
 6. Immediately before each Git write, re-read its bound facts and call the
    private [submission-validator.md](agents/submission-validator.md) with
@@ -86,14 +99,24 @@ business source.
    - `SKIP`: make no Jenkins call and record `SKIPPED_BY_INTENT`.
    `FAILED|UNKNOWN` blocks every later Wiki/TAPD write.
 8. After `DEPLOYED|SKIPPED_BY_INTENT`, execute the authorized Wiki plan under
-   `STANDARD` only when the drafter returned `VALIDATED`, validating and
-   reading back each create/update. For `SKIPPED_BY_POLICY`, perform no Wiki
-   or Wiki-comment operation. When a validated final Wiki target is available,
-   invoke `zan-workflows:linking-tapd-wiki` with
-   `confirmation_mode=DEFER_TO_ORCHESTRATOR`, the originating
-   `Bug|Story|Task`, and the exact consolidated-plan authorization. Require
-   `LINKED|ALREADY_LINKED`; a conflict or failed readback blocks later TAPD
-   actions. Retain the final Wiki target for `going-live`.
+   `STANDARD` only when the drafter returned `VALIDATED`. For a new child or
+   unchanged existing link, run
+   [ensure-test-wiki.mjs](scripts/ensure-test-wiki.mjs) once with the exact
+   item, original branch, approved title/body file, creator and
+   `--expect-target` from the confirmed plan, plus
+   `--execute`. Validate the complete
+   `WIKI_CREATE_AND_LINK_BUNDLE` once before invoking the script; its
+   deterministic internal steps need no separate validator invocation. It uses
+   `tapd-mcp` and owns Wiki creation/readback and the
+   idempotent comment write/readback in that single invocation. Require
+   `LINKED|ALREADY_LINKED`; do not then invoke `zan-workflows:linking-tapd-wiki`
+   again. A functional `CONTINUE` that patches an existing Wiki still applies
+   the authorized minimal update, then invokes
+   `zan-workflows:linking-tapd-wiki` with
+   `confirmation_mode=DEFER_TO_ORCHESTRATOR` only if the link is missing.
+   For `SKIPPED_BY_POLICY`, perform no Wiki or Wiki-comment operation. A
+   conflict or failed readback blocks later TAPD actions. Retain the exact
+   final Wiki target for `going-live`.
 9. Apply the status policy from the work mode through `tapd-mcp`: write/read `待测试` and the test
    version only when required; for `CONTINUE` already in `待测试`, record
    `SKIPPED_ALREADY_WAITING_TEST` and perform no duplicate writes. Give all
@@ -108,4 +131,6 @@ TAPD item. Do not retry automatically, adopt an earlier unknown effect, roll bac
 or continue later writes.
 
 No run/attempt/effect ledger, input/output JSON, report file, or interruption
-recovery is created. The result exists only for the current in-memory handoff.
+recovery is created. A temporary Markdown file used solely to carry the exact
+authorized Wiki body into `ensure-test-wiki.mjs` is removed after the call.
+The result exists only for the current in-memory handoff.

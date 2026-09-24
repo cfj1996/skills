@@ -54,10 +54,10 @@ future write/readback results.
 - `MR_CREATE_OR_UPDATE|MR_MERGE` requires `tool_route=gitlab-mcp`.
 
 For `PRE_SUBMISSION_WRITE`, accept exactly one operation:
-`JENKINS_TEST_DEPLOY|WIKI_MONTH_CREATE|WIKI_CHILD_CREATE|WIKI_UPDATE|TAPD_COMMENT|TAPD_STATUS|TEST_VERSION`.
+`JENKINS_TEST_DEPLOY|WIKI_CREATE_AND_LINK_BUNDLE|WIKI_MONTH_CREATE|WIKI_CHILD_CREATE|WIKI_UPDATE|TAPD_COMMENT|TAPD_STATUS|TEST_VERSION`.
 Require successful prior dependencies and validate only that operation. A
-child created after a new month uses the read-back real month ID and fresh
-authorization. Under `NO_WIKI`, reject Wiki and comment operations and require
+child created after a new month uses the read-back real month ID under the
+unchanged consolidated authorization. Under `NO_WIKI`, reject Wiki and comment operations and require
 no Wiki material.
 
 For `JENKINS_TEST_DEPLOY`, require `deployment_mode=DEPLOY`, the release-safety
@@ -69,6 +69,17 @@ operation and records `SKIPPED_BY_INTENT`.
 For Wiki operations, require the TAPD workspace from the current work item.
 Require `tool_route=tapd-mcp` for every Wiki, TAPD comment, TAPD status and
 test-version operation.
+`WIKI_CREATE_AND_LINK_BUNDLE` validates one invocation of
+`scripts/ensure-test-wiki.mjs --execute` for a new child or unchanged linked
+Wiki. Require the exact item type/ID/workspace, original source branch,
+approved title, creator, complete approved body file, expected target action
+and current matching
+`ValidatedWikiDraft`. Its internal TAPD reads/writes use `tapd-mcp`; it must
+query Wiki only by exact ID/name, check returned parent IDs locally, stop on
+ambiguous results, read back each created page, recheck comments before the
+comment write, and read back the final comment. Validate the entire bundle
+once before invocation and use `POST_WRITE` on its final result; do not spawn
+separate validators between its deterministic steps.
 `WIKI_MONTH_CREATE` uses title `YYYY-MM`, parent
 `1150372234001008260`, a resolved creator, and no entry body.
 `WIKI_CHILD_CREATE` uses title `MM-DD: 中文简述`, the verified/read-back month
@@ -79,7 +90,7 @@ resulting body. Reject any canonical entry body aimed at the month page.
 For `TAPD_COMMENT`, require the originating item type `Bug|Story|Task`, the
 exact canonical final Wiki target, a complete historical-comment check, no
 different 提测 Wiki conflict, and the exact deterministic payload owned by
-`linking-tapd-wiki`. Accept `ALREADY_LINKED` as a no-write result only with
+`linking-tapd-wiki` or the validated bundle script. Accept `ALREADY_LINKED` as a no-write result only with
 same-ID historical-comment evidence.
 
 For `POST_WRITE`, require successful merge/develop containment and deployment

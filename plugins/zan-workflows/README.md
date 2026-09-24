@@ -34,6 +34,33 @@
 
 主流程入口负责组织顺序和收集确认；具体能力由专用 Skill 执行。多数交接只保存在当前对话内存，不创建额外的流程状态文件。
 
+### 一次执行提测 Wiki 与评论
+
+提测计划已确认、Wiki 正文已审阅后，可从插件根目录运行一个脚本完成
+“需求详情 → 评论 → 复用已有链接或定位月份父页并创建 → 读回 → 评论写回”。
+脚本复用 `tapd-mcp` 的本机凭证；不接受 token 参数。默认只读预览，
+加 `--execute` 才会创建 Wiki/评论。原分支用于核对 Wiki 归属。
+
+```bash
+node skills/submitting-for-test/scripts/ensure-test-wiki.mjs \
+  --tapd-url '<TAPD Story/Task/Bug 详情 URL>' \
+  --source-branch '<已确认的原始 feature/fixbug 分支>' \
+  --creator '<TAPD 创建人>' \
+  --body-file '<已批准 Wiki 正文文件>' \
+  --wiki-title 'MM-DD: 中文简述' --json
+```
+
+确认预览与提测计划一致后，使用同一命令加
+`--expect-target <预览中的 target> --execute`。编排流程可直接用已确认
+计划中的 target 一次执行；目标或月份 ID 变化时脚本会在写入前停止。
+评论已有匹配
+Wiki 时，只需完整 TAPD URL 和原分支，脚本返回 `ALREADY_LINKED`
+且不写入。`bug`、`tasks` 也可作为 `--entry-type`。同名月份只按返回的
+`parent_wiki_id` 在本地判定；脚本不会扫描全工作区 Wiki。功能性
+`CONTINUE` 需要改已有 Wiki 正文时，仍走技能的最小补丁流程。默认根页
+`1150372234001008260` 只适用于空间 `50372234`；其他空间创建时必须
+提供已验证的 `--root-wiki-id`。
+
 ### 集中项目知识库
 
 除插件外，团队工作流还会读取独立的 `project-knowledge` 知识库。它不是随插件打包的副本，也不是 MCP；它提供项目归属、仓库路径、Jenkins Job、服务类型、代码上下文和 Graphify 索引等团队事实。没有它时，部分 Skill 只能使用插件内的有限回退资料，结果可能不完整。

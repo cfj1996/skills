@@ -87,14 +87,20 @@ target-location, Wiki-ID, TAPD-comment, writeback, merge, or release narration.
 
 Do not request a Wiki URL from the user. Resolve the target in this order:
 
-1. Read the current TAPD item and exhaust pagination for all historical
-   comments. If one matching 提测 Wiki link is associated with this work, use
-   `REUSE_EXISTING`; never create another.
-2. If no link exists, inspect root Wiki `1150372234001008260` (`提测文档`),
-   then the `Asia/Shanghai` submission month's `YYYY-MM` page and all its
-   children, exhausting pagination.
-3. Reuse one related child matched by TAPD ID/short ID, original source branch,
-   or unambiguous existing association.
+1. Read the exact TAPD item and comments. One `get_comments` page is enough
+   when its count shows the full result; page further only for genuinely
+   remaining comments. If one matching 提测 Wiki link is associated with this
+   work, read that Wiki by ID and use `REUSE_EXISTING`; do not query Wiki lists.
+2. If no link exists, call `get_wiki` with `name=YYYY-MM` for the
+   `Asia/Shanghai` submission month. Select the exact month whose returned
+   `parent_wiki_id` is root `1150372234001008260` (`提测文档`). Multiple same-name
+   results under other parents are not a reason to scan the whole workspace.
+3. When the month exists, query the deterministic child title once with
+   `get_wiki(name=MM-DD: 中文简述)` and locally match its returned
+   `parent_wiki_id` to the month ID. Reuse only a unique matching child whose
+   body evidences the original branch. `get_wiki` accepts `name` and `id`, but
+   not `parent_wiki_id` as a query option; never send that unsupported filter,
+   paginate the unfiltered Wiki list, or repeat identical requests.
 4. If no related child exists, use title `MM-DD: {任务标题中文简述}`. Plan
    `CREATE_CHILD` when the month exists, otherwise
    `CREATE_MONTH_AND_CHILD`. Derive the required creator from authenticated

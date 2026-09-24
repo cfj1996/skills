@@ -50,11 +50,13 @@ class WikiTargetOwnershipTests(unittest.TestCase):
         self.assertIn("must never appear in `待确认`", FIXING)
 
     def test_drafter_resolves_existing_before_planning_creation(self):
-        linked = DRAFTING.index("all historical comments")
-        hierarchy = DRAFTING.index("fixed `提测文档` hierarchy")
+        linked = DRAFTING.index("comments once")
+        hierarchy = DRAFTING.index("get_wiki(name=YYYY-MM)")
         create = DRAFTING.index("plan creation")
         self.assertLess(linked, hierarchy)
         self.assertLess(hierarchy, create)
+        self.assertIn("does not support `parent_wiki_id`", DRAFTING)
+        self.assertIn("never pass it", DRAFTING)
         self.assertIn("1150372234001008260", DRAFTING_RULES)
         self.assertIn("CREATE_MONTH_AND_CHILD", DRAFTING_RULES)
         self.assertIn("CREATE_CHILD", DRAFTING_RULES)

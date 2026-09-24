@@ -18,7 +18,12 @@
   - `IMPLEMENTATION_BLOCKER`：需求语义已明确，但接口字段、代码落点等实施证据不足；允许确认需求，禁止进入实施；
   - `NON_BLOCKING`：已有证据或明确不适用。
 
-## 必查类别
+## 适用性检查
+
+先按用户明确的交付边界判断每类是否适用。`NOT_APPLICABLE` 只需说明本次
+没有相应变更及所依据的现有页面/数据绑定，不要求为每类执行完整源码或
+接口搜索。不要把后台实现、未请求的真实数据联调，或别的端的行为当成
+UI/交互任务的隐含门禁。
 
 1. 项目与范围：受影响项目、页面/模块、包含项、排除项、跨项目边界。
 2. 业务行为：触发条件、规则、边界、异常、默认值、角色差异。
@@ -33,7 +38,10 @@
 
 - 需求范围、业务规则、输入输出语义、用户可观察结果、关键验收标准存在 `MISSING|CONFLICT` 时，标记 `REQUIREMENT_BLOCKER`。
 - API method、URL、请求/响应字段、类型、枚举、状态码、权限实现或代码落点缺失，但业务语义已经确定时，标记 `IMPLEMENTATION_BLOCKER`；需求可以确认，`implementationPlan.status` 必须保持 `blocked`。
-- API 是否需要仍为 `unknown`、`required` 消费点未完成正式来源搜索或接口事实没有来源证据时，至少是 `IMPLEMENTATION_BLOCKER`；若缺失同时导致业务输入输出无法确定，则升级为 `REQUIREMENT_BLOCKER`。
+- 只有本次新增或改变实际网络消费时，API 是否需要仍为 `unknown`、
+  `required` 消费点未完成正式来源搜索或接口事实没有来源证据才是
+  `IMPLEMENTATION_BLOCKER`；若缺失同时导致业务输入输出无法确定，则升级为
+  `REQUIREMENT_BLOCKER`。纯 UI/Mock 场景可在现有绑定证据下记为无新增契约。
 - `none` 或 `NOT_APPLICABLE` 必须有证据，不能为了清空清单而填写。
 - 不得猜测 method、URL、字段、类型、必填、可空、枚举、默认值、包装结构、状态码或 Schema。
 

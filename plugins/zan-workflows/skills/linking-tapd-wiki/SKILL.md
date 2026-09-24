@@ -13,6 +13,9 @@ gates.
 Link one verified 提测 Wiki to one TAPD work item comment. This capability is
 idempotent and supports `Bug|Story|Task`. It does not create or edit Wiki pages,
 change TAPD status or test versions, deliver Git changes, deploy, or go live.
+When `submitting-for-test/scripts/ensure-test-wiki.mjs` has already returned a
+read-back `LINKED|ALREADY_LINKED` result for the exact item/Wiki, do not invoke
+this skill again.
 
 Read [contracts.md](references/contracts.md),
 [acceptance-scenarios.md](references/acceptance-scenarios.md), and the shared
@@ -41,8 +44,10 @@ conflicting association evidence is `BLOCKED`.
 
 ## Procedure
 
-1. Read the exact TAPD item and every historical comment. Verify its type, ID,
-   workspace, and current accessibility.
+1. Read the exact TAPD item and comments once. Page further only when the
+   returned count proves another page exists; reuse a complete comment set
+   supplied by the current submission handoff. Verify type, ID, workspace and
+   accessibility.
 2. Read the exact Wiki target. Extract the canonical Wiki ID and URL, verify the
    same TAPD workspace, and verify the supplied association evidence. Never
    accept a predicted create ID or an unreadable Wiki.
@@ -63,8 +68,9 @@ conflicting association evidence is `BLOCKED`.
    payload, `intended_operation=TAPD_COMMENT`, and purpose, return
    `AWAITING_CONFIRMATION`, ask exactly `是否补写以上 Wiki 链接评论？`, and stop.
 6. For `EXECUTE`, require the matching standalone confirmation or unchanged
-   orchestrator confirmation. Re-read the item, Wiki, association, and all
-   comments immediately before writing. Any changed fact returns the updated
+   orchestrator confirmation. Refresh the exact Wiki and comments immediately
+   before writing; reuse unchanged item identity and association evidence.
+   Any changed fact returns the updated
    plan or conflict and performs no write.
 7. Run the private read-only [comment-validator.md](agents/comment-validator.md).
    Only `验证通过` permits the write; discard the private protocol line.

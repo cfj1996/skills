@@ -57,6 +57,9 @@ feature/alice.0918.1080800.supplier-split-bill-restrictions
 - source branch/base：精确 `origin/master` ref 与 SHA，或已存在分支 ref/SHA；
 - target branch：精确 `feature/<branch-owner>.<MMDD>.<短ID>.<描述slug>`；
 - Story/Task 状态：`NOT_APPLICABLE_NON_BUG`，无 TAPD Bug 状态写入。
+- 如本轮要写 Plan：列出精确路径和拟写入内容或差异。该内容已完整展示且
+  确认后未变时，同一次清单确认可用于 Plan 写入；若仅列路径而未展示内容，
+  写入前仍须展示实际 Plan 变更并确认。
 
 只问一次：`是否按此清单执行？`
 

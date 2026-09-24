@@ -22,6 +22,11 @@ Accept `confirmation_mode=STANDALONE|DEFER_TO_ORCHESTRATOR`, defaulting to
 `STANDALONE`. Deferred mode returns a proposed scope for a combined downstream
 checklist and must not ask a separate dialogue scope-confirmation question.
 
+Reuse the orchestrator's evidenced TAPD/prototype, exact project,
+`origin/master` SHA and scope when supplied. Refresh a mutable fact before a
+dependent write or after an observed change; do not restart routing, fetch and
+prototype inspection at every `SCOPE_REVIEW` / `PLAN_WRITE` handoff.
+
 ## 固定主流程
 
 严格按以下顺序推进，不得先开面板、先定分支或先写 Plan：
@@ -42,7 +47,7 @@ checklist and must not ask a separate dialogue scope-confirmation question.
 1. Read applicable `AGENTS.md`, dependencies, and existing constraints. Do not assume a component system.
 2. 使用 `zan-workflows:workspace-project-knowledge` 从需求/原型路由受影响项目；目标明确时读取该项目知识，目标不明确时先完成项目归属判断，禁止全工作区盲搜。
 3. 对每个候选仓库验证 Git root、origin 和远程 `master`，执行只读 fetch，并记录实际 `origin/master` SHA。源码搜索只在项目确定后进行。
-4. 用 `origin/master` 中的路由、页面、组件、服务、API、状态与测试证据整理完整功能清单、排除项和未决问题。需求或原型描述与代码冲突时显式展示冲突，不自行选边。
+4. 用 `origin/master` 中与本次交付有关的路由、页面、组件、服务、API、状态与测试证据整理功能清单、排除项和未决问题。UI/交互任务先核对现有页面与数据绑定；只有新增或改变实际网络消费时才展开接口契约搜索。需求或原型描述与代码冲突时显式展示冲突，不自行选边。
 5. 展示项目列表、远程基线、范围摘要和推荐评审模式。Resolve unresolved matters from evidence and ask only for missing decisions. If available, `superpowers:brainstorming` may assist; it is optional and must not launch a separate workflow.
 
 在项目、远程基线和范围证据齐全前保持只读；此时不得创建分支、写 Plan 或改源码。
@@ -92,7 +97,7 @@ Read an existing Plan semantically when present; scripts must not parse Markdown
 
 新会话使用 `schemaVersion=2` 的模块卡。每张卡按“职责与范围 → 输入输出 → 行为规则与验收例子 → 待确认问题 → 本次变更”组织，内部实现默认折叠。只有职责、输入输出与验收能够独立说明时才拆子模块；布局、API、权限等技术维度是 Agent 后台检查清单，不再按维度或 API 消费点强制拆卡。
 
-Agent 根据 [API 契约阶段](references/api-contract-stages.md) 建立消费需求清单，对已知消费点分类并开展正式来源搜索，形成接口事实清单。尚未查清的事实进入模块的待确认问题与实现阻塞项，不阻止用户评审已明确的功能行为。Treat 能力归属、运行时范围 and 本次交付关系 as separate facts; never assign an API to a page or module.
+Agent 根据 [API 契约阶段](references/api-contract-stages.md) 只为本次新增或改变的网络消费建立需求清单。纯布局、文案、交互重排或已批准的 Mock 状态，可复用现有数据绑定证据并标记“无新增契约”；不要依次遍历 YApi、OpenAPI、Query Contract 和 Swagger 来证明一个未请求的后端改动。真实数据必须新增字段时，再开展正式来源搜索；未查清的事实进入该消费点的实现阻塞项，不扩展整个 UI 范围。Treat 能力归属、运行时范围 and 本次交付关系 as separate facts; never assign an API to a page or module.
 
 在任何范围确认或 `READY_FOR_CHECKLIST` 输出前，按
 [需求确认前检查清单](references/requirement-readiness-checklist.md) 汇总所有已确认、缺失和冲突项。
@@ -107,8 +112,8 @@ Keep the page state only as “评审中” or “阻塞” while reviewing. 不
 
 完成项目定位和远程 `master` 范围分析后再选择模式，并记录选择理由：
 
-- `DIALOGUE`：单项目、单一内聚页面/模块、功能点较少、关系清晰，且没有需要逐项收集的多组业务决定。直接在对话中展示范围、功能点、排除项、未决问题和实现摘要，用户一次确认或给出增量修正即可。
-- `PANEL`：涉及多项目、多页面/子模块、较多独立功能点，或存在复杂状态、跨模块依赖、API/权限/路由冲突及多轮独立决策。使用评审面板逐项确认。
+- `DIALOGUE`：单项目、单一内聚页面/模块，或同一交互模式应用于多个页面；功能点关系清晰，且没有需要逐项收集的多组业务决定。直接在对话中展示范围、功能点、排除项、未决问题和实现摘要，用户一次确认或给出增量修正即可。
+- `PANEL`：涉及多项目、多页面间不同的行为决定、较多独立功能点，或存在复杂状态、跨模块依赖、API/权限/路由冲突及多轮独立决策。使用评审面板逐项确认。
 
 不要只因存在原型、API 或多个技术维度就开启面板；也不要为了省事把复杂需求压缩成一次对话确认。
 简单模式在范围扩大后可以升级为面板模式，并保留已确认的功能清单和来源证据。
@@ -157,7 +162,18 @@ in-app Browser 打开；本地文件才启动临时 loopback 服务。使用运�
 
 ## 确认更新 Plan
 
-Write the Plan only after the user explicitly confirms the displayed update. This is separate from confirmation of the 产物位置规则 and development branch binding.
+Write the Plan only after the user explicitly confirms the displayed update.
+The authorization must bind the 产物位置规则 and development branch facts;
+standalone and panel confirmation can remain separate when those facts were
+not already shown together.
+
+For `DEFER_TO_ORCHESTRATOR`, the combined requirement/branch checklist may also
+serve as this Plan-update confirmation only when it already displays the exact
+Plan paths and proposed content or diff. Reuse that current-conversation
+authorization if the saved content is unchanged; do not ask the same question
+again just because `PLAN_WRITE` begins. A new location, new module or material
+content change requires a fresh preview and confirmation. `PANEL` still uses
+its trusted `confirmPlan` and saved-plan receipt protocol.
 
 Use the human-readable [页面交付 Plan 模板](assets/page-delivery-plan-template.md) only after both the project location rule and this update are confirmed. 按模块原样保存需求、验收例子、`reviewConclusion`、实现方案、未决事项与本轮变更。需求已确认但实现 `blocked` 时允许阶段保存，明确缺口且不得标为可实施；`ready` 方案仍须保留一句话摘要、四块实施内容与证据。规范化校验模型使用 `schemaVersion=3`，兼容旧版 `2` 的阶段保存；适用模块仍有未解决 `questions` 时不能进入可实施。Markdown 中不嵌入 JSON。保持同一模块一份 Plan、稳定编号与明确双向关联。用户确认只表示允许写入，Agent 写入并读回核对后调用 `markPlanSaved`，面板才显示“已保存”。
 

@@ -23,8 +23,9 @@ and a separate exact cleanup confirmation, revalidates every candidate, and may
 remove only those confirmed local resources.
 
 Read [contracts.md](references/contracts.md) and
-[acceptance-scenarios.md](references/acceptance-scenarios.md), plus the shared
 [tool-routing policy](../../references/tool-routing.md) before any write.
+Read [acceptance-scenarios.md](references/acceptance-scenarios.md) only for an
+edge case or regression check.
 GitLab operations use `gitlab-mcp`; Wiki operations use `tapd-mcp`.
 Confirmed local cleanup uses only ordinary local Git CLI commands described
 below.
@@ -38,6 +39,11 @@ For `operation=DELIVER`, require:
 - verified repository/source/current-round commit facts; and
 - resolved project category/service type; and
 - an explicit current-conversation request to go live.
+
+Reuse the exact source branch, project category and Wiki ID from the submitted
+result. Read that Wiki by ID; do not rediscover the hierarchy or enumerate
+other entries. Refresh source/master refs and the exact Wiki body at their
+write boundaries, not the entire submission preflight.
 
 When the upstream profile is `STANDARD`, require the exact existing Wiki target
 and readback retained by submission, whether the submission Wiki state is

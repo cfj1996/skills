@@ -6,14 +6,20 @@ Prepare one consolidated authorization using
 [deployment-and-confirmation.md](deployment-and-confirmation.md). For every
 external write inside that unchanged authorized plan:
 
-1. Read the current target facts.
-2. Display the exact target, payload, operation, and purpose.
-3. Reuse the consolidated authorization; obtain a fresh one only when a bound
-   fact or operation changes.
-4. Re-read the facts immediately before execution.
-5. Ask the private validator to check that one planned operation.
-6. Execute only after validation passes.
-7. Read the result back before proceeding.
+1. The consolidated plan has already displayed the exact target, payload,
+   operation and purpose; do not repeat that display or broad discovery for
+   each operation.
+2. Re-read only the mutable facts for this specific write immediately before
+   execution. Reuse the consolidated authorization when they still match;
+   obtain a fresh one only when a bound fact or operation changes.
+3. Ask the private validator to check this operation, execute only after it
+   passes, and read the result back before proceeding.
+
+The Wiki creation/comment helper is one `WIKI_CREATE_AND_LINK_BUNDLE`
+operation: validate its complete authorized inputs once before invocation,
+let the script perform each deterministic readback internally, then validate
+the final result. Do not re-enter the per-operation process or run a separate
+validator between the helper's month, child and comment calls.
 
 Generated IDs and readbacks that follow the authorized derivation are not
 changed plan facts and do not require another prompt. If a bound value changed
@@ -46,22 +52,59 @@ plan, or `terminal_state=SKIPPED_BY_POLICY` with
 `skip_reason=NON_FUNCTIONAL_CONTINUE` and no Wiki operation. Discovery order is
 mandatory for the validated path:
 
-1. Read TAPD details and all historical comments; reuse any linked 提测 Wiki.
-2. Otherwise inspect root `1150372234001008260`, the current `YYYY-MM` month,
-   and related children by TAPD ID/short ID/original branch.
-3. Reuse one related child, or plan `MM-DD: 中文简述` creation. Create the month
-   first only when absent.
+1. Read the exact TAPD item and its comments once; page comments only when the
+   reported count exceeds the returned page. Reuse a matching linked 提测 Wiki
+   ID immediately.
+2. Otherwise query `get_wiki(name=YYYY-MM)` and select the result whose
+   returned `parent_wiki_id` is root `1150372234001008260`.
+3. Query the deterministic child title once and compare returned parent IDs.
+   Reuse the unique matching child or plan `MM-DD: 中文简述` creation. Never pass
+   unsupported `parent_wiki_id` to `get_wiki`, list all Wiki pages, or repeat
+   an unchanged query with a different page size/order.
 
 Include the complete resulting child Markdown and every exact create/update
 payload in the consolidated `SubmissionPlan` for the validated path. After the
 deployment gate permits later writes, execute only that authorized plan when
-the drafter returned `VALIDATED`:
+the drafter returned `VALIDATED`. For a new child or an existing linked child
+whose body needs no patch, call `scripts/ensure-test-wiki.mjs` once. Its minimum
+inputs are the full TAPD item URL (or workspace/type/ID) and original source branch; creating a
+page also needs creator, approved Markdown file and optionally an approved
+title. The script defaults to read-only preview. Pass `--execute` only after
+the consolidated plan has been confirmed; this performs the complete
+TAPD-detail → comments → linked Wiki or month/child → create/readback →
+comment/readback sequence through `tapd-mcp`.
+For an orchestrated invocation, materialize the already validated Markdown
+in a transient local file outside the repository immediately before the call,
+pass it as `--body-file`, and remove it afterward. This file is only the exact
+authorized request payload, not a saved workflow record or evidence artifact.
+
+```bash
+node skills/submitting-for-test/scripts/ensure-test-wiki.mjs \
+  --tapd-url '<full-story-url>' --source-branch '<feature-branch>' \
+  --creator <tapd-user> --body-file <approved-wiki-markdown> \
+  --wiki-title '<approved-MM-DD-title>' \
+  --expect-target CREATE_CHILD --execute --json
+```
+
+The example is run from the plugin root. `bug` and `tasks` are also supported.
+An existing matching comment needs no creation parameters. The script never
+calls `get_wiki` without an exact ID or name, and it stops on ambiguity or
+unknown write effects instead of blindly retrying. Its final `LINKED` or
+`ALREADY_LINKED` result includes the actual Wiki ID/URL. Do not call
+`zan-workflows:linking-tapd-wiki` again on this path. The built-in root Wiki ID
+applies only to workspace `50372234`; for another workspace supply its exact
+verified `--root-wiki-id` before creation. Replace `CREATE_CHILD` in the
+example with the confirmed target action. If the current target action or
+month ID differs from the plan, the script stops before writing; pass
+`--expected-month-id` when the plan bound an existing month.
+
+For a functional `CONTINUE` that must patch an existing Wiki body, keep the
+minimal authorized update path below; the helper does not replace that patch:
 
 - `REUSE_EXISTING`: re-read the child and apply the minimal patch.
-- `CREATE_CHILD`: create the child under the verified month with the complete
-  initial body.
-- `CREATE_MONTH_AND_CHILD`: create/read the month under `提测文档`, then use its
-  real ID in the deterministic child create payload without a second prompt.
+- `CREATE_CHILD|CREATE_MONTH_AND_CHILD`: use the helper for the complete
+  initial body; it creates and reads back the month only when absent, then
+  creates and reads back the child.
 
 Never write the canonical entry body into the month page. For the validated
 path, read back the final child, retain its actual ID/URL and original source
@@ -87,8 +130,8 @@ Immediately read back every created/updated page. A create response without a
 real Wiki ID, a parent mismatch, or a body readback mismatch blocks all later
 Wiki comments, TAPD status changes, and test-version writes.
 
-For a `Bug|Story|Task` with a validated final Wiki target, invoke
-`zan-workflows:linking-tapd-wiki` to write or verify exactly:
+For a functional `CONTINUE` patched outside the helper and still missing a
+link, invoke `zan-workflows:linking-tapd-wiki` to write or verify exactly:
 
 ```text
 提测wiki：[https://www.tapd.cn/{workspace_id}/markdown_wikis/show/#{wiki_id}](https://www.tapd.cn/{workspace_id}/markdown_wikis/show/#{wiki_id})

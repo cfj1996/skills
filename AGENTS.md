@@ -21,7 +21,7 @@ python3 /Users/cfj/.codex/skills/.system/plugin-creator/scripts/validate_plugin.
   plugins/zan-workflows
 ```
 
-The `npx` command fetches TAPD data for workflow execution. Run Git commands from this repository root; use a pathspec such as `-- skills/tapd-workflow` when history should be limited to one standalone skill. The remaining commands run the Zan plugin's complete Node test suite and official Skill/Plugin validators. For browser checks, run `node plugins/zan-workflows/skills/writing-plans/tests/preview-review-panel.mjs`, then open the printed preview URL with `?assert` for legacy sessions or `?modules&assert` for module sessions and `?wake&assert` for notification races; `?modules` shows the interactive module preview.
+The `npx` command fetches TAPD data for workflow execution. Run Git commands from this repository root; use a pathspec such as `-- skills/tapd-workflow` when history should be limited to one standalone skill. The remaining commands run the Zan plugin's complete Node test suite and official Skill/Plugin validators. For a focused Wiki helper check, run `node --test plugins/zan-workflows/tests/ensure-test-wiki.test.mjs`; the complete Node suite already includes it. For browser checks, run `node plugins/zan-workflows/skills/writing-plans/tests/preview-review-panel.mjs`, then open the printed preview URL with `?assert` for legacy sessions or `?modules&assert` for module sessions and `?wake&assert` for notification races; `?modules` shows the interactive module preview.
 
 ## Coding Style & Naming Conventions
 
