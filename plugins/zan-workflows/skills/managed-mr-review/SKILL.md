@@ -5,8 +5,8 @@ description: Use when the user asks to find, review, or remotely merge open GitL
 
 # 管辖项目 MR 审核
 
-模型配置按阶段动态路由：发现阶段默认 `BALANCED`；高风险审核和所有合并决策使用
-`CRITICAL`。选择 reviewer 子代理前读取共享
+主代理模型配置按阶段动态路由：发现阶段默认 `BALANCED`；高风险审核和所有合并决策使用
+`CRITICAL`。reviewer 子代理的模型由运行环境默认分配。选择 reviewer 子代理前读取共享
 [model-routing policy](../../references/model-routing.md)。
 所有 GitLab 读写同时遵循共享
 [tool-routing policy](../../references/tool-routing.md)：GitLab MCP 优先，浏览器不是默认降级路径。
@@ -154,11 +154,12 @@ description: Use when the user asks to find, review, or remotely merge open GitL
 
 按风险选择本技能目录中的角色：
 
-- `ROUTINE` 使用 `agents/mr-code-reviewer.md`：`gpt-5.6-terra` + `medium`。
-- `HIGH` 使用 `agents/mr-critical-reviewer.md`：`gpt-5.6-sol` + `high`。
+- `ROUTINE` 使用 `agents/mr-code-reviewer.md`。
+- `HIGH` 使用 `agents/mr-critical-reviewer.md`。
+- 启动 reviewer 子代理时不指定 `model` 或 `reasoning_effort`，角色文件也不绑定模型；由运行环境按默认机制分配（包括继承主代理模型的情况）。审核角色和证据门槛仍由风险分类决定。
 - 只有一个 MR 时，如果 subagent 可用也按风险选择对应角色；不可用时由主代理按相同检查项串行审核。
 - 两个及以上 MR 时按 MR 粒度并行，最多同时启动 6 个 reviewer；超过 6 个时先处理 `HIGH` 和改动最大的 MR，再继续下一批。
-- 不能因为并发额度、模型不可用或成本考虑把 `HIGH` 降为 `ROUTINE`。高配角色不可用时，由主代理按 `HIGH` 规则串行审核并说明模型降级，不降低证据门槛。
+- 不能因为并发额度、实际分配的模型或成本考虑把 `HIGH` 降为 `ROUTINE`。子代理不可用时，由主代理按 `HIGH` 规则串行审核，不降低证据门槛。
 
 并行审核要求：
 

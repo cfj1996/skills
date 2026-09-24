@@ -19,7 +19,7 @@
     ],
     "defaultPrompt": [
       "Use the appropriate Zan workflow skill for this task.",
-      "Apply the bundled model-routing policy: use CRITICAL reviewers for high-risk code, write, and merge decisions; use BALANCED or FAST profiles for bounded read-only work.",
+      "Apply the bundled model-routing policy to lead decisions and explicitly bound validators; let the runtime choose models for managed MR reviewer agents.",
       "Before initial Bug work, show a concise project/repository, branch, and scope checklist and wait for confirmation; for CONTINUE work, reuse unchanged bound facts and confirm only unclear incremental scope.",
       "Reuse original branch, Wiki, and TAPD status for CONTINUE work; use one consolidated submission confirmation and resolve Jenkins deployment as AUTO, DEPLOY, or SKIP.",
       "Resolve and scope each TAPD work item before changing code.",

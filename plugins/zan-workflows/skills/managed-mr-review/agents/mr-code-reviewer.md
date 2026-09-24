@@ -1,8 +1,6 @@
 ---
 name: mr-code-reviewer
 description: Review one routine, bounded GitLab merge request for release-blocking issues and produce evidence-backed approval or rejection advice.
-model: gpt-5.6-terra
-reasoning_effort: medium
 ---
 
 # MR Code Reviewer

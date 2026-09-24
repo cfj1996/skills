@@ -64,7 +64,6 @@ class ModelRoutingTests(unittest.TestCase):
             "skills/submitting-for-test/agents/submission-validator.md",
             "skills/going-live/agents/master-merge-validator.md",
             "skills/linking-tapd-wiki/agents/comment-validator.md",
-            "skills/managed-mr-review/agents/mr-critical-reviewer.md",
         ]
         for agent in critical_agents:
             with self.subTest(agent=agent):
@@ -72,16 +71,32 @@ class ModelRoutingTests(unittest.TestCase):
                 self.assertEqual(values["model"], "gpt-5.6-sol")
                 self.assertEqual(values["reasoning_effort"], "high")
 
-    def test_balanced_reviewers_use_terra_medium_profile(self):
+    def test_balanced_wiki_validator_uses_terra_medium_profile(self):
         balanced_agents = [
             "skills/drafting-wiki/agents/wiki-validator.md",
-            "skills/managed-mr-review/agents/mr-code-reviewer.md",
         ]
         for agent in balanced_agents:
             with self.subTest(agent=agent):
                 values = agent_frontmatter(agent)
                 self.assertEqual(values["model"], "gpt-5.6-terra")
                 self.assertEqual(values["reasoning_effort"], "medium")
+
+    def test_managed_mr_reviewers_use_runtime_model_assignment(self):
+        for agent in (
+            "skills/managed-mr-review/agents/mr-code-reviewer.md",
+            "skills/managed-mr-review/agents/mr-critical-reviewer.md",
+        ):
+            with self.subTest(agent=agent):
+                values = agent_frontmatter(agent)
+                self.assertNotIn("model", values)
+                self.assertNotIn("reasoning_effort", values)
+
+        skill = (
+            PLUGIN_ROOT / "skills/managed-mr-review/SKILL.md"
+        ).read_text()
+        self.assertIn("启动 reviewer 子代理时不指定 `model` 或 `reasoning_effort`", skill)
+        policy = (PLUGIN_ROOT / "references/model-routing.md").read_text()
+        self.assertIn("Do not specify `model` or `reasoning_effort`", policy)
 
     def test_managed_mr_review_routes_by_risk_without_spark(self):
         skill = (

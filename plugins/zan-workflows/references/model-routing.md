@@ -4,8 +4,9 @@ These profiles balance correctness, latency, and token cost. They are execution
 preferences, not user input gates. A skill cannot replace the active parent
 model: never block, ask the user to switch models, or spawn an otherwise
 unneeded agent solely to emulate a profile. Apply a profile when the current
-client can choose the lead model or when a skill invokes a private/subagent
-role.
+client can choose the lead model or when a skill explicitly binds a
+private/subagent role to a model. `managed-mr-review` reviewer agents leave
+model and reasoning effort unset for the runtime's default assignment.
 
 ## Profiles
 
@@ -30,7 +31,7 @@ standard to compensate for model availability.
 | `submitting-for-test` | `CRITICAL` | Executes Git, Wiki, TAPD, and test-version writes with ordered readbacks |
 | `going-live` | `CRITICAL` | Merges an original repair branch to `master` and maintains Wiki online state |
 | `linking-tapd-wiki` | `CRITICAL` | Plans or writes an exact TAPD work-item comment with conflict and readback gates |
-| `managed-mr-review` | Conditional | Discovery is `BALANCED`; code review/merge decisions are `CRITICAL` for high-risk MRs and `BALANCED` for routine MRs |
+| `managed-mr-review` | Conditional | Lead discovery and routine review are `BALANCED`; high-risk review and all merge decisions are `CRITICAL`. Reviewer agents use runtime defaults |
 | `drafting-wiki` | `BALANCED` | Read-only target resolution and deterministic Markdown/sequence calculation |
 | `writing-plans` | `BALANCED` | Resolves remote-master scope, chooses dialogue or panel review, and writes branch-bound Plans |
 | `workspace-project-knowledge` | `BALANCED` | Read-heavy routing and graph/knowledge lookup |
@@ -57,8 +58,11 @@ formatting, and deterministic validation.
 
 ## Managed MR reviewer roles
 
-- Use `agents/mr-code-reviewer.md` (`BALANCED`) for routine, bounded MRs.
-- Use `agents/mr-critical-reviewer.md` (`CRITICAL`) for any escalation signal.
+- Use `agents/mr-code-reviewer.md` for routine, bounded MRs.
+- Use `agents/mr-critical-reviewer.md` for any escalation signal.
+- Do not specify `model` or `reasoning_effort` when starting either reviewer.
+  The runtime may inherit the lead model. Review depth follows the assigned
+  risk level regardless of the model selected.
 - The lead agent classifies risk from MR metadata/diff before delegation,
   resolves reviewer disagreements conservatively, and owns every approval or
   merge authorization.
