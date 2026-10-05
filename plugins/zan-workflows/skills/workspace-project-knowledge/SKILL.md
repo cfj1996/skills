@@ -49,6 +49,12 @@ Fast path:
 
 - If the user already gave an exact repository path or an exact repository name with strong certainty, skip broad routing and jump straight to that repository's centralized knowledge.
 - If the user already gave an exact file path, treat the repository as resolved and use this skill only to gather surrounding project context if needed.
+- For a verified exact repository or orchestrator handoff, read only its
+  `AI_CONTEXT.md` and applicable local rules. Do not read workspace-wide
+  routing maps, other project graphs or all standard modules by default.
+  Query Graphify only when an entrypoint or relationship question remains.
+  A bounded UI change does not become a cross-project analysis merely because
+  it uses an already-owned shared component.
 
 Graphify usage rule:
 

@@ -44,7 +44,8 @@ not authorize submission writes.
 The same authorization remains valid while those bound facts are unchanged.
 Generated commit SHA, MR ID, Wiki/month/child ID, Jenkins queue/build ID, and
 readback values do not require another confirmation when they are deterministic
-results of the authorized plan. Validate and read back every operation anyway.
+results of the authorized plan. Validate each complete operation bundle once;
+scripts still check and read back every write without another Agent invocation.
 
 Require fresh authorization only when project/repository, reviewed paths or
 diff, source/target branch, operation set, Wiki target/body semantics, Jenkins
@@ -67,9 +68,26 @@ Git commit/push/MR -> develop containment
 
 For `DEPLOY`, resolve the Jenkins Job through workspace project knowledge and
 the release-safety policy. Jenkins success alone is insufficient: read back the
-build parameters/changes/console evidence needed to prove it built the expected
+build parameters and repository-specific SCM evidence needed to prove it built the expected
 `origin/develop` commit. Use that SHA as the release identity when the job has
 no semantic version parameter.
+
+Use the [scripted delivery executors](../../../references/scripted-delivery.md).
+Preview exact Job/ref/version/channel selections once; pass the unchanged
+configuration or explicitly displayed metadata-only binding fingerprints and
+consolidated authority into one execution. Use one live workflow session for
+preview/execution and later helpers. Actual parameter names and supported
+computed-version policies come from the Job adapter; an entire-project
+package release scope must be displayed before confirmation.
+Queue/build waiting stays in the process with bounded backoff and state-change
+progress. Do not repeatedly fetch rules, branch history, console logs or Job
+definitions while waiting. The helper checks a symbolic source ref once
+immediately before trigger and verifies the actual target SCM revision after
+completion. Pin the delivered merge SHA when the Job supports it; a later
+external target advancement is a real changed fact and cannot be silently
+included. For a package release, retain `releaseKind=package` and actual
+`RELEASED` evidence while mapping to the existing `DEPLOYED` gate; report the
+package result, not an application-environment deployment.
 
 Deployment states are:
 
@@ -95,3 +113,11 @@ DEPLOYED | SKIPPED_BY_INTENT | FAILED | UNKNOWN | NOT_ATTEMPTED
   and Wiki steps complete.
 - Any other current state requires an explicit policy/user decision; do not
   guess a transition.
+
+Run `register-test-submission.mjs` once after the other gates pass. The
+read-only preview resolves actual workflow labels/transitions and native or
+enabled writable custom version fields, checks required current values and
+fingerprints metadata. Validate the resolved preview once; do not manually
+reinterpret the same mapping. Execute consumes those exact facts and the same consolidated
+authorization, combining applicable status/version writes and readback.
+No item/metadata rediscovery or private Agent call is needed between fields.

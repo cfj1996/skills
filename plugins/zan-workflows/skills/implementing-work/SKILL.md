@@ -15,10 +15,11 @@ and an independent private review. It does not submit, merge to `develop` or
 `master`, publish a version, or write a Wiki.
 
 Read [contracts.md](references/contracts.md),
-[development-rules.md](references/development-rules.md), and
-[acceptance-scenarios.md](references/acceptance-scenarios.md), plus the shared
+[development-rules.md](references/development-rules.md), plus the shared
 [tool-routing policy](../../references/tool-routing.md) before editing. Any
 authorized TAPD status write uses `tapd-mcp`, never browser automation by default.
+Read [acceptance-scenarios.md](references/acceptance-scenarios.md) only for an
+edge case or regression check.
 
 ## Input gate
 
@@ -35,6 +36,10 @@ Accept only `terminal_state=READY_FOR_HANDOFF` with:
 
 Re-read actual repository path, Git root, origin, branch refs, HEAD, and
 `git status --short`. A mismatch blocks before edits.
+Reuse verified project knowledge, Plan and scope from the handoff. Check the
+project's Node/package-manager version and relevant verification commands
+before the first project verification command so an avoidable runtime mismatch does not start a
+trial-and-error sequence.
 
 ## Fixed-branch execution
 
@@ -70,7 +75,12 @@ return `BLOCKED` and explain the overlap. Do not modify or erase them.
    the confirmed checklist.
 2. Diagnose the Bug or plan the requested Story/Task within the approved scope.
 3. Implement the smallest coherent change. Add or update ordinary project
-   tests when appropriate and run relevant project verification commands.
+   tests when appropriate. During edits run focused tests, type/lint checks
+   that exercise the changed files; run the broader required suite and build
+   once after the coherent diff is stable. Repeat a broad gate only if a later
+   change can invalidate its result. Do not rerun `git status`, diff statistics
+   or `git diff --check` after every local edit; inspect the final change set
+   before review. Run relevant project verification commands.
    Verification output stays in the current execution; do not copy it into a
    workflow evidence directory.
 4. Compare the final diff with the starting status and approved scope. Exclude
@@ -81,6 +91,9 @@ return `BLOCKED` and explain the overlap. Do not modify or erase them.
    read-only and returns one private verdict line. Map it to
    `REVIEW_PASSED|REVIEW_FAILED|NOT_RUN`, retain only a normalized reason, and
    discard the private line.
+   One coherent final diff gets one independent review. If review feedback
+   causes a change, recheck the affected paths and review that delta; do not
+   restart the whole preparation and implementation workflow.
 6. Return one in-memory `ReviewedChange`. Do not create a report file, runtime
    record, raw data file, or generated test-evidence directory.
 

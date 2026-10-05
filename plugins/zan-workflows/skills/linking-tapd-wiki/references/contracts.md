@@ -23,5 +23,11 @@
   link or silently replace the earlier one.
 - `LINKED` requires one successful `tapd-mcp` write and a subsequent comment
   readback containing exactly one canonical target ID.
+- `ensure-test-wiki.mjs --mode link` is the deterministic executor. Bind its
+  exact Wiki ID/parent/title and original body SHA-256; no body file or Wiki
+  create/update is permitted. Reuse a current complete handoff or its
+  read-only preview and validate the authorized invocation once. Its final
+  `wikiState=UNCHANGED` plus `commentState` and comment-check evidence supply
+  the write/readback facts without another Agent round.
 - No result authorizes or performs Wiki changes, TAPD status/version changes,
   Git delivery, deployment, master merge, or local cleanup.

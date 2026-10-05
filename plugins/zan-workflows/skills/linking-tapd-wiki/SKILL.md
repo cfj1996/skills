@@ -13,6 +13,9 @@ gates.
 Link one verified 提测 Wiki to one TAPD work item comment. This capability is
 idempotent and supports `Bug|Story|Task`. It does not create or edit Wiki pages,
 change TAPD status or test versions, deliver Git changes, deploy, or go live.
+When `submitting-for-test/scripts/ensure-test-wiki.mjs` has already returned a
+read-back `LINKED|ALREADY_LINKED` result for the exact item/Wiki, do not invoke
+this skill again.
 
 Read [contracts.md](references/contracts.md),
 [acceptance-scenarios.md](references/acceptance-scenarios.md), and the shared
@@ -41,13 +44,20 @@ conflicting association evidence is `BLOCKED`.
 
 ## Procedure
 
-1. Read the exact TAPD item and every historical comment. Verify its type, ID,
-   workspace, and current accessibility.
-2. Read the exact Wiki target. Extract the canonical Wiki ID and URL, verify the
-   same TAPD workspace, and verify the supplied association evidence. Never
-   accept a predicted create ID or an unreadable Wiki.
-3. Inspect all historical comments by canonical Wiki ID, regardless of whether
-   the link is plain text or Markdown:
+1. Resolve the exact item, Wiki ID, original source branch and author from
+   the request/current verified handoff. Reuse available association evidence;
+   never ask again for known facts. Without a complete current handoff, call
+   [ensure-test-wiki.mjs](../submitting-for-test/scripts/ensure-test-wiki.mjs)
+   once in `--mode link --expected-wiki-id <id>` without `--execute`.
+   Its preview returns the exact body SHA-256, parent/title, canonical payload
+   and complete comment-check evidence. It reads item/comments/Wiki in parallel,
+   pages comments until a short page when count is absent, and blocks repeated
+   or inconsistent results. Never accept a predicted ID or unreadable Wiki.
+2. Verify the same TAPD workspace and supplied association evidence. Retain
+   the exact Wiki ID, parent, title and `beforeBodySha256` from the preview or
+   current handoff; no hierarchy discovery is needed.
+3. Use the script's historical-comment evidence by canonical Wiki ID,
+   regardless of plain text or Markdown:
    - the same Wiki ID already present returns `ALREADY_LINKED` with no write;
    - a different 提测 Wiki link returns `BLOCKED_CONFLICT` with both targets;
    - no Wiki link proceeds to the exact comment plan.
@@ -62,16 +72,20 @@ conflicting association evidence is `BLOCKED`.
 5. For standalone `PLAN`, display item type/ID, canonical Wiki ID/URL, exact
    payload, `intended_operation=TAPD_COMMENT`, and purpose, return
    `AWAITING_CONFIRMATION`, ask exactly `是否补写以上 Wiki 链接评论？`, and stop.
-6. For `EXECUTE`, require the matching standalone confirmation or unchanged
-   orchestrator confirmation. Re-read the item, Wiki, association, and all
-   comments immediately before writing. Any changed fact returns the updated
-   plan or conflict and performs no write.
-7. Run the private read-only [comment-validator.md](agents/comment-validator.md).
-   Only `验证通过` permits the write; discard the private protocol line.
-8. Write the comment through `tapd-mcp`, then read the item comments again and
-   require exactly one matching canonical Wiki ID. Return `LINKED` only after
-   that readback. Unknown or failed outcomes are `BLOCKED`; never retry or
-   infer success.
+6. For `EXECUTE`, require the matching standalone or unchanged orchestrator
+   confirmation and run [comment-validator.md](agents/comment-validator.md)
+   once for the full authorized script invocation. Only `验证通过` permits
+   execution; discard the private line.
+7. Call the helper once with `--mode link --execute`, exact item/branch,
+   `--expected-wiki-id`, `--expected-month-id`, title,
+   `--expected-body-sha256`, `--expect-target REUSE_EXISTING` and comment
+   author. Do not pass `--body-file`: this mode cannot create or update Wiki.
+   The script refreshes exact bound facts, writes through `tapd-mcp` only when
+   missing and reads back one conflict-free canonical target. Require
+   `wikiState=UNCHANGED` and `commentState=LINKED|ALREADY_LINKED`; map its
+   failure to `BLOCKED` and stop. Do not manually repeat its reads or invoke
+   another validator between write and readback. Unknown effects are never
+   retried or inferred as success.
 
 ## Output
 

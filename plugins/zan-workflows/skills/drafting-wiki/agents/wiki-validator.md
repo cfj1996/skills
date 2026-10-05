@@ -17,9 +17,12 @@ Validate these invariants in order:
 
 1. The result has exactly one target plan:
    `REUSE_EXISTING|CREATE_CHILD|CREATE_MONTH_AND_CHILD`. TAPD details, all
-   historical-comment pages, and all relevant Wiki-list pages were checked
-   first. Any linked Wiki is reused; without a link, one related current-month
-   child is reused before creation is considered. Creation uses root
+   historical-comment pages (with a short-page fallback when count is absent)
+   were checked first. A complete helper preview is valid read-only discovery
+   evidence. Any linked Wiki in details or comments is reused, including prior
+   months. Without a link, only the exact month-name and child-title queries
+   are needed; returned parent IDs are checked locally. Never require an
+   unfiltered Wiki-list scan. Creation uses root
    `1150372234001008260`, `YYYY-MM`, and
    `MM-DD: 中文简述`. Ambiguous/inaccessible existing evidence is blocked rather
    than delegated to the user as a required URL.

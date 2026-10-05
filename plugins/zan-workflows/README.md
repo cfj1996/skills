@@ -27,12 +27,93 @@
 | zan:补写提测 Wiki 链接 | [`linking-tapd-wiki`](skills/linking-tapd-wiki/SKILL.md) | 将已验证的提测 Wiki 链接幂等地添加到或核对 TAPD Bug、Story、Task 评论 | TAPD 评论 |
 | zan:提交测试 | [`submitting-for-test`](skills/submitting-for-test/SKILL.md) | 在提测计划确认后，负责代码交付到 `develop`、可选 Jenkins 测试部署、Wiki、TAPD 评论/状态/测试版本 | 提测执行 |
 | zan:上线发布 | [`going-live`](skills/going-live/SKILL.md) | 将原始开发分支合并到 `master`，维护 Wiki 合并状态；验证后生成本地清理计划，并在另行确认后清理 worktree/本地分支 | 上线/清理 |
+| zan:Jenkins 部署发布 | [`running-release`](skills/running-release/SKILL.md) | 一次确认完整发布清单，由脚本触发 Jenkins、等待本次队列/构建并核对源码；支持部署和工具包版本发布 | 部署/发包 |
 | zan:管辖 MR 审核 | [`managed-mr-review`](skills/managed-mr-review/SKILL.md) | 查找、审核和按明确要求合并管辖范围内 GitLab MR；代码结论和合并资格分别判断 | MR 管理 |
 | zan:团队身份映射 | [`team-identity-map`](skills/team-identity-map/SKILL.md) | 根据已知姓名、企微线索或 GitLab 用户名查询团队身份映射 | 身份查询 |
 | zan:登录令牌工作流 | [`login-token-workflow`](skills/login-token-workflow/SKILL.md) | 获取测试环境商家后台/C 端调试 token 并组装本地调试 URL | 本地调试 |
 | zan:项目记忆上下文 | [`project-memory-context`](skills/project-memory-context/SKILL.md) | 需要历史决策或旧问题上下文时检索有限的 AI 会话记忆，并以当前代码和证据复核 | 历史上下文 |
 
 主流程入口负责组织顺序和收集确认；具体能力由专用 Skill 执行。多数交接只保存在当前对话内存，不创建额外的流程状态文件。
+
+### 一次执行 Wiki 创建、补充与评论回写
+
+Agent 准备正文并展示提测计划，用户确认一次后，脚本统一完成 Wiki
+创建或补充、读回和评论回写。已有同 ID 的评论直接跳过；功能性
+`CONTINUE` 也走同一个脚本。内部步骤不再分别启动 Agent 校验或确认。
+脚本复用 `tapd-mcp` 本机凭证，不接受 token 参数。
+
+从插件根目录先只读定位。此时不需要创建人或正文文件：
+
+```bash
+node skills/submitting-for-test/scripts/ensure-test-wiki.mjs \
+  --tapd-url '<TAPD Story/Task/Bug 详情 URL>' \
+  --source-branch '<原始 feature/fixbug 分支>' --json
+```
+
+预览返回目标、ID、月份/标题、已有正文及 `beforeBodySha256`。Agent
+复用这些结果计算正文，执行时直接传入确认计划，不重复预览或搜索：
+
+| 操作 | 执行时绑定的参数 |
+| --- | --- |
+| 创建 | `--expect-target CREATE_CHILD` 或 `CREATE_MONTH_AND_CHILD`、固定 `--month`/`--wiki-title`、创建人、正文文件；已有月份还需 `--expected-month-id` |
+| 补充或复用 | `--expect-target REUSE_EXISTING`、`--expected-wiki-id`、父页/标题、`--expected-body-sha256`、评论人；补充时传入完整批准后的正文文件 |
+| 仅补评论 | `--mode link` 加复用参数，不传正文文件；该模式不会创建或更新 Wiki |
+| 仅更新 Wiki | `--mode update` 加复用参数及批准正文；适用于上线合并状态更新，不读取或写入 TAPD 条目/评论 |
+
+执行命令加 `--execute --json`，详见
+[参数示例](skills/submitting-for-test/references/submission-rules.md)。正文文件
+只作临时请求载体，调用后删除。更新前会再次核对原正文，随后只写批准
+后的正文并读回；Wiki ID、父页、标题或原正文变化会阻断。评论没有
+count 时脚本按完整页继续查询，详情中的提测 Wiki 链接同样会复用。
+独立读取并行完成，只有 Wiki 写入后才刷新评论。
+
+结果分别报告 `wikiState=CREATED|UPDATED|UNCHANGED` 和
+`commentState=LINKED|ALREADY_LINKED`，包含实际 Wiki 链接和正文哈希。
+出错时报告阶段、已知写入和未知结果，停止后续动作。`bug`、`tasks`
+同样支持。默认根页 `1150372234001008260` 仅适用于空间 `50372234`，
+其他空间创建时需提供已验证的 `--root-wiki-id`。
+
+### 合并与 Jenkins 等待交给脚本
+
+提测清单确认后，Git 交付包只校验一次：本地按已评审内容提交/推送，
+随后 `merge-reviewed-branch.mjs` 负责 MR 复用/创建、等待 CI、检查最新
+refs/审批、合并和包含关系核验。不会每一步重新启动评审 Agent，也不会
+把待自动合并当成已合并。源码或目标变化、冲突、审批/CI 不通过会停止。
+
+`run-jenkins-release.mjs` 负责一次触发、等待确切队列/构建和参数/源码
+核验。等待时只输出状态变化，Agent 不反复查 Job、拉日志或读规则。
+部分必要字段由同实例、同 Job 的只读 API 补齐；发布仍由 Jenkins 执行。
+Jenkins 构建本身的耗时不会因此消失，减少的是 Agent 的重复操作。
+
+常用部署 Job 的 `branch` 参数由适配器解析；`npm-tools` 的项目/发布类型
+参数则从已核实的 Jenkinsfile 规则绑定，实际包版本在构建后读回。该 Job
+发布整个项目，计划必须明确这个范围。配置 XML 返回 403 时，计划会明确
+采用可读 Job 身份和参数指纹核验，不把它说成完整配置校验；本次队列、
+构建和目标仓库 SHA 仍必须匹配。
+
+连续交付优先使用 `workflow-session.mjs`：同一进程保留 MCP 连接，预览、
+确认后的执行以及后续 Wiki/TAPD 步骤不重复启动服务。每项业务写入仍需
+已确认计划；会话失败不自动重试，结束或空闲超时会关闭连接。
+
+上线的合并动作与精确 Wiki 补丁完整展示时，一次确认覆盖两个明确的
+授权范围。合并成功后用 Wiki `update` 模式完成补丁；清理删除仍单独确认。
+脚本通过 stdin 接收内存计划，不增加流程 JSON 文件或恢复记录。
+参数与限制见[脚本化交付说明](references/scripted-delivery.md)。
+
+### 最后登记与本地预检合并执行
+
+`register-test-submission.mjs` 在 Git、部署和 Wiki/评论门禁通过后，
+一次写入适用的待测试状态和测试版本，并统一读回。继续开发已经待测试
+时直接跳过，Story/Task 不写 Bug 状态。字段或状态配置变化时停止，
+不覆盖他人的更新，也不重复启动逐字段校验 Agent。
+状态代码、允许流转和版本字段由实际 TAPD 配置自动解析，支持数字和
+单词后缀的自定义字段；歧义、不可写字段或缺失必填现值会停止。
+
+`check-local-closeout.mjs` 在默认分支交付核实后，一次批量读取关联
+worktree、refs、完整 tip 包含关系、状态和忽略数据，并使用一次收集的
+任务/进程占用证据。默认自动读取限定目录的 Codex SQLite 元数据和进程
+工作目录/打开文件，不读取聊天正文或文件内容。未归档关联任务、当前工作位置、有改动或仍使用的资源会保留；证据
+不足标为待核实。它只产生清理建议，没有删除入口，实际删除仍单独确认。
 
 ### 集中项目知识库
 

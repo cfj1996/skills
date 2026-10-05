@@ -16,6 +16,10 @@ Wiki entry as `是否上线：已合并` after verified master containment. A to
 project keeps `是否上线：无需上线` and requires no master-merge status
 transition.
 
+Here `master` denotes the verified default delivery branch. Use actual `main`
+only when remote evidence confirms it as the default; keep that exact name in
+the visible plan, executor and containment refs. Never infer it from cwd.
+
 After verified master delivery, `DELIVER` also checks associated local branches
 and worktrees and creates an exact `CleanupPlan` for safe candidates. It never
 deletes them in the delivery turn. `CLEANUP` consumes the prior merged result
@@ -23,11 +27,17 @@ and a separate exact cleanup confirmation, revalidates every candidate, and may
 remove only those confirmed local resources.
 
 Read [contracts.md](references/contracts.md) and
-[acceptance-scenarios.md](references/acceptance-scenarios.md), plus the shared
 [tool-routing policy](../../references/tool-routing.md) before any write.
+Read [acceptance-scenarios.md](references/acceptance-scenarios.md) only for an
+edge case or regression check.
 GitLab operations use `gitlab-mcp`; Wiki operations use `tapd-mcp`.
 Confirmed local cleanup uses only ordinary local Git CLI commands described
 below.
+
+Reuse a live [workflow session](../../scripts/workflow-session.mjs) for merge,
+closeout and Wiki actions when available; its MCP pool saves initialization
+without caching source refs, occupancy, Wiki state or authorization. Individual
+helpers remain the fallback for a standalone action.
 
 ## Input gate
 
@@ -38,6 +48,11 @@ For `operation=DELIVER`, require:
 - verified repository/source/current-round commit facts; and
 - resolved project category/service type; and
 - an explicit current-conversation request to go live.
+
+Reuse the exact source branch, project category and Wiki ID from the submitted
+result. Read that Wiki by ID; do not rediscover the hierarchy or enumerate
+other entries. Refresh source/master refs and the exact Wiki body at their
+write boundaries, not the entire submission preflight.
 
 When the upstream profile is `STANDARD`, require the exact existing Wiki target
 and readback retained by submission, whether the submission Wiki state is
@@ -64,9 +79,12 @@ authorizes cleanup. `CLEANUP` never repeats the master MR or Wiki operations.
 
 1. Re-read repository fingerprint, original source ref, `master` ref, existing
    MR state, and current-round commits.
-2. Display exact repository, source, target=`master`, source/target SHAs,
-   commits, operation, and purpose. Obtain explicit authorization for those
-   current facts. A changed fact requires a fresh display and authorization.
+2. Prepare one complete delivery checklist with repository, original source,
+   exact default target, source/target SHAs, commits, MR actions and purpose.
+   Resolve the Wiki action below before showing this checklist. One explicit
+   current-conversation confirmation can bind both merge authority and exact
+   Wiki-patch authority when both are fully displayed. An omitted scope still
+   needs its own confirmation; changed facts require a fresh actual preview.
 3. For a `STANDARD` submission, read its exact Wiki target and uniquely locate
    the entry by the original source branch. Resolve the project category and
    service type before planning the Wiki operation:
@@ -78,7 +96,10 @@ authorizes cleanup. `CLEANUP` never repeats the master MR or Wiki operations.
      master containment;
    - record `ALREADY_MERGED` when a business entry is already `已合并`.
    For a business entry that needs a patch, display the minimal patch and
-   resulting body and obtain separate exact authorization for that Wiki write.
+   resulting body and obtain exact authorization for that Wiki write. This is
+   a separately identified authority scope in the same complete checklist;
+   do not ask a second question when its target/body/purpose were already
+   fully shown and confirmed.
    A tooling entry performs no Wiki write and requires no Wiki-write
    authorization. Duplicate/conflicting fields or ambiguous entries block
    before the merge. For `NO_WIKI`, record `SKIPPED_NO_WIKI`; never create a
@@ -87,22 +108,40 @@ authorizes cleanup. `CLEANUP` never repeats the master MR or Wiki operations.
    [master-merge-validator.md](agents/master-merge-validator.md) before the
    first write. Map its response to a public validation state, retain only a
    concise failure reason, and discard the private line.
-5. Immediately re-read source and `master` SHAs. If they differ from the
-   authorized facts, stop and re-authorize. Otherwise create/update and merge
-   the direct source-to-master MR. Read back the merge and prove all approved
-   current-round commits are contained in `origin/master`.
+5. Run [merge-reviewed-branch.mjs](../../scripts/merge-reviewed-branch.mjs)
+   once for the exact original-source-to-default-target plan. It checks fresh
+   refs/approvals, waits for CI itself, creates or reuses the exact MR, merges
+   once and verifies containment. Require `MERGED` plus actual readback and
+   containment; pending auto-merge is not completion. Do not repeat whole
+   preparation, review, private validation or Agent polling between its steps.
+   A real metadata edit or conflict needs its own exact authorized action.
 6. After successful merge readback and `origin/master` containment, run the
-   read-only [local closeout check](references/local-closeout.md). Retain its
+   read-only [local closeout check](references/local-closeout.md) through
+   [check-local-closeout.mjs](../../scripts/check-local-closeout.mjs) once.
+   Supply only the original branch and explicitly evidenced related branches
+   and current task location. It automatically collects one fresh scoped
+   Codex task/process snapshot; a supported external collector snapshot may
+   replace that collection when already available.
+   It batches target fetch/ref/worktree reads and parallel local inspections;
+   unknown occupancy/data yields `VERIFY`, never assumed idle. Do not repeat
+   these reads manually or introduce deletion into this check. Retain its
    result even if subsequent Wiki maintenance fails. A partial or unavailable
    local check does not block Wiki maintenance or change the confirmed merge.
 7. Only after successful merge readback and `origin/master` containment, for a
    `STANDARD` business submission re-read the Wiki. If the authorized patch
-   still applies, validate that Wiki write, apply it, and read back exactly
+   still applies, reuse the prevalidated exact Wiki authority and invoke
+   [ensure-test-wiki.mjs](../submitting-for-test/scripts/ensure-test-wiki.mjs)
+   once in `--mode update --execute`, with the existing ID/parent/title,
+   original body SHA-256 and approved full resulting body. This mode performs
+   only Wiki update/readback, with no item/comment read or write. Require
+   `UPDATED|UNCHANGED`, approved final body hash and exactly
    `是否上线：已合并`; for `ALREADY_MERGED`, verify the unchanged field instead.
    For `SKIPPED_TOOL_PROJECT`, verify the unchanged
    `是否上线：无需上线` field and perform no Wiki write. If the page changed,
    stop for a fresh patch and authorization; never overwrite the changed page.
-   A `NO_WIKI` submission performs no Wiki read or write.
+   A `NO_WIKI` submission performs no Wiki read or write. No extra private
+   Agent validation is needed for an unchanged fully displayed patch; a changed
+   body/patch is a real exception and needs a new preview/authorization.
 8. Return `MERGED` only when all required merge and Wiki readbacks pass;
    otherwise return `BLOCKED` with actual completed effects. Include the local
    check result separately, with paths/branches, reasons, and cleanup advice.
@@ -146,6 +185,9 @@ Run only for `operation=CLEANUP` after its exact confirmation:
 Do not publish a production version, run smoke tests, update TAPD status or
 comments, publish a test version, or write local workflow state. No retry or
 interruption recovery is built into this skill.
+Remove the transient approved Wiki-body Markdown file after its helper call;
+it is only a request carrier, never a workflow record. An explicit version or
+environment publication uses `running-release` with its exact release plan.
 
 `是否上线：已合并` means that the approved current-round commits are verified
 in `origin/master`; it does not claim that a production version was published.

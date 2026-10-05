@@ -61,6 +61,31 @@ Use the skills in this order:
 Do not skip ahead because the user supplied a plausible repository or branch.
 Exact user constraints are preserved and verified, not replaced.
 
+## Fast path and evidence reuse
+
+- Treat an explicit project, delivery surface and scope boundary as constraints.
+  For a request limited to UI and interaction, do not expand into backend
+  design, refund-event handling or every possible API contract. Check a live
+  field only when the requested display actually consumes it; a user-approved
+  Mock/visual state does not require a new backend contract to begin UI work.
+- Keep one current in-memory evidence set for the TAPD item, project, prototype,
+  remote baseline, branch and scope. Pass those facts to child skills. Do not
+  re-read a skill, knowledge file, TAPD item, branch or prototype merely because
+  the next stage starts; refresh mutable Git/TAPD facts at the write boundary
+  or when an observed change invalidates them.
+- Batch independent read-only facts once the item and repository are known.
+  Ask for user decisions only after checking available evidence. Bundle related
+  unresolved decisions into one question; explicit clarifications update the
+  current scope instead of starting discovery again. Never use timed sleep as
+  a substitute for a required answer.
+- Use `DIALOGUE` for a uniform interaction applied to several pages when there
+  is one shared behavior and no independent page decisions. Do not load panel
+  runtime, fixtures or browser injection scripts unless `PANEL` was selected.
+- A stage boundary does not require a new turn. Continue through all authorized
+  read-only work and implementation stages in the same turn while gates pass;
+  pause only for a genuinely missing decision or an operation whose exact
+  current facts still need authorization.
+
 ## 1. Resolve affected projects
 
 Read the requirement and prototype evidence, then invoke
@@ -82,8 +107,9 @@ acceptance criteria, code evidence, and missing decisions.
 
 Require the user-visible
 [需求确认前检查清单](../writing-plans/references/requirement-readiness-checklist.md)
-covering business behavior, data fields, API facts, permissions, state and
-acceptance. Continue toward the execution checklist only when
+covering the business behavior, data fields, API facts, permissions, state and
+acceptance that apply to this delivery. `NOT_APPLICABLE` categories need a
+short scope-based reason, not a full source search. Continue toward the execution checklist only when
 `requirement_blocker_count=0`. Preserve any implementation-only gaps with
 `implementation_ready=false`; they do not invalidate confirmed business scope
 but they block `IMPLEMENT` until resolved.
@@ -116,6 +142,8 @@ but never invents or substitutes the branch name.
 Before confirmation, invoke `zan-workflows:preparing-work` read-only with the
 exact TAPD URL, proposed scope and branch constraints to obtain preflight facts;
 an unconfirmed scope may remain `PENDING` and is not a downstream handoff.
+Reuse the same TAPD/project/branch evidence from scope review; do not perform
+a second broad project or historical-Wiki discovery.
 
 Build one combined checklist from all project rows using
 [需求开发分支与单次确认](references/branch-checklist.md), show one authorization
@@ -125,7 +153,8 @@ scope or branch confirmation. The initial Story/Task request selects the work;
 it does not confirm derived checklist fields.
 
 After confirmation, re-invoke `preparing-work` with the same visible facts and
-the current-conversation checklist authorization. Require a validated
+the current-conversation checklist authorization. Revalidate only mutable
+refs/status and facts changed since preflight. Require a validated
 `TapdWorkDefinition` with `terminal_state=READY_FOR_HANDOFF`, exact
 `CREATE|USE_EXISTING`, fixed branch, repository fingerprint, verified base
 ref/SHA when creating, and reusable branch authorization. Any visible change
@@ -226,9 +255,10 @@ verified merge result.
 
 Before every final response, pause, blocker handoff, branch-only completion,
 Plan-only completion, or reviewed completion, apply
-[需求开发进度与下一步引导](references/progress-guidance.md). Always show the
-completed-stage checklist, current stage/status, one recommended next action,
-relevant alternatives, and short reply phrases the user can copy.
+[需求开发进度与下一步引导](references/progress-guidance.md). Show the current
+stage/status and one actionable next step. Use a full completed-stage checklist
+only when handing off a blocked or multi-project run; ordinary progress and
+small follow-up fixes need a concise delta, not a repeated workflow transcript.
 
 Recommend improving the current stage whenever it is `PENDING|BLOCKED|FAILED`;
 recommend the next stage only after the current gate passes. A recommendation

@@ -30,11 +30,20 @@
   `是否上线：无需上线` and performs no Wiki write. A `NO_WIKI`
   submission yields `SKIPPED_NO_WIKI` and does not prevent `MERGED`; never
   create a Wiki.
-- `UPDATED_MERGED` requires verified master containment, separate authorization
+- `UPDATED_MERGED` requires verified master containment, exact Wiki authorization
   for the exact minimal field patch, and a readback of exactly
   `是否上线：已合并`. The authorized patch must replace exactly one
   `是否上线：未合并` field. Missing or non-current values block; no migration
   or insertion is allowed.
+- Merge and Wiki-patch authority are distinct scopes and may share one
+  current-conversation confirmation only when the full targets, operation,
+  purpose and actual minimal Wiki body/patch were displayed together. Omitted
+  or changed scopes need fresh confirmation. Validate the unchanged delivery
+  bundle once; the MR and update-only Wiki executors enforce fresh checks and
+  readbacks without separate Agent validation between steps. Cleanup remains
+  a separately confirmed exact resource set.
+- References to `master` use the verified actual default; `main` is permitted
+  only after actual remote-default evidence, never an inferred branch alias.
 - `ALREADY_MERGED` requires a readback of exactly one matching
   `是否上线：已合并` field and performs no Wiki write.
 - The merge-status field denotes current-round commit containment in
@@ -49,6 +58,11 @@
   local inspection evidence yields `PARTIAL` or `UNAVAILABLE`, independently
   of merge/Wiki success; it does not alone change the terminal state or block
   Wiki maintenance. `NOT_TRIGGERED` applies only before verified delivery.
+- The closeout executor consumes only exact evidenced resources and one fresh
+  scoped occupancy snapshot. It batches Git/ref/worktree reads and per-tree
+  checks; it has no deletion entry point. Missing/stale occupancy, ignored data
+  or ancestry yields partial/verify outcomes, never assumed cleanliness or idle
+  resources. Reuse its complete output instead of repeating the same commands.
 - Cleanup candidacy requires evidence for the entire current local tip, not
   only the approved current-round commits. A closeout result creates only a
   plan; deletion requires a separate exact current-conversation confirmation
