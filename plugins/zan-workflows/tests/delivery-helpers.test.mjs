@@ -146,6 +146,100 @@ test('merge readback without source containment cannot claim delivery', async ()
   });
 });
 
+test('legacy approval counters are accepted without an approval-rule array', async () => {
+  const fake = mergeFake({ onCall: name => name === 'get_merge_request_approval_state'
+    ? reply({ approvals_required: 0, approvals_left: 0, approved: false, approved_by: [] }) : undefined });
+  const result = await mergeReviewedBranch(fake.call, mergeInput(), fake.io);
+  assert.equal(result.state, 'MERGED');
+  assert.equal(result.approvalEvidence.state, 'COUNTS_VERIFIED');
+});
+
+test('actual Community Edition MCP summary no longer blocks on missing rules', async () => {
+  let probes = 0;
+  const fake = mergeFake({ onCall: name => name === 'get_merge_request_approval_state'
+    ? reply({ approved: false, user_has_approved: false, user_can_approve: true,
+      approved_by: [], approved_by_usernames: [], source_endpoint: 'approvals' }) : undefined });
+  const result = await mergeReviewedBranch(fake.call, mergeInput(), { ...fake.io, approvalReader: {
+    metadata: async () => { probes++; return { enterprise: false, version: '17.10.0' }; },
+    approvals: async () => { throw new Error('CE does not need an additional approvals request'); },
+  } });
+  assert.equal(result.state, 'MERGED'); assert.equal(probes, 1);
+  assert.equal(result.approvalEvidence.state, 'COMMUNITY_OPTIONAL');
+  assert.equal(fake.calls.filter(row => row.name === 'merge_merge_request').length, 1);
+  assert.equal(result.containment, true);
+});
+
+test('Enterprise Edition restores counters omitted by MCP and never merges pending approvals', async () => {
+  for (const raw of [
+    { approvals_required: 2, approvals_left: 1, approved: true, approved_by: [] },
+    { approved: false, approved_by: [] },
+  ]) {
+    const fake = mergeFake({ onCall: name => name === 'get_merge_request_approval_state'
+      ? reply({ approved: true, approved_by: [], source_endpoint: 'approvals' }) : undefined });
+    await assert.rejects(mergeReviewedBranch(fake.call, mergeInput(), { ...fake.io, approvalReader: {
+      metadata: async () => ({ enterprise: true, version: '17.10.0-ee' }), approvals: async () => raw,
+    } }), /审批尚未完成/);
+    assert.equal(fake.calls.some(row => row.name === 'merge_merge_request'), false);
+  }
+});
+
+test('Enterprise approval summary and complete counters can verify fulfilled requirements', async () => {
+  for (const raw of [
+    { approvals_required: 2, approvals_left: 0, approved: true, approved_by: [] },
+    { approved: true, approved_by: [] },
+  ]) {
+    const fake = mergeFake({ onCall: name => name === 'get_merge_request_approval_state'
+      ? reply({ approved: true, approved_by: [], source_endpoint: 'approvals' }) : undefined });
+    const result = await mergeReviewedBranch(fake.call, mergeInput(), { ...fake.io, approvalReader: {
+      metadata: async () => ({ enterprise: true, version: '17.10.0-ee' }), approvals: async () => raw,
+    } });
+    assert.equal(result.state, 'MERGED');
+    assert.equal(result.approvalEvidence.source, 'readonly-approvals');
+  }
+});
+
+test('unknown edition and metadata permission failures remain blocking', async () => {
+  for (const metadata of [async () => ({ version: '17.10.0' }), async () => { throw new Error('HTTP 403'); }]) {
+    const fake = mergeFake({ onCall: name => name === 'get_merge_request_approval_state'
+      ? reply({ approved: false, approved_by: [], source_endpoint: 'approvals' }) : undefined });
+    await assert.rejects(mergeReviewedBranch(fake.call, mergeInput(), { ...fake.io, approvalReader: { metadata } }));
+    assert.equal(fake.calls.some(row => row.name === 'merge_merge_request'), false);
+  }
+});
+
+test('source refs are refreshed after the edition probe rather than before it', async () => {
+  let changed = false;
+  const fake = mergeFake({ onCall(name, args) {
+    if (name === 'get_merge_request_approval_state') return reply({ approved: false, approved_by: [], source_endpoint: 'approvals' });
+    if (changed && name === 'get_branch' && args.branch_name === sourceBranch) return reply({ commit: { id: otherSha } });
+  } });
+  await assert.rejects(mergeReviewedBranch(fake.call, mergeInput(), { ...fake.io, approvalReader: {
+    metadata: async () => { changed = true; return { enterprise: false, version: '17.10.0' }; },
+  } }), /SHA 已变化/);
+  assert.equal(fake.calls.some(row => row.name === 'merge_merge_request'), false);
+});
+
+test('a coarse mergeable flag cannot override a detailed server blocker', async () => {
+  const fake = mergeFake({ onCall: name => name === 'get_merge_request' ? reply({ iid: 7,
+    source_branch: sourceBranch, target_branch: 'develop', sha: sourceSha, state: 'opened',
+    detailed_merge_status: 'security_policy_violations', merge_status: 'can_be_merged' }) : undefined });
+  await assert.rejects(mergeReviewedBranch(fake.call, { ...mergeInput(), pipelineRequired: false }, fake.io), /不可验证/);
+  assert.equal(fake.calls.some(row => row.name === 'merge_merge_request'), false);
+});
+
+test('Community edition compatibility retains CI and discussion gates', async () => {
+  for (const onCall of [
+    name => name === 'get_merge_request' ? reply({ iid: 7, source_branch: sourceBranch, target_branch: 'develop',
+      sha: sourceSha, state: 'opened', detailed_merge_status: 'not_approved', merge_status: 'can_be_merged' }) : undefined,
+    name => name === 'get_merge_request' ? reply({ iid: 7, source_branch: sourceBranch, target_branch: 'develop',
+      sha: sourceSha, state: 'opened', detailed_merge_status: 'mergeable', blocking_discussions_resolved: false }) : undefined,
+  ]) {
+    const fake = mergeFake({ onCall });
+    await assert.rejects(mergeReviewedBranch(fake.call, mergeInput(), fake.io));
+    assert.equal(fake.calls.some(row => row.name === 'merge_merge_request'), false);
+  }
+});
+
 const jobUrl = 'https://ci.example.test/jenkins/job/demo-test/';
 const releaseInput = () => ({ targetProject: 'demo', releaseTarget: 'demo-web', targetEnvironment: 'test',
   jobName: 'demo-test', jobUrl, releaseRef: sourceSha, refParameter: 'REF', version: '1.0.0-canary.1',

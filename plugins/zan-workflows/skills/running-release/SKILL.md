@@ -15,6 +15,9 @@ Resolve the project/module or package owner and exact Job/URL through
 release path; do not run package publish/deploy scripts locally. Reuse current
 verified project, repository, source and Job evidence instead of restarting
 routing. No TAPD item is required for a standalone release.
+Start the workflow session with the pinned helper runtime and wait for its
+`SESSION_READY` event. It manages its own TTY input; do not inspect or change
+another terminal to deliver a long plan.
 
 1. Prepare one release plan with project, release target/package, environment,
    Job/name/URL, exact release ref and expected target-repository SHA, version,

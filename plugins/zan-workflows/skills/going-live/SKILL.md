@@ -38,6 +38,9 @@ Reuse a live [workflow session](../../scripts/workflow-session.mjs) for merge,
 closeout and Wiki actions when available; its MCP pool saves initialization
 without caching source refs, occupancy, Wiki state or authorization. Individual
 helpers remain the fallback for a standalone action.
+Use the pinned helper runtime and wait for `SESSION_READY`; avoid manual TTY
+repair. The merge helper verifies supported rule/counter/edition formats and
+records approval evidence; an unknown or denied check remains blocking.
 
 ## Input gate
 

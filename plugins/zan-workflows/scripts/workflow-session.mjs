@@ -9,6 +9,7 @@ import { runJenkinsRelease } from './run-jenkins-release.mjs';
 import { registerTestSubmission } from './register-test-submission.mjs';
 import { checkLocalCloseout } from './check-local-closeout.mjs';
 import { ensureTestWiki } from '../skills/submitting-for-test/scripts/ensure-test-wiki.mjs';
+import { sessionInput } from './session-input.mjs';
 
 export class WorkflowSession {
   constructor({ allowExecute = false, pool = new McpClientPool(), reader = configuredJenkinsReader, io = {} } = {}) {
@@ -64,15 +65,18 @@ async function main() {
   }
   const session = new WorkflowSession({ allowExecute: argv.includes('--allow-execute'),
     io: { onProgress: event => process.stderr.write(JSON.stringify(event) + '\n') } });
-  const lines = createInterface({ input: process.stdin, terminal: false });
+  let lines, transport;
   let timer;
+  const stop = code => { lines?.close(); transport?.restore(); session.close(); process.exit(code); };
+  transport = sessionInput(process.stdin, () => stop(130));
+  lines = createInterface({ input: transport.stream, terminal: false });
   const arm = () => {
     clearTimeout(timer);
-    timer = setTimeout(() => { lines.close(); session.close(); process.stdin.destroy(); }, 1800000);
+    timer = setTimeout(() => { lines.close(); transport.restore(); session.close(); process.stdin.destroy(); }, 1800000);
   };
-  const stop = code => { lines.close(); session.close(); process.exit(code); };
   process.once('SIGINT', () => stop(130));
   process.once('SIGTERM', () => stop(143));
+  process.stderr.write(JSON.stringify({ state: 'SESSION_READY', inputMode: transport.mode }) + '\n');
   arm();
   try {
     for await (const line of lines) {
@@ -81,7 +85,7 @@ async function main() {
       let request;
       try {
         if (Buffer.byteLength(line) > 262144) throw new Error('请求超过 256 KiB');
-        request = JSON.parse(line);
+        try { request = JSON.parse(line); } catch { throw new Error('请求不是有效 JSON'); }
         const result = await session.dispatch(request);
         process.stdout.write(JSON.stringify({ id: request.id, result }) + '\n');
       } catch (error) {
@@ -90,7 +94,7 @@ async function main() {
       }
       arm();
     }
-  } finally { clearTimeout(timer); session.close(); }
+  } finally { clearTimeout(timer); lines.close(); transport.restore(); session.close(); }
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
