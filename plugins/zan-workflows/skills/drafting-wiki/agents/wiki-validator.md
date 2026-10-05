@@ -62,13 +62,20 @@ Validate these invariants in order:
    Under `CONTINUE`, one matching source-branch entry receives the current
    affected-scope append; a business entry also resets `已合并` to `未合并`
    when the new current-round commits are not in `origin/master`, while a
-   tooling entry preserves `无需上线`. Missing or non-current statuses are invalid,
+   tooling entry preserves `当前版本` or applies only the evidenced channel
+   update/legacy-line replacement allowed by `wiki-template.md`. Missing or
+   conflicting statuses are invalid,
    and a new duplicate entry is invalid. A proven non-functional continuation
    is skipped before this validator is called.
 5. A successful new entry contains every canonical field from
    `references/wiki-template.md`, including `项目名称`, the exact Jenkins Job
-   link, and exactly one valid status: `未合并` for a business project at test
-   submission or `无需上线` for a tooling/library project. It contains no
+   link, and exactly one valid type-specific status: `是否上线：未合并` for a
+   business project at test submission; `当前版本：canary` for
+   tooling `canary` or `当前版本：latest` for tooling `official`. Tooling
+   has no `是否上线` line. Check release evidence, or the exact planned channel
+   with a conditional successful-release gate under `DEPLOY`; under `SKIP`,
+   preserve valid existing evidence without querying builds or defaulting to
+   canary. A master merge alone cannot prove the latest publication. It contains no
    process narration, validation verdict, write instruction, or unsupported
    claim that the change is already merged. An existing status value is not
    silently reset.

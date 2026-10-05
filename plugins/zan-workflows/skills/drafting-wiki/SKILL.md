@@ -87,12 +87,13 @@ invent a value or render a placeholder.
    `影响范围` list. For a business project, also change `已合并` back to
    `未合并` when the new current-round commits are not contained in
    `origin/master`; preserve an existing `未合并`. For a tooling project,
-   require and preserve `无需上线`. A missing status or any value outside the
-   current three-state contract blocks. Never create a second entry for the same branch. For
+   resolve `当前版本` using the channel evidence and minimal legacy-field
+   replacement rules in `wiki-template.md`. Missing or conflicting status facts
+   block. Never create a second entry for the same branch. For
    `INITIAL`, render
    a complete body beginning with `# 前端` and sequence `1`, initializing each
-   new entry with the resolved status: `未合并` for a business project or
-   `无需上线` for a tooling/library project.
+   new entry with `是否上线：未合并` for a business project, or
+   `当前版本：canary|latest` for a tooling/library project.
 7. For a policy skip, map validation to `NOT_RUN` with its normalized reason.
    Otherwise, give the target plan, hierarchy/readback evidence, normalized
    facts, calculation, patch, and proposed body to the private read-only

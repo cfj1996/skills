@@ -36,8 +36,12 @@ filesystem, or network write operations.
   evidence, non-empty rendered Markdown, and no `待补充`. Existing links/related
   children are reused before creation. Month creation targets root
   `1150372234001008260`; entry content targets only the child. A new entry
-  contains the resolved status—exactly `未合并` for a business project or
-  `无需上线` for a tooling/library project—and the final result retains the
+  contains the resolved type-specific status: `是否上线：未合并` for a
+  business project, or `当前版本：canary|latest` for a
+  tooling/library project. Tooling `DEPLOY` gates Wiki writes on a matching
+  successful `canary|official` release readback; `SKIP` uses existing evidence
+  or preserves the valid prior field without build queries or a canary default.
+  The final result retains the
   actual child ID/URL plus source-branch identity for `going-live`.
 - Under `STANDARD`, a drafter result with
   `terminal_state=SKIPPED_BY_POLICY` is valid only when

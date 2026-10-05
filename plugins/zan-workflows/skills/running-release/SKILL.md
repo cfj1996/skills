@@ -55,6 +55,10 @@ another terminal to deliver a long plan.
    package release additionally verifies the actual pipeline SHA and parses
    the exact build's bounded publication summary. Report `publishedPackages`
    as actual npm versions, never the source identity as a package version.
+   For a later authorized tooling Wiki update, pass the verified actual channel,
+   package versions, source SHA and build evidence: `canary` maps to
+   `当前版本：canary`, `official` to `当前版本：latest`.
+   The release capability itself still performs no Wiki write.
 5. On `FAILED|UNKNOWN|BLOCKED`, report the exact phase, queue/build and known
    effects, and stop later actions. Never retry a trigger or use another build
    as success evidence. A Job without verifiable SCM metadata requires a

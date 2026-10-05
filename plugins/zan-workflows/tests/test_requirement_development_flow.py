@@ -33,7 +33,7 @@ class RequirementDevelopmentFlowTests(unittest.TestCase):
         self.assertIn("AWAITING_GO_LIVE_CONFIRMATION", text)
         self.assertIn("AWAITING_CLEANUP_CONFIRMATION", text)
         self.assertIn("operation=CLEANUP", text)
-        self.assertIn("No mode publishes a production version", text)
+        self.assertIn("Business application\nproduction deployment remains outside this mode", text)
 
     def test_writing_plans_routes_simple_and_complex_scope_before_branch_plan(self):
         text = (PLUGIN_ROOT / "skills/writing-plans/SKILL.md").read_text()

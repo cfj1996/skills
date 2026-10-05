@@ -26,7 +26,7 @@
 | zan:起草提测 Wiki | [`drafting-wiki`](skills/drafting-wiki/SKILL.md) | 只读定位现有提测 Wiki 或计算新 Wiki 正文，不直接写入 | Wiki 规划 |
 | zan:补写提测 Wiki 链接 | [`linking-tapd-wiki`](skills/linking-tapd-wiki/SKILL.md) | 将已验证的提测 Wiki 链接幂等地添加到或核对 TAPD Bug、Story、Task 评论 | TAPD 评论 |
 | zan:提交测试 | [`submitting-for-test`](skills/submitting-for-test/SKILL.md) | 在提测计划确认后，负责代码交付到 `develop`、可选 Jenkins 测试部署、Wiki、TAPD 评论/状态/测试版本 | 提测执行 |
-| zan:上线发布 | [`going-live`](skills/going-live/SKILL.md) | 将原始开发分支合并到 `master`，维护 Wiki 合并状态；验证后生成本地清理计划，并在另行确认后清理 worktree/本地分支 | 上线/清理 |
+| zan:上线发布 | [`going-live`](skills/going-live/SKILL.md) | 原分支合并 `master`；先检查工具包 latest，按需发布、升级并核验对应项目、更新 Wiki；验证后按单独确认清理本地环境 | 上线/清理 |
 | zan:Jenkins 部署发布 | [`running-release`](skills/running-release/SKILL.md) | 一次确认完整发布清单，由脚本触发 Jenkins、等待本次队列/构建并核对源码；支持部署和工具包版本发布 | 部署/发包 |
 | zan:管辖 MR 审核 | [`managed-mr-review`](skills/managed-mr-review/SKILL.md) | 查找、审核和按明确要求合并管辖范围内 GitLab MR；代码结论和合并资格分别判断 | MR 管理 |
 | zan:团队身份映射 | [`team-identity-map`](skills/team-identity-map/SKILL.md) | 根据已知姓名、企微线索或 GitLab 用户名查询团队身份映射 | 身份查询 |
@@ -202,7 +202,7 @@ flowchart LR
 - `BRANCH_ONLY`：只创建或选择分支并读回。
 - `IMPLEMENT`：实现、验证和评审后结束。
 - `SUBMIT`：在实现评审后进入提测流程。
-- `GO_LIVE`：在提测后继续进入 `going-live`；“上线”在此指原分支合并 `master` 并维护 Wiki 状态，不表示发布生产版本。
+- `GO_LIVE`：在提测后继续进入 `going-live`；先验证工具包 latest，再验证对应项目依赖，完成两项检查后决定是否发布或升级，按原分支交付到 `master` 并更新 Wiki。业务应用的生产部署需另行明确请求。
 
 初始需求清单的确认只授权清单中列出的范围、分支动作、Plan 和实现。提测、合并 `master`、Wiki 写入和本地清理都要等各自的精确计划展示后再确认。
 
@@ -244,7 +244,9 @@ Bug 使用 `fixing-bug`。它可以接收一个 Bug URL 或有序列表；多个
 
 ### 合并 master 与本地清理
 
-`going-live` 只接受原始 `feature/*` 或 `fixbug/*` 分支，并直接合并到 `master`；不把 `develop`、`dev`、`merge/*` 或重建分支作为源。业务项目在 master 包含性通过后将 Wiki“是否上线”更新为“已合并”；工具类项目维持“无需上线”。该状态只证明代码已进入 master，不代表生产发布。
+`going-live` 只接受原始 `feature/*` 或 `fixbug/*` 分支，并直接合并到 `master`；不把 `develop`、`dev`、`merge/*` 或重建分支作为源。业务项目在 master 包含性通过后将 Wiki“是否上线”更新为“已合并”，该状态只证明代码已进入 master。
+
+涉及工具包时，按[工具包 latest 上线流程](skills/going-live/references/tooling-latest.md)先只读验证工具包 latest 是否已发布并覆盖本次变更，再验证对应项目的依赖声明、锁文件和实际解析版本是否为最新 latest。完成两项检查后统一判断：包和项目均已最新时跳过构建与升级；包已发布但项目未升级时仅升级对应项目；包尚未发布时才通过 Jenkins 发布，再按实际新版本判断哪些项目需要升级。证据不明或查询失败时停止，不能先构建再检查项目。验证并评审必要改动后交付原始分支，最后更新并读回 Wiki“当前版本：latest”。无工具包时跳过此流程；完整确认可一次覆盖不变的操作，清理仍需另行确认。
 
 合并成功后先做本地只读检查，将关联资源标为可清理候选、保留或待核实。发现候选时，必须展示准确的 worktree 路径、本地分支和目标 SHA，单独取得清理确认，再刷新检查。只用普通 `git worktree remove` 和 `git branch -d`；不删除远程分支，也不强制删除。当前任务目录/分支、保护分支、脏/活跃/锁定或证据不完整的资源不得清理。
 

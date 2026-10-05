@@ -164,7 +164,10 @@ order:
 6. If submission returns `SUBMITTED` and go-live was explicitly requested,
    call `going-live` with `operation=DELIVER` and that exact
    `TestSubmissionResult`; it owns reading the original repair branch from the
-   result. Its master merge and Wiki facts require their own confirmation.
+   result. Include related submitted package-owner/consumer projects when the
+   repair involves tooling dependencies; `going-live` owns latest publication,
+   scoped dependency upgrades, actual-version checks and Wiki latest readback.
+   Its complete merge/release/upgrade/Wiki facts require their own confirmation.
    Preserve any returned `CleanupPlan`, but do not execute cleanup inside the
    per-Bug loop or while another confirmed Bug still uses the shared branch.
 7. After every Bug in the confirmed queue has reached its truthful terminal

@@ -15,7 +15,7 @@ target-location, Wiki-ID, TAPD-comment, writeback, merge, or release narration.
 - 影响范围：
   1. {影响范围}
 - 测试人员：{测试人员}
-- 是否上线：{上线状态}
+{项目状态行}
 ```
 
 ## Field rules
@@ -72,18 +72,35 @@ target-location, Wiki-ID, TAPD-comment, writeback, merge, or release narration.
 - `影响范围` lists resolved current-round scopes in order. Missing scope blocks.
 - `测试人员` comes from the TAPD tester field or its dynamically resolved custom
   field. Never use `reporter` as an implicit substitute; missing tester blocks.
-- `上线状态` is derived from the project type: a business project is exactly
-  `未合并` for test submission and becomes `已合并` only after the original
-  branch is verified in `origin/master`; a tooling/library project is exactly
-  `无需上线`. An unresolved project type blocks; never guess. `已合并` also
-  requires the corresponding master-containment evidence.
+- `项目状态行` contains exactly one type-specific field:
+  - Business: `- 是否上线：未合并` for test submission; use `已合并` only
+    after the original branch is verified in `origin/master`.
+  - Tooling/library: `- 当前版本：canary` for `canary`, or
+    `- 当前版本：latest` for `official`. Do not render `是否上线` for tooling.
+    The Wiki uses package channel labels `canary|latest`; the release executor's
+    internal enum remains `canary|official`, with `official` displayed as `latest`.
+    Resolve the latest verified publication for this entry's project/package
+    from current delivery readbacks; retain its channel, actual package versions when applicable,
+    source SHA and build evidence in claims. A newer verified publication may
+    change the value in either direction. Do not infer a publication from the
+    project category, Job name, selected parameter, or a master merge.
+    A `DEPLOY` draft may bind the exact planned channel, but its Wiki write is
+    conditional on the matching successful release readback. Under `SKIP`, use
+    existing release evidence or preserve a valid existing `当前版本` field;
+    do not query builds, require deployment selections, or default to canary.
+    If the channel cannot be resolved, block the final body.
+  An unresolved project type blocks; never guess.
 - For `CONTINUE`, classify the current-round change before patching. If it is
   `NON_FUNCTIONAL`, do not update the Wiki. If it is `FUNCTIONAL_IMPACT`, the
   new affected module/page must be appended to the matching entry's
   `影响范围` list; do not duplicate an identical existing item. A business
   entry already marked `已合并` must also return to `未合并` when this new
-  current round is not contained in `origin/master`. A tooling entry remains
-  `无需上线`.
+  current round is not contained in `origin/master`. A tooling entry preserves
+  its valid `当前版本` unless a newer release changes the channel under the
+  verified-readback or conditional `DEPLOY` rule above.
+  Replace a legacy tooling `是否上线：无需上线` field with the evidenced
+  `当前版本` line as an explicit minimal patch; no other legacy-field migration
+  is allowed.
 
 ## Wiki target resolution
 
@@ -121,7 +138,7 @@ belongs in the child Wiki.
 
 For `CREATE_CHILD|CREATE_MONTH_AND_CHILD`, render a complete new child body as
 `# 前端`, one blank line, then the canonical entry above with `序号=1` and the
-resolved `上线状态`.
+resolved `项目状态行`.
 
 For `REUSE_EXISTING`, operate only on the current child body read from TAPD:
 
@@ -137,13 +154,14 @@ For `REUSE_EXISTING`, operate only on the current child body read from TAPD:
   `影响范围` field. For a business project, the same minimal patch also changes
   `是否上线：已合并` to `是否上线：未合并` when the new current-round commits
   are not contained in `origin/master`; an existing `未合并` is preserved. A
-  tooling project must preserve `是否上线：无需上线`. A missing status or any
-  value outside the current three-state contract blocks; do not migrate an old
-  template. For a `NON_FUNCTIONAL` continuation, produce a policy skip and no
-  patch.
+  tooling project follows the `当前版本` rule above: preserve a valid value,
+  update it only under the release-evidence rule above, or replace exactly one legacy
+  `是否上线：无需上线` line when the release channel is evidenced. A missing
+  status or any other non-current value blocks. For a `NON_FUNCTIONAL`
+  continuation, produce a policy skip and no patch.
 - Multiple matching entries, duplicate existing sequences,
-  duplicate/conflicting merge-status fields, malformed section boundaries, or an
-  unreadable child block instead of guessing.
+  duplicate/conflicting status fields (including both tooling field names),
+  malformed section boundaries, or an unreadable child block instead of guessing.
 
 Keep every reused character unchanged outside the calculated patch. Never
 replace an existing child with a freshly generated page, renumber historical

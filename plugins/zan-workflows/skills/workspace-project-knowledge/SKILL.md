@@ -252,7 +252,8 @@ After routing:
 10. If the routed target is a `zan-projects` subproject, return the subproject path rather than stopping at the monorepo root.
 11. When the consumer is a TAPD Wiki workflow, normalize the routed project to
     exactly one Wiki service type using the table below and return the
-    corresponding initial merge status. An unmapped category blocks instead of
+    corresponding Wiki status field. Tooling current-version channel comes from
+    release evidence, not the category. An unmapped category blocks instead of
     being guessed.
 
 Signal ranking:
@@ -277,11 +278,15 @@ Fast category hints:
 
 Wiki service-type normalization:
 
-| Knowledge category | Normalized type | Red marker | Test-submission status |
+| Knowledge category | Normalized type | Red marker | Wiki status field |
 |---|---|---|---|
-| `Atlas业务模块` | `BUSINESS` | `更新服务` | `未合并` |
-| `管理后台`, `管理后台Monorepo`, `商城类`, `服务商`, `仓配系统前端`, `仓配管理系统`, `仓配作业系统`, `仓配移动端` | `BUSINESS` | `更新服务` | `未合并` |
-| `基础库`, `组件库`, `平台库`, `Atlas跨平台基座`, `文档`, `技能库`, `AI技能`, `MCP服务`, `DevOps`, `CLI工具`, `本地CLI工具` | `TOOLING` | `工具服务-无需上线` | `无需上线` |
+| `Atlas业务模块` | `BUSINESS` | `更新服务` | `是否上线：未合并` |
+| `管理后台`, `管理后台Monorepo`, `商城类`, `服务商`, `仓配系统前端`, `仓配管理系统`, `仓配作业系统`, `仓配移动端` | `BUSINESS` | `更新服务` | `是否上线：未合并` |
+| `基础库`, `组件库`, `平台库`, `Atlas跨平台基座`, `文档`, `技能库`, `AI技能`, `MCP服务`, `DevOps`, `CLI工具`, `本地CLI工具` | `TOOLING` | `工具服务-无需上线` | `当前版本：canary` 或 `当前版本：latest`，由发布证据决定 |
+
+Tooling category alone does not determine the latest release channel. Follow
+[wiki-template.md](../drafting-wiki/references/wiki-template.md): `canary` means `canary`,
+`official` means `latest`; a master merge does not prove publication.
 
 For a monorepo, classify the matched package/app rather than the repository
 root. `zan-projects/admin/*` applications are `BUSINESS`; packages under
@@ -480,7 +485,8 @@ Project routing:
 - `分类`
 - `Wiki 服务类型`：`BUSINESS|TOOLING` when requested by a Wiki workflow
 - `Wiki 服务标识`：`更新服务|工具服务-无需上线` when requested by a Wiki workflow
-- `提测合并状态`：`未合并|无需上线` when requested by a Wiki workflow
+- `Wiki 状态字段`：business `是否上线：未合并`; tooling `当前版本` with
+  `canary|latest` only when release evidence resolves the channel
 - `命中依据`
 - `置信度`
 - `Jenkins Job 名称` when relevant

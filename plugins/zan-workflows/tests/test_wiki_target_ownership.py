@@ -88,8 +88,9 @@ class WikiTargetOwnershipTests(unittest.TestCase):
         self.assertIn("{服务类型}", DRAFTING_RULES)
         self.assertIn("`更新服务` for a business project", DRAFTING_RULES)
         self.assertIn("`工具服务-无需上线` for a tooling/library project", DRAFTING_RULES)
-        self.assertIn("`未合并` for test submission", DRAFTING_RULES)
-        self.assertIn("`无需上线`. An unresolved project type", DRAFTING_RULES)
+        self.assertIn("`- 是否上线：未合并` for test submission", DRAFTING_RULES)
+        self.assertIn("`- 当前版本：canary` for `canary`", DRAFTING_RULES)
+        self.assertIn("`- 当前版本：latest` for `official`", DRAFTING_RULES)
         self.assertIn("Jenkins Job 名称` is the exact Job name", DRAFTING_RULES)
         self.assertIn("Jenkins Job 地址` is the exact clickable URL", DRAFTING_RULES)
         self.assertNotIn("{git地址}", DRAFTING_RULES)
@@ -113,19 +114,19 @@ class WikiTargetOwnershipTests(unittest.TestCase):
         self.assertIn("`TOOLING`", normalization)
         self.assertIn("BLOCKED_UNMAPPED_WIKI_SERVICE_TYPE", normalization)
 
-    def test_going_live_rejects_old_statuses_and_skips_tool_wiki_authorization(self):
+    def test_going_live_rejects_old_statuses_and_checks_tool_latest_delivery(self):
         going_live = GOING_LIVE + GOING_LIVE_VALIDATOR + GOING_LIVE_CONTRACT
         self.assertNotIn("`是否上线：否`", going_live)
         self.assertNotIn("`是否上线：是`", going_live)
         self.assertIn("no old-template migration is allowed", GOING_LIVE_VALIDATOR)
         self.assertIn("`是否上线：已合并`", going_live)
-        self.assertIn("requires no Wiki-write\n  authorization", GOING_LIVE_CONTRACT)
-        self.assertIn("requires no Wiki-write\n   authorization", GOING_LIVE)
+        self.assertIn("`UPDATED_LATEST` requires verified official publication", GOING_LIVE_CONTRACT)
+        self.assertIn("`ALREADY_LATEST`", GOING_LIVE)
 
     def test_continue_resets_current_business_status_for_new_round(self):
         drafting = DRAFTING + DRAFTING_RULES + DRAFTING_CONTRACT
         self.assertIn("`已合并` back to `未合并`", drafting)
-        self.assertIn("tooling entry preserves `无需上线`", drafting)
+        self.assertIn("tooling entry preserves `当前版本`", drafting)
 
     def test_going_live_cleanup_requires_a_fresh_exact_confirmation(self):
         going_live = GOING_LIVE + GOING_LIVE_CONTRACT + LOCAL_CLOSEOUT

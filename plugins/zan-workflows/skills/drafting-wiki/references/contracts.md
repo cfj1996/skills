@@ -11,7 +11,7 @@
 | Claims | resolved value and read-only source for each material field |
 | Conflicts | competing values, sources, criticality |
 | Deployment context | Resolved `DEPLOY|SKIP`; a standalone Wiki-only request uses `SKIP` for parameter requirements. |
-| Current entry | sequence, Jenkins Job name/URL, selected build/release parameter names and values (only already-evidenced selections required under `SKIP`), project name, project category/service type, repository, developer, description, branch, scope, tester, merge status |
+| Current entry | sequence, Jenkins Job name/URL, selected build/release parameter names and values (only already-evidenced selections required under `SKIP`), project name, project category/service type, repository, developer, description, branch, scope, tester, business merge status or tooling current-version channel and release evidence |
 | Work mode | `INITIAL|CONTINUE`, impact classification, and incremental-scope evidence when continuing |
 | Wiki decision | `UPDATE|SKIP_NON_FUNCTIONAL` and normalized reason |
 | Placement | For `VALIDATED`, `NEW_FRONTEND_SECTION|APPEND_ENTRY|APPEND_IMPACT_SCOPE`, `# 前端` evidence, matching-entry evidence, and sequence calculation; for a policy skip, the skip decision evidence |
@@ -75,7 +75,9 @@
 - `FUNCTIONAL_IMPACT` continuation reuses the matching existing entry and
   appends the new affected module/page to that entry's `影响范围` list. A
   business entry changes `已合并` back to `未合并` when the new current-round
-  commits are not in `origin/master`; a tooling entry preserves `无需上线`. Do
+  commits are not in `origin/master`; a tooling entry preserves `当前版本`
+  unless a newer release changes the channel under the verified-readback or
+  conditional `DEPLOY` rule in `wiki-template.md`. Do
   not create a duplicate entry or duplicate an identical scope already listed.
 - The effective branch must be exactly one evidenced `feature/*` or `fixbug/*`
   source branch.
@@ -85,15 +87,19 @@
   section is appended as `# 前端` with sequence `1`. A unique entry with the
   same source branch gets an impact-scope patch and no new sequence. Duplicate
   sequences or ambiguous matches block.
-- Every new entry initializes `是否上线` from the project type: `未合并` for a
-  business project or `无需上线` for a tooling/library project. A business
+- Every new business entry initializes `是否上线：未合并`. Tooling/library
+  entries instead use `当前版本：canary` for `canary` or
+  `当前版本：latest` for `official`, following the release-evidence rules
+  in `wiki-template.md`; no tooling `是否上线` field is rendered. A business
   entry changes to `已合并` only after the original branch is verified in
   `origin/master`; it is not a production-publication claim.
 - Reused valid content is immutable outside the declared minimal patch. A
   matching entry must already use the current status contract: business
-  `未合并|已合并`, or tooling `无需上线`. Missing or non-current values block.
-  Only the declared current-round scope append and any
-  required business `已合并` to `未合并` reset may change.
+  `未合并|已合并`, or tooling `当前版本：canary|latest`.
+  Exactly one legacy tooling `是否上线：无需上线` line may be replaced with
+  the evidenced `当前版本` line in the declared minimal patch. Missing,
+  conflicting or other non-current values block. Only the declared scope
+  append, required business reset, and evidenced tooling status patch may change.
 - `VALIDATED` requires passing validation and a non-empty copyable Markdown
   body. `BLOCKED` requires a concise blocker and no rendered final body.
 - The result contains no external-write authority, local path, runtime ID,

@@ -138,8 +138,14 @@ or version writes.
 Never write the canonical entry body into the month page. For the validated
 path, read back the final child, retain its actual ID/URL and original source
 branch for `going-live`, and require the expected body including the resolved
-status (`未合并` for a business project or `无需上线` for a tooling/library
-project) before continuing. A policy skip has no
+status (`是否上线：未合并` for a business project, or
+`当前版本：canary|latest` for a tooling/library project)
+before continuing. For tooling `DEPLOY`, before the Wiki write, require the
+successful release result's actual channel to match the draft: `canary` maps
+to `canary`, `official` to `latest`. A planned parameter or
+develop/master merge alone is insufficient. Under `SKIP`, apply the existing
+release-evidence/preservation rules in `drafting-wiki`; do not default to canary
+or add deployment queries. A policy skip has no
 child write/readback or Wiki update,
 but retains any existing target readback needed by an explicitly requested
 `going-live` step.

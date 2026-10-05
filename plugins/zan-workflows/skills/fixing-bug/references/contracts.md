@@ -87,7 +87,7 @@ the first confirmation never authorizes submission writes.
 | `preparing-work` | `TapdWorkDefinition` with `READY_FOR_HANDOFF` | `implementing-work` |
 | `implementing-work` | `ReviewedChange` with `REVIEWED` | `submitting-for-test` |
 | `submitting-for-test` | `TestSubmissionResult` with `SUBMITTED` | optional `going-live`, as the complete input |
-| `going-live` `DELIVER` | `MasterMergeResult` with `MERGED` and cleanup state/plan | final summary or deferred cleanup confirmation |
+| `going-live` `DELIVER` | `MasterMergeResult` with `MERGED`, involved tooling latest release/consumer verification/Wiki readbacks, and cleanup state/plan | final summary or deferred cleanup confirmation |
 | `going-live` `CLEANUP` | updated cleanup result with `CLEANED|PARTIAL|BLOCKED` | final summary |
 
 Preflight snapshots are not handoffs. Handoffs live only for the current

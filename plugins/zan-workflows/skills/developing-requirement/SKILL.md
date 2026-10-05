@@ -33,15 +33,17 @@ Do not infer a later delivery mode from an earlier-stage request.
 For `SUBMIT|GO_LIVE`, also accept
 `submission_profile=AUTO|STANDARD|NO_WIKI` and
 `deployment_mode=AUTO|DEPLOY|SKIP` under the contracts of
-`submitting-for-test`. `GO_LIVE` means the bounded `going-live` capability—an
-original source-branch merge to `master` plus Wiki maintenance—not production
-version publication.
+`submitting-for-test`. `GO_LIVE` uses `going-live` for original-branch master
+delivery, involved tooling-package latest publication, affected-project
+dependency upgrades/verification, and Wiki maintenance. Business application
+production deployment remains outside this mode.
 
 Bug repair belongs to `zan-workflows:fixing-bug`. This orchestrator never
 performs delivery writes directly: only `submitting-for-test` may own its
 confirmed commit/push/MR/deployment/Wiki/TAPD operations, and only
-`going-live` may own its separately confirmed master merge, Wiki maintenance,
-and local cleanup. No mode publishes a production version.
+`going-live` may own its separately confirmed master delivery, tooling latest
+flow, Wiki maintenance and local cleanup. Package publication uses
+`running-release` through Jenkins; this orchestrator does not publish directly.
 
 ## Composition contract
 
@@ -230,11 +232,17 @@ for `SUBMIT` only when every project returns
 
 ## 7. Go live and close out
 
-For `GO_LIVE`, after every project is `SUBMITTED`, invoke `going-live` with
-`operation=DELIVER` for each exact `TestSubmissionResult` in dependency order.
-Its source-to-master merge facts and any Wiki patch require their own current
-confirmations; neither the implementation checklist nor submission confirmation
-may be reused. When those exact facts are displayed, set
+For `GO_LIVE`, after every project is `SUBMITTED`, pass the exact submissions
+and affected-package/consumer map to `going-live`. When tooling dependencies
+exist, use one bound delivery bundle with the related submissions so the
+package latest is checked first and consumer versions second; only then decide
+whether to release or upgrade, before consumers receive their final
+master merges; do not finalize a consumer first or run the same package release
+once per project. Without tooling packages, retain per-project delivery in
+dependency order. Its complete merge, official package release, scoped consumer
+upgrade and Wiki facts require their own current confirmation; neither the
+implementation checklist nor submission confirmation may be reused.
+When those exact facts are displayed, set
 `AWAITING_GO_LIVE_CONFIRMATION` and stop for that confirmation.
 
 After a project returns `MasterMergeResult.terminal_state=MERGED`, preserve its
@@ -246,8 +254,10 @@ go-live result, de-duplicate and surface the exact cleanup plans, then stop at
 the confirmed local worktree and local branch resources. Never infer cleanup
 authorization from `GO_LIVE` or merge confirmation.
 
-Return `MERGED` only when every project has a verified master delivery and all
-required Wiki readbacks. Cleanup is reported separately as
+Return `MERGED` only when every project has a verified master delivery, all
+involved tooling packages have verified latest releases, affected projects
+resolve the registry's current latest versions, and required Wiki readbacks
+include tooling `当前版本：latest`. Cleanup is reported separately as
 `NO_CANDIDATE|AWAITING_CONFIRMATION|CLEANED|PARTIAL|BLOCKED` and cannot undo a
 verified merge result.
 
