@@ -40,8 +40,9 @@ Validate these invariants in order:
    `branch` by default. Omit `?` and its suffix when no displayable parameters
    remain. Under `DEPLOY`, unresolved required selections block. Under `SKIP`
    or a standalone Wiki-only request, absent deployment selections are valid;
-   only already-evidenced parameters may be shown, with no Jenkins calls or
-   deployment-only input requests. Job name/URL and other canonical fields
+   only already-evidenced parameters may be shown, with no parameter/build
+   queries or deployment-only input requests. Permit only exact read-only Job
+   metadata lookup when its canonical URL is absent. Job name/URL and other canonical fields
    remain required. Never append these display
    parameters to the actual Job URL. The
    red service marker is exactly `更新服务` for a business project and exactly

@@ -5,21 +5,30 @@ import { clientFor } from './mcp-client.mjs';
 import { assertTransitionFields, resolveBugWorkflow, resolveVersionField } from './tapd-mappings.mjs';
 import { readCliPlan, sha256, stableJson, requireText } from './workflow-runtime.mjs';
 
-function apiData(result, name) {
+export function apiData(result, name) {
   if (result?.isError) throw new Error(`${name} 调用失败`);
   let value = result;
+  let successEnvelope = false;
   for (let depth = 0; depth < 8; depth++) {
+    if (value?.isError === true) throw new Error(`${name} 调用失败`);
     if (typeof value === 'string') {
-      try { value = JSON.parse(value); } catch { throw new Error(`${name} 返回不可识别的数据`); }
+      try { value = JSON.parse(value); } catch {
+        if (successEnvelope && name.startsWith('update_')) return value;
+        throw new Error(`${name} 返回不可识别的数据`);
+      }
     } else if (value?.content) {
       const texts = value.content.filter(item => item.type === 'text');
       if (texts.length !== 1) throw new Error(`${name} 返回结果不唯一`);
       value = texts[0].text;
     } else if (value && Object.hasOwn(value, 'status') && Object.hasOwn(value, 'data')) {
       if (String(value.status) !== '1') throw new Error(`${name} 返回失败状态`);
-      return value.data;
+      successEnvelope = true;
+      value = value.data;
     } else if (value && Object.hasOwn(value, 'result')) value = value.result;
+    else if (value?.structuredContent) value = value.structuredContent;
     else if (value && Object.hasOwn(value, 'data')) value = value.data;
+    else if (Array.isArray(value) || value && typeof value === 'object') return value;
+    else if (successEnvelope) return value;
     else throw new Error(`${name} 缺少成功的数据封装`);
   }
   throw new Error(`${name} 返回封装过深`);

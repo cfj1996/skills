@@ -8,7 +8,7 @@ clear:
 | Mode | Trigger | Result requirement |
 | --- | --- | --- |
 | `DEPLOY` | “发布测试环境”“发布版本”“部署并提测” or a named project policy requiring deployment | Jenkins test deployment must succeed and prove the expected ref/SHA |
-| `SKIP` | “直接提测”“跳过发布”“不发测试环境” | Do not call Jenkins; record `SKIPPED_BY_INTENT` |
+| `SKIP` | “直接提测”“跳过发布”“不发测试环境” | No build/deploy/parameter/poll calls; allow only missing canonical Wiki Job metadata lookup; record `SKIPPED_BY_INTENT` |
 | `AUTO` | No explicit deployment wording | Use a named project policy when present; otherwise select `SKIP` |
 
 Never silently downgrade an explicit `DEPLOY` request. If the user changes from
@@ -60,7 +60,7 @@ the deployment gate is resolved:
 ```text
 Git commit/push/MR -> develop containment
   -> DEPLOY: Jenkins SUCCESS + expected ref/SHA proof
-     SKIP: no Jenkins call + SKIPPED_BY_INTENT
+     SKIP: no Jenkins deployment call + SKIPPED_BY_INTENT
   -> Wiki create/update/readback when STANDARD
   -> idempotent Bug/Story/Task Wiki-link comment when applicable
   -> TAPD waiting-test/test-version writes when status policy requires them

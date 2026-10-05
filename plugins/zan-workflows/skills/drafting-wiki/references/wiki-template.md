@@ -39,8 +39,10 @@ target-location, Wiki-ID, TAPD-comment, writeback, merge, or release narration.
   If no displayable parameters remain, omit `?` and the parameter suffix;
   under `DEPLOY`, unresolved required selections block a final body. Under
   `SKIP`, render only parameters already evidenced in the current work context;
-  missing build/release selections do not block the Wiki. Do not call Jenkins
-  or request deployment-only selections to complete a skipped deployment.
+  missing build/release selections do not block the Wiki. Do not query build
+  parameters/status or request deployment-only selections for skipped deployment.
+  A missing canonical Job URL may be resolved by the exact read-only Job
+  metadata lookup; that lookup must not trigger any build/deploy operation.
   Still require an evidenced Job name/URL and the other canonical Wiki fields.
   This query-like text is
   only a display label, never a modification to the actual Job URL.

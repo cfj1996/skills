@@ -126,7 +126,10 @@ business source.
      validation. A verified package `RELEASED` maps to the existing deployment
      gate `DEPLOYED` while retaining `releaseKind=package`; report package
      publication accurately rather than claiming an application deployment;
-   - `SKIP`: make no Jenkins call and record `SKIPPED_BY_INTENT`.
+   - `SKIP`: make no Jenkins build/deploy/parameter/queue/log call and record
+     `SKIPPED_BY_INTENT`. Only a STANDARD Wiki's missing canonical Job URL
+     permits the earlier exact read-only metadata lookup. NO_WIKI+SKIP has no
+     reason to load or call Jenkins.
    `FAILED|UNKNOWN` blocks every later Wiki/TAPD write.
 8. After `DEPLOYED|SKIPPED_BY_INTENT`, execute the authorized Wiki plan under
    `STANDARD` only when the drafter returned `VALIDATED`. For creation,
@@ -165,10 +168,14 @@ business source.
 
 ## Failure behavior
 
-On any mismatch, missing authorization, failed validation, failed call, or
-missing readback, return `BLOCKED` with actual completed actions and stop this
-TAPD item. Do not retry automatically, adopt an earlier unknown effect, roll back,
-or continue later writes.
+On a write failure, unknown effect or missing readback, return `BLOCKED` with
+actual completed actions and stop this TAPD item. Do not retry automatically
+any external mutation, adopt an earlier unknown effect, roll back, or continue
+later writes. A PLAN-only parser/input/evidence failure with no mutation
+attempt is a read-only preflight problem: correct it and prepare a fresh
+read-only preview with a new request ID. It neither authorizes a write nor
+requires repeating implementation/review. Present a valid complete plan before
+any submission write; never call a read-only failure an unknown write effect.
 
 No run/attempt/effect ledger, input/output JSON, report file, or interruption
 recovery is created. A temporary Markdown file used solely to carry the exact
