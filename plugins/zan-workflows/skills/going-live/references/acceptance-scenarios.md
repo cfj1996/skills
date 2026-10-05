@@ -3,6 +3,10 @@
 | Scenario | Expected result |
 | --- | --- |
 | Submitted original branch with valid authorization | Merge that branch directly to `master` and verify containment. |
+| One complete checklist displays merge and exact Wiki patch | One confirmation binds both distinct scopes; validate once and run the merge and update-only executors without another question. |
+| Wiki patch was omitted or materially changed | Obtain its exact new preview/authorization before write; never inherit merge authority alone. |
+| CI is running for the exact approved MR | Let the executor wait with bounded backoff; no Agent/rule/reviewer loop. |
+| Verified actual default is main | Use the actual main target/ref and its containment proof; do not silently target a different master branch. |
 | Source is `develop`, `merge/*`, or another branch | `BLOCKED` before MR write. |
 | Source or master SHA changes after authorization | Stop, display new facts, and require fresh authorization. |
 | `STANDARD` Wiki has one matching business entry with `是否上线：未合并` | After merge containment, update only that field to `已合并` and verify readback. |

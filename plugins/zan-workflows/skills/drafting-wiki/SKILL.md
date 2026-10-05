@@ -42,12 +42,21 @@ invent a value or render a placeholder.
    `skip_reason=NON_FUNCTIONAL_CONTINUE` and do not plan or create a Wiki
    target; retain an already-read existing target only when it is available for
    a later explicit `going-live` handoff.
-2. Read the exact TAPD item and its comments once, paging only when the returned
-   count proves more comments exist. Never repeat an identical comment query.
-   If a matching 提测 Wiki link exists, read that exact ID and reuse it; do not
-   list Wiki pages. Under `CONTINUE`, reuse a matching current-conversation
-   target after checking the current comments for conflicts.
-3. When no matching link exists, query `get_wiki(name=YYYY-MM)` once and select
+2. Reuse a current complete discovery handoff, or call
+   [ensure-test-wiki.mjs](../submitting-for-test/scripts/ensure-test-wiki.mjs)
+   once without `--execute` to obtain the target, existing body/hash and
+   comment-check evidence; creator/body-file are not needed for discovery.
+   It reads the exact TAPD item and comments once. When count is absent,
+   continue full pages until a short page; otherwise exhaust the reported
+   count. Repeated or inconsistent pages block. Never repeat an identical comment query.
+   If a matching 提测 Wiki link exists, reuse its exact ID and readback; read
+   that ID only if the handoff did not include it. Never re-read a page already
+   supplied by the helper or list Wiki pages. Under `CONTINUE`, reuse a matching current-conversation
+   target after checking details and current comments for conflicts. Retain
+   the exact existing ID/parent/title/hash; do not rediscover it at execution.
+3. When the helper supplied a complete target, reuse it with no further Wiki
+   queries. Only when no matching link or complete helper target exists,
+   query `get_wiki(name=YYYY-MM)` once and select
    the month whose returned `parent_wiki_id` equals the fixed `提测文档` root.
    Then query the deterministic child title once; filter returned rows by the
    verified month ID and reuse a unique matching child or plan creation.

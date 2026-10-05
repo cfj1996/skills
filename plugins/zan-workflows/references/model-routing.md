@@ -30,6 +30,7 @@ standard to compensate for model availability.
 | `implementing-work` | `CRITICAL` | Changes code, verifies behavior, and performs independent change review |
 | `submitting-for-test` | `CRITICAL` | Executes Git, Wiki, TAPD, and test-version writes with ordered readbacks |
 | `going-live` | `CRITICAL` | Merges an original repair branch to `master` and maintains Wiki online state |
+| `running-release` | `CRITICAL` | Runs one confirmed Jenkins deployment/package release and verifies its exact build/source |
 | `linking-tapd-wiki` | `CRITICAL` | Plans or writes an exact TAPD work-item comment with conflict and readback gates |
 | `managed-mr-review` | Conditional | Lead discovery and routine review are `BALANCED`; high-risk review and all merge decisions are `CRITICAL`. Reviewer agents use runtime defaults |
 | `drafting-wiki` | `BALANCED` | Read-only target resolution and deterministic Markdown/sequence calculation |

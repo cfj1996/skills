@@ -5,6 +5,44 @@ before Wiki maintenance can stop the workflow. This is an automatic read-only
 check under the workspace Git rules. It may produce a cleanup plan but never
 cleanup authorization.
 
+## Batched executor
+
+Invoke `scripts/check-local-closeout.mjs` from the plugin root with a JSON
+stdin plan, no `--execute`. Supply the exact verified default delivery result,
+repository/origin, current task path, original branch and only explicitly
+associated temporary branches with their own merged MR targets. It reads
+worktree registration once, fetches relevant targets once, snapshots exact
+refs once and checks per-tree status/ignored paths in parallel. Do not re-run
+the same commands in the Agent after receiving a complete result.
+
+By default the executor invokes `collect-local-occupancy.mjs` once for its
+exact resources. It reads only scoped `id/cwd/archived/git_branch` fields from
+the local Codex SQLite database, with SQLite read-only access, and snapshots
+process cwd/open-file paths. No chat text, rollout content, file contents,
+environment or process command arguments are read. Nonarchived associated
+tasks mean later work may need the resource and are retained; archiving is
+never performed by this collector. Missing database/tool support, unreadable
+processes or truncated inventories remain unknown, even when some active
+resources can already be identified. Platform support is macOS/Linux with
+SQLite/ps/lsof; other tools/platforms can supply a verified collector snapshot.
+
+If such a fresh scoped snapshot is already available, pass it directly rather
+than collecting twice. For each resource pass branch, exact path (or null), `task=IDLE|ACTIVE|UNKNOWN`,
+`process=IDLE|ACTIVE|UNKNOWN`, `needed=true|false`, `source`,
+`scopeComplete=true` and UTC Unix `checkedAt` in milliseconds. Only explicit
+idle/no-longer-needed evidence at most 60 seconds old permits candidacy;
+missing, partial or stale evidence is unknown. Do not infer idle from absence
+in a truncated task/process list or from a branch prefix. Refresh only a
+genuinely incomplete/stale evidence component, not the whole delivery.
+
+Ignored paths are listed compactly with `--directory` without reading content.
+Pass `disposableIgnoredPaths` only when project/human evidence declares those
+exact directories rebuildable; arbitrary ignored data requires preservation
+or verification. Inspection outcomes remain separate from merge/Wiki results.
+The executor has no branch/worktree deletion, switching, pruning or process
+termination code. Confirmed cleanup later repeats the candidate check and
+uses the existing exact deletion authorization rules below.
+
 ## Scope and evidence
 
 1. Use the verified repository and original source branch from the submission.

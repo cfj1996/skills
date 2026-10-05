@@ -23,6 +23,14 @@ Require all of:
 - no status, version, Wiki, Git, deployment, or unrelated comment operation is
   bundled with this write.
 
+Execution may be one `ensure-test-wiki.mjs --mode link --execute` invocation.
+Require its exact item/branch, Wiki ID/parent/title, original body SHA-256,
+comment author and `REUSE_EXISTING` target. No body file is allowed. Validate
+the invocation once; its complete pagination, parallel bound reads,
+idempotency/conflict check and comment readback are deterministic internal
+steps. A successful result has `wikiState=UNCHANGED` and one same-ID comment
+readback; no additional Agent validation is needed between its steps.
+
 Return exactly one line:
 
 ```text

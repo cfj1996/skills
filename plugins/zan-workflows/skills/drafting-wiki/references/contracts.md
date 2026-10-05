@@ -43,6 +43,12 @@
   continuation returns `SKIPPED_BY_POLICY`. It never
   creates a duplicate entry solely because the prior MR was merged.
 - `REUSE_EXISTING` requires the exact current target body and content hash.
+  The helper preview's `beforeBodySha256` is SHA-256 over the exact UTF-8
+  Markdown, including trailing newlines. Carry it with the exact Wiki
+  ID/parent/title into the one creation/supplementation/comment execution;
+  a changed original body blocks supplementation. A preview is read-only and
+  does not authorize writes. New-page execution uses the preview's fixed
+  month/title, not the date when the later confirmation arrives.
   Create modes use `before_content_hash=NEW_PAGE` and a fully specified parent
   plan; the monthly parent never receives the entry body.
 - Every canonical field must be resolved from read-only evidence. A successful

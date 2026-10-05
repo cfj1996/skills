@@ -87,10 +87,14 @@ target-location, Wiki-ID, TAPD-comment, writeback, merge, or release narration.
 
 Do not request a Wiki URL from the user. Resolve the target in this order:
 
-1. Read the exact TAPD item and comments. One `get_comments` page is enough
-   when its count shows the full result; page further only for genuinely
-   remaining comments. If one matching 提测 Wiki link is associated with this
-   work, read that Wiki by ID and use `REUSE_EXISTING`; do not query Wiki lists.
+1. Read the exact TAPD item and comments, including links in the description.
+   `get_comments` may omit count: then page through full pages until a short
+   page. With count, require the full reported set; inconsistent or repeated
+   pages block. If one matching 提测 Wiki link is associated with this
+   work, read that Wiki by ID and use `REUSE_EXISTING`, including prior-month
+   children; do not query Wiki lists. Reuse a complete script preview instead
+   of repeating these reads. Execution binds the ID, parent, title and original
+   body SHA-256; new pages bind the preview's month/title.
 2. If no link exists, call `get_wiki` with `name=YYYY-MM` for the
    `Asia/Shanghai` submission month. Select the exact month whose returned
    `parent_wiki_id` is root `1150372234001008260` (`提测文档`). Multiple same-name

@@ -39,8 +39,16 @@ complete visible `SubmissionPlan`, bound-fact fingerprint, exact
   deployment, comment, and final TAPD plan. Deterministically generated commit,
   MR, Wiki, queue, and build identifiers do not create new confirmation points.
 - The Git sequence is commit when needed, push when needed, MR create/update,
-  then MR merge. Each step is displayed, validated, executed, and read back
-  before the next.
+  then MR merge. Include every step in the displayed validated bundle, perform
+  its fresh bound checks, execute and read back before the next.
+- One displayed `GIT_DELIVERY_BUNDLE` and pre-write validation cover that
+  unchanged sequence; internal fresh checks/readbacks remain mandatory without
+  per-step Agent validators. The merge executor supplies the actual delivered
+  merge revision and observed target tip; deployment must not confuse the
+  original feature SHA with the target merge SHA. Jenkins executes one trigger
+  and verifies its exact queue/build, actual parameters and target SCM source.
+  A verified package `RELEASED` maps to `DEPLOYED` with its release kind retained
+  and no claim that an application environment was deployed.
 - `STANDARD` requires either a complete in-memory `ValidatedWikiDraft` with
   `terminal_state=VALIDATED`, its full rendered Markdown and calculated minimal
   patch or new-page body, an auto-resolved
@@ -52,6 +60,13 @@ complete visible `SubmissionPlan`, bound-fact fingerprint, exact
   operation. A newly created entry reads back the exact status derived from
   project type: `未合并` for a business project or `无需上线` for a
   tooling/library project.
+- Wiki creation and functional supplementation plus their comment are one
+  `WIKI_WRITE_AND_LINK_BUNDLE` with one pre-invocation validation. Its internal
+  readbacks satisfy the per-write invariant without extra Agent validators.
+  Bind existing ID/parent/title/original SHA-256 or the new planned month/title.
+  Require exact item/branch/Wiki, approved final `bodySha256` and separate
+  `wikiState`/`commentState`. `ALREADY_LINKED` describes the comment and may
+  accompany successful `wikiState=UPDATED` supplementation.
 - `STANDARD` never requires a Wiki URL from the user. Existing links in
   TAPD details/comments are reused; absent links trigger related-child lookup
   and then month/child creation under root `1150372234001008260` when needed.
@@ -71,6 +86,12 @@ complete visible `SubmissionPlan`, bound-fact fingerprint, exact
 - `INITIAL` writes `待测试`/test version only after
   `DEPLOYED|SKIPPED_BY_INTENT`. `CONTINUE` already in `待测试` performs no status
   or duplicate test-version write.
+- Status and test version use one `TAPD_REGISTRATION_BUNDLE`: exact item,
+  work mode, automatically resolved workflow/field mappings, current metadata
+  hashes and expected old values are confirmed together. One update and one
+  readback cover both fields; no per-field Agent validator is needed. Partial
+  readback retains actual successful status/version facts without rollback or
+  retry. Story/Task never receives Bug workflow states.
 - Any failed or unknown action returns `BLOCKED`, reports prior completed
   actions truthfully, and performs no later action.
 - Private validator responses are discarded after mapping to public pass/fail

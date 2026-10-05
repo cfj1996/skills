@@ -25,6 +25,13 @@ Read [contracts.md](references/contracts.md),
 Read [acceptance-scenarios.md](references/acceptance-scenarios.md) only for an
 edge case or regression check.
 
+For successive preview/execution/helper actions, use one live
+[workflow-session.mjs](../../scripts/workflow-session.mjs) session and its lazy
+MCP pool; individual CLI helpers remain available for standalone actions.
+Send each authorized action separately, retain no workflow file, and refresh
+mutable facts inside its executor. Session reuse caches connections, not
+authorization, item state, refs or deployment evidence.
+
 Accept `submission_phase=PLAN|EXECUTE`. The first invocation is always `PLAN`:
 it is read-only, returns the complete plan and stops. `EXECUTE` requires that
 exact current plan plus a later current-conversation confirmation.
@@ -79,7 +86,12 @@ business source.
    Reuse the item's current details/comments and the original source branch;
    do not start an independent Wiki search in this skill.
 4. Build and display one consolidated `SubmissionPlan` containing Git,
-   applicable Wiki/comment actions, deployment, and final TAPD actions. Under
+   applicable Wiki/comment actions, deployment, and final TAPD actions.
+   Preview registration to automatically resolve actual state labels,
+   transitions, required-field values and native/custom test-version mapping;
+   bind the returned codes, old values and metadata hashes. Resolve applicable
+   Job parameters through its adapter, showing a metadata-only Job binding
+   or pipeline-computed version policy explicitly when used. Under
    `NO_WIKI`, explicitly list that no Wiki discovery/read/write/comment tool
    will be called. Return `PlannedTestSubmission` with
    `terminal_state=AWAITING_CONFIRMATION` and stop; perform no write.
@@ -87,41 +99,66 @@ business source.
    exact unchanged plan, then re-read each mutable bound fact at its write
    boundary. If anything changed,
    return the updated plan and stop for fresh confirmation.
-6. Immediately before each Git write, re-read its bound facts and call the
-   private [submission-validator.md](agents/submission-validator.md) with
-   `PRE_GIT_WRITE`. Use local Git CLI for commit/push; use `gitlab-mcp` for
-   remote MR create/update/conflict/merge operations. Read back each result and
-   prove every current-round commit is contained in `origin/develop`.
+6. Before the first Git write, validate one `GIT_DELIVERY_BUNDLE` with the
+   private [submission-validator.md](agents/submission-validator.md) using
+   `PRE_GIT_WRITE`. Bind the complete reviewed diff/file list, repository,
+   original branch, target refs, commit/push/MR actions and purpose once.
+   Commit/push through local Git only when needed, checking actual bound facts
+   and reading back the derived SHA without another Agent validator. Run
+   [merge-reviewed-branch.mjs](../../scripts/merge-reviewed-branch.mjs) once for
+   exact MR reuse/create, CI waiting, fresh ref/approval checks, merge readback
+   and containment. It uses `gitlab-mcp`; never manually poll or validate each
+   GET. Reuse the final result and delivered target revision for deployment;
+   the source branch SHA is not automatically the target merge commit SHA.
+   A genuine metadata update or conflict needs its exact authorized action,
+   not a new broad preparation/review run.
 7. Resolve the deployment gate through `jenkins-mcp`:
-   - `DEPLOY`: validate `JENKINS_TEST_DEPLOY`, trigger the authorized Jenkins
-     Job, follow the real queue/build, require terminal `SUCCESS`, and prove the
-     build used the expected `origin/develop` SHA;
+   - `DEPLOY`: validate `JENKINS_TEST_DEPLOY` once, then run
+     [run-jenkins-release.mjs](../../scripts/run-jenkins-release.mjs) once with
+     the exact confirmed release plan and Job/config fingerprints. It triggers
+     through `jenkins-mcp` once, tracks the exact queue/build itself, and
+     requires `SUCCESS`, actual parameters and target-repository SCM SHA.
+     Record its narrowly scoped GET-only API read fallback for fields missing
+     from MCP. No Agent polling, repeated console fetch, routing or per-poll
+     validation. A verified package `RELEASED` maps to the existing deployment
+     gate `DEPLOYED` while retaining `releaseKind=package`; report package
+     publication accurately rather than claiming an application deployment;
    - `SKIP`: make no Jenkins call and record `SKIPPED_BY_INTENT`.
    `FAILED|UNKNOWN` blocks every later Wiki/TAPD write.
 8. After `DEPLOYED|SKIPPED_BY_INTENT`, execute the authorized Wiki plan under
-   `STANDARD` only when the drafter returned `VALIDATED`. For a new child or
-   unchanged existing link, run
+   `STANDARD` only when the drafter returned `VALIDATED`. For creation,
+   functional `CONTINUE` supplementation, or unchanged reuse, run
    [ensure-test-wiki.mjs](scripts/ensure-test-wiki.mjs) once with the exact
-   item, original branch, approved title/body file, creator and
-   `--expect-target` from the confirmed plan, plus
-   `--execute`. Validate the complete
-   `WIKI_CREATE_AND_LINK_BUNDLE` once before invoking the script; its
-   deterministic internal steps need no separate validator invocation. It uses
-   `tapd-mcp` and owns Wiki creation/readback and the
-   idempotent comment write/readback in that single invocation. Require
-   `LINKED|ALREADY_LINKED`; do not then invoke `zan-workflows:linking-tapd-wiki`
-   again. A functional `CONTINUE` that patches an existing Wiki still applies
-   the authorized minimal update, then invokes
-   `zan-workflows:linking-tapd-wiki` with
-   `confirmation_mode=DEFER_TO_ORCHESTRATOR` only if the link is missing.
+   item, original branch and approved complete body file. Copy the confirmed
+   target into `--expect-target`; for an existing Wiki pass its exact
+   `--expected-wiki-id`, `--expected-month-id`, approved title and
+   `--expected-body-sha256`; for creation pass the fixed `--month`, title,
+   creator and any existing month ID. Add `--execute` only under the unchanged
+   consolidated authorization. Validate `WIKI_WRITE_AND_LINK_BUNDLE` once
+   before invocation. The script uses `tapd-mcp` to create or update/read back
+   the approved body and ensure/read back its comment. Independent initial
+   reads run in parallel; it refreshes the exact body immediately before an
+   update and comments after a Wiki write. No separate Agent validation or
+   confirmation is needed between its deterministic steps. Require
+   `LINKED|ALREADY_LINKED`, exact Wiki ID, approved final `bodySha256`, and
+   `wikiState=CREATED|UPDATED|UNCHANGED`. Do not invoke
+   `zan-workflows:linking-tapd-wiki` again after this bundle.
    For `SKIPPED_BY_POLICY`, perform no Wiki or Wiki-comment operation. A
    conflict or failed readback blocks later TAPD actions. Retain the exact
    final Wiki target for `going-live`.
-9. Apply the status policy from the work mode through `tapd-mcp`: write/read `待测试` and the test
-   version only when required; for `CONTINUE` already in `待测试`, record
-   `SKIPPED_ALREADY_WAITING_TEST` and perform no duplicate writes. Give all
-   readbacks to the validator with `POST_WRITE`; return `SUBMITTED` only on a
-   passing verdict.
+9. Apply the status policy from the work mode through one validated
+   `TAPD_REGISTRATION_BUNDLE`, then invoke
+   [register-test-submission.mjs](../../scripts/register-test-submission.mjs)
+   once with the exact item, work mode, approved status/version policy,
+   automatically resolved workflow/field mappings and metadata fingerprints.
+   Reuse the consolidated authorization and successful Git/deployment/Wiki
+   prerequisites. Through `tapd-mcp` it refreshes the bound facts, sends one
+   combined update for status and version, and reads both back. `CONTINUE`
+   already in `待测试` returns `SKIPPED_ALREADY_WAITING_TEST` without duplicate
+   writes. Story/Task never receives a Bug status; version-only registration
+   requires its explicit policy. Do not manually repeat reads or validate the
+   two fields separately. Give the final readbacks to `POST_WRITE`; return
+   `SUBMITTED` only on a passing verdict.
 
 ## Failure behavior
 
