@@ -71,7 +71,10 @@ invent a value or render a placeholder.
    branch from current read-only evidence. Retain conflicts and block
    unresolved required fields. Under `SKIP` (including a standalone Wiki-only
    request), use only existing parameter evidence and omit unknown selections;
-   do not call Jenkins or ask for deployment-only inputs. Missing selections
+   do not query Jenkins parameters/builds or ask for deployment-only inputs.
+   If the canonical Job URL is missing from knowledge, use the exact read-only
+   [Job lookup](../../scripts/resolve-jenkins-job.mjs), or the session's `job`
+   PLAN action. This metadata lookup is not a deployment. Missing selections
    are allowed under `SKIP`, but the Job name/URL and other Wiki facts remain
    required. An exact developer name already present in TAPD or the reviewed
    handoff needs no team-roster or GitLab identity lookup; use the identity

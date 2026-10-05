@@ -86,8 +86,10 @@ Its only write is through `jenkins-mcp`; the declared GET-only API read fallback
 must stay within that instance and Job and bind queue/build/actual SCM SHA.
 No per-poll validator is needed. Source SHA must identify the intended target
 merge revision, not merely the original feature tip or any changes-list entry.
-`deployment_mode=SKIP` permits no Jenkins
-operation and records `SKIPPED_BY_INTENT`.
+`deployment_mode=SKIP` permits no Jenkins build/deploy/parameter/poll operation
+and records `SKIPPED_BY_INTENT`. Exact metadata-only lookup to evidence a
+STANDARD Wiki's missing canonical Job URL is allowed; it is not deployment
+evidence and cannot imply published parameters or versions.
 
 For Wiki operations, require the TAPD workspace from the current work item.
 Require `tool_route=tapd-mcp` for every Wiki, TAPD comment, TAPD status and

@@ -18,6 +18,7 @@
 | Continue impact classification is ambiguous | Block and emit no final body; never guess whether the Wiki needs an update. |
 | Tester or another canonical field cannot be resolved | Block and emit no final body; never render `待补充`. |
 | `SKIP`, known Job name/URL and remaining Wiki fields, but no build/release selections | Validate using the bare display name without `?`; do not call Jenkins or request deployment-only inputs. |
+| `SKIP`, known exact Job name but no indexed URL | Resolve only that Job's metadata through Jenkins readback; retain SKIP, never query parameters/builds or trigger deployment. |
 | `SKIP` for a tooling library, only `PROJECT_NAME=zan-lib` is evidenced | Render `npm-tools?PROJECT_NAME=zan-lib`; do not invent or require `RELEASE_TYPE`. |
 | `DEPLOY` for a tooling library with unresolved required `RELEASE_TYPE` | Block; the `SKIP` exception must not weaken deployment validation. |
 | Only a branch parameter is evidenced under `SKIP` | Omit that parameter and the empty `?` suffix; retain the original source branch in its dedicated field. |

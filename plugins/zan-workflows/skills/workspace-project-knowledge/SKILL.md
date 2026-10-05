@@ -344,8 +344,12 @@ Workflow:
 
 1. Route the project with Function 1.
 2. Read `jenkins_jobs` and, when present, `jenkins_job_urls` from the centralized `${project_knowledge_root}/data/workspace/project-relations.yaml`, falling back to `references/project-relations.yaml`.
-3. Return the exact Job name and the exact Job URL indexed under that Job name or
-   read back from
+3. When an indexed URL is absent, use the read-only
+   [Job resolver](../../scripts/resolve-jenkins-job.mjs) or session `job` PLAN
+   action: query the selected instance and exact Job name, restricted to its
+   known folder with no recursive traversal. Missing `jenkins_job_urls` is
+   a lookup task, not proof the URL is unavailable. Return the exact Job name
+   and the exact Job URL indexed under that Job name or read back from
    Jenkins, and the routing evidence. A consumer that needs a clickable Job
    link must block when the URL cannot be evidenced; it must not derive one.
 4. If a project is not listed in `jenkins_jobs`, say it is not listed in the workspace index; do not guess a `front-*-test` name.

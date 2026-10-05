@@ -60,7 +60,9 @@
   and `工具服务-无需上线` for tooling/library projects.
 - Under `SKIP`, absent build/release selections do not block validation. Render
   only already-evidenced parameters, omitting the `?` suffix when none remain.
-  Do not call Jenkins or require deployment-only inputs to fill this field;
+  Do not query Jenkins parameters/builds or require deployment-only inputs;
+  exact read-only Job metadata lookup is permitted solely to evidence the
+  required canonical URL when knowledge lacks it. No build/deploy is triggered;
   Job name/URL and other canonical facts remain required. Under `DEPLOY`,
   required selections must still be resolved and checked against definitions.
 - For `CONTINUE`, classify the current-round change from reviewed diff and

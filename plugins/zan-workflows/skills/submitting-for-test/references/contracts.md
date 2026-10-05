@@ -81,7 +81,9 @@ complete visible `SubmissionPlan`, bound-fact fingerprint, exact
   non-functional `CONTINUE`; it omits Wiki and Wiki-comment writes while still
   completing the remaining authorized submission steps.
 - `DEPLOY` requires Jenkins terminal `SUCCESS` plus evidence that the expected
-  `origin/develop` SHA was built. `SKIP` performs no Jenkins call and records
+  `origin/develop` SHA was built. `SKIP` performs no Jenkins build/deploy or
+  parameter/poll call; exact metadata-only canonical Wiki Job lookup is the
+  sole read-only exception. It records
   `SKIPPED_BY_INTENT`. `FAILED|UNKNOWN` forbids later Wiki/status/version writes.
 - `INITIAL` writes `待测试`/test version only after
   `DEPLOYED|SKIPPED_BY_INTENT`. `CONTINUE` already in `待测试` performs no status

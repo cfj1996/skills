@@ -10,6 +10,7 @@ import { registerTestSubmission } from './register-test-submission.mjs';
 import { checkLocalCloseout } from './check-local-closeout.mjs';
 import { ensureTestWiki } from '../skills/submitting-for-test/scripts/ensure-test-wiki.mjs';
 import { sessionInput } from './session-input.mjs';
+import { resolveJenkinsJob } from './resolve-jenkins-job.mjs';
 
 export class WorkflowSession {
   constructor({ allowExecute = false, pool = new McpClientPool(), reader = configuredJenkinsReader, io = {} } = {}) {
@@ -27,12 +28,12 @@ export class WorkflowSession {
     if (!request || typeof request.id !== 'string' || !request.id || request.id.length > 128 ||
         this.ids.has(request.id) || !['PLAN', 'EXECUTE'].includes(request.phase) ||
         !request.input || typeof request.input !== 'object' || Array.isArray(request.input) ||
-        !['merge', 'release', 'wiki', 'registration', 'closeout'].includes(request.action)) {
+        !['merge', 'release', 'wiki', 'registration', 'closeout', 'job'].includes(request.action)) {
       throw new Error('请求身份、阶段、动作或输入无效；请求 ID 不可重复');
     }
     this.ids.add(request.id);
     const execute = request.phase === 'EXECUTE';
-    if (execute && (!this.allowExecute || this.executionBlocked || request.action === 'closeout')) {
+    if (execute && (!this.allowExecute || this.executionBlocked || ['closeout', 'job'].includes(request.action))) {
       throw new Error('当前会话不允许此写操作；关闭会话并重新核实实际状态');
     }
     const input = { ...request.input, execute };
@@ -46,6 +47,7 @@ export class WorkflowSession {
         case 'registration': result = await registerTestSubmission(call('tapd-mcp'), input); break;
         case 'wiki': result = await ensureTestWiki(call('tapd-mcp'), input); break;
         case 'closeout': result = await checkLocalCloseout(input, this.io); break;
+        case 'job': result = await resolveJenkinsJob(call('jenkins-mcp'), input); break;
       }
       if (execute && ['BLOCKED', 'FAILED', 'UNKNOWN'].includes(result?.state)) this.executionBlocked = true;
       return result;

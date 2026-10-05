@@ -10,17 +10,22 @@ The caller must bind the current displayed plan and actual confirmation first.
 For successive previews/executions/helpers, start
 `volta run --node 22.20.0 node scripts/workflow-session.mjs --allow-execute --json` with stdin kept open
 (one terminal/exec session). Send one JSON line per request: unique string
-`id`, `action=merge|release|wiki|registration|closeout`, `phase=PLAN|EXECUTE`
+`id`, `action=merge|release|wiki|registration|closeout|job`, `phase=PLAN|EXECUTE`
 and the helper's `input` object. Read its response before sending the next
 line through the same process. Input names match the exported helpers,
 including the Wiki helper's parsed camelCase inputs.
 
 PLAN overrides input `execute=true`. EXECUTE needs the startup capability
 flag plus exact current-plan `confirmed=true`; the flag is not business
-authorization. Closeout rejects EXECUTE. Requests run sequentially; a failed
+authorization. Closeout and Job lookup reject EXECUTE. Requests run sequentially; a failed
 or unknown execution blocks later writes while allowing read-only inspection.
 Duplicate IDs are rejected, not replayed. No workflow file, effect ledger or
 interruption recovery exists.
+
+A failed PLAN with no mutation attempt can be corrected and previewed again
+under a new ID. It does not poison execution or grant write authority. The
+no-retry rule applies to failed/unknown mutations; never use it to forbid
+collecting missing evidence or fixing a read-only decoder.
 
 The pool starts/initializes each needed MCP once and shares its connection
 and tool catalog. Ref/item/metadata/confirmation/build facts are not cached;
@@ -109,6 +114,14 @@ any later target advancement rather than passing the source branch SHA as
 though it were the target's merge commit.
 
 ## Jenkins deployment and package release
+
+`resolve-jenkins-job.mjs` (or session `job` PLAN) resolves an already routed
+exact Job name into an evidenced URL. It reads selected instance metadata and
+searches only the root/known folder without recursion, rejects similar or
+duplicate names and cross-instance/mismatched URLs, and returns writes=0.
+Missing static `jenkins_job_urls` is not a blocker until this precise lookup
+actually fails. STANDARD+SKIP may use it solely for the required Wiki link;
+parameter/build/queue/log queries and triggers stay forbidden under SKIP.
 
 `scripts/run-jenkins-release.mjs` owns one trigger, queue/build waiting and
 source/parameter verification. Job lookup and release intent stay with the
@@ -229,6 +242,11 @@ registration uses WAITING_TEST; Story/Task does not receive that status. An
 applicable version uses the exact native `test_version` (Bug), `version`
 (Story/Task), or a semantically verified `custom_field_*` with the complete
 approved string payload in `testVersion`.
+
+Decode actual MCP list wrappers (`base_url/data/count`), direct entity arrays,
+status/data API envelopes, structured results and nested JSON strings. Explicit
+API failures and ambiguous MCP text blocks still stop; successful acknowledgments
+do not replace the required item readback. A pure preview never calls update tools.
 
 Preview reads the item's workflow category when needed, resolves exact
 `修复中`/`待测试` labels, verifies an allowed transition (including actual
