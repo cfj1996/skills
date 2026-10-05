@@ -4,6 +4,7 @@ import { promisify } from 'node:util';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { clientFor } from './mcp-client.mjs';
+import { verifyMergeApprovals } from './gitlab-approvals.mjs';
 import { pollState, progressToStderr, readCliPlan, readTool, repositoryKey, requireText, validateWait } from './workflow-runtime.mjs';
 
 const run = promisify(execFile);
@@ -64,21 +65,11 @@ function mergeState(mr, input) {
     if (['checking', 'unchecked', 'preparing'].includes(detail || mr.merge_status)) return { state: 'CI_PREPARING' };
     return { state: 'CI_MISSING', error: '项目要求 CI，但没有成功的当前 MR 流水线' };
   }
-  if (detail === 'mergeable' || mr.merge_status === 'can_be_merged') return { state: 'READY', done: true };
+  if (detail === 'mergeable' || !detail && mr.merge_status === 'can_be_merged') return { state: 'READY', done: true };
   if (['checking', 'unchecked', 'preparing', 'ci_still_running', 'ci_must_pass'].includes(detail || mr.merge_status)) {
     return { state: detail || mr.merge_status };
   }
   return { state: detail || mr.merge_status || 'UNKNOWN', error: '合并条件不可验证，停止而不是尝试合并' };
-}
-
-function checkApprovals(value) {
-  if (!value || !Array.isArray(value.rules)) throw new Error('审批规则不可验证');
-  if (value.rules.some(rule => !Number.isSafeInteger(Number(rule.approvals_required)) || Number(rule.approvals_required) < 0)) {
-    throw new Error('审批规则缺少明确的审批数量');
-  }
-  if (value.rules.some(rule => Number(rule.approvals_required) > 0 && rule.approved !== true)) {
-    throw new Error('MR 需要的审批尚未完成');
-  }
 }
 
 export async function mergeReviewedBranch(call, input, io = {}) {
@@ -148,15 +139,20 @@ export async function mergeReviewedBranch(call, input, io = {}) {
       value => mergeState(value, plan), io);
     if (mr.state !== 'merged') {
       phase = 'CHECK_MERGE';
-      const [freshSource, freshTarget, approvals] = await Promise.all([
+      const approvals = await verifyMergeApprovals(call, mrArgs, plan, project, io);
+      const [freshSource, freshTarget, freshMr] = await Promise.all([
         readTool(call, 'get_branch', { ...projectArgs, branch_name: input.sourceBranch }),
         readTool(call, 'get_branch', { ...projectArgs, branch_name: input.targetBranch }),
-        readTool(call, 'get_merge_request_approval_state', mrArgs),
+        readTool(call, 'get_merge_request', mrArgs),
       ]);
       if (freshSource?.commit?.id !== plan.sourceSha || freshTarget?.commit?.id !== plan.targetSha) {
         throw new Error('合并前 source/target SHA 已变化，需要更新清单');
       }
-      checkApprovals(approvals);
+      // Keep the detailed server readiness check authoritative even when the
+      // approval format is Community Edition's optional-approval summary.
+      const readiness = mergeState(freshMr, plan);
+      if (readiness.state !== 'READY') throw new Error(readiness.error || '合并前 MR 条件已变化');
+      result.approvalEvidence = approvals;
       await (io.checkRepository || checkRepository)(input);
       phase = 'MERGE_MR';
       await readTool(call, 'merge_merge_request', { ...mrArgs, sha: plan.sourceSha, auto_merge: false,

@@ -8,7 +8,7 @@ The caller must bind the current displayed plan and actual confirmation first.
 ## Reuse one live MCP session
 
 For successive previews/executions/helpers, start
-`scripts/workflow-session.mjs --allow-execute --json` with stdin kept open
+`volta run --node 22.20.0 node scripts/workflow-session.mjs --allow-execute --json` with stdin kept open
 (one terminal/exec session). Send one JSON line per request: unique string
 `id`, `action=merge|release|wiki|registration|closeout`, `phase=PLAN|EXECUTE`
 and the helper's `input` object. Read its response before sending the next
@@ -27,6 +27,15 @@ and tool catalog. Ref/item/metadata/confirmation/build facts are not cached;
 their checks remain fresh. Failed connections stay failed without a relaunch.
 EOF, signals or 30 minutes idle close the process/connections. Standalone
 helper CLIs remain available for isolated calls or after a session ended.
+
+Wait for the single `SESSION_READY` event before sending input. On a PTY the
+session switches only its own stdin to raw mode, preventing canonical-line
+truncation and input echo. Long Chinese JSON is accepted up to 256 KiB;
+oversized/malformed requests stop before helper calls. Ctrl-C terminates the
+session; Ctrl-D ends its input. EOF/signals/idle shutdown restore its original
+TTY mode. Do not locate another `/dev/ttys*` or run manual `stty` commands.
+The pinned helper runtime is independent of a business project's older Node
+version; keep that project's own runtime for its build/install commands.
 
 ## Git delivery
 
@@ -70,6 +79,24 @@ Commit and push with ordinary local Git, reading back their deterministic
 results. The generated source SHA goes into this same authorized merge plan;
 it is not a reason to repeat review, display or confirmation. The script
 still checks it against the remote branch immediately before merge.
+
+Approval checks accept rule arrays and complete legacy counters. The connected
+MCP can normalize `/approvals` and omit its counters/rules. For that recognized
+summary, use a same-instance GET-only metadata check to verify the edition;
+never infer zero required approvals from missing fields or a 404. Community
+Edition approvals are optional, so an unapproved summary is recorded as
+`COMMUNITY_OPTIONAL`, while server mergeability, CI and discussion gates remain.
+Enterprise Edition reads the exact MR's raw `/approvals` to recover counters
+or its satisfied-requirements boolean. Pending approvals, invalid data,
+unknown editions and permission/connection failures stop. Report the actual
+`approvalEvidence`; no approval write or forced merge exists. Refresh refs
+and exact MR readiness after this evidence check, at the merge boundary.
+
+The narrow GET fallback fills fields missing from MCP and reads only
+`/metadata` and this project's exact MR `/approvals`, using existing credentials
+without redirects. It performs no remote writes. Edition semantics follow
+[GitLab approvals API](https://docs.gitlab.com/api/merge_request_approvals/)
+and [metadata API](https://docs.gitlab.com/api/metadata/).
 
 CI polls only the exact MR. It never triggers/retries CI, auto-approves,
 resolves conflicts, enables source deletion, squashes or treats pending

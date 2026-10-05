@@ -28,6 +28,9 @@ edge case or regression check.
 For successive preview/execution/helper actions, use one live
 [workflow-session.mjs](../../scripts/workflow-session.mjs) session and its lazy
 MCP pool; individual CLI helpers remain available for standalone actions.
+Use the pinned helper runtime and wait for `SESSION_READY`; the session owns
+its TTY mode. Approval-format compatibility stays inside the merge helper;
+do not expand a missing `rules` field into manual endpoint probing.
 Send each authorized action separately, retain no workflow file, and refresh
 mutable facts inside its executor. Session reuse caches connections, not
 authorization, item state, refs or deployment evidence.
