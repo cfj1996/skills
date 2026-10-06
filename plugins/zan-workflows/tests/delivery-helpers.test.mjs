@@ -244,7 +244,7 @@ const jobUrl = 'https://ci.example.test/jenkins/job/demo-test/';
 const releaseInput = () => ({ targetProject: 'demo', releaseTarget: 'demo-web', targetEnvironment: 'test',
   jobName: 'demo-test', jobUrl, releaseRef: sourceSha, refParameter: 'REF', version: '1.0.0-canary.1',
   versionParameter: 'VERSION', releaseChannel: 'canary', releaseKind: 'deployment', purpose: '部署确认过的源码',
-  sourceRepository: originUrl, expectedSha: sourceSha,
+  sourceRepository: originUrl, expectedSha: sourceSha, jobBindingMode: 'CONFIG_XML',
   params: { REF: sourceSha, VERSION: '1.0.0-canary.1' }, execute: false });
 
 function releaseFake({ status = 'SUCCESS', sha = sourceSha, queueId = 8, onCall, onBuild, queuePending = 0 } = {}) {

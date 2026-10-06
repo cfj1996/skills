@@ -35,7 +35,10 @@
 | `STANDARD` submission skipped Wiki because the continue fix was non-functional | Reuse the retained existing target and maintain business merge status or the involved tooling latest field after its required gates. |
 | Merge/readback/containment fails | `BLOCKED`; do not change `是否上线` or claim go-live success. |
 | Wiki changes after authorization | Preserve the changed page and require a fresh patch/authorization; report any already completed merge truthfully. |
-| Master delivery is verified and associated resources are clean, idle, and fully delivered | Run local closeout automatically; build the exact cleanup plan, set `AWAITING_CONFIRMATION`, and delete nothing in the delivery turn. |
+| Master delivery is verified and associated resources are clean, idle, and fully delivered | Run local closeout automatically; build the exact cleanup plan, set `AWAITING_CONFIRMATION`, end the final response with `是否删除以上本地开发环境？` and choices `确认清理` / `保留开发环境`, and delete nothing in the delivery turn. |
+| User replies `确认清理` or `执行清理` to the unchanged exact displayed plan | Start `operation=CLEANUP` with the prior merged result; do not repeat merge, publication or Wiki work. |
+| User chooses `保留开发环境` | Delete nothing and end the flow; do not repeat the cleanup question until a later explicit request. |
+| A caller summarizes a completed multi-Bug or multi-project delivery | Preserve the combined exact cleanup plan and ask once in the final response; a result list or cleanup state alone is insufficient. |
 | User confirms the exact unchanged cleanup plan | Recheck every candidate, remove its worktree without force, delete its local branch with `git branch -d`, and verify both readbacks. |
 | Cleanup candidate facts changed after confirmation | Delete nothing; return the refreshed plan or classify the resource `RETAIN|VERIFY`. |
 | Worktree removal or local branch deletion fails | Stop remaining cleanup, report `PARTIAL|BLOCKED`, and preserve the verified merge/Wiki outcome. |
@@ -48,7 +51,7 @@
 | Another branch merely shares the feature name or merge prefix | Do not infer association or include it as a cleanup candidate. |
 | Repository, fetch, worktree, or occupancy evidence is unavailable | Report local closeout `PARTIAL|UNAVAILABLE` and cleanup `BLOCKED` with the gap; preserve merge/Wiki outcomes and perform no cleanup. |
 | Wiki maintenance fails after verified master delivery | Report the completed merge, Wiki blocker, and retained local closeout result separately. |
-| Complete inspection finds no related local resources | Report `CHECKED` with no related candidates; perform no workspace-wide search. |
+| Complete inspection finds no safe candidates, including when the original branch/worktree is still current or active | Say `目前没有可安全清理的本地资源。`, explain retained resources, and do not ask to delete them or perform a workspace-wide search. |
 
 Official tooling publication is executed only through Jenkins by `running-release`.
 No scenario deploys a business application to production, changes TAPD, or creates

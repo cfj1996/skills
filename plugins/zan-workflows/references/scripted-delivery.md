@@ -146,12 +146,19 @@ is sufficient when it already displayed these exact fields/actions.
 ### Common Job adapters
 
 `branch-deployment-v1` resolves the real `branch` parameter and its live
-choices. `explicit-v1` preserves explicit bindings for other Jobs. XML HTTP
-403 alone permits a displayed `READABLE_METADATA` binding: read/fingerprint
-exact Job URL/fullName/type/buildable state and live parameter definitions.
-This does not fingerprint hidden configuration. A binding mode/identity
-change blocks execution; other XML errors stop. Queue/build/parameters and
-actual target repository SHA remain mandatory.
+choices. `explicit-v1` preserves explicit bindings for other Jobs. The default
+`READABLE_METADATA` mode reads/fingerprints the exact Job URL/fullName/type/
+buildable state and live parameter definitions without calling
+`jenkins_get_job_config` or requiring that MCP tool. Include the mode in the
+release plan; known missing XML permission needs no repeated warning or
+separate confirmation. Report binding changes, insufficient evidence and
+verification failures. Metadata does not fingerprint hidden configuration.
+Set `jobBindingMode=CONFIG_XML` when full configuration verification is
+needed and readable; legacy plans with `jobConfigHash` retain XML verification.
+Only XML HTTP 403 permits a metadata preview in that mode. Reuse its returned
+mode for execution without retrying XML. Other XML errors stop. A binding
+mode/identity or parameter change blocks execution. Queue/build/parameters
+and actual target repository SHA remain mandatory.
 
 `npm-tools-v1` recognizes `PROJECT_NAME` and `RELEASE_TYPE`. It requires
 `pipelineSource` with verified `repositoryPath`, `repositoryUrl`, `ref`, full

@@ -93,9 +93,11 @@ disposition:
   distinguish proven undelivered commits from inconclusive history.
 
 In the final response, summarize the findings with concrete paths/branches and
-reasons, separately from merge/Wiki status. When candidates exist, remind the
-user they can confirm cleanup of that exact list. If none exist after a complete
-check, say there are no related cleanup candidates. For incomplete checks, state
+reasons, separately from merge/Wiki status. After all delivery gates pass,
+display the exact cleanup plan and ask `是否删除以上本地开发环境？` in the
+final response; a cleanup suggestion or status code alone is insufficient.
+If none exist after a complete check, say `目前没有可安全清理的本地资源。`
+and explain any retained current/active resources. For incomplete checks, state
 what was checked and what remains unknown. Always make clear no deletion was
 performed during this check. Do not create local workflow state or change the
 merge outcome to `BLOCKED` solely because this inspection could not complete.
@@ -116,8 +118,13 @@ The authorization summary must bind:
 - every exact `worktree_to_remove`; and
 - every exact `branch_to_delete`.
 
-Ask exactly `是否删除以上本地开发环境？` and stop. The merge confirmation does
-not authorize this plan.
+Ask exactly `是否删除以上本地开发环境？`, offer `确认清理` or
+`保留开发环境`, and stop. The merge confirmation does not authorize this plan.
+An immediate `确认清理` or `执行清理` replying to the unchanged exact plan
+starts the confirmed cleanup below; `保留开发环境` ends the flow without
+deletion or another prompt. An orchestrator must surface the combined plan
+and this question after all required deliveries pass, rather than dropping
+them from its final summary.
 
 ## Confirmed cleanup
 

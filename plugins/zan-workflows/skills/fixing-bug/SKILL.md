@@ -172,7 +172,9 @@ order:
    per-Bug loop or while another confirmed Bug still uses the shared branch.
 7. After every Bug in the confirmed queue has reached its truthful terminal
    result, de-duplicate cleanup candidates by repository, worktree and branch.
-   If candidates remain, display the exact combined cleanup plan and stop at
+   If all required go-live gates passed and candidates remain, display the exact
+   combined cleanup plan, ask `是否删除以上本地开发环境？` with choices
+   `确认清理` / `保留开发环境` in the final response, and stop at
    `AWAITING_CLEANUP_CONFIRMATION`. A later exact confirmation calls
    `going-live` with `operation=CLEANUP`; merge, submission, or generic
    continuation confirmation is never cleanup authorization.
@@ -211,6 +213,12 @@ After execution, return a concise ordered list with one row per Bug:
   `NO_CANDIDATE|AWAITING_CONFIRMATION|CLEANED|PARTIAL|BLOCKED` when go-live was
   attempted;
 - failure/confirmation reason when applicable.
+
+When go-live was attempted, append its local cleanup outcome after the ordered
+Bug results. For verified candidates, include the exact combined plan and
+confirmation question from step 7; never reduce it to a cleanup-state code.
+For no candidates or blocked cleanup, explain the retained resources or missing
+evidence instead. `保留开发环境` ends the flow without deletion or another prompt.
 
 Do not expose internal handoff objects, validator protocol lines, JSON/YAML, or
 local record paths. No interruption recovery is provided: after interruption,

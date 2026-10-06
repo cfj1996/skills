@@ -33,10 +33,17 @@ another terminal to deliver a long plan.
 2. Reuse a complete current preview with Job/config fingerprints, or call
    the release action of [workflow-session.mjs](../../scripts/workflow-session.mjs)
    in `PLAN`, or [run-jenkins-release.mjs](../../scripts/run-jenkins-release.mjs)
-   without `--execute` for a standalone call. It reads instance, exact Job
-   definitions and config in parallel. Only XML HTTP 403 permits the explicitly
-   displayed `READABLE_METADATA` binding of Job identity and parameters;
-   this does not prove unchanged hidden configuration. Other failures stop.
+   without `--execute` for a standalone call. By default it uses
+   `READABLE_METADATA`: read and fingerprint the exact Job identity and live
+   parameter definitions without requesting config XML. Include the binding
+   mode in the plan; known missing XML permission is normal and needs no
+   repeated warning or separate confirmation. Report only binding changes,
+   insufficient evidence or verification failures. Metadata does not prove
+   unchanged hidden configuration. Use `jobBindingMode=CONFIG_XML` only when
+   full configuration verification is needed and readable; legacy plans with
+   a config hash retain XML verification. In XML mode, only HTTP 403 permits a
+   metadata preview; other failures stop. Any binding change requires an
+   updated plan before execution.
    It validates selections and returns fingerprints. Check Job
    ownership, channel/version semantics and complete source evidence once.
    Display the complete actual plan and obtain one exact current-conversation

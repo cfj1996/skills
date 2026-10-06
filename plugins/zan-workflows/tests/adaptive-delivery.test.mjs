@@ -10,7 +10,7 @@ import { WorkflowSession } from '../scripts/workflow-session.mjs';
 import { registerTestSubmission } from '../scripts/register-test-submission.mjs';
 import { resolveBugWorkflow, resolveVersionField } from '../scripts/tapd-mappings.mjs';
 import { collectLocalOccupancy, parseOpenFiles, readCodexTasks, readProcessFiles } from '../scripts/collect-local-occupancy.mjs';
-import { runJenkinsRelease } from '../scripts/run-jenkins-release.mjs';
+import { releaseRequiredTools, runJenkinsRelease } from '../scripts/run-jenkins-release.mjs';
 import { adaptJenkinsInput, parseNpmToolsPublication } from '../scripts/jenkins-job-adapters.mjs';
 import { createJenkinsReader } from '../scripts/jenkins-readonly.mjs';
 
@@ -247,7 +247,7 @@ function jenkins({ forbidden = false, packageJob = false, modifyIdentity, badPip
   return { base, calls, call, reader, io: { checkSource: async () => {}, readPipeline: async () => npmBody } };
 }
 
-test('branch-only deployment resolves parameters and handles forbidden XML with a displayed metadata binding', async () => {
+test('branch-only deployment defaults to metadata and never requests XML during preview or execution', async () => {
   const fake = jenkins({ forbidden: true });
   const plan = await runJenkinsRelease(fake.call, fake.reader, fake.base, fake.io);
   assert.deepEqual(plan.params, { branch: 'develop' }); assert.equal(plan.version, sha);
@@ -255,14 +255,104 @@ test('branch-only deployment resolves parameters and handles forbidden XML with 
   const result = await runJenkinsRelease(fake.call, fake.reader, { ...plan, execute: true, confirmed: true }, fake.io);
   assert.equal(result.state, 'DEPLOYED'); assert.equal(result.sourceVerified, true);
   assert.equal(fake.calls.filter(row => row.name === 'jenkins_trigger_build').length, 1);
+  assert.equal(fake.calls.filter(row => row.name === 'jenkins_get_job_config').length, 0);
 });
 
-test('metadata identity changes block a 403-compatible execution before trigger', async () => {
+test('metadata identity changes block execution before trigger', async () => {
   let changed = false;
   const fake = jenkins({ forbidden: true, modifyIdentity: () => changed ? { fullName: 'other-job' } : null });
   const plan = await runJenkinsRelease(fake.call, fake.reader, fake.base, fake.io); changed = true;
   await assert.rejects(runJenkinsRelease(fake.call, fake.reader, { ...plan, execute: true, confirmed: true }, fake.io), /已变化/);
   assert.equal(fake.calls.some(row => row.name === 'jenkins_trigger_build'), false);
+});
+
+test('metadata releases do not require the XML MCP tool', async () => {
+  const fake = jenkins();
+  const call = async (name, args) => {
+    assert.ok(releaseRequiredTools({ execute: true }).includes(name));
+    return fake.call(name, args);
+  };
+  const plan = await runJenkinsRelease(call, fake.reader, fake.base, fake.io);
+  assert.equal(plan.jobBindingMode, 'READABLE_METADATA');
+  await runJenkinsRelease(call, fake.reader, { ...plan, execute: true, confirmed: true }, fake.io);
+  assert.ok(releaseRequiredTools({ jobBindingMode: 'CONFIG_XML' }).includes('jenkins_get_job_config'));
+  assert.ok(releaseRequiredTools({ jobConfigHash: 'legacy-hash' }).includes('jenkins_get_job_config'));
+});
+
+test('explicit XML 403 falls back once and execution reuses metadata without retrying XML', async () => {
+  const fake = jenkins({ forbidden: true });
+  const plan = await runJenkinsRelease(fake.call, fake.reader, { ...fake.base, jobBindingMode: 'CONFIG_XML' }, fake.io);
+  assert.equal(plan.jobBindingMode, 'READABLE_METADATA');
+  assert.equal(plan.jobConfigHash, null);
+  const result = await runJenkinsRelease(fake.call, fake.reader, { ...plan, execute: true, confirmed: true }, fake.io);
+  assert.equal(result.state, 'DEPLOYED');
+  assert.equal(fake.calls.filter(row => row.name === 'jenkins_get_job_config').length, 1);
+});
+
+test('explicit and legacy XML plans keep configuration drift checks', async () => {
+  for (const legacy of [false, true]) {
+    const fake = jenkins();
+    const plan = await runJenkinsRelease(fake.call, fake.reader, { ...fake.base, jobBindingMode: 'CONFIG_XML' }, fake.io);
+    assert.equal(plan.jobBindingMode, 'CONFIG_XML');
+    assert.match(plan.jobConfigHash, /^[a-f\d]{64}$/);
+    const execute = { ...plan, execute: true, confirmed: true };
+    if (legacy) delete execute.jobBindingMode;
+    const changed = (name, args) => name === 'jenkins_get_job_config'
+      ? reply({ jobName: fake.base.jobName, config: '<changed/>' }) : fake.call(name, args);
+    await assert.rejects(runJenkinsRelease(changed, fake.reader, execute, fake.io), /已变化/);
+    assert.equal(fake.calls.some(row => row.name === 'jenkins_trigger_build'), false);
+    const result = await runJenkinsRelease(fake.call, fake.reader, execute, fake.io);
+    assert.equal(result.state, 'DEPLOYED');
+    assert.equal(result.jobBindingMode, 'CONFIG_XML');
+  }
+});
+
+test('XML errors other than 403 stop rather than silently switch verification', async () => {
+  for (const status of [401, 404, 500]) {
+    const fake = jenkins();
+    const call = (name, args) => name === 'jenkins_get_job_config'
+      ? { isError: true, content: [{ type: 'text', text: `HTTP ${status}` }] } : fake.call(name, args);
+    await assert.rejects(runJenkinsRelease(call, fake.reader, { ...fake.base, jobBindingMode: 'CONFIG_XML' }, fake.io));
+    assert.equal(fake.calls.some(row => row.name === 'jenkins_trigger_build'), false);
+  }
+});
+
+test('an approved XML execution cannot silently downgrade after losing permission', async () => {
+  const fake = jenkins();
+  const plan = await runJenkinsRelease(fake.call, fake.reader, { ...fake.base, jobBindingMode: 'CONFIG_XML' }, fake.io);
+  const forbidden = (name, args) => name === 'jenkins_get_job_config'
+    ? { isError: true, content: [{ type: 'text', text: 'HTTP 403' }] } : fake.call(name, args);
+  await assert.rejects(runJenkinsRelease(forbidden, fake.reader, { ...plan, execute: true, confirmed: true }, fake.io), /已变化/);
+  assert.equal(fake.calls.some(row => row.name === 'jenkins_trigger_build'), false);
+});
+
+test('metadata verification fails closed on missing identity, changed parameters or unconfirmed mode', async () => {
+  const fake = jenkins();
+  await assert.rejects(runJenkinsRelease(fake.call, { ...fake.reader, job: undefined }, fake.base, fake.io), /身份核验/);
+  const plan = await runJenkinsRelease(fake.call, fake.reader, fake.base, fake.io);
+  const changed = (name, args) => name === 'jenkins_get_job_parameters'
+    ? reply({ jobName: fake.base.jobName, parameters: [{ name: 'branch', choices: ['develop', 'master'] }] }) : fake.call(name, args);
+  await assert.rejects(runJenkinsRelease(changed, fake.reader, { ...plan, execute: true, confirmed: true }, fake.io), /已变化/);
+  const unconfirmedMode = { ...plan, execute: true, confirmed: true };
+  delete unconfirmedMode.jobBindingMode;
+  await assert.rejects(runJenkinsRelease(fake.call, fake.reader, unconfirmedMode, fake.io), /已确认清单/);
+  for (const mode of ['', 'UNKNOWN']) {
+    await assert.rejects(runJenkinsRelease(fake.call, fake.reader, { ...fake.base, jobBindingMode: mode }, fake.io), /方式无效/);
+  }
+  assert.equal(fake.calls.some(row => row.name === 'jenkins_trigger_build'), false);
+});
+
+test('metadata mode still rejects an actual build from the wrong source revision', async () => {
+  const fake = jenkins();
+  const plan = await runJenkinsRelease(fake.call, fake.reader, fake.base, fake.io);
+  const reader = { ...fake.reader, build: async number => {
+    const build = await fake.reader.build(number);
+    build.actions[1].lastBuiltRevision.SHA1 = pipelineSha;
+    return build;
+  } };
+  await assert.rejects(runJenkinsRelease(fake.call, reader, { ...plan, execute: true, confirmed: true }, fake.io), /实际构建 SHA/);
+  assert.equal(fake.calls.filter(row => row.name === 'jenkins_trigger_build').length, 1);
+  assert.equal(fake.calls.some(row => row.name === 'jenkins_get_job_config'), false);
 });
 
 test('npm-tools computes ref and channel from verified pipeline source then reads actual published versions', async () => {

@@ -27,6 +27,10 @@
 | Normal initial one-Bug flow | Require at most one start confirmation and one consolidated submission confirmation before optional go-live. |
 
 The preflight response is exactly the concise checklist and one confirmation
-question. The final response contains only the ordered result list. Neither
+question. The final response contains the ordered result list and, when go-live
+was attempted, its cleanup outcome. Verified candidates require the exact
+combined plan and `是否删除以上本地开发环境？` with choices
+`确认清理` / `保留开发环境`; no candidates or blocked cleanup require a reason.
+Neither
 response exposes handoff objects, runtime metadata, generated files, or
 validator protocol.

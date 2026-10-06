@@ -16,7 +16,7 @@ packages and affected consumers.
 | Wiki | `UPDATED_MERGED|ALREADY_MERGED|UPDATED_LATEST|ALREADY_LATEST|SKIPPED_TOOL_PROJECT|SKIPPED_NO_WIKI|BLOCKED|NOT_ATTEMPTED`, matching branch entry, project type, before/after type-specific status, target/patch authorization, and exact-body readback when used |
 | Validation | `VALIDATION_PASSED|VALIDATION_FAILED|NOT_RUN` and normalized reason |
 | Local closeout | per completed project `CHECKED|PARTIAL|UNAVAILABLE|NOT_TRIGGERED`; related branch/worktree paths, association and delivery evidence, observed tip/target SHAs, dirty/ignored/occupancy findings, and per-resource `CANDIDATE|RETAIN|VERIFY` with reasons |
-| Cleanup | `NO_CANDIDATE|AWAITING_CONFIRMATION|CLEANED|PARTIAL|BLOCKED|NOT_TRIGGERED`; exact plan and confirmation when applicable, refreshed evidence, worktree-removal and local-branch-deletion readbacks, and completed/retained resources |
+| Cleanup | `NO_CANDIDATE|AWAITING_CONFIRMATION|CLEANED|PARTIAL|BLOCKED|NOT_TRIGGERED`; exact plan and confirmation when applicable, final-response cleanup question or no-candidate/blocker reason, refreshed evidence, worktree-removal and local-branch-deletion readbacks, and completed/retained resources |
 | Terminal | `MERGED|BLOCKED` and blocker when applicable |
 
 ## Invariants
@@ -108,6 +108,17 @@ packages and affected consumers.
 - `NO_CANDIDATE` requires a complete check with no safe candidates. A partial
   or unavailable check yields cleanup `BLOCKED`, never a clean/no-candidate
   claim.
+- Every delivery final response includes the cleanup outcome. An
+  `AWAITING_CONFIRMATION` result displays the exact plan and ends with
+  `是否删除以上本地开发环境？`, offering `确认清理` or `保留开发环境`.
+  A state code or generic recommendation cannot replace this question.
+  Orchestrators retain the plan and surface one combined question only after
+  all required delivery gates pass. Other states explain why cleanup is
+  unavailable; they do not request deletion of retained or uncertain resources.
+- An immediate cleanup confirmation answers only the unchanged displayed
+  plan; `CLEANUP` reuses the prior merge result and rechecks candidates without
+  repeating delivery writes. Choosing to retain resources performs no deletion
+  and ends the cleanup prompt until a later explicit request.
 - Cleanup may remove only confirmed local worktrees followed by their exact
   local branches. It never removes the current task path/branch, protected
   branches, dirty/active/locked/uncertain resources, remote branches, or any

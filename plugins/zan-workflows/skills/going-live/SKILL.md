@@ -30,6 +30,13 @@ deletes them in the delivery turn. `CLEANUP` consumes the prior merged result
 and a separate exact cleanup confirmation, revalidates every candidate, and may
 remove only those confirmed local resources.
 
+Every delivery final response must include the local cleanup outcome. After
+all required delivery gates pass and the completed check yields safe
+candidates, show their exact plan and end
+with `是否删除以上本地开发环境？`; a cleanup-state code or a generic cleanup
+recommendation alone is insufficient. When invoked by an orchestrator,
+preserve this next step for its final response after the whole delivery ends.
+
 Read [contracts.md](references/contracts.md) and
 [tool-routing policy](../../references/tool-routing.md) before any write.
 Read [acceptance-scenarios.md](references/acceptance-scenarios.md) only for an
@@ -199,8 +206,34 @@ authorizes cleanup. `CLEANUP` never repeats the master MR or Wiki operations.
    `CleanupPlan`. Use `NO_CANDIDATE` only when the check completed and found no
    safe candidates; use `BLOCKED` when cleanup evidence is partial or
    unavailable. Otherwise set `cleanup_state=AWAITING_CONFIRMATION`, display
-   the plan and ask exactly `是否删除以上本地开发环境？`, then stop without
-   deleting anything.
+   the plan and apply the completion response below, then stop without deleting
+   anything.
+
+## Completion response and next turn
+
+After reporting the actual merge, release/consumer and Wiki results, always
+report the cleanup outcome separately:
+
+- `AWAITING_CONFIRMATION`: display the exact repository/current branch,
+  worktree paths, local branches, ordered deletion actions and purpose from
+  `CleanupPlan`. State that nothing has been deleted, then end with
+  `是否删除以上本地开发环境？` and offer `确认清理` or `保留开发环境`.
+  Never finish with only “上线完成” or bury this question in progress updates.
+- `NO_CANDIDATE`: say `目前没有可安全清理的本地资源。` and give any retention
+  reason, especially a current branch/worktree or active task. Do not ask to
+  delete resources that failed candidacy.
+- `BLOCKED`: explain the missing inspection evidence or unfinished delivery
+  gate and the specific next check; do not ask for deletion yet.
+- `NOT_TRIGGERED`: explain that default-branch delivery is unverified and
+  cleanup has not started.
+
+An immediate `确认清理` or `执行清理` answering the unchanged exact displayed
+plan confirms only that list and starts `operation=CLEANUP` on the next turn.
+Reuse the prior merged result; do not restart merge, release or Wiki work.
+`保留开发环境` ends the flow with no deletion and no repeated cleanup prompt
+unless the user later requests it. A changed plan needs a fresh confirmation.
+An orchestrator combines duplicate candidates and asks once after all required
+deliveries pass; it must preserve retained/blocked reasons in its final output.
 
 ## Cleanup procedure
 

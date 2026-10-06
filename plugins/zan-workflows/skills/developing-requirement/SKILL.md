@@ -248,11 +248,17 @@ When those exact facts are displayed, set
 After a project returns `MasterMergeResult.terminal_state=MERGED`, preserve its
 local closeout result and any `CleanupPlan`, but do not clean it while another
 project still awaits delivery. After every project reaches its truthful
-go-live result, de-duplicate and surface the exact cleanup plans, then stop at
-`AWAITING_CLEANUP_CONFIRMATION`. A later exact cleanup confirmation invokes
+go-live result, de-duplicate the exact cleanup plans. When all required delivery
+gates pass and safe candidates remain, display the combined plan and end the
+final response with `是否删除以上本地开发环境？`, offering `确认清理` or
+`保留开发环境`, then stop at `AWAITING_CLEANUP_CONFIRMATION`. When no safe
+candidates exist or inspection is blocked, report that outcome and its reasons
+instead of entering a confirmation state without a plan. A later exact cleanup
+confirmation invokes
 `going-live` with `operation=CLEANUP`; it must revalidate and may remove only
 the confirmed local worktree and local branch resources. Never infer cleanup
 authorization from `GO_LIVE` or merge confirmation.
+`保留开发环境` ends the flow without deletion or a repeated cleanup question.
 
 Return `MERGED` only when every project has a verified master delivery, all
 involved tooling packages have verified latest releases, affected projects

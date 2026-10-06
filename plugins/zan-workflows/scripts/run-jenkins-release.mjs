@@ -101,8 +101,21 @@ async function jobConfig(call, args) {
   }
 }
 
+function bindingMode(input) {
+  const mode = input.jobBindingMode ?? (input.jobConfigHash ? 'CONFIG_XML' : 'READABLE_METADATA');
+  if (!['READABLE_METADATA', 'CONFIG_XML'].includes(mode)) throw new Error('Job 核验方式无效');
+  return mode;
+}
+
+export function releaseRequiredTools(input) {
+  return ['jenkins_list_instances', 'jenkins_get_job_parameters',
+    ...(bindingMode(input) === 'CONFIG_XML' ? ['jenkins_get_job_config'] : []),
+    ...(input.execute ? ['jenkins_trigger_build'] : [])];
+}
+
 export async function runJenkinsRelease(call, reader, input, io = {}) {
   validateWait(io);
+  const requestedBindingMode = bindingMode(input);
   for (const key of ['targetProject', 'releaseTarget', 'targetEnvironment', 'jobName', 'jobUrl',
     'releaseRef', 'releaseChannel', 'purpose', 'sourceRepository', 'expectedSha']) requireText(input[key], key);
   for (const address of [input.sourceRepository, input.pipelineSource?.repositoryUrl].filter(Boolean)) {
@@ -122,7 +135,8 @@ export async function runJenkinsRelease(call, reader, input, io = {}) {
   }
   const args = { jobName: input.jobName, ...(input.instance ? { instance: input.instance } : {}) };
   const [definitions, config, instances] = await Promise.all([
-    readTool(call, 'jenkins_get_job_parameters', args), jobConfig(call, args),
+    readTool(call, 'jenkins_get_job_parameters', args),
+    requestedBindingMode === 'CONFIG_XML' ? jobConfig(call, args) : Promise.resolve(null),
     readTool(call, 'jenkins_list_instances', {}),
   ]);
   if (!Array.isArray(instances) || !instances.length) throw new Error('Jenkins 实例不可验证');
@@ -138,7 +152,7 @@ export async function runJenkinsRelease(call, reader, input, io = {}) {
   checkParameters(definitions, input);
   let jobConfigHash = null, jobBindingHash, jobBindingMode;
   if (config === null) {
-    if (!reader.job) throw new Error('Job 配置无权限且没有可读身份核验能力');
+    if (!reader.job) throw new Error('缺少 Job 可读身份核验能力');
     const identity = await reader.job();
     jobBindingMode = 'READABLE_METADATA';
     jobBindingHash = sha256(stableJson(identity));
@@ -151,14 +165,15 @@ export async function runJenkinsRelease(call, reader, input, io = {}) {
   const parameterDefinitionsHash = sha256(stableJson(definitions));
   if ((input.jobConfigHash && input.jobConfigHash !== jobConfigHash) ||
       (input.jobBindingHash && input.jobBindingHash !== jobBindingHash) ||
-      (input.jobBindingMode && input.jobBindingMode !== jobBindingMode) ||
+      (input.jobBindingMode && input.jobBindingMode !== jobBindingMode &&
+        (input.execute || input.jobBindingHash || input.jobConfigHash)) ||
       (input.parameterDefinitionsHash && input.parameterDefinitionsHash !== parameterDefinitionsHash)) {
     throw new Error('Job 配置或参数定义已变化，需要更新清单');
   }
   if (!input.execute) return { ...input, instance: args.instance, execute: false, confirmed: false, state: 'AWAITING_CONFIRMATION',
     jobConfigHash, jobBindingHash, jobBindingMode, parameterDefinitionsHash, writes: 0 };
   if (jobBindingMode === 'READABLE_METADATA' && input.jobBindingMode !== jobBindingMode) {
-    throw new Error('配置 XML 不可读的核验方式尚未展示和确认');
+    throw new Error('Job 元数据核验方式尚未纳入已确认清单');
   }
   await (io.checkSource || checkReleaseSource)(input);
   if (input.jobAdapter === 'npm-tools-v1') await (io.checkSource || checkReleaseSource)({
@@ -227,7 +242,7 @@ async function main() {
   const client = clientFor('jenkins-mcp');
   try {
     await client.initialize();
-    client.requireTools(['jenkins_list_instances', 'jenkins_get_job_parameters', 'jenkins_get_job_config', ...(input.execute ? ['jenkins_trigger_build'] : [])]);
+    client.requireTools(releaseRequiredTools(input));
     const result = await runJenkinsRelease((name, args) => client.call(name, args), reader, input, {
       maxWaitMs: input.maxWaitMs, onProgress: progressToStderr,
     });
