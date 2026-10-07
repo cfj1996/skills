@@ -26,6 +26,7 @@
 | `AWAITING_SUBMISSION_CONFIRMATION` | 已展示全部精确 `SubmissionPlan` | 确认提测计划或修改计划 | `确认提交测试` / `修改提测计划：...` |
 | `SUBMITTED` | `TestSubmissionResult=SUBMITTED` | 按明确意图上线或暂停 | `上线` / `暂停` |
 | `AWAITING_GO_LIVE_CONFIRMATION` | 已展示 source-to-master 与 Wiki 精确变更 | 确认上线计划或暂停 | `确认上线` / `暂停` |
+| `AWAITING_MERGE` | 原 MR 已创建/复用，等待有权限人员合并 | 展示 MR 链接；人工合并后只读核验同一个 MR 再继续 | `已合并，继续上线` |
 | `MERGED` | master 包含性与必需 Wiki 读回通过 | 有安全候选时展示清单并询问；否则解释保留或检查阻塞原因 | `确认清理` / `保留开发环境`（仅已展示精确清单时） |
 | `AWAITING_CLEANUP_CONFIRMATION` | 已展示精确本地分支/worktree 清理计划 | 确认、修改或保留 | `确认删除以上本地开发环境` / `保留开发环境` |
 | `PAUSED` | 用户要求暂停 | 从记录的当前阶段恢复 | `继续需求开发` |

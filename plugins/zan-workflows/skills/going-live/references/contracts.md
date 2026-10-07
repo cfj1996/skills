@@ -11,15 +11,27 @@ packages and affected consumers.
 | Submission | upstream `SUBMITTED` result and original repair branch; exact related submitted owner/consumer handoffs when tooling dependencies are involved |
 | Repository | expected/actual path, Git root, origin, verification result |
 | Merge | source/target branches and SHAs, current-round commits, authorization, MR result, merge readback, master containment |
-| Tooling latest | `VERIFIED|NOT_APPLICABLE|BLOCKED`; exact plan/authorization, latest precheck `VERIFIED_EXISTING|NEEDS_RELEASE|BLOCKED`, package owner delivery, `REUSED_LATEST|PUBLISHED_LATEST` and publication/source/registry evidence, Jenkins result only when a release is needed, affected consumer manifests/locks/resolved versions, upgrade review/checks/delivery, and final latest recheck |
+| Tooling latest | `VERIFIED|NOT_APPLICABLE|AWAITING_MERGE|BLOCKED`; exact plan/authorization, latest precheck `VERIFIED_EXISTING|NEEDS_RELEASE|BLOCKED`, package owner delivery, `REUSED_LATEST|PUBLISHED_LATEST` and publication/source/registry evidence, Jenkins result only when a release is needed, affected consumer manifests/locks/resolved versions, upgrade review/checks/delivery, and final latest recheck |
 | Related deliveries | per-project repository/original branch/source and target SHA, scoped upgrade diff when used, review/verification, commit/push/MR readbacks and default-branch containment |
 | Wiki | `UPDATED_MERGED|ALREADY_MERGED|UPDATED_LATEST|ALREADY_LATEST|SKIPPED_TOOL_PROJECT|SKIPPED_NO_WIKI|BLOCKED|NOT_ATTEMPTED`, matching branch entry, project type, before/after type-specific status, target/patch authorization, and exact-body readback when used |
 | Validation | `VALIDATION_PASSED|VALIDATION_FAILED|NOT_RUN` and normalized reason |
 | Local closeout | per completed project `CHECKED|PARTIAL|UNAVAILABLE|NOT_TRIGGERED`; related branch/worktree paths, association and delivery evidence, observed tip/target SHAs, dirty/ignored/occupancy findings, and per-resource `CANDIDATE|RETAIN|VERIFY` with reasons |
 | Cleanup | `NO_CANDIDATE|AWAITING_CONFIRMATION|CLEANED|PARTIAL|BLOCKED|NOT_TRIGGERED`; exact plan and confirmation when applicable, final-response cleanup question or no-candidate/blocker reason, refreshed evidence, worktree-removal and local-branch-deletion readbacks, and completed/retained resources |
-| Terminal | `MERGED|BLOCKED` and blocker when applicable |
+| Terminal | `MERGED|AWAITING_MERGE|BLOCKED`; exact pending MR/read-only continuation when waiting, or blocker when applicable |
 
 ## Invariants
+
+- `AWAITING_MERGE` is a normal handoff for manual merge, explicit MR
+  `user.can_merge=false`, or merge-call HTTP 403. Retain exact MR IID/URL,
+  repository/branches/source SHA, completed effects, unfinished stage and
+  read-only `resumePlan`; never infer completion or label this a failed merge.
+  Dependent publication, consumer delivery, Wiki and cleanup require `MERGED`.
+- Continuation uses `VERIFY_ONLY` without mutation tools. The user's reply is
+  not proof: verify the same MR, unchanged source SHA, required CI and fetched
+  target containment. A deleted source branch or unrelated target advancement
+  is acceptable only with that proof. An open MR remains waiting; changed
+  source/identity, closed MR, bad CI, unknown/read failures or absent proof
+  block. Reuse unchanged authority only for unfinished dependent actions.
 
 - `MERGED` requires the original submitted `feature/*` or `fixbug/*` source,
   target exactly `master`, matching expected/actual source and target SHAs at

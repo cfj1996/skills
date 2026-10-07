@@ -170,6 +170,12 @@ order:
    Its complete merge/release/upgrade/Wiki facts require their own confirmation.
    Preserve any returned `CleanupPlan`, but do not execute cleanup inside the
    per-Bug loop or while another confirmed Bug still uses the shared branch.
+   On `AWAITING_MERGE`, pause the shared-branch queue, retaining remaining Bugs,
+   exact MR and completed effects in the conversation. Report
+   `待确认：等待有权限人员合并` with its link and `已合并，继续上线` next step.
+   Route that reply to `going-live`'s read-only continuation before remaining
+   delivery writes; do not treat it as a failed Bug, start the next shared-branch
+   repair or repeat completed steps.
 7. After every Bug in the confirmed queue has reached its truthful terminal
    result, de-duplicate cleanup candidates by repository, worktree and branch.
    If all required go-live gates passed and candidates remain, display the exact

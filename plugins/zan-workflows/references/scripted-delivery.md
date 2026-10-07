@@ -113,6 +113,30 @@ Use the intended delivered revision for deployment and explicitly reconcile
 any later target advancement rather than passing the source branch SHA as
 though it were the target's merge commit.
 
+### Developers without merge permission
+
+Bind `mergeMode=MANUAL` in the preview when merge permission is known absent.
+Execution creates/reuses the exact MR and returns `AWAITING_MERGE`, `mrUrl`,
+`reason`, completed effects and a read-only `resumePlan`. `AUTO` also hands off
+on explicit `user.can_merge=false` or merge-call HTTP 403 after exact readback;
+it never retries a denied merge. Read/approval/creation failures, other HTTP
+errors and unknown outcomes stay blocking.
+
+Show the MR link and `等待有权限人员合并`; after `已合并，继续上线`, invoke
+`resumePlan` without `--execute`, or session `action=merge`, `phase=PLAN`,
+`mergeMode=VERIFY_ONLY`. It uses no mutation tool and requires exact IID/source
+SHA, required CI and fetched target containment before `MERGED`. A deleted
+source branch is acceptable only with that proof; an open MR stays waiting.
+Preserve the actual delivered revision and refresh mutable facts before
+dependent actions.
+
+The live session retains pending MR bindings in memory and blocks subsequent
+`EXECUTE` actions until all exact pending MRs have verified completion. PLAN
+reads remain available; this normal handoff does not poison the session as a
+failed write. The caller retains completed steps and runs only unfinished
+authorized actions. No durable recovery record, permission/account escalation
+or automatic background monitor is added.
+
 ## Jenkins deployment and package release
 
 `resolve-jenkins-job.mjs` (or session `job` PLAN) resolves an already routed

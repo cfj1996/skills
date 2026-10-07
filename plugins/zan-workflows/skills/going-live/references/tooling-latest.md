@@ -47,6 +47,15 @@ for a package that consumes another changed package. Cyclic or unresolved
 ownership/dependency facts block planning rather than guessing an order.
 An owner merge must be verified before publishing from its default ref; a
 consumer must use the verified latest package before its final master merge.
+
+Every owner/consumer merge supports the manual handoff in `going-live`.
+On `AWAITING_MERGE`, retain its exact MR/read-only continuation and completed
+effects; pause dependent actions and show `等待有权限人员合并`. An owner
+awaiting merge prevents its required publication and dependent upgrades/delivery.
+A consumer awaiting merge prevents final Wiki/latest completion and cleanup.
+After `已合并，继续上线`, verify that exact MR with `VERIFY_ONLY`, then run
+only unfinished authorized stages. Do not repeat a successful publication or
+merge; refresh registry/ref/Wiki facts at the remaining boundaries.
 Do not merge consumers first and claim the old merge includes a later upgrade.
 
 ## Check latest before building
@@ -180,7 +189,7 @@ latest, verify the unchanged field against release/upgrade evidence. Business
 entries retain their normal `是否上线：已合并` rule. Missing, duplicate or
 legacy status fields block this delivery; no old-template migration is allowed.
 
-`ToolingLatestResult` is in memory: `VERIFIED|NOT_APPLICABLE|BLOCKED`, package
+`ToolingLatestResult` is in memory: `VERIFIED|NOT_APPLICABLE|AWAITING_MERGE|BLOCKED`, package
 package/consumer prechecks, action decision, and
 `REUSED_LATEST|PUBLISHED_LATEST` release/registry evidence,
 each consumer's `UPGRADED|ALREADY_CURRENT` result,

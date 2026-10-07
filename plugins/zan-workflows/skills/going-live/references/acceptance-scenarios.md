@@ -34,6 +34,12 @@
 | `NO_WIKI` submission with tooling packages | `SKIPPED_NO_WIKI`; still require latest publication and consumer verification, never create a Wiki. |
 | `STANDARD` submission skipped Wiki because the continue fix was non-functional | Reuse the retained existing target and maintain business merge status or the involved tooling latest field after its required gates. |
 | Merge/readback/containment fails | `BLOCKED`; do not change `是否上线` or claim go-live success. |
+| Developer can create an MR but cannot merge the protected target | Create/reuse the exact MR, return `AWAITING_MERGE` with its link and `已合并，继续上线` next step, and pause dependent writes. |
+| Merge API explicitly returns 403 | Read back the same MR once; keep an open MR waiting without retrying, or require actual merged/containment proof if a maintainer already merged. Other errors remain blockers. |
+| Maintainer merges the same MR and deletes its source branch | Read-only `VERIFY_ONLY` checks exact MR/source SHA, CI and target containment, then continues only unfinished authorized actions. |
+| User says merged but the MR is still open | Keep `AWAITING_MERGE`; perform no downstream write. |
+| Manual continuation finds another MR, changed source, closed MR, bad CI or missing containment | Block/investigate and retain completed effects; never recreate or force merge. |
+| Consumer waits for manual merge after successful publication | Preserve publication, pause final Wiki/cleanup, then resume after exact consumer merge proof without publishing again. |
 | Wiki changes after authorization | Preserve the changed page and require a fresh patch/authorization; report any already completed merge truthfully. |
 | Master delivery is verified and associated resources are clean, idle, and fully delivered | Run local closeout automatically; build the exact cleanup plan, set `AWAITING_CONFIRMATION`, end the final response with `是否删除以上本地开发环境？` and choices `确认清理` / `保留开发环境`, and delete nothing in the delivery turn. |
 | User replies `确认清理` or `执行清理` to the unchanged exact displayed plan | Start `operation=CLEANUP` with the prior merged result; do not repeat merge, publication or Wiki work. |

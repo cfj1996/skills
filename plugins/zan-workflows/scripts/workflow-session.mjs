@@ -19,6 +19,7 @@ export class WorkflowSession {
     this.reader = reader;
     this.io = io;
     this.executionBlocked = false;
+    this.pendingMerges = new Map();
     this.ids = new Set();
     this.closed = false;
   }
@@ -36,8 +37,16 @@ export class WorkflowSession {
     if (execute && (!this.allowExecute || this.executionBlocked || ['closeout', 'job'].includes(request.action))) {
       throw new Error('当前会话不允许此写操作；关闭会话并重新核实实际状态');
     }
+    if (execute && this.pendingMerges.size) throw new Error('存在待人工合并 MR；先用 PLAN 和 VERIFY_ONLY 核验原 MR，后续写入暂不执行');
     const input = { ...request.input, execute };
     if (execute && input.confirmed !== true) throw new Error('执行缺少已展示清单的明确确认');
+    if (request.action === 'merge' && input.mergeMode === 'VERIFY_ONLY') {
+      const pending = this.pendingMerges.get(`${input.projectId}:${input.mrIid}`);
+      if (pending && !['originUrl', 'repositoryPath', 'sourceBranch', 'targetBranch', 'sourceSha',
+        'targetSha', 'pipelineRequired', 'reviewPassed'].every(field => pending[field] === input[field])) {
+        throw new Error('待合并清单身份或校验要求已变化；需重新评审和确认');
+      }
+    }
     const call = server => (name, args) => this.pool.call(server, name, args);
     try {
       let result;
@@ -48,6 +57,15 @@ export class WorkflowSession {
         case 'wiki': result = await ensureTestWiki(call('tapd-mcp'), input); break;
         case 'closeout': result = await checkLocalCloseout(input, this.io); break;
         case 'job': result = await resolveJenkinsJob(call('jenkins-mcp'), input); break;
+      }
+      if (request.action === 'merge' && result.state === 'AWAITING_MERGE') {
+        this.pendingMerges.set(`${result.projectId}:${result.mrIid}`, result.resumePlan);
+      }
+      if (request.action === 'merge' && input.mergeMode === 'VERIFY_ONLY' && result.state === 'MERGED') {
+        const key = `${result.projectId}:${result.mrIid}`;
+        const pending = this.pendingMerges.get(key);
+        if (pending && ['originUrl', 'repositoryPath', 'sourceBranch', 'targetBranch', 'sourceSha']
+          .every(field => pending[field] === result[field])) this.pendingMerges.delete(key);
       }
       if (execute && ['BLOCKED', 'FAILED', 'UNKNOWN'].includes(result?.state)) this.executionBlocked = true;
       return result;

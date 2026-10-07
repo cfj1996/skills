@@ -56,6 +56,37 @@ Use the pinned helper runtime and wait for `SESSION_READY`; avoid manual TTY
 repair. The merge helper verifies supported rule/counter/edition formats and
 records approval evidence; an unknown or denied check remains blocking.
 
+## Manual merge handoff
+
+Developers may create MRs without permission to merge protected targets. Use
+`mergeMode=MANUAL` in the displayed plan when that restriction is known;
+otherwise `AUTO` hands off on explicit `user.can_merge=false` or a merge-call
+HTTP 403. Read, approval, creation, network and other API failures remain
+blockers rather than guessed permission issues.
+
+The executor creates/reuses the exact MR and returns `AWAITING_MERGE`, its
+URL, repository/branches/source SHA, completed effects and read-only
+`resumePlan`. Report `等待有权限人员合并` with the exact link and paused next
+stage. Tell the user to reply `已合并，继续上线` after the maintainer merges.
+Do not repeat merge attempts, create a replacement MR, switch accounts,
+approve on the user's behalf or continue dependent publication, consumer
+delivery, Wiki updates or cleanup. This normal handoff is not a failed delivery;
+conflict, CI and changed-source blockers remain distinct.
+
+On that reply, reuse the same in-conversation submissions and delivery plan.
+Run the exact `resumePlan` with `mergeMode=VERIFY_ONLY` and no `--execute`
+(session `PLAN`). The reply prompts a read, never proves completion: require
+the same MR's merged state, unchanged source SHA, required CI and source
+containment in the freshly fetched target. A maintainer-deleted source branch
+or unrelated target advancement is acceptable only with that proof; never
+recreate the branch. An open MR remains waiting; changed source/identity,
+closed MR or missing proof needs investigation/new review. After `MERGED`,
+continue only the first unfinished dependent stage under unchanged prior
+authorization, refreshing mutable refs/latest/Wiki facts. Do not replay
+completed merges/publications. Changed action scope needs a new actual preview
+and confirmation. Keep the handoff in the conversation only; create no
+persistent recovery record or automatic scheduled monitor.
+
 ## Input gate
 
 For `operation=DELIVER`, require:
@@ -197,7 +228,9 @@ authorizes cleanup. `CLEANUP` never repeats the master MR or Wiki operations.
    A `NO_WIKI` submission performs no Wiki read or write. No extra private
    Agent validation is needed for an unchanged fully displayed patch; a changed
    body/patch is a real exception and needs a new preview/authorization.
-8. Return `MERGED` only when all required merge, tooling release, consumer
+8. On `AWAITING_MERGE`, return the exact handoff and completed effects, pause
+   dependent writes and follow the continuation above. Return `MERGED` only
+   when all required merge, tooling release, consumer
    current-version verification and applicable Wiki readbacks pass;
    otherwise return `BLOCKED` with actual completed effects. Include the local
    check result separately, with paths/branches, reasons, and cleanup advice.
@@ -213,6 +246,9 @@ authorizes cleanup. `CLEANUP` never repeats the master MR or Wiki operations.
 
 After reporting the actual merge, release/consumer and Wiki results, always
 report the cleanup outcome separately:
+
+For `AWAITING_MERGE`, show the exact MR link and `已合并，继续上线` next step
+instead of a deletion question. Resources remain retained until delivery ends.
 
 - `AWAITING_CONFIRMATION`: display the exact repository/current branch,
   worktree paths, local branches, ordered deletion actions and purpose from

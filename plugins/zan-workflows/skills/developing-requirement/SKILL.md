@@ -245,6 +245,12 @@ implementation checklist nor submission confirmation may be reused.
 When those exact facts are displayed, set
 `AWAITING_GO_LIVE_CONFIRMATION` and stop for that confirmation.
 
+An `AWAITING_MERGE` result pauses dependent project delivery with the exact MR
+link, completed effects and `已合并，继续上线` next step. Keep this waiting
+stage instead of marking go-live failed or complete. On that reply, use
+`going-live`'s read-only exact-MR continuation, then run only unfinished
+authorized actions; do not repeat completed publication or merges.
+
 After a project returns `MasterMergeResult.terminal_state=MERGED`, preserve its
 local closeout result and any `CleanupPlan`, but do not clean it while another
 project still awaits delivery. After every project reaches its truthful
@@ -289,7 +295,7 @@ per-project `TestSubmissionResult` and `MasterMergeResult` values when requested
 cleanup plans/results, verification results, requirement-readiness checklist and blocker counts,
 `implementation_ready`, `current_stage`, `stage_status`, `completed_stages`,
 `blockers`, `recommended_next_action`, `available_actions`, `resume_prompt`, and
-`BRANCH_READY|PLAN_READY|REVIEWED|AWAITING_SUBMISSION_CONFIRMATION|SUBMITTED|AWAITING_GO_LIVE_CONFIRMATION|AWAITING_CLEANUP_CONFIRMATION|MERGED|PENDING|BLOCKED|PAUSED|STOPPED`.
+`BRANCH_READY|PLAN_READY|REVIEWED|AWAITING_SUBMISSION_CONFIRMATION|SUBMITTED|AWAITING_GO_LIVE_CONFIRMATION|AWAITING_MERGE|AWAITING_CLEANUP_CONFIRMATION|MERGED|PENDING|BLOCKED|PAUSED|STOPPED`.
 
 Do not create a workflow report, runtime ledger, raw requirement dump, or
 generated evidence directory.

@@ -67,8 +67,13 @@ For the proposed scoped operations, validate:
    publication and consumer evidence; master containment alone is insufficient.
 8. No local record, recovery metadata, or private prior verdict is used.
 
-Do not require future readbacks for bundle pre-validation. The one merge
-executor checks refs, approvals, CI, merged readback and containment; the
+Do not require future readbacks for bundle pre-validation. The merge
+plan may use `MANUAL` for a developer without merge permission. An
+`AWAITING_MERGE` handoff is valid: all dependent publication, consumer, Wiki
+and cleanup actions still require exact merged/source-containment proof.
+Continuation uses read-only `VERIFY_ONLY` on the same MR and never requires
+merge permission or substitutes another MR/source. The executor checks refs,
+approvals, CI, merged readback and containment; the
 update-only Wiki helper checks body/patch and readback. Their deterministic
 checks need no additional Agent validator or per-poll review. A changed plan,
 failed check or unknown write blocks later operations. For a genuinely changed
