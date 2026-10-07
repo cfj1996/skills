@@ -115,7 +115,7 @@ function findGitInvocation(tokens) {
       index += 1;
       continue;
     }
-    return { subcommand: token, args: tokens.slice(index + 1) };
+    return { subcommand: token, args: tokens.slice(index + 1), globalArgs: tokens.slice(gitIndex + 1, index) };
   }
 
   return undefined;
@@ -180,9 +180,22 @@ function branchCreation(invocation) {
   return undefined;
 }
 
-function inferCurrentBranch(cwd) {
+function branchDeletion(invocation) {
+  if (invocation.subcommand !== 'branch') return undefined;
+  const end = invocation.args.indexOf('--');
+  const options = end === -1 ? invocation.args : invocation.args.slice(0, end);
+  const shortFlags = options.filter(arg => /^-[A-Za-z]+$/.test(arg)).join('');
+  if (!options.includes('--delete') && !/[dD]/.test(shortFlags)) return undefined;
+  return {
+    branches: positionalArgs(invocation.args),
+    forced: /[Df]/.test(shortFlags) || options.includes('--force'),
+    remote: /[ra]/.test(shortFlags) || options.includes('--remotes') || options.includes('--all'),
+  };
+}
+
+function inferCurrentBranch(cwd, globalArgs = []) {
   try {
-    return execFileSync('git', ['-C', cwd, 'branch', '--show-current'], {
+    return execFileSync('git', ['-C', cwd, ...globalArgs, 'branch', '--show-current'], {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
     }).trim();
@@ -227,6 +240,20 @@ export function evaluateHookInput(input, { workspaceRoot, currentBranch } = {}) 
   for (const tokens of tokenizeShell(command)) {
     const invocation = findGitInvocation(tokens);
     if (!invocation) continue;
+
+    const deletion = branchDeletion(invocation);
+    if (deletion) {
+      if (deletion.forced) return deny('Blocked force branch deletion. Use ordinary git branch -d after verified delivery and explicit confirmation.');
+      if (deletion.remote) return deny('Blocked non-local branch cleanup. Only exact confirmed local branches may be removed.');
+      const branch = currentBranch ?? inferCurrentBranch(cwd, invocation.globalArgs);
+      const protectedBranches = new Set(['master', 'main', 'develop', 'dev', branch]);
+      if (deletion.branches.some(name => protectedBranches.has(name))) {
+        return deny('Blocked deletion of a baseline or currently checked-out branch.');
+      }
+      // A deletion operand is not a new branch or its start ref. Continue
+      // checking any subsequent shell commands without applying creation rules.
+      continue;
+    }
 
     const creation = branchCreation(invocation);
     if (creation) {

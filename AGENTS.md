@@ -27,6 +27,11 @@ For manual merge permission handoff and read-only continuation checks, run
 `node --test plugins/zan-workflows/tests/manual-merge.test.mjs`. These tests
 simulate GitLab and workflow sessions, with no external writes.
 
+For Git safety Hook deletion classification and retained creation/rebase gates,
+run `node --test plugins/zan-workflows/tests/git-branch-safety.test.mjs`. These
+tests evaluate the Hook without executing deletion commands and use one
+disposable local Git fixture for `git -C` branch lookup.
+
 ## Coding Style & Naming Conventions
 
 Write skill docs in concise Markdown with clear `#`/`##` headings, short rule lists, and fenced command examples. Preserve the existing mix of English headings and Chinese workflow detail where the skill already uses it. Name new skill folders with lowercase kebab-case, keep the entry file exactly `SKILL.md`, and use descriptive agent filenames such as `collector.md` or `reviewer.md`.

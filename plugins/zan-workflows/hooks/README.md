@@ -7,6 +7,14 @@ This plugin bundles the two lifecycle hooks used by the local Codex setup:
 - `PreToolUse` checks Bash commands that invoke Git and blocks unsafe branch
   creation and cross-base rebases.
 
+Ordinary `git branch -d/--delete` cleanup is classified as deletion, not branch
+creation, so it does not require an `origin/master` start ref or `--no-track`.
+The hook rejects force deletion, remote-tracking deletion, baseline branches
+and the current branch (including the repository selected by `git -C`). It
+continues checking later commands in the same shell request. Passing this
+syntax check does not authorize deletion: `going-live` still requires the
+exact user-confirmed cleanup plan and a fresh delivery/data/occupancy check.
+
 The hooks are portable across machines:
 
 - Plugin scripts are resolved from `${PLUGIN_ROOT}`.
