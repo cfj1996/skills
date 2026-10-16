@@ -1,8 +1,37 @@
 # Local MCP setup
 
-插件通过 `.mcp.json` 启动 `scripts/start-mcp.mjs`，捆绑 GitLab、Jenkins、
-TAPD 和 YApi 四个 STDIO MCP。初始化只需配置一次；每次 MCP 启动时重新读取
+插件通过 `.mcp.json` 提供 `graphify-hub` 远程 HTTP MCP，以及由
+`scripts/start-mcp.mjs` 启动的 GitLab、Jenkins、TAPD、YApi 四个 STDIO MCP。初始化只需配置一次；每次 MCP 启动时重新读取
 本机凭证，安装和更新插件不会覆盖凭证文件。插件不会弹出安装凭证表单。
+
+## Graphify Hub
+
+`graphify-hub` 使用 Codex 原生 HTTP 连接，地址为公司内网
+`http://172.16.1.152:24100/mcp`。当前服务不要求认证，不向四个 STDIO
+进程传递 Hub 配置，也不把 Hub 当作 `start-mcp.mjs` 的服务参数。
+首次使用需能访问该内网；失败由统一知识入口回退本地。
+
+插件配置仅开放查询工具，覆盖项目发现、功能定位、图谱/Wiki 检索和按需分析。
+`save_solution`、`feedback`、`submit_knowledge`、`submit_file`、`rescan_projects`、
+`evolve_wiki`、`process_submissions` 等回写/刷新工具不在查询允许列表中。
+查询响应可能包含服务端建议，不能把建议当成回写授权。
+
+从独立注册迁移时：
+
+1. **安装或更新插件前**，将原 `mcp_servers.graphify-hub` 的完整配置备份至
+   本机受限权限文件，记录有效 enabled 状态和工具策略。安装器可能自动移除
+   同名独立注册，不能在安装后再从旧配置恢复这些信息。
+2. 在安装前将原 enabled 状态和已有工具限制保留在
+   `plugins."zan-workflows@cfj-skills".mcp_servers.graphify-hub`；
+   原配置若是停用，迁移后也保持停用。需要使用 Hub 时在插件 MCP 设置中启用。
+3. 安装包含 Hub 配置的插件版本，核对插件 ID 为 `zan-workflows@cfj-skills`、
+   端点及读回的有效开关/工具策略。已启用时验证 MCP initialize/tools/list 和
+   一个只读查询；原状态为停用时只核验配置，不为验证临时启用或绕过宿主连接。
+4. 确认安装版本已包含新入口后，仅在独立注册仍存在时移除它，避免同名覆盖。
+   不修改其他 MCP 注册，也不直接编辑插件缓存。新会话中检查实际生效入口。
+
+不要在新插件尚未可用时删除原注册。迁移失败可恢复备份中的这一项，
+不整份覆盖可能已发生其他修改的 Codex 配置。
 
 ## Dependencies
 

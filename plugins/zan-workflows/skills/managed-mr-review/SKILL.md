@@ -133,14 +133,17 @@ description: Use when the user asks to find, review, or remotely merge open GitL
 
 ### 项目级 Preflight 与证据复用
 
-先按项目分组，再为每个项目读取一次集中配置、项目 AI_CONTEXT、Graphify freshness、目标分支状态、项目审核模式和公共治理证据。生成 project preflight packet，至少包含：
+先按项目分组，再为每个项目读取一次集中配置、目标分支状态、项目审核模式和公共治理证据。项目知识通过
+[workspace-project-knowledge](../workspace-project-knowledge/SKILL.md) 获取：传入 canonical 项目/子项目、审核需要回答的问题和 `purpose: review`，复用已有有效 `KnowledgeContext`，只补充缺失知识。由该入口选择 Hub 或本地来源，MR 流程和 reviewer 不另行选择 provider 或强制检查本地图谱。生成 project preflight packet，至少包含：
 
 - project id/path、目标分支 SHA、接入模式与判定证据；
 - 项目明确声明的 pipeline/approval/test 要求；
-- 可复用的项目上下文、标准资源路径和 Graphify 状态；
+- 可复用的 `KnowledgeContext`（范围、来源/版本、证据和缺口）及适用标准资源路径；
 - 公共缺口与读取时间。
 
-每个 MR 再生成绑定 HEAD SHA 的 review packet，包含 diff、changed files、提交历史、pipeline、discussion、approval 和 mergeability。Reviewer 优先消费 packet，不重复加载 workspace 规则、项目路由、公共配置和无差异的标准资源。
+每个 MR 再生成绑定 HEAD SHA 的 review packet，包含 diff、changed files、提交历史、pipeline、discussion、approval 和 mergeability。Reviewer 优先消费 packet，不重复加载 workspace 规则、项目路由、公共配置和无差异的标准资源。知识中的实现线索必须在该 MR HEAD 的源码核验；版本未知、范围不明或未命中不能证明代码缺陷或功能不存在。Hub 不可用本身不阻断审核，有等价证据时继续；关键代码证据仍不足时按现有规则标记 `未完成`。
+
+管辖配置、Adoption、标准原文、分支 SHA 和 GitLab 实时门禁仍从现有权威来源精确读取；`KnowledgeContext` 不替代这些检查。缺少知识时向统一入口补查，不要求 reviewer 重跑全部 preflight。
 
 如果 MR 修改了 `AGENTS.md`、Adoption，或其 HEAD 上这些文件与 project preflight 不同，必须为该 MR 重新分类；否则同一项目复用一次 preflight 结果。
 

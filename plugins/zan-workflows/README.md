@@ -17,7 +17,7 @@
 
 | Codex 显示名称 | Skill ID | 作用 | 类型 |
 | --- | --- | --- | --- |
-| zan:项目知识 | [`workspace-project-knowledge`](skills/workspace-project-knowledge/SKILL.md) | 根据业务词、仓库、服务名或页面/API 线索定位项目，读取项目知识，查 Jenkins Job 和共享包归属 | 项目路由/知识入口 |
+| zan:项目知识 | [`workspace-project-knowledge`](skills/workspace-project-knowledge/SKILL.md) | 统一查询项目知识，优先 Graphify Hub，必要时回退本地；定位项目、代码入口、Jenkins Job 和共享包归属 | 项目路由/知识入口 |
 | zan:准备 TAPD 工作 | [`preparing-work`](skills/preparing-work/SKILL.md) | 只读读取 TAPD Bug、Story、Task，确认项目、仓库、范围、原始分支及创建/复用动作，输出内存交接定义 | 只读预检 |
 | zan:可视化编写计划 | [`writing-plans`](skills/writing-plans/SKILL.md) | 按远程 `origin/master` 收敛需求和验收；简单需求用对话，复杂需求用评审面板；绑定分支后写可执行 Plan | 范围/Plan |
 | zan:拆分需求任务 | [`breaking-down-requirement`](skills/breaking-down-requirement/SKILL.md) | 按需求拆分任务，核实开发人员，预估开发工时，确认清单后创建/更新 TAPD 并关联 Plan | 任务拆分/估时 |
@@ -144,9 +144,11 @@ worktree、refs、完整 tip 包含关系、状态和忽略数据，并使用一
 
 ### 集中项目知识库
 
-除插件外，团队工作流还会读取独立的 `project-knowledge` 知识库。它不是随插件打包的副本，也不是 MCP；它提供项目归属、仓库路径、Jenkins Job、服务类型、代码上下文和 Graphify 索引等团队事实。没有它时，部分 Skill 只能使用插件内的有限回退资料，结果可能不完整。
+`workspace-project-knowledge` 是统一查询入口。调用方提供项目（可未知）、问题和用途，入口优先调用插件内的 `graphify-hub`，在未启用、不可用、未覆盖或结果不足时回退本地集中知识与 Graphify。结果统一携带来源、索引版本（或 unknown）及知识缺口；调用方不选择数据源。
 
-`workspace-project-knowledge` 是读取入口；需求开发、Plan、提测和 MR 审核等 Skill 会按任务通过它查项目事实。具体项目资料由 Skill 按当前任务选择，团队成员不需要逐项目配置。
+独立的 `project-knowledge` 仓库继续维护项目身份、Hub 项目/子目录映射、工作区规则、工程标准和 Jenkins 等精确配置，并提供本地知识回退。Hub 检索结果用于定位和补充上下文；当前实现仍核验目标分支源码。未检索到不能证明功能不存在。
+
+需求开发、Plan、提测和 MR 审核等 Skill 复用入口返回的 `KnowledgeContext`。Hub 工具选择、查询范围和回退约定见 [统一查询约定](skills/workspace-project-knowledge/references/knowledge-query.md)。项目映射由中央知识库维护，团队成员无需重复配置。
 
 #### 团队成员需要准备什么
 
@@ -300,10 +302,11 @@ Bug 使用 `fixing-bug`。它可以接收一个 Bug URL 或有序列表；多个
 
 ## 5. MCP 与本地配置
 
-插件通过 [`.mcp.json`](.mcp.json) 启动 4 个 STDIO MCP。`scripts/start-mcp.mjs` 从本机凭据文件读取配置，并只向对应服务进程注入其所需环境变量。
+插件通过 [`.mcp.json`](.mcp.json) 提供 4 个 STDIO MCP 和 1 个远程 HTTP MCP。`scripts/start-mcp.mjs` 只负责四个本地进程的凭据隔离；`graphify-hub` 由 Codex 直接连接公司内网服务，无需经过 STDIO 启动器。
 
 | MCP | 用途 | 必需配置字段 |
 | --- | --- | --- |
+| `graphify-hub` | 功能定位、业务知识、项目图谱与历史变更查询 | 可访问公司内网；当前端点不需要本机凭据 |
 | `tapd-mcp` | TAPD Bug/Story/Task、评论、状态、测试版本、Wiki | `TAPD_ACCESS_TOKEN`、`TAPD_API_BASE_URL`、`TAPD_BASE_URL` |
 | `gitlab-mcp` | 项目、MR、diff、pipeline、审批和远程合并 | `GITLAB_API_URL`、`GITLAB_PERSONAL_ACCESS_TOKEN` |
 | `jenkins-mcp` | Job 查询、触发与跟踪测试构建 | `MCP_JENKINS_URL`、`MCP_JENKINS_USER`、`MCP_JENKINS_API_TOKEN` |
@@ -423,7 +426,7 @@ codex plugin add zan-workflows@cfj-skills
 | 提测 Wiki 评论冲突 | 检查 TAPD 历史评论是否已关联另一个 Wiki；流程不会自动追加第二个冲突链接 |
 | 清理计划没有执行 | 检查是否单独确认了列出的 worktree/分支，确认后候选事实仍须完全一致 |
 
-MCP 配置、凭据字段和迁移细节见 [`references/mcp-setup.md`](references/mcp-setup.md)。
+Hub 只暴露查询工具；知识回写和后台进化不属于查询流程。MCP 配置、凭据字段及独立 Hub 注册迁移见 [`references/mcp-setup.md`](references/mcp-setup.md)。
 
 ## 10. 相关目录
 

@@ -15,7 +15,7 @@ This is the workspace-level knowledge entrypoint for a local company projects wo
 
 Use it before source search when the user asks where a feature lives, which project owns a business term, what service or Jenkins job maps to a project, which private package is involved, or how multiple local projects relate.
 
-This skill is the company multi-project gateway that sits in front of the centralized `project-knowledge` repository and the per-project Graphify outputs collected inside it.
+This skill is the unified company knowledge gateway. Callers describe the project, question, and purpose; this skill selects `graphify-hub` MCP first for knowledge retrieval and falls back to centralized local knowledge when needed. Callers do not select providers or repeat their fallback logic.
 
 This skill is the successor to `company-project-routing`. It must cover project routing plus knowledge-base entry. Do not depend on `company-project-routing` being available.
 
@@ -34,43 +34,49 @@ Requests that must invoke this workflow first:
 - cross-project relationship or impact analysis
 - any company workspace question where the target repository is not already explicit
 
-You may skip the routing stage only when the user already gave the exact target repository or exact target file and the task is a local implementation change inside that already-identified repository.
+Skip broad routing when an exact repository/file or a valid handoff already establishes the target identity.
 
-Follow this protocol:
+## Unified Query Contract
 
-1. Resolve the workspace root.
-2. Resolve the centralized project knowledge root.
-3. Route the target project from centralized workspace knowledge.
-4. Read the matched centralized project `AI_CONTEXT.md`.
-5. If the answer needs code structure, module relationships, call chains, or entrypoint reasoning, query the matched centralized Graphify graph with `--graph`.
-6. Only then read live source files or run source search inside the narrowed project.
+Accept `project` (canonical repository/subproject, or unknown), `question`, and
+`purpose` (for example routing, entrypoint location, impact analysis, planning,
+or review). Infer omitted values from the request instead of requiring a form.
+Return one `KnowledgeContext` using
+[knowledge-query.md](references/knowledge-query.md), which owns the provider
+sequence, mapping, scope filtering, fallback rules, and result fields.
 
-Fast path:
+1. Resolve workspace and project-knowledge roots; reuse valid task context.
+2. Resolve canonical identity and applicable local rules from the minimum
+   relevant index/context. Exact repository/file paths skip broad routing.
+3. For a knowledge gap, apply the Hub-first query strategy in the reference.
+   Read local authoritative engineering rules, standards, governance, and
+   exact service/deployment mappings whenever they are relevant.
+4. Return scoped evidence, provenance, version limits, and remaining gaps.
+   Verify implementation claims against current source/HEAD before acting on
+   them; restrict source search to the resolved project and candidate paths.
 
-- If the user already gave an exact repository path or an exact repository name with strong certainty, skip broad routing and jump straight to that repository's centralized knowledge.
-- If the user already gave an exact file path, treat the repository as resolved and use this skill only to gather surrounding project context if needed.
-- For a verified exact repository or orchestrator handoff, read only its
-  `AI_CONTEXT.md` and applicable local rules. Do not read workspace-wide
-  routing maps, other project graphs or all standard modules by default.
-  Query Graphify only when an entrypoint or relationship question remains.
-  A bounded UI change does not become a cross-project analysis merely because
-  it uses an already-owned shared component.
+Fast path: an exact file/repository or a valid orchestrator handoff may already
+supply the needed context. Read only applicable rules and missing knowledge;
+do not start a Hub/Graphify query, scan all workspace maps, or load all standard
+modules solely because this skill was invoked. A bounded UI change using an
+already-owned component does not imply cross-project analysis.
 
-Graphify usage rule:
+Source roles:
 
-- The centralized repository already contains per-project `graphify-out/graph.json`.
-- Do not run plain `graphify query "<question>"` from an arbitrary directory.
-- After the target project is known, always query the matched centralized graph explicitly:
-  - `graphify query "<question>" --graph ${project_knowledge_root}/data/projects/<project-relative-path>/graphify-out/graph.json`
-  - `graphify path "<A>" "<B>" --graph ${project_knowledge_root}/data/projects/<project-relative-path>/graphify-out/graph.json`
-  - `graphify explain "<concept>" --graph ${project_knowledge_root}/data/projects/<project-relative-path>/graphify-out/graph.json`
+- `project-relations.yaml`: canonical project identity, scope, explicit Hub
+  mapping, service/package/deployment routing.
+- Local `AI_CONTEXT.md`, project rules and declared standards: boundaries and
+  applicable engineering instructions. Read the declared standard entry and
+  task-specific flow/primitive before source search or edits when applicable.
+- Hub and local Graphify: knowledge and code-relationship evidence; both can
+  be stale. Provider preference does not establish authority or freshness.
+- Current source/HEAD and live system readbacks: current implementation and
+  operational facts. A graph result does not replace an exact check.
 
-Decision rule:
-
-- `project-relations.yaml` is the routing index.
-- Centralized `AI_CONTEXT.md` is the project boundary and modification guide.
-- Centralized Graphify output is the code-structure and relationship layer.
-- Live source search is the last step, not the first step.
+The query stage is complete when one suitable provider supplies sufficient
+scoped evidence. Do not force a second local graph query after a sufficient Hub
+answer. An unavailable provider or an empty result is not proof that a feature
+is absent; carry unresolved gaps into the next source check.
 
 ## Workspace Root Resolution
 
@@ -95,17 +101,9 @@ Resolve the project knowledge root before reading generated knowledge:
 1. Read the current tool entry file and use its `PROJECT_KNOWLEDGE_ROOT` value when present.
 2. If `PROJECT_KNOWLEDGE_ROOT` is set in the environment, use it.
 3. If `${workspace_root}/project-knowledge` exists, use it.
-4. If no project knowledge root exists, fall back to this skill's bundled `references/` files and then to live source search.
+4. If no project knowledge root exists, use this skill's bundled routing references and mark unavailable local authoritative material as a gap. Continue the unified query strategy without inventing mappings or engineering rules.
 
 When returning generated knowledge paths, prefer the centralized path under `${project_knowledge_root}`. Return live source paths under `${workspace_root}` only when pointing to actual source code.
-
-The default centralized layout is:
-
-- workspace routing index: `${project_knowledge_root}/data/workspace/project-relations.yaml`
-- workspace context: `${project_knowledge_root}/data/workspace/AI_CONTEXT.md`
-- project context: `${project_knowledge_root}/data/projects/<project-relative-path>/AI_CONTEXT.md`
-- project graph report: `${project_knowledge_root}/data/projects/<project-relative-path>/graphify-out/GRAPH_REPORT.md`
-- project graph json: `${project_knowledge_root}/data/projects/<project-relative-path>/graphify-out/graph.json`
 
 ## Company Runtime Relationship Map
 
@@ -147,28 +145,23 @@ Runtime routing shortcuts:
 | 服务商后台, `facilitator` | `zan-projects/admin/facilitator` |
 | 服务商移动端, `provider-mobile`, `tenantId` | `provider-mobile` |
 
-## Centralized Knowledge Files
+## Local Knowledge Files
 
-Always start from the centralized project-knowledge repository when it exists:
+These paths are the local authority/fallback inputs used by the gateway. Read
+only entries relevant to the task rather than every file on each invocation:
 
-1. `${project_knowledge_root}/data/workspace/AI_CONTEXT.md`
-2. `${project_knowledge_root}/data/workspace/project-relations.yaml`
-3. `${project_knowledge_root}/manifests/latest.tsv`
+- routing and Hub mappings: `${project_knowledge_root}/data/workspace/project-relations.yaml`
+- workspace context: `${project_knowledge_root}/data/workspace/AI_CONTEXT.md`
+- snapshot metadata when freshness matters: `${project_knowledge_root}/manifests/latest.tsv`
+- project context: `${project_knowledge_root}/data/projects/<project-relative-path>/AI_CONTEXT.md`
+- local graph report/data: `${project_knowledge_root}/data/projects/<project-relative-path>/graphify-out/{GRAPH_REPORT.md,graph.json}`
 
-Project-level generated knowledge lives under:
-
-- `${project_knowledge_root}/data/projects/<project-relative-path>/AI_CONTEXT.md`
-- `${project_knowledge_root}/data/projects/<project-relative-path>/graphify-out/GRAPH_REPORT.md`
-- `${project_knowledge_root}/data/projects/<project-relative-path>/graphify-out/graph.json`
-
-Compatibility fallback order:
-
-1. Centralized project-knowledge files.
-2. This skill's bundled `references/AI_CONTEXT.md` and `references/project-relations.yaml`.
-3. Legacy workspace mirrors: `${workspace_root}/AI_CONTEXT.md` and `${workspace_root}/project-relations.yaml`.
-4. Live source search in the target project.
-
-Do not treat project-local generated files as the primary source. They may have been migrated out of business repositories.
+When a local file is missing, use bundled `references/AI_CONTEXT.md` and
+`references/project-relations.yaml`, then legacy workspace mirrors if present.
+Record their provenance and limitations. Project-local generated files may have
+been migrated out of business repositories; do not assume they remain current.
+Knowledge retrieval still follows the Hub-first strategy; this file lookup
+order does not override it or replace a required exact governance check.
 
 ## Source of Truth
 
@@ -178,6 +171,7 @@ Use these `project-relations.yaml` sections as the routing index:
 |---|---|
 | `projects` | Project path, category, business domain, service name, AI context, graph report |
 | `projects.*.subprojects` | Monorepo subproject routing, especially `zan-projects` |
+| `projects.*.knowledge_sources.graphify_hub` and subproject equivalents | Explicit Hub project slug and repository-relative scope |
 | `runtime_relationships` | Company runtime relationship map around merchant systems |
 | `routes` | Business words and aliases to project candidates |
 | `domains` | Workspace groupings such as 管理后台, 商城类, 基础库 |
@@ -186,11 +180,9 @@ Use these `project-relations.yaml` sections as the routing index:
 | `jenkins_jobs` | Jenkins test job lookup |
 | `excluded_or_secondary` | Projects that are not primary business routing targets |
 
-After a project is matched, read centralized generated knowledge first:
-
-1. `${project_knowledge_root}/data/projects/<project-relative-path>/AI_CONTEXT.md`
-2. `${project_knowledge_root}/data/projects/<project-relative-path>/graphify-out/GRAPH_REPORT.md` when the answer needs code structure, module relationship, or entrypoint location
-3. The live source project under `${workspace_root}` only after the generated knowledge has narrowed the search
+After a project is matched, read its applicable local rules/context and obtain
+knowledge through the unified query strategy. Query results narrow the live
+source check; they do not promote generated snapshots to current code truth.
 
 For `zan-projects`, do not stop at the repository root if a subproject can be inferred. Prefer the matched subproject context:
 
@@ -208,28 +200,19 @@ For `zan-projects`, do not stop at the repository root if a subproject can be in
 | Service name resolution | User asks for service name, deployment name, backend/service mapping | `projects.*.service_name`, `service_aliases` | Service name and alias notes |
 | Jenkins job lookup | User asks to build, deploy, test env, or Jenkins job | `jenkins_jobs` | Exact Jenkins job name |
 | Package ownership | `@zan/*`, `@jbz/*`, shared library, component package | `packages`, `dependencies` | Owner project, package path, consumers |
-| Knowledge entry | User asks where code lives or how modules relate | Project `AI_CONTEXT.md`, `GRAPH_REPORT.md` | Code map and next files to inspect |
+| Knowledge entry | User asks where code lives or how modules relate | Unified query strategy plus local project rules | `KnowledgeContext` with code map and next files to inspect |
 | Cross-project impact | User asks impact, relation, consumers, upstream/downstream | `dependencies`, `packages`, `domains` | Relationship chain and affected projects |
-| Code entrypoint location | Business term plus code keyword, route, page, API, pay/live/order/etc. | Global index, project context, Graphify | Narrowed module/files and search plan |
+| Code entrypoint location | Business term plus code keyword, route, page, API, pay/live/order/etc. | Canonical routing plus unified query strategy | Narrowed module/files and search plan |
 | Modification preflight | User asks to change code after routing | Project context and local rules | Scope, constraints, verification hints |
 
-## Standard Execution Sequence
+## Execution And Reuse
 
-Use this sequence unless a narrower function below says otherwise:
-
-1. Read centralized workspace `AI_CONTEXT.md`.
-2. Read centralized workspace `project-relations.yaml`.
-3. Route to the target project or subproject.
-4. Read centralized target project `AI_CONTEXT.md`.
-5. If the question is about code structure, call chain, module boundaries, or feature entrypoints, query centralized Graphify with `--graph`.
-6. Only then search live source code inside the narrowed project.
-
-When reporting results, distinguish:
-
-- routing evidence from workspace knowledge
-- project guidance from centralized `AI_CONTEXT.md`
-- code-relationship evidence from centralized Graphify
-- raw-source evidence from live source search
+Use the unified contract above for every knowledge consumer. The functions
+below preserve domain-specific routing and exact lookup rules; they do not
+introduce separate provider choices. Reuse a valid `KnowledgeContext` across
+planning, implementation, and reviewers while its project/scope/question remain
+applicable. Refresh changed or missing evidence, not the whole knowledge base.
+A packet never caches authorization, live Git state, or MR merge gates.
 
 ## Function 1 - Project Routing
 
@@ -244,7 +227,7 @@ Workflow:
 5. Prefer exact project names, exact paths, package names, service names, route names, Jenkins jobs, and unique business terms.
 6. If one project has one unique strong signal, route to it.
 7. If one project has two or more strong signals, route to it even if weak words also match other projects.
-8. If candidates are tied, return the candidates and ask for one discriminator: exact path, page route, package name, service name, error text, screenshot, or repository name.
+8. If ownership remains unclear, use Hub `feature_lookup` when available to discover candidates, then verify them against local identity/path evidence. If candidates still tie, return them and ask for one discriminator: exact path, page route, package name, service name, error text, screenshot, or repository name.
 
 After routing:
 
@@ -393,27 +376,17 @@ Output:
 - `影响范围`
 - `下一步应读取`
 
-## Function 5 - Project Knowledge Entry And Graphify
+## Function 5 - Project Knowledge Entry
 
-Use this when the target project is known and the answer needs code/module structure.
+Use this when the target project is known and the answer needs code/module
+structure. Read applicable project rules/context, then follow
+[knowledge-query.md](references/knowledge-query.md) for Hub-first retrieval,
+local fallback, and the `KnowledgeContext` result. Do not expose provider
+selection to the caller.
 
-Rules:
-
-1. Read centralized project `AI_CONTEXT.md` before source files.
-2. Read centralized `graphify-out/GRAPH_REPORT.md` before raw search if it exists.
-3. If centralized `graphify-out/wiki/index.md` exists, prefer it for conceptual navigation.
-4. Use centralized Graphify commands with explicit `--graph` for relationship questions:
-   - `graphify query "<question>" --graph ${project_knowledge_root}/data/projects/<project-relative-path>/graphify-out/graph.json`
-   - `graphify path "<A>" "<B>" --graph ${project_knowledge_root}/data/projects/<project-relative-path>/graphify-out/graph.json`
-   - `graphify explain "<concept>" --graph ${project_knowledge_root}/data/projects/<project-relative-path>/graphify-out/graph.json`
-5. Do not query an arbitrary local `graphify-out/graph.json` when the centralized project graph is available.
-6. Use raw source search only after project and module scope are narrowed.
-
-Graphify is a code-structure graph, not a business ontology. Business routing comes from centralized `project-relations.yaml`; code relationships come from centralized Graphify output and project context.
-
-For `zan-projects`, select the subproject first whenever possible, then read that subproject's centralized `AI_CONTEXT.md` and `graphify-out/GRAPH_REPORT.md`.
-
-When the answer depends on Graphify, report which centralized graph path was queried.
+For `zan-projects`, select the subproject whenever possible. A repository-wide
+Hub match is insufficient until its evidence has been filtered to the requested
+subproject scope. Preserve that scope in the returned context and source check.
 
 ## Function 6 - Cross-Project Relationship And Impact Analysis
 
@@ -425,7 +398,7 @@ Workflow:
 2. Read `dependencies` and `packages`.
 3. If a shared package is involved, start from Function 4.
 4. If a business flow spans projects, combine `routes`, `domains`, and centralized project `AI_CONTEXT.md` files.
-5. Read Graphify reports only for the narrowed projects; do not scan every repository by default.
+5. Query knowledge only for the narrowed projects through the unified strategy; retain each source project/scope in cross-project evidence. Do not scan every repository by default.
 
 Output:
 
@@ -443,18 +416,17 @@ Workflow:
 
 1. Convert business words to candidate projects with Function 1.
 2. Resolve service name and subproject if relevant.
-3. Read centralized candidate `AI_CONTEXT.md`.
-4. Read centralized candidate `graphify-out/GRAPH_REPORT.md`.
-5. Try centralized `graphify query --graph ...` for relationship or module questions.
-6. Search source only inside the narrowed project or subproject.
-7. If the result comes from raw search, report that it is source-search evidence, not graph evidence.
+3. Read applicable candidate project rules/context.
+4. Retrieve scoped knowledge through the unified strategy.
+5. Verify candidate files/symbols in current source, searching only inside the narrowed project or subproject.
+6. Preserve retrieval and current-source evidence separately in `KnowledgeContext`.
 
 Example sequence for "移动端直播项目的微信支付模块":
 
 1. "移动端直播项目" may match `zan-mini` or `instant-apps`; route by additional signal. `provider-mobile` is 服务商移动端, not 商城直播.
 2. "微信支付" is a weak business/code word by itself and cannot choose a project alone.
-3. After project selection, read centralized project `AI_CONTEXT.md` and `GRAPH_REPORT.md`.
-4. Search only inside the selected project for pay-related entrypoints if Graphify does not answer.
+3. After project selection, read applicable local rules and retrieve knowledge through the gateway.
+4. Check pay-related candidate entrypoints in current source inside the selected project; report remaining gaps if retrieval is insufficient.
 
 ## Function 8 - Modification Preflight
 
@@ -475,6 +447,11 @@ If the user only asks for routing or explanation, do not modify files.
 For this workspace, do not modify centralized `project-knowledge` snapshots as part of ordinary business-project edits unless the task explicitly targets the knowledge repository itself.
 
 ## Output Formats
+
+Return the common `KnowledgeContext` fields defined in
+[knowledge-query.md](references/knowledge-query.md). The following task-specific
+fields enrich its summary/evidence or user-facing rendering; they are not
+separate provider-specific result formats.
 
 Project routing:
 
@@ -528,9 +505,11 @@ Ambiguous routing:
 
 - Calling `company-project-routing` after this skill has enough information.
 - Guessing a project from weak words like `支付`, `直播`, `后台`, or `登录`.
-- Treating Graphify as a business-term router.
+- Treating an unverified Hub candidate or graph node as canonical project identity.
 - Running broad `rg` or source-file reads before routing the project.
-- Querying Graphify without pinning `--graph` to the matched centralized project graph.
+- Selecting providers in callers or querying local Graphify without an explicit matched `--graph`.
+- Treating Hub priority as authority, or hiding unknown versions and unresolved scope.
+- Bypassing a disabled Hub with a temporary HTTP client, or executing Hub write tools during retrieval.
 - Reading all repositories when `project-relations.yaml` can narrow the scope.
 - Reading generated knowledge from business repositories after it has been migrated into `project-knowledge`.
 - Stopping at `zan-projects` root instead of selecting a subproject.

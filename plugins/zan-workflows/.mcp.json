@@ -1,5 +1,17 @@
 {
   "mcpServers": {
+    "graphify-hub": {
+      "type": "http",
+      "url": "http://172.16.1.152:24100/mcp",
+      "startup_timeout_sec": 10,
+      "tool_timeout_sec": 30,
+      "enabled_tools": [
+        "list_projects", "feature_lookup", "query_graph", "wiki_search",
+        "vocabulary", "get_node", "get_neighbors", "shortest_path",
+        "graph_stats", "get_community", "god_nodes", "module_changes",
+        "expert_answer", "requirement_analysis"
+      ]
+    },
     "gitlab-mcp": {
       "command": "node",
       "args": ["./scripts/start-mcp.mjs", "gitlab-mcp"],

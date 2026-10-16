@@ -4,7 +4,7 @@
 
 `${workspace_root}` 是本机公司项目和工具项目的工作区入口。这里不是单个代码仓库，而是多个业务系统、基础库、工具链、AI 技能和参考项目的集合。
 
-本文件用于给 AI 建立 workspace 级上下文：先理解项目版图，再进入具体项目的 `AI_CONTEXT.md` 和 `graphify-out/GRAPH_REPORT.md`，最后才读源码。
+本文件是本地集中知识不可用时的 workspace 上下文备份，用于理解项目版图。知识检索统一通过 `workspace-project-knowledge`，由入口决定 Hub 查询或本地回退，再核验当前源码。
 
 # 核心职责
 
@@ -17,7 +17,7 @@
 
 - 不承载具体业务实现。
 - 不替代各项目自己的 `AI_CONTEXT.md`。
-- 不替代各项目自己的 `graphify-out/GRAPH_REPORT.md`。
+- 不替代各项目的规则、标准或当前源码事实。
 - 不直接回答代码细节；代码细节必须进入命中项目后再分析。
 
 # 项目分类
@@ -178,7 +178,7 @@
 
 - `${project_knowledge_root}/data/workspace/project-relations.yaml`
 
-每个项目的标准入口：
+每个项目的本地规则与知识回退入口：
 
 - `${project_knowledge_root}/data/projects/<repo>/AI_CONTEXT.md`
 - `${project_knowledge_root}/data/projects/<repo>/graphify-out/GRAPH_REPORT.md`
@@ -196,15 +196,15 @@
 
 # AI 使用规则
 
-当用户的问题涉及项目、业务、功能、服务名、Jenkins Job、私有包、代码入口或跨项目影响范围时，必须按这个顺序工作：
+项目、业务、功能、服务名、Jenkins Job、私有包、代码入口和跨项目问题统一使用
+`workspace-project-knowledge`。调用方只提供项目/子项目（可未知）、问题和目的，
+消费统一 `KnowledgeContext`；不要在这里另建本地优先的检索流程。
 
-1. 读取本文件。
-2. 读取 `${project_knowledge_root}/data/workspace/project-relations.yaml`。
-3. 通过 `routes`、`domains`、`projects`、`packages`、`jenkins_jobs` 定位候选项目。
-4. 读取命中项目的 `AI_CONTEXT.md`。
-5. 读取命中项目的 `graphify-out/GRAPH_REPORT.md`。
-6. 需要跨模块关系时优先使用 `graphify query/path/explain`。
-7. 最后才读取源码或执行搜索。
+- 项目身份、路径和精确服务/部署映射由本地 `project-relations.yaml` 核验。
+- 具体知识优先查询 `graphify-hub`；不可用、未覆盖或结果不足时回退本地集中知识和指定图谱。
+- 检索映射、范围过滤、版本未知及失败复用遵循 [knowledge-query.md](knowledge-query.md)。
+- 本地规则和标准仍按适用范围读取，当前实现依靠当前源码/HEAD 验证。
+- 已有足够上下文时复用；未命中不代表功能不存在，缺口随结果交接。
 
 # 修改代码前约束
 
@@ -216,9 +216,7 @@
 
 # 与技能的关系
 
-`workspace-project-knowledge` 是本 workspace 的推荐入口技能。它取代旧的 `company-project-routing` 和 `grouped-project-graph` 的组合使用方式：
-
-- 先做全局路由。
-- 再读项目关系索引。
-- 再进入项目上下文。
-- 再使用 Graphify。
+`workspace-project-knowledge` 是统一知识入口，取代旧的
+`company-project-routing` 和 `grouped-project-graph` 组合。它负责 canonical
+项目路由、Hub 优先检索、本地回退以及来源整理；调用方无需区分数据提供者。
+本文件保留业务关系备份，不覆盖入口的查询策略或当前本地权威规则。

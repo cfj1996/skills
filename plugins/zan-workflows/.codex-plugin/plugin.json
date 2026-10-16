@@ -1,7 +1,7 @@
 {
   "name": "zan-workflows",
-  "version": "0.1.0+codex.20261007145223",
-  "description": "Company requirement development, stateless TAPD and Wiki-link workflows, page review, MR review, debug token, identity, and memory skills for Codex.",
+  "version": "0.1.0+codex.20261016-graphify-hub-r2",
+  "description": "Company requirement development, TAPD and Wiki-link workflows, page review, MR review, debug token, identity, memory, and unified Hub-first project knowledge for Codex.",
   "author": {
     "name": "Local developer"
   },
@@ -10,7 +10,7 @@
   "interface": {
     "displayName": "Zan Workflows",
     "shortDescription": "TAPD task breakdown, development and delivery workflows.",
-    "longDescription": "Bundles requirement task breakdown with verified developers, final workload estimates and confirmation before TAPD writes; then linked branch-bound Plans, implementation, optional test submission, master delivery and local cleanup. Also includes TAPD Bug handling, Wiki workflows, GitLab MR review, debug tokens, team identity and project memory.",
+    "longDescription": "Bundles requirement task breakdown with verified developers, final workload estimates and confirmation before TAPD writes; then linked branch-bound Plans, implementation, optional test submission, master delivery and local cleanup. Also includes TAPD Bug handling, Wiki workflows, GitLab MR review, debug tokens, team identity and project memory. Project knowledge queries use one entrypoint with Graphify Hub first and local knowledge fallback, retaining source and revision evidence.",
     "developerName": "Local developer",
     "category": "Productivity",
     "capabilities": [
