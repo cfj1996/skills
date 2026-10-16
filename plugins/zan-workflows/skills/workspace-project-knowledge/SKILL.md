@@ -45,15 +45,21 @@ Return one `KnowledgeContext` using
 [knowledge-query.md](references/knowledge-query.md), which owns the provider
 sequence, mapping, scope filtering, fallback rules, and result fields.
 
-1. Resolve workspace and project-knowledge roots; reuse valid task context.
-2. Resolve canonical identity and applicable local rules from the minimum
-   relevant index/context. Exact repository/file paths skip broad routing.
-3. For a knowledge gap, apply the Hub-first query strategy in the reference.
-   Read local authoritative engineering rules, standards, governance, and
-   exact service/deployment mappings whenever they are relevant.
+1. Resolve roots and load necessary workspace rules; reuse valid task context.
+   This does not require expanding candidate projects or reading their contexts.
+2. For a knowledge question, check Hub capability before opening candidate
+   projects' `AI_CONTEXT.md`, `AGENTS.md`, or graph reports. If the project is
+   unknown, start with cross-project `feature_lookup` or a suitable overview
+   query, then verify returned identities against the relevant local mappings.
+   Follow the reference for known-project queries and local fallback.
+3. Read only the matched mappings and task-relevant constraints. Exact service,
+   Jenkins and governance lookups use their local authoritative entries directly;
+   they do not require a general Hub search. Before source inspection, changes
+   or review, load the resolved project's applicable rules and standards.
 4. Return scoped evidence, provenance, version limits, and remaining gaps.
-   Verify implementation claims against current source/HEAD before acting on
-   them; restrict source search to the resolved project and candidate paths.
+   A knowledge overview may stop at a sourced summary. Verify current behavior
+   or action/review claims against the target source/HEAD when the task needs
+   that assurance; do not expand an overview into every candidate repository.
 
 Fast path: an exact file/repository or a valid orchestrator handoff may already
 supply the needed context. Read only applicable rules and missing knowledge;
@@ -180,11 +186,13 @@ Use these `project-relations.yaml` sections as the routing index:
 | `jenkins_jobs` | Jenkins test job lookup |
 | `excluded_or_secondary` | Projects that are not primary business routing targets |
 
-After a project is matched, read its applicable local rules/context and obtain
-knowledge through the unified query strategy. Query results narrow the live
-source check; they do not promote generated snapshots to current code truth.
+After a project is matched, continue the unified query strategy. Read its local
+rules/context when needed for a remaining gap or before source inspection and
+action; a sourced overview does not require opening every matched project.
+Query results remain snapshot evidence until checked against current code.
 
-For `zan-projects`, do not stop at the repository root if a subproject can be inferred. Prefer the matched subproject context:
+For `zan-projects`, resolve the subproject whenever possible. When local context
+is needed, read the matched subproject's entry, for example:
 
 - `${project_knowledge_root}/data/projects/zan-projects/admin/facilitator/AI_CONTEXT.md`
 - `${project_knowledge_root}/data/projects/zan-projects/admin/factory/AI_CONTEXT.md`
@@ -220,20 +228,31 @@ Use this when the user gives a business term, project name, path fragment, servi
 
 Workflow:
 
-1. Resolve `${project_knowledge_root}`.
-2. Read `${project_knowledge_root}/data/workspace/AI_CONTEXT.md`, falling back to `references/AI_CONTEXT.md`.
-3. Read `${project_knowledge_root}/data/workspace/project-relations.yaml`, falling back to `references/project-relations.yaml`.
-4. Match the user input against `routes`, `domains`, `projects`, `projects.*.subprojects`, `service_name`, `service_aliases`, package names, and Jenkins job names.
-5. Prefer exact project names, exact paths, package names, service names, route names, Jenkins jobs, and unique business terms.
-6. If one project has one unique strong signal, route to it.
-7. If one project has two or more strong signals, route to it even if weak words also match other projects.
-8. If ownership remains unclear, use Hub `feature_lookup` when available to discover candidates, then verify them against local identity/path evidence. If candidates still tie, return them and ask for one discriminator: exact path, page route, package name, service name, error text, screenshot, or repository name.
+1. For a feature/business knowledge question with an unknown project, follow
+   the unified strategy first: check Hub and use cross-project `feature_lookup`
+   to find candidates. A broad explanation may use `expert_answer` when its
+   advertised schema supports an unspecified project. Do not first expand the
+   category's project list into local context reads.
+2. Verify returned candidates using the relevant `projects`, subprojects,
+   routes or aliases in `${project_knowledge_root}/data/workspace/project-relations.yaml`.
+   Exact path/service/Jenkins/governance lookup may go directly to this index.
+   Fall back to `references/project-relations.yaml` if the centralized index is
+   unavailable; read workspace `AI_CONTEXT.md` only for a remaining routing gap.
+3. If Hub cannot answer, report the concrete fallback reason before local
+   expansion, then narrow candidates with the index's routes, domains, package,
+   service and Jenkins entries. Read a candidate's context only for a specific
+   unresolved fact; a category match alone does not require reading every project.
+4. Prefer exact names, paths, packages, service names, routes and other strong
+   evidence. If candidates remain tied, return them and request one useful
+   discriminator only when the task needs a single target. A cross-project
+   overview may retain multiple supported candidates.
 
 After routing:
 
-9. Return the centralized project knowledge paths that should be read next.
-10. If the routed target is a `zan-projects` subproject, return the subproject path rather than stopping at the monorepo root.
-11. When the consumer is a TAPD Wiki workflow, normalize the routed project to
+5. Return supported project identities and relevant entrypoints/sources, with
+   local knowledge paths only when they are needed next.
+6. If the routed target is a `zan-projects` subproject, return the subproject path rather than stopping at the monorepo root.
+7. When the consumer is a TAPD Wiki workflow, normalize the routed project to
     exactly one Wiki service type using the table below and return the
     corresponding Wiki status field. Tooling current-version channel comes from
     release evidence, not the category. An unmapped category blocks instead of
@@ -379,10 +398,11 @@ Output:
 ## Function 5 - Project Knowledge Entry
 
 Use this when the target project is known and the answer needs code/module
-structure. Read applicable project rules/context, then follow
-[knowledge-query.md](references/knowledge-query.md) for Hub-first retrieval,
-local fallback, and the `KnowledgeContext` result. Do not expose provider
-selection to the caller.
+structure. Follow [knowledge-query.md](references/knowledge-query.md) for
+Hub capability checking, matched mapping verification and retrieval before
+expanding local project context. Read applicable project rules before any
+subsequent source inspection or action. Return `KnowledgeContext` without
+exposing provider selection to the caller.
 
 For `zan-projects`, select the subproject whenever possible. A repository-wide
 Hub match is insufficient until its evidence has been filtered to the requested
@@ -394,11 +414,13 @@ Use this when the user asks how projects relate, what a change may affect, or wh
 
 Workflow:
 
-1. Route all mentioned projects, packages, service names, or domains.
-2. Read `dependencies` and `packages`.
-3. If a shared package is involved, start from Function 4.
-4. If a business flow spans projects, combine `routes`, `domains`, and centralized project `AI_CONTEXT.md` files.
-5. Query knowledge only for the narrowed projects through the unified strategy; retain each source project/scope in cross-project evidence. Do not scan every repository by default.
+1. For a business-flow overview, start with the unified Hub query strategy,
+   retaining each source project/scope; do not read every candidate context first.
+2. Confirm relevant identities or dependency facts with matched `routes`,
+   `dependencies` and `packages` entries. Exact package ownership uses Function 4.
+3. Return a sourced overview when it answers the question. Read local project
+   context or inspect source only for material gaps or a task requiring verified
+   current impact; limit that work to the implicated projects and paths.
 
 Output:
 
@@ -414,19 +436,22 @@ Use this when the user asks where a feature or module is implemented.
 
 Workflow:
 
-1. Convert business words to candidate projects with Function 1.
-2. Resolve service name and subproject if relevant.
-3. Read applicable candidate project rules/context.
-4. Retrieve scoped knowledge through the unified strategy.
-5. Verify candidate files/symbols in current source, searching only inside the narrowed project or subproject.
-6. Preserve retrieval and current-source evidence separately in `KnowledgeContext`.
+1. Use the unified strategy; for an unknown project, start with Hub discovery
+   through Function 1 before opening candidate project contexts.
+2. Verify returned project/subproject identities and scopes with matched mappings.
+3. Return sourced candidate entrypoints for a knowledge overview. If the task
+   requires confirmed current implementation, read the matched project rules
+   and verify candidate files/symbols at the target revision.
+4. Preserve retrieval and any current-source evidence separately in `KnowledgeContext`.
 
 Example sequence for "移动端直播项目的微信支付模块":
 
-1. "移动端直播项目" may match `zan-mini` or `instant-apps`; route by additional signal. `provider-mobile` is 服务商移动端, not 商城直播.
-2. "微信支付" is a weak business/code word by itself and cannot choose a project alone.
-3. After project selection, read applicable local rules and retrieve knowledge through the gateway.
-4. Check pay-related candidate entrypoints in current source inside the selected project; report remaining gaps if retrieval is insufficient.
+1. Ask Hub for the payment feature and owning projects first; do not read all
+   C-end projects' contexts based on the category hint.
+2. Verify returned identities/scopes. `provider-mobile` is 服务商移动端, not
+   商城直播; "微信支付" alone is insufficient to choose one project.
+3. Return the sourced knowledge map when that is the requested outcome. Check
+   current pay-related source only when needed, after loading the matched rules.
 
 ## Function 8 - Modification Preflight
 

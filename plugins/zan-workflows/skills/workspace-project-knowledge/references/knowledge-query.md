@@ -42,10 +42,20 @@ fallback_reason: null # why local retrieval was needed; null if not needed
 
 ## Resolve Identity And Scope
 
-Use local `project-relations.yaml` and applicable rules/context for canonical
-identity, workspace paths and exact operational mappings. Exact project/file
-inputs or valid handoffs avoid broad routing. Missing engineering/governance
-material cannot be replaced by a Hub summary.
+Check Hub capability before expanding candidate projects' local contexts. For
+an unknown project, use cross-project `feature_lookup` first; a knowledge
+overview may use `expert_answer` when the advertised schema supports omitting
+the project. Do not invent a project argument or require a canonical mapping
+before this discovery query. Category hints such as "C-end" are query context,
+not a list of repositories whose files must all be read.
+
+After discovery, use the matched entries in local `project-relations.yaml` to
+verify canonical identity and workspace paths. Exact project/file inputs or
+valid handoffs avoid broad routing. Exact service/Jenkins/governance lookups
+go directly to their authoritative entries without a general Hub search.
+Project rules/standards are required before source inspection, changes or
+review, but not as a reason to open every possible project's context before
+the first knowledge query. A Hub summary cannot replace required constraints.
 
 Hub mappings live on a project or its subproject entry:
 
@@ -62,10 +72,11 @@ subproject mapping; do not silently inherit a whole-repository mapping for a
 subproject. Do not generate slugs by case conversion, replacing underscores,
 or dropping path segments.
 
-On first Hub use, verify the configured slug against live `list_projects`
-results; reuse that result for the current task. If the mapping is absent,
-`feature_lookup` may discover candidates, but local repository/path evidence
-and the live project list must verify identity before project-specific queries.
+Before the first project-specific Hub query, verify the configured slug against
+live `list_projects` results; reuse that result for the current task. Global
+discovery queries do not wait for a project mapping. If a mapping is absent,
+verify discovered candidates using local repository/path evidence and the live
+project list before subsequent project-specific queries.
 A verified candidate can be used for this task without automatically writing
 the mapping file. An ambiguous or unverified candidate falls back locally.
 
@@ -80,19 +91,31 @@ questions may retain outside-scope evidence with its own project identity.
 
 ## Retrieval Strategy
 
-1. Reuse applicable task knowledge. If no question remains, use the fast path:
-   return existing context with its evidence and skip provider discovery.
+1. Load necessary workspace rules and reuse applicable task knowledge. If no
+   question remains, return existing context and skip provider discovery.
 2. Discover the configured `graphify-hub` MCP through the host's available
-   tools, including tool discovery when supported. Verify identity/scope above
-   and query only the capability needed by the question.
+   tools, including tool discovery when supported, before reading candidate
+   projects' contexts, rules or graph reports. For an unknown project, start
+   with cross-project discovery as above; for a known project, read only its
+   mapping and verify identity/scope before the scoped query.
 3. Prefer one targeted retrieval, with one narrower query only when a concrete
    missing fact could change the answer. Do not query every tool or every
    project. Stop once sufficient scoped evidence is available.
 4. On missing/disabled tools, connection/auth/permission failure, timeout,
    unverified mapping, uncovered project, or insufficient scoped results,
-   retrieve the missing knowledge locally and set `fallback_reason`.
-5. Normalize and deduplicate evidence, read applicable local authority, and
-   verify implementation-sensitive claims in the current source/HEAD.
+   briefly state the observed reason before local expansion and set
+   `fallback_reason`. Then retrieve only the missing knowledge locally.
+5. Normalize evidence and return a sourced summary when it satisfies an
+   overview question. For tasks requiring current implementation, a change or
+   review, read the matched project's applicable rules and verify the needed
+   source/HEAD evidence. Do not turn a cross-project overview into source
+   inspection of every candidate by default.
+
+Distinguish observed fallback causes: an explicit disabled setting means
+"disabled by the host"; absent tools after discovery means "not exposed in
+this session". Only an attempted call that fails establishes a connection,
+authentication or timeout failure. Do not report "connection failed" when
+no connection was attempted, or delay this explanation until after local reads.
 
 Reuse a provider failure for the current task rather than retrying it for each
 consumer or reviewer. Recheck only after evidence of restored capability or a
@@ -123,9 +146,12 @@ workflow; it is never a prerequisite for returning `KnowledgeContext`.
 
 ### Local Retrieval
 
-Read the matched centralized project `AI_CONTEXT.md`, then the relevant
-`graphify-out/GRAPH_REPORT.md` or `graphify-out/wiki/index.md` for navigation.
-For code-relationship gaps, query its centralized graph explicitly:
+If the project is unknown, first narrow it with the relevant workspace index
+entries. Read a matched centralized project `AI_CONTEXT.md` only for an
+unresolved question or applicable constraints, then the relevant graph report
+or Wiki for remaining navigation gaps. Do not open every C-end project merely
+because the question is about C-end payment. For code-relationship gaps, query
+the matched centralized graph explicitly:
 
 ```bash
 graphify query "<specific English question>" --graph "${project_knowledge_root}/data/projects/<project-relative-path>/graphify-out/graph.json"
@@ -152,6 +178,7 @@ Hub evidence. Preserve actual project engineering constraints separately.
 
 Hand off one `KnowledgeContext`, including gaps, to planning, implementation
 and review. A consumer asks this gateway for a missing fact; it does not repeat
-Hub/local routing. Revalidate implementation evidence against the consumer's
-actual branch or MR HEAD. A provider outage alone is not a code defect or a
-merge blocker when equivalent required evidence is available.
+Hub/local routing. A sourced overview may retain unknown revisions without
+claiming current behavior. Implementation and review consumers revalidate the
+needed evidence against their actual branch or MR HEAD. A provider outage alone
+is not a code defect or a merge blocker when equivalent evidence is available.

@@ -1,6 +1,6 @@
 {
   "name": "zan-workflows",
-  "version": "0.1.0+codex.20261016-graphify-hub-r2",
+  "version": "0.1.0+codex.20261016-graphify-hub-r3",
   "description": "Company requirement development, TAPD and Wiki-link workflows, page review, MR review, debug token, identity, memory, and unified Hub-first project knowledge for Codex.",
   "author": {
     "name": "Local developer"
