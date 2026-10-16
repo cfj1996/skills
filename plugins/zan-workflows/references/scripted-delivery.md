@@ -1,5 +1,11 @@
 # Scripted delivery
 
+This reference covers planned delivery bundles and the full release flow.
+Standalone daily dev/test project builds use the direct MCP flow in
+[running-release](../skills/running-release/SKILL.md#daily-project-build); they
+do not require a workflow session, release PLAN or these executors. Production
+releases and all package publications retain the complete flow below.
+
 Use one confirmed in-memory plan per operation bundle. Scripts receive JSON
 through stdin and return JSON on stdout; do not save workflow plan/result
 files. `--execute` is an execution switch, not evidence of human authorization.

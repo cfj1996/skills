@@ -1,77 +1,80 @@
 ---
 name: running-release
-description: Use when a project deployment or tooling package release must run through a verified Jenkins Job with one complete plan, exact queue/build tracking and source verification.
+description: Run daily Jenkins project builds with a short flow; use the complete release flow for production deployments and every tooling/package publication. Track the exact build and verify its source. Excludes local build/test commands.
 ---
 
-# Run Jenkins Release
+# Run Jenkins Builds and Releases
 
-Preferred lead model profile: `CRITICAL`. Read the shared
-[model-routing policy](../../references/model-routing.md) when model selection
-is available. Follow the workspace release-safety rules and
-[tool routing](../../references/tool-routing.md).
+Follow workspace release-safety rules and [tool routing](../../references/tool-routing.md).
+Preferred model profile: `CRITICAL`; consult [model routing](../../references/model-routing.md)
+only when model selection is available. No TAPD item is required for a standalone build.
 
-Resolve the project/module or package owner and exact Job/URL through
-`workspace-project-knowledge` once. Tooling packages use their declared Jenkins
-release path; do not run package publish/deploy scripts locally. Reuse current
-verified project, repository, source and Job evidence instead of restarting
-routing. No TAPD item is required for a standalone release.
-Start the workflow session with the pinned helper runtime and wait for its
-`SESSION_READY` event. It manages its own TTY input; do not inspect or change
-another terminal to deliver a long plan.
+## Choose the flow first
 
-1. Prepare one release plan with project, release target/package, environment,
-   Job/name/URL, exact release ref and expected target-repository SHA, version,
-   `canary|official` channel, purpose and actual Job parameters. Bind ref and
-   version parameter names; without a version parameter use the confirmed SHA
-   as deployment identity. Let the Job adapter resolve actual parameter names.
-   For a pipeline-computed package version, bind the verified Jenkinsfile
-   repository/ref/SHA/path, source identity and explicit whole-project release
-   scope; read actual package versions after the build. Never expand a request
-   for one package to a whole project without displaying and confirming that scope.
-   Package canary must bind a non-official channel
-   parameter and cannot update `latest`/stable. Do not infer official intent.
-2. Reuse a complete current preview with Job/config fingerprints, or call
-   the release action of [workflow-session.mjs](../../scripts/workflow-session.mjs)
-   in `PLAN`, or [run-jenkins-release.mjs](../../scripts/run-jenkins-release.mjs)
-   without `--execute` for a standalone call. By default it uses
-   `READABLE_METADATA`: read and fingerprint the exact Job identity and live
-   parameter definitions without requesting config XML. Include the binding
-   mode in the plan; known missing XML permission is normal and needs no
-   repeated warning or separate confirmation. Report only binding changes,
-   insufficient evidence or verification failures. Metadata does not prove
-   unchanged hidden configuration. Use `jobBindingMode=CONFIG_XML` only when
-   full configuration verification is needed and readable; legacy plans with
-   a config hash retain XML verification. In XML mode, only HTTP 403 permits a
-   metadata preview; other failures stop. Any binding change requires an
-   updated plan before execution.
-   It validates selections and returns fingerprints. Check Job
-   ownership, channel/version semantics and complete source evidence once.
-   Display the complete actual plan and obtain one exact current-conversation
-   release confirmation. An unchanged confirmed submission/delivery plan that already
-   includes all these actions is reusable; do not ask again.
-3. Send `EXECUTE` to the same live session, or invoke the standalone helper
-   once with the unchanged plan and `--execute`. It
-   triggers through `jenkins-mcp` exactly once and waits in its own process.
-   The configured GET-only API supplies queue executable, build queueId,
-   parameters and SCM fields missing from MCP. It is restricted to that same
-   Jenkins instance and exact Job; record this read-only capability fallback.
-4. Let the script poll with bounded backoff and emit only state changes. Do
-   not have an Agent reread rules, refetch source, download console logs or
-   validate each poll. Require terminal `SUCCESS`, matching queue/build/params
-   and the actual target repository SHA before `DEPLOYED|RELEASED`. A computed
-   package release additionally verifies the actual pipeline SHA and parses
-   the exact build's bounded publication summary. Report `publishedPackages`
-   as actual npm versions, never the source identity as a package version.
-   For a later authorized tooling Wiki update, pass the verified actual channel,
-   package versions, source SHA and build evidence: `canary` maps to
-   `当前版本：canary`, `official` to `当前版本：latest`.
-   The release capability itself still performs no Wiki write.
-5. On `FAILED|UNKNOWN|BLOCKED`, report the exact phase, queue/build and known
-   effects, and stop later actions. Never retry a trigger or use another build
-   as success evidence. A Job without verifiable SCM metadata requires a
-   specific evidence/configuration fix, not repeated searches or a guessed SHA.
+- **Daily build (default):** a standalone application/project build for a verified
+  dev/test Job, including its normal dev/test deployment. “构建项目”, “构建测试环境”
+  and “重新构建” are candidates for this short flow; they never imply production
+  intent or an automatic retry of a failed/unknown trigger.
+- **Full release:** production/official deployment, any package/tooling publication
+  (including canary/test packages), or a build within a submission/go-live bundle
+  that requires a complete confirmed delivery plan. Read only
+  [full-release.md](references/full-release.md) for that flow; preserve all its gates.
+- Local build/test verification belongs to the project's development commands.
+  An unclear environment, conflicting Job mapping or unknown publication effects
+  needs one focused clarification; a Job name containing `test` alone does not
+  prove that it cannot publish packages or affect production.
 
-See [scripted delivery](../../references/scripted-delivery.md) for the stdin
-interface. Plans/results remain in memory or stdout; create no workflow JSON,
-recovery ledger or artifact directory. This capability does not merge code,
-change Wiki/TAPD or clean up branches/worktrees.
+## Daily project build
+
+Use the connected Jenkins MCP directly. Do not start `workflow-session.mjs`,
+create a release `PLAN`/fingerprints, or invoke `run-jenkins-release.mjs` for this
+flow. Do not load full-release/scripted-delivery guidance just to run a daily build.
+
+1. Resolve the project, exact Jenkins instance, Job/URL and source repository once
+   through `workspace-project-knowledge`; reuse valid current context. Query only
+   a missing mapping or URL. For an exact project/Job lookup, skip source scans,
+   Graphify queries and unrelated project contexts. Use an evidenced dev/test
+   default only when it selects one unambiguous target; never guess `develop`/`dev`
+   or derive a Job URL from a naming pattern.
+2. Read live Job parameter definitions once and resolve the exact requested ref
+   to its current remote SHA once. These independent reads may run together.
+   Bind the real ref parameter and allowed values; use other defaults only within
+   the authorized build scope. Honour an explicit commit/tag and do not substitute
+   the local branch, another ref, an official channel or a package publication.
+   Refresh source evidence if it changed or a confirmation delay made it stale.
+   When there is no version parameter, the SHA is the build identity; do not ask
+   the user to invent a version or a package channel for an ordinary project build.
+3. Briefly state the project, dev/test environment, Job, ref/SHA and relevant
+   parameters. Reuse the user's current build instruction or unchanged prior
+   confirmation when it satisfies workspace authorization requirements. Defaults
+   and readbacks are evidence, not permission: if the rules require confirmation
+   of resolved fields, ask once using this compact summary. Do not demand a second
+   confirmation or a full release checklist for an unchanged authorized build.
+4. Call `jenkins_trigger_build` exactly once with the selected instance, exact Job
+   and resolved parameters. Keep the returned queue ID/URL and follow that queue
+   to its exact build number. Track that build with bounded backoff (at most 30
+   seconds per wait, default total deadline 30 minutes), reporting state changes
+   only. Do not infer the build from `lastBuild`, the largest/recent build number,
+   the queue disappearing, or a different successful build.
+5. Verify the exact build's terminal result, queue/Job identity, submitted parameters
+   and target repository's actual SCM SHA against the resolved SHA. Use supported
+   MCP fields first. If queue executable, queueId, parameters or SCM actions are
+   omitted, use the existing GET-only `configuredJenkinsReader` in
+   [jenkins-readonly.mjs](../../scripts/jenkins-readonly.mjs), restricted to the same
+   instance, returned queue and exact Job/build. Compare the reader's `instanceUrl`
+   with the selected MCP instance before reading; a default-instance mismatch
+   must stop rather than silently query another server. A bounded read-only wait can use
+   `pollState` from [workflow-runtime.mjs](../../scripts/workflow-runtime.mjs);
+   it must not trigger or restart a workflow session. Do not read helper source
+   routinely or repeatedly fetch rules, Job definitions, refs or full logs while
+   waiting. Missing or mismatched evidence is `UNKNOWN`/`BLOCKED`, never verified
+   success. Build changes lists and other repositories' SHAs are not SCM proof.
+
+Return project/environment, Job/build link, ref/actual SHA and success/failure.
+On failure, cancellation, timeout or an unknown trigger result, report the exact
+queue/build and known effects, then stop. Never automatically retrigger or switch
+to another Job. For an explicit new build request, retain and report the prior
+build's known state; never hide an unknown outcome.
+Keep a Jenkins SUCCESS with unverified source distinct from verified completion.
+Do not create workflow JSON/recovery files or write Wiki/TAPD, merge code,
+publish locally, or add production/package operations to a daily build.

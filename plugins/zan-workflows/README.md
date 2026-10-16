@@ -28,7 +28,7 @@
 | zan:补写提测 Wiki 链接 | [`linking-tapd-wiki`](skills/linking-tapd-wiki/SKILL.md) | 将已验证的提测 Wiki 链接幂等地添加到或核对 TAPD Bug、Story、Task 评论 | TAPD 评论 |
 | zan:提交测试 | [`submitting-for-test`](skills/submitting-for-test/SKILL.md) | 在提测计划确认后，负责代码交付到 `develop`、可选 Jenkins 测试部署、Wiki、TAPD 评论/状态/测试版本 | 提测执行 |
 | zan:上线发布 | [`going-live`](skills/going-live/SKILL.md) | 原分支合并 `master`；先检查工具包 latest，按需发布、升级并核验对应项目、更新 Wiki；验证后按单独确认清理本地环境 | 上线/清理 |
-| zan:Jenkins 部署发布 | [`running-release`](skills/running-release/SKILL.md) | 一次确认完整发布清单，由脚本触发 Jenkins、等待本次队列/构建并核对源码；支持部署和工具包版本发布 | 部署/发包 |
+| zan:Jenkins 构建与发布 | [`running-release`](skills/running-release/SKILL.md) | 日常 dev/test 项目构建直接使用 MCP；正式发布、所有工具包发版及组合交付保留完整计划，均核验本次构建和源码 | 构建/部署/发包 |
 | zan:管辖 MR 审核 | [`managed-mr-review`](skills/managed-mr-review/SKILL.md) | 查找、审核和按明确要求合并管辖范围内 GitLab MR；代码结论和合并资格分别判断 | MR 管理 |
 | zan:团队身份映射 | [`team-identity-map`](skills/team-identity-map/SKILL.md) | 根据已知姓名、企微线索或 GitLab 用户名查询团队身份映射 | 身份查询 |
 | zan:登录令牌工作流 | [`login-token-workflow`](skills/login-token-workflow/SKILL.md) | 获取测试环境商家后台/C 端调试 token 并组装本地调试 URL | 本地调试 |
@@ -91,7 +91,13 @@ refs/审批、合并和包含关系核验。不会每一步重新启动评审 Ag
 MR、反复尝试合并或重复发包；核验后将对应业务 Wiki 从待合并更新为已合并，
 等待期间不执行清理。
 
-`run-jenkins-release.mjs` 负责一次触发、等待确切队列/构建和参数/源码
+`running-release` 默认将独立的日常 dev/test 项目构建交给 Jenkins MCP：
+一次解析 Job/参数/源码，复用有效授权，触发一次并核验确切队列、构建和 SHA。
+不启动 workflow session 或生成完整发布 PLAN；缺少必须确认的信息时只做
+一次简短确认。正式/生产发布、所有工具包发版（含 canary）及提测/上线组合
+交付仍走完整发布流程。目标或发布副作用不明确时先澄清，不凭 Job 名猜测。
+
+完整发布流程的 `run-jenkins-release.mjs` 负责一次触发、等待确切队列/构建和参数/源码
 核验。等待时只输出状态变化，Agent 不反复查 Job、拉日志或读规则。
 部分必要字段由同实例、同 Job 的只读 API 补齐；发布仍由 Jenkins 执行。
 Jenkins 构建本身的耗时不会因此消失，减少的是 Agent 的重复操作。

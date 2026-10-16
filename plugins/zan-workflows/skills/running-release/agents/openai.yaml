@@ -1,4 +1,4 @@
 interface:
-  display_name: "zan:Jenkins 部署发布"
-  short_description: "一次确认部署或工具包发布，自动等待并核对本次构建及源码"
-  default_prompt: "使用 $running-release 为当前项目准备完整 Jenkins 发布清单，确认后执行并核对构建来源。"
+  display_name: "zan:Jenkins 构建与发布"
+  short_description: "日常项目构建走简化流程，正式发布和工具包发版保留完整计划与结果核验"
+  default_prompt: "使用 $running-release 执行当前项目的 Jenkins 构建；日常构建走简化流程，正式发布和工具包发版走完整流程。"
