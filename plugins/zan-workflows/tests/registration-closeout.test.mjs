@@ -11,7 +11,8 @@ const input = () => ({ workspaceId: 50372234, entryId: id, entryType: 'bug', wor
   purpose: '登记已经核实的提测结果', prerequisites: { git: 'VERIFIED', deployment: 'DEPLOYED', profile: 'STANDARD', wiki: 'VERIFIED' } });
 
 function tapdFake({ status = 'fixing', version = '', onCall } = {}) {
-  const calls = [], item = { id, status, test_version: version, version, custom_field_10: version };
+  const calls = [], item = { id, status, te: 'tester', reporter: 'creator', current_owner: 'developer',
+    test_version: version, version, custom_field_10: version };
   const call = async (name, args) => {
     calls.push({ name, args });
     const override = await onCall?.(name, args, item);
@@ -20,7 +21,8 @@ function tapdFake({ status = 'fixing', version = '', onCall } = {}) {
     if (name === 'get_workflows_all_transitions') return response({ fixing: ['testing'] });
     if (name === 'get_entity_custom_fields') return response({ custom_field_10: { name: '测试版本', type: 'text' } });
     const kind = args.options.entity_type === 'tasks' ? 'Task' : args.options.entity_type === 'stories' ? 'Story' : 'Bug';
-    if (name === 'get_bug' || name === 'get_stories_or_tasks') return response([{ [kind]: { ...item } }]);
+    if (name === 'get_bug' || name === 'get_stories_or_tasks') return response([{ [kind]:
+      Object.fromEntries(args.options.fields.split(',').filter(name => Object.hasOwn(item, name)).map(name => [name, item[name]])) }]);
     if (name === 'update_bug' || name === 'update_story_or_task') {
       Object.assign(item, args.options); return { content: [{ type: 'text', text: JSON.stringify({ data: JSON.stringify({ status: 1, data: { [kind]: item } }) }) }] };
     }
@@ -34,18 +36,110 @@ async function register(fake, changes = {}) {
   return registerTestSubmission(fake.call, { ...plan, execute: true, confirmed: true });
 }
 
-test('registration updates status and version in one exact write and reads both back', async () => {
+test('registration updates status, owner and version in one exact write and reads them back', async () => {
   const fake = tapdFake();
   const result = await register(fake);
   assert.equal(result.state, 'REGISTERED');
   assert.equal(result.statusState, 'WRITTEN');
   assert.equal(result.versionState, 'WRITTEN');
+  assert.equal(result.ownerState, 'WRITTEN');
+  assert.equal(result.actualOwner, 'tester');
   const writes = fake.calls.filter(call => call.name === 'update_bug');
   assert.equal(writes.length, 1);
-  assert.deepEqual(writes[0].args.options, { id, status: 'testing', test_version: input().testVersion });
+  assert.deepEqual(writes[0].args.options, { id, status: 'testing', current_owner: 'tester', test_version: input().testVersion });
+  for (const read of fake.calls.filter(call => call.name === 'get_bug')) {
+    assert.ok(['te', 'reporter', 'current_owner'].every(name => read.args.options.fields.split(',').includes(name)));
+  }
   const repeated = await register(fake);
   assert.equal(repeated.state, 'ALREADY_REGISTERED');
   assert.equal(fake.calls.filter(call => call.name === 'update_bug').length, 1);
+});
+
+test('missing or blank tester falls back to the creator even without a version write', async () => {
+  for (const te of [undefined, null, '', '  ', ' ; ; ']) {
+    const fake = tapdFake(); fake.item.te = te;
+    const plan = await registerTestSubmission(fake.call, { ...input(), versionAction: 'NONE' });
+    assert.equal(plan.assigneeSource, 'reporter');
+    assert.equal(plan.payload.current_owner, 'creator');
+    assert.equal(fake.calls.some(call => call.name.startsWith('update_')), false);
+    const result = await registerTestSubmission(fake.call, { ...plan, execute: true, confirmed: true });
+    assert.equal(result.ownerState, 'WRITTEN');
+    assert.equal(result.actualOwner, 'creator');
+    assert.equal(result.versionState, 'UNCHANGED');
+  }
+});
+
+test('no tester or creator blocks before writing instead of retaining the developer', async () => {
+  const fake = tapdFake(); fake.item.te = ''; fake.item.reporter = null;
+  await assert.rejects(registerTestSubmission(fake.call, input()), /测试人员和创建人均为空/);
+  assert.equal(fake.calls.some(call => call.name.startsWith('update_')), false);
+});
+
+test('changes to assignment facts after preview require fresh confirmation', async () => {
+  for (const name of ['te', 'reporter', 'current_owner']) {
+    const fake = tapdFake();
+    const plan = await registerTestSubmission(fake.call, input());
+    assert.equal(plan.assigneeSource, 'te');
+    fake.item[name] = 'other-person';
+    await assert.rejects(registerTestSubmission(fake.call, { ...plan, execute: true, confirmed: true }), /重新确认/);
+    assert.equal(fake.calls.some(call => call.name.startsWith('update_')), false);
+  }
+});
+
+test('an owner readback mismatch reports partial effects and never retries', async () => {
+  const fake = tapdFake({ onCall(name, args, item) {
+    if (name === 'update_bug') {
+      item.status = args.options.status; item.test_version = args.options.test_version;
+      return response({ Bug: item });
+    }
+  } });
+  await assert.rejects(register(fake), error => {
+    assert.equal(error.result.statusState, 'WRITTEN');
+    assert.equal(error.result.versionState, 'WRITTEN');
+    assert.equal(error.result.ownerState, 'UNVERIFIED');
+    assert.equal(error.result.actualOwner, 'developer');
+    assert.equal(error.result.state, 'BLOCKED');
+    return true;
+  });
+  assert.equal(fake.calls.filter(call => call.name === 'update_bug').length, 1);
+});
+
+test('owner readback tolerates TAPD semicolon separators while retaining every tester', async () => {
+  const fake = tapdFake({ onCall(name, args, item) {
+    if (name === 'update_bug') {
+      Object.assign(item, args.options, { current_owner: 'second;tester;' });
+      return response({ Bug: item });
+    }
+  } });
+  fake.item.te = 'tester;second';
+  const result = await register(fake);
+  assert.equal(result.ownerState, 'WRITTEN');
+  assert.equal(fake.calls.find(call => call.name === 'update_bug').args.options.current_owner, 'tester;second');
+});
+
+test('missing owner or an incomplete tester list in readback cannot pass registration', async () => {
+  for (const actualOwner of [undefined, 'tester;']) {
+    const fake = tapdFake({ onCall(name, args, item) {
+      if (name === 'update_bug') {
+        Object.assign(item, args.options, { current_owner: actualOwner });
+        return response({ Bug: item });
+      }
+    } });
+    fake.item.te = 'tester;second';
+    await assert.rejects(register(fake), error => {
+      assert.equal(error.result.ownerState, 'UNVERIFIED');
+      return true;
+    });
+    assert.equal(fake.calls.filter(call => call.name === 'update_bug').length, 1);
+  }
+});
+
+test('continue from fixing still assigns the tester as part of the status transition', async () => {
+  const fake = tapdFake();
+  const result = await register(fake, { workMode: 'CONTINUE' });
+  assert.equal(result.state, 'REGISTERED');
+  assert.equal(result.ownerState, 'WRITTEN');
+  assert.equal(fake.item.current_owner, 'tester');
 });
 
 test('continue while waiting skips status and version even when a new version was proposed', async () => {
@@ -53,6 +147,8 @@ test('continue while waiting skips status and version even when a new version wa
   const result = await register(fake, { workMode: 'CONTINUE' });
   assert.equal(result.state, 'SKIPPED_ALREADY_WAITING_TEST');
   assert.equal(fake.item.test_version, 'previous-version');
+  assert.equal(fake.item.current_owner, 'developer');
+  assert.equal(result.ownerState, 'UNCHANGED');
   assert.equal(fake.calls.some(call => call.name.startsWith('update_')), false);
 });
 
@@ -73,6 +169,7 @@ test('Story/Task version registration does not write a Bug waiting-test status',
     assert.equal(result.versionState, 'WRITTEN');
     const write = fake.calls.find(call => call.name === 'update_story_or_task');
     assert.equal(Object.hasOwn(write.args.options, 'status'), false);
+    assert.equal(Object.hasOwn(write.args.options, 'current_owner'), false);
     assert.equal(write.args.options.entity_type, entryType);
     assert.equal(fake.item.status, 'open');
   }
@@ -117,6 +214,7 @@ test('unknown registration outcome is not repeated', async () => {
   await assert.rejects(register(fake), error => {
     assert.equal(error.result.phase, 'UPDATE');
     assert.equal(error.result.statusState, 'UNKNOWN');
+    assert.equal(error.result.ownerState, 'UNKNOWN');
     return true;
   });
   assert.equal(fake.calls.filter(call => call.name === 'update_bug').length, 1);

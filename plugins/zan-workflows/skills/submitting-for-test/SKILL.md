@@ -91,7 +91,10 @@ business source.
 4. Build and display one consolidated `SubmissionPlan` containing Git,
    applicable Wiki/comment actions, deployment, and final TAPD actions.
    Preview registration to automatically resolve actual state labels,
-   transitions, required-field values and native/custom test-version mapping;
+   transitions, required-field values and native/custom test-version mapping.
+   For a Bug transition, read `te`, `reporter` and `current_owner`; assign the
+   waiting-test owner to non-empty `te`, otherwise `reporter`, and bind these
+   old values and the selected owner in the preview. Missing both blocks;
    bind the returned codes, old values and metadata hashes. Resolve applicable
    Job parameters through its adapter, showing a metadata-only Job binding
    or pipeline-computed version policy explicitly when used. Under
@@ -159,11 +162,13 @@ business source.
    automatically resolved workflow/field mappings and metadata fingerprints.
    Reuse the consolidated authorization and successful Git/deployment/Wiki
    prerequisites. Through `tapd-mcp` it refreshes the bound facts, sends one
-   combined update for status and version, and reads both back. `CONTINUE`
+   combined update for status, waiting-test owner and version, and reads all
+   written fields back. The owner uses `te` first, otherwise `reporter`;
+   verify it through `current_owner`. `CONTINUE`
    already in `待测试` returns `SKIPPED_ALREADY_WAITING_TEST` without duplicate
    writes. Story/Task never receives a Bug status; version-only registration
    requires its explicit policy. Do not manually repeat reads or validate the
-   two fields separately. Give the final readbacks to `POST_WRITE`; return
+   fields separately. Give the final readbacks to `POST_WRITE`; return
    `SUBMITTED` only on a passing verdict.
 
 ## Failure behavior

@@ -104,20 +104,28 @@ DEPLOYED | SKIPPED_BY_INTENT | FAILED | UNKNOWN | NOT_ATTEMPTED
 
 ## TAPD status policy
 
-- `INITIAL`: after `DEPLOYED` or `SKIPPED_BY_INTENT`, write/read `待测试` and the
-  test-version field exactly once.
+- `INITIAL`: after `DEPLOYED` or `SKIPPED_BY_INTENT`, write/read `待测试`, the
+  waiting-test owner and the test-version field exactly once.
 - `CONTINUE` while already `待测试`: use
   `SKIPPED_ALREADY_WAITING_TEST`; do not write `修复中`, `待测试`, or the same
-  test-version field again.
+  test-version field again; leave the current owner unchanged.
 - `CONTINUE` while still `修复中`: write `待测试` once after the deployment gate
-  and Wiki steps complete.
+  and Wiki steps complete, assigning its waiting-test owner at the same time.
 - Any other current state requires an explicit policy/user decision; do not
   guess a transition.
 
 Run `register-test-submission.mjs` once after the other gates pass. The
 read-only preview resolves actual workflow labels/transitions and native or
-enabled writable custom version fields, checks required current values and
+enabled writable custom version fields. For each Bug status transition, set
+`current_owner` to non-empty `te` (测试人员), otherwise `reporter` (创建人).
+Missing both blocks; never fall back to the old developer/owner. Bind the
+selected owner and old `te`/`reporter`/`current_owner` values; changes before
+execution require a fresh plan. The resolved owner satisfies a required
+`current_owner` field; other required fields still need existing values.
+The preview checks required values and
 fingerprints metadata. Validate the resolved preview once; do not manually
 reinterpret the same mapping. Execute consumes those exact facts and the same consolidated
-authorization, combining applicable status/version writes and readback.
+authorization, combining applicable status/owner/version writes and readback.
+Owner readback must match the selected TAPD account(s). A mismatch blocks
+with actual completed effects and no automatic retry or rollback.
 No item/metadata rediscovery or private Agent call is needed between fields.

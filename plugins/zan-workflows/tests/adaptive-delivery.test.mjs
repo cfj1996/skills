@@ -21,7 +21,8 @@ const registration = () => ({ workspaceId: 12345, entryId: '123450001', entryTyp
   statusAction: 'WAITING_TEST', versionAction: 'WRITE', testVersion: 'demo@1.0.0-canary.1', purpose: '提测登记',
   prerequisites: { git: 'VERIFIED', deployment: 'DEPLOYED', profile: 'NO_WIKI', wiki: 'SKIPPED_NO_WIKI' } });
 function tapd({ custom = false, required = false, owner = 'reviewer', failWrite = false } = {}) {
-  const item = { id: '123450001', status: 'in_progress', workitem_type_id: '', test_version: '', custom_field_one: '', current_owner: owner };
+  const item = { id: '123450001', status: 'in_progress', workitem_type_id: '', test_version: '', custom_field_one: '',
+    te: 'tester', reporter: 'creator', current_owner: owner };
   const calls = [];
   const call = async (name, args) => {
     calls.push({ name, args });
@@ -97,7 +98,7 @@ test('actual TAPD transition shapes and symbolic custom fields are mapped withou
   const result = await registerTestSubmission(fake.call, { ...plan, execute: true, confirmed: true });
   assert.equal(result.state, 'REGISTERED'); assert.equal(fake.item.custom_field_one, registration().testVersion);
   const write = fake.calls.find(row => row.name === 'update_bug');
-  assert.deepEqual(write.args.options, { id: '123450001', status: 'resolved', custom_field_one: registration().testVersion });
+  assert.deepEqual(write.args.options, { id: '123450001', status: 'resolved', current_owner: 'tester', custom_field_one: registration().testVersion });
   assert.ok(fake.calls.findIndex(row => row.name === 'get_entity_custom_fields') <
     fake.calls.findIndex(row => row.name === 'get_bug' && row.args.options.fields.includes('custom_field_one')));
 });
@@ -126,9 +127,20 @@ test('ambiguous, disabled or incompatible version fields stop instead of guessin
   assert.throws(() => resolveVersionField([], { entryType: 'bug', versionFieldLabel: '业务版本' }), /缺失/);
 });
 
-test('missing transition fields block the read-only preview without adding unauthorized fields', async () => {
+test('required owner can be filled from the tester when the previous owner is empty', async () => {
   const fake = tapd({ required: true, owner: '' });
-  await assert.rejects(registerTestSubmission(fake.call, registration()), /必填字段/);
+  const plan = await registerTestSubmission(fake.call, registration());
+  assert.equal(plan.payload.current_owner, 'tester');
+  const result = await registerTestSubmission(fake.call, { ...plan, execute: true, confirmed: true });
+  assert.equal(result.ownerState, 'WRITTEN');
+});
+
+test('other missing transition fields still block without adding unauthorized fields', async () => {
+  const fake = tapd();
+  const call = (name, args) => name === 'get_workflows_all_transitions' ? api([
+    { StepPrevious: 'in_progress', StepNext: 'resolved', Appendfield: [{ FieldName: 'resolution', Notnull: 'yes' }] },
+  ]) : fake.call(name, args);
+  await assert.rejects(registerTestSubmission(call, registration()), /必填字段/);
   assert.equal(fake.calls.some(row => row.name === 'update_bug'), false);
 });
 

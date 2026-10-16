@@ -18,7 +18,7 @@ complete visible `SubmissionPlan`, bound-fact fingerprint, exact
 | Git delivery | original source branch, target `develop`, current-round commits, commit/push/MR/merge results, develop containment |
 | Deployment | `DEPLOYED|SKIPPED_BY_INTENT|FAILED|UNKNOWN|NOT_ATTEMPTED`, Jenkins job/environment/ref/version/channel/purpose and trigger/readback evidence when applicable |
 | Wiki | `WRITTEN|SKIPPED_BY_POLICY|BLOCKED|NOT_ATTEMPTED`, auto-resolved target plan when written or retained for `going-live`, hierarchy evidence, create/update authorizations and readbacks when written, actual final child ID/URL and source-branch identity when available, business merge-status or tooling current-version/channel readback, and final body when applicable |
-| TAPD | exact status action, exact `Bug|Story|Task` Wiki-link result when applicable, duplicate/conflict evidence, and write/readback results |
+| TAPD | exact status action, waiting-test owner and source (`te` or `reporter`) for Bug transitions, owner write/readback result, exact `Bug|Story|Task` Wiki-link result when applicable, duplicate/conflict evidence, and write/readback results |
 | Test version | `WRITTEN|SKIPPED_ALREADY_WAITING_TEST|BLOCKED|NOT_ATTEMPTED`, structured payload and readback when written |
 | Validation | mapped results for each pre-write operation and final post-write validation |
 | Terminal | `SUBMITTED|BLOCKED` and blocker when applicable |
@@ -88,15 +88,19 @@ complete visible `SubmissionPlan`, bound-fact fingerprint, exact
   parameter/poll call; exact metadata-only canonical Wiki Job lookup is the
   sole read-only exception. It records
   `SKIPPED_BY_INTENT`. `FAILED|UNKNOWN` forbids later Wiki/status/version writes.
-- `INITIAL` writes `待测试`/test version only after
+- `INITIAL` writes `待测试`/waiting-test owner/test version only after
   `DEPLOYED|SKIPPED_BY_INTENT`. `CONTINUE` already in `待测试` performs no status
-  or duplicate test-version write.
-- Status and test version use one `TAPD_REGISTRATION_BUNDLE`: exact item,
+  or owner write, or duplicate test-version write.
+- Status, waiting-test owner and test version use one
+  `TAPD_REGISTRATION_BUNDLE`: exact item,
   work mode, automatically resolved workflow/field mappings, current metadata
-  hashes and expected old values are confirmed together. One update and one
-  readback cover both fields; no per-field Agent validator is needed. Partial
-  readback retains actual successful status/version facts without rollback or
-  retry. Story/Task never receives Bug workflow states.
+  hashes and expected old values are confirmed together. Bug transitions set
+  `current_owner` from non-empty `te`, otherwise `reporter`; missing both blocks.
+  The preview binds old owner/tester/reporter values; drift requires a fresh
+  plan. One update and one readback cover the written fields; no per-field
+  Agent validator is needed. Partial readback retains actual successful
+  status/owner/version facts without rollback or retry. Story/Task never
+  receives Bug workflow states.
 - Any failed or unknown action returns `BLOCKED`, reports prior completed
   actions truthfully, and performs no later action.
 - Private validator responses are discarded after mapping to public pass/fail

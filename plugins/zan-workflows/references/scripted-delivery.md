@@ -338,6 +338,16 @@ Preview reads the item's workflow category when needed, resolves exact
 It never adds unapproved required-field writes. Explicit actual labels are
 supported; duplicate labels, unfamiliar shapes or invalid transitions stop.
 
+For a Bug transition, read `te` (测试人员), `reporter` (创建人) and
+`current_owner`. Write `current_owner` from non-empty `te`, otherwise
+`reporter`, in the same update as the status and applicable version. Missing
+both blocks. Preview exposes `assigneeSource`, the selected owner in
+`payload.current_owner`, and `expectedAssignee` with the three old field
+values. Execution rejects changes to these facts. The resolved owner can
+satisfy a required `current_owner`; other required fields still need existing
+values. Readback verifies all selected account names, tolerating TAPD's
+semicolon separators/order, and reports `ownerState` plus `actualOwner`.
+
 Version mapping uses native fields or enabled writable text/textarea custom
 fields with exact `测试版本|提测版本` labels, or an explicit actual label.
 Custom codes support numeric and word suffixes (`custom_field_one`);
@@ -351,9 +361,9 @@ Execution also carries the existing consolidated confirmation and
 `prerequisites`: `git=VERIFIED`, `deployment=DEPLOYED|SKIPPED_BY_INTENT`,
 `profile=STANDARD|NO_WIKI`, with `wiki=VERIFIED|SKIPPED_NON_FUNCTIONAL` for
 STANDARD or `SKIPPED_NO_WIKI` for NO_WIKI. This helper never calls Wiki tools.
-Continue already waiting skips both fields; a completely matching final
+Continue already waiting skips status, owner and version writes; a completely matching final
 state is read-only. Unknown writes are never repeated. Partial readback
-reports actual status/version effects and blocks the submission result.
+reports actual status/owner/version effects and blocks the submission result.
 
 ## Batched local closeout
 

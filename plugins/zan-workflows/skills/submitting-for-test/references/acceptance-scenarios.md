@@ -32,7 +32,11 @@
 | Wiki readback fails | Return `BLOCKED`; do not write comment, status, or version. |
 | Status succeeds but version fails | Return `BLOCKED` with truthful status success and version failure. |
 | External outcome is unknown | Return `BLOCKED`; do not retry or infer success. |
-| Continue Bug is already `待测试` | Complete Git/deployment/Wiki increment but skip status and duplicate test-version writes. |
+| Bug enters `待测试` with a tester | Write status and `current_owner=te` in the same update and verify both with the applicable version. |
+| Bug enters `待测试` without a tester | Use `reporter` as `current_owner`; missing both blocks before writing. |
+| Assignment fields change after preview | Block before update and prepare a fresh confirmation plan. |
+| Owner readback mismatches | Report actual status/owner/version effects and block without retry or rollback. |
+| Continue Bug is already `待测试` | Complete Git/deployment/Wiki increment but skip status, owner and duplicate test-version writes. |
 | `CONTINUE` change is proven non-functional under `STANDARD` | Record `SKIPPED_BY_POLICY`, omit Wiki and Wiki-comment operations, and continue the remaining authorized submission steps. |
 | `CONTINUE` change affects functionality under `STANDARD` | Update the existing Wiki entry's `影响范围` with only the new affected scope. |
 | Functional supplementation with an existing same-ID comment | Execute one helper invocation; report `wikiState=UPDATED` and `commentState=ALREADY_LINKED` without another comment. |

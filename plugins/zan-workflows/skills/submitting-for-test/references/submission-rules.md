@@ -193,6 +193,10 @@ proof; `SKIP` records `SKIPPED_BY_INTENT` and must not claim a published test
 environment.
 
 Use the status operation appropriate to the work mode. `INITIAL` writes and
-reads `待测试` plus the test-version field once. `CONTINUE` already in `待测试`
+reads `待测试`, its `current_owner` and the test-version field once. On a Bug
+transition, assign non-empty `te` (测试人员), otherwise `reporter` (创建人);
+missing both blocks. Confirm the selected owner and old assignment fields,
+then verify owner readback in the same registration bundle.
+`CONTINUE` already in `待测试`
 records `SKIPPED_ALREADY_WAITING_TEST` and performs no duplicate status/version
-write. Later failure never erases or disguises an earlier successful action.
+or owner write. Later failure never erases or disguises an earlier successful action.

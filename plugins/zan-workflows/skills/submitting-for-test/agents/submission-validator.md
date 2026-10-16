@@ -129,17 +129,22 @@ readback evidence; a Wiki bundle may still have `wikiState=UPDATED`.
 
 `TAPD_REGISTRATION_BUNDLE` validates one `register-test-submission.mjs`
 invocation. Require exact type/ID/workspace, current work mode, purpose,
-expected status/version, complete test-version payload and confirmed workflow
+expected status/version/assignment fields, selected owner, complete
+test-version payload and confirmed workflow
 codes/field mapping with current metadata hashes. The deterministic parser
 binds exact status labels, an allowed transition and enabled writable version
 fields from raw metadata. Check its resolved preview and hashes once; do not
 reinterpret the same mapping manually between steps. A caller's true flag alone
-is not evidence. Required transition fields need actual existing values and
-must not be silently added to the write payload. Git/deployment and applicable Wiki/comment gates must pass
-first. The script writes only status plus the approved version field in one
-`tapd-mcp` update and reads both back, without another private Agent call.
-Continue already waiting skips both fields; Story/Task rejects Bug status.
-Changed state, version or metadata blocks before update. Partial/unknown
+is not evidence. Bug transitions must set `current_owner` to non-empty `te`,
+otherwise `reporter`; missing both blocks. Require the preview's selected
+owner and old `te`/`reporter`/`current_owner` values. The resolved owner can
+satisfy a required `current_owner`; other required transition fields need
+actual existing values and must not be silently added to the payload.
+Git/deployment and applicable Wiki/comment gates must pass first. The script
+writes status, waiting-test owner and the approved version field in one
+`tapd-mcp` update and reads the written fields back, without another private Agent call.
+Continue already waiting skips these writes; Story/Task rejects Bug status/owner writes.
+Changed state, version, assignment facts or metadata blocks before update. Partial/unknown
 readback reports actual known effects and never rolls back/retries.
 
 For final `POST_WRITE`, require successful merge/develop containment and deployment
@@ -147,8 +152,8 @@ state `DEPLOYED|SKIPPED_BY_INTENT`. Under `DEPLOY`, require Jenkins success/SHA
 proof before Wiki/TAPD writes. Require Wiki readback and work-item link state
 `LINKED|ALREADY_LINKED` under `STANDARD` whenever the Wiki target is validated;
 a policy skip requires no such readbacks.
-For `INITIAL`, require applicable waiting-test/version readbacks; for
-`CONTINUE` already in `待测试`, require no status/version write and public
+For `INITIAL`, require applicable waiting-test/owner/version readbacks; for
+`CONTINUE` already in `待测试`, require no status/owner/version write and public
 `SKIPPED_ALREADY_WAITING_TEST`. Verify ordering and truthful completed effects.
 
 Return exactly one line:
