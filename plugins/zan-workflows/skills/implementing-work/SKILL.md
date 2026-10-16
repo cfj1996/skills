@@ -58,6 +58,13 @@ return `BLOCKED` and explain the overlap. Do not modify or erase them.
 
 ## Implementation
 
+需求开发在第一项业务源码修改前，按
+[实施排期推荐](references/implementation-schedule.md) 展示所选 Task 的建议
+起止日期/工作日窗口：复用已确认的预估工时、当前剩余范围、人员可用时间
+和依赖。复用编排传入的共享 `scheduleRecommendation`，独立调用则自行生成。
+它是推荐，不要求新增确认才能继续已授权实施，也不写 TAPD 日期或 Plan；
+用户另行要求回写时再展示精确日期变更并确认。Bug 保持原有流程。
+
 1. After the repository/branch/scope gate passes, handle TAPD status by item type:
    - for Story/Task, require `NOT_APPLICABLE_NON_BUG` and perform no status
      validation, authorization request, write, or readback;
@@ -74,6 +81,19 @@ return `BLOCKED` and explain the overlap. Do not modify or erase them.
    back immediately. Never ask again merely because authorization came from
    the confirmed checklist.
 2. Diagnose the Bug or plan the requested Story/Task within the approved scope.
+   For requirement development, consume the selected `TASKS_READY` Task records
+   and the Plan's `tapdTaskKey` links under the
+   [task contract](../breaking-down-requirement/references/contracts.md).
+   Verify the real Task IDs, assigned developers, positive final workload
+   estimates, dependencies and acceptance against current readbacks before
+   implementation. Execute only the selected Tasks and their linked steps on
+   the original bound branch. Missing Task data, stale scope/person/hours or
+   unmapped steps return to task breakdown/confirmation; never create Tasks or
+   infer permission to edit a coworker's unselected Task. Non-TAPD/Bug flows
+   retain their existing contract. Report Task-level verification; completion
+   of one step never authorizes a Task done/status write. Conversation and
+   progress show final estimated hours only; do not disclose internal base
+   effort, coefficients, formulas or calculation comparisons.
 3. Implement the smallest coherent change. Add or update ordinary project
    tests when appropriate. During edits run focused tests, type/lint checks
    that exercise the changed files; run the broader required suite and build

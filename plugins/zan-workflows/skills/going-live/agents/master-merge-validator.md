@@ -44,7 +44,8 @@ For the proposed scoped operations, validate:
    official publication, current registry latest and delivered consumers.
    `SKIPPED_TOOL_PROJECT` is valid only without an involved publishable package.
    For a business project,
-   its patch only changes `是否上线：未合并` to `是否上线：已合并` and has
+   its final patch only changes `是否上线：未合并` or `是否上线：待合并`
+   to `是否上线：已合并` and has
    exact Wiki-write authorization. Its authority scope is distinct from merge
    authority but may be confirmed by the same complete visible checklist;
    do not require a second question when both scopes were fully shown.
@@ -53,7 +54,13 @@ For the proposed scoped operations, validate:
    performs no write. An unchanged tooling field needs no Wiki-write authority
    but does not skip release/consumer checks. Only `NO_WIKI` may omit the
    existing target entirely; it still requires those latest-flow checks.
-6. The Wiki write is conditional on successful merge readback and current-round
+   A conditional `未合并 → 待合并` patch may share this authorization only
+   when its exact target, project-entry heading, repository/branch, body and
+   hash were displayed. It requires a real open MR with the original source
+   SHA on the verified default target. Never regress an already merged entry,
+   alter another project's status, add a business field to tooling or write
+   under NO_WIKI. Retain the exact intermediate body hash for continuation.
+6. The final Wiki write is conditional on successful merge readback and current-round
    containment in the actual default ref. The executor must check that proof
    before `--mode update`, then check exact ID/parent/title and original body
    hash immediately before writing only the approved resulting body. No TAPD
@@ -69,8 +76,10 @@ For the proposed scoped operations, validate:
 
 Do not require future readbacks for bundle pre-validation. The merge
 plan may use `MANUAL` for a developer without merge permission. An
-`AWAITING_MERGE` handoff is valid: all dependent publication, consumer, Wiki
-and cleanup actions still require exact merged/source-containment proof.
+`AWAITING_MERGE` handoff is valid: all dependent publication, consumer, final
+merged/latest Wiki and cleanup actions still require exact merged/source-containment
+proof. The approved pending business-status patch is the only waiting-stage
+Wiki write and requires exact open-MR/source evidence rather than merge proof.
 Continuation uses read-only `VERIFY_ONLY` on the same MR and never requires
 merge permission or substitutes another MR/source. The executor checks refs,
 approvals, CI, merged readback and containment; the

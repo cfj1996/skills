@@ -63,7 +63,10 @@ Validate these invariants in order:
    affected-scope append; a business entry also resets `已合并` to `未合并`
    when the new current-round commits are not in `origin/master`, while a
    tooling entry preserves `当前版本` or applies only the evidenced channel
-   update/legacy-line replacement allowed by `wiki-template.md`. Missing or
+   update/legacy-line replacement allowed by `wiki-template.md`.
+   A business 待合并 field is valid on reuse but resets to 未合并 for a new
+   functional submission round; this drafting stage never creates a waiting
+   MR claim without going-live's exact MR evidence. Missing or
    conflicting statuses are invalid,
    and a new duplicate entry is invalid. A proven non-functional continuation
    is skipped before this validator is called.

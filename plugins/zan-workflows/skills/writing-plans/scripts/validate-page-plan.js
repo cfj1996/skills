@@ -299,6 +299,8 @@ function validateReciprocalLinks(itemsByCollection, indexes, errors) {
   }
 }
 
+const { validatePlanTaskBindings } = require('../../breaking-down-requirement/scripts/validate-task-breakdown.js');
+
 function validatePagePlanModel(model) {
   const errors = [];
   if (!isNormalizedObject(model)) {
@@ -456,6 +458,7 @@ function validatePagePlanModel(model) {
 
   validateReferences(itemsByCollection, indexes, errors);
   validateReciprocalLinks(itemsByCollection, indexes, errors);
+  errors.push(...validatePlanTaskBindings(model, { implementationStage }).errors);
 
   return {
     valid: errors.length === 0,

@@ -15,18 +15,21 @@
 | --- | --- | --- | --- |
 | `DISCOVERY` | 项目、仓库、origin、`origin/master` 已唯一确认 | 收敛需求范围 | `继续分析需求范围` |
 | `SCOPE_BLOCKED` | 仍有 `REQUIREMENT_BLOCKER` | 解决范围、行为或验收问题 | `解决需求确认项` |
-| `SCOPE_READY` | 范围、排除项、验收和评审模式已形成 | 生成分支并展示统一清单 | `继续生成执行清单` |
+| `SCOPE_READY` | 范围、排除项、验收和评审模式已形成 | 拆分开发任务并准备统一清单（BRANCH_ONLY 仅分支） | `继续生成执行清单` |
+| `AWAITING_TASK_CONFIRMATION` | 已展示完整拆分表、人员、预估工时和拟写入字段 | 确认或修改任务清单 | `确认任务清单` / `修改任务清单：...` |
+| `TASKS_READY` | 所选任务均已准确读回，人员与预计工时完整 | 按已确认分支编写关联 Plan | `继续编写 Plan` |
+| `TASK_WRITE_PARTIAL` | 已有成功项，失败或结果不明项尚未核实 | 核查原任务后展示剩余差异，禁止直接重试创建 | `核查任务创建结果` |
 | `IMPLEMENTATION_EVIDENCE_BLOCKED` | 需求可确认，但 API/字段/代码落点等仍阻塞实施 | 补齐技术证据或改为仅编写 Plan | `继续补齐实施证据` / `改为仅编写 Plan` |
 | `AWAITING_CHECKLIST_CONFIRMATION` | 等待用户确认完整清单 | 确认或修改清单 | `确认执行` / `修改清单：...` |
 | `BRANCH_READY` | 分支已创建/选定且读回匹配 | 编写 branch-bound Plan | `继续编写 Plan` |
-| `PLAN_READY` | Plan 已确认、写入并读回 | 开始实施或仅保留 Plan | `开始实施` / `仅保留 Plan` |
-| `IMPLEMENTING` | 尚有任务未完成 | 继续当前任务 | `继续实施` |
+| `PLAN_READY` | Plan 已确认、写入并读回 | 开始实施时展示推荐开发周期，或仅保留 Plan | `开始实施` / `仅保留 Plan` |
+| `IMPLEMENTING` | 尚有任务未完成 | 继续当前任务；日期/依赖/剩余范围变化时刷新推荐排期 | `继续实施` |
 | `REVIEW_BLOCKED` | 实现或必需验证未通过 | 解决当前阻塞并重新验证 | `解决当前阻塞后继续验证` |
 | `REVIEWED` | 所有项目均 `REVIEW_PASSED` | 进入提测流程或检查当前实现 | `提交测试` / `查看当前实现` |
 | `AWAITING_SUBMISSION_CONFIRMATION` | 已展示全部精确 `SubmissionPlan` | 确认提测计划或修改计划 | `确认提交测试` / `修改提测计划：...` |
 | `SUBMITTED` | `TestSubmissionResult=SUBMITTED` | 按明确意图上线或暂停 | `上线` / `暂停` |
 | `AWAITING_GO_LIVE_CONFIRMATION` | 已展示 source-to-master 与 Wiki 精确变更 | 确认上线计划或暂停 | `确认上线` / `暂停` |
-| `AWAITING_MERGE` | 原 MR 已创建/复用，等待有权限人员合并 | 展示 MR 链接；人工合并后只读核验同一个 MR 再继续 | `已合并，继续上线` |
+| `AWAITING_MERGE` | 原 MR 已创建/复用，等待有权限人员合并；业务 Wiki 已读回待合并或单列 Wiki 阻塞 | 展示 MR 链接及 Wiki 结果；人工合并后只读核验同一个 MR 再继续 | `已合并，继续上线` |
 | `MERGED` | master 包含性与必需 Wiki 读回通过 | 有安全候选时展示清单并询问；否则解释保留或检查阻塞原因 | `确认清理` / `保留开发环境`（仅已展示精确清单时） |
 | `AWAITING_CLEANUP_CONFIRMATION` | 已展示精确本地分支/worktree 清理计划 | 确认、修改或保留 | `确认删除以上本地开发环境` / `保留开发环境` |
 | `PAUSED` | 用户要求暂停 | 从记录的当前阶段恢复 | `继续需求开发` |

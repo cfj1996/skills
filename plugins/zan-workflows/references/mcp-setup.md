@@ -11,6 +11,11 @@ TAPD 和 YApi 四个 STDIO MCP。初始化只需配置一次；每次 MCP 启动
 - uv/uvx：用于 TAPD 的 Python 包启动。
 - 能访问公司服务、私有 npm 源，以及 npm/Python 包所需的下载源。
 
+三个 npm MCP 显式使用 `https://registry.npmjs.org/` 下载公共包及依赖，
+避免继承用户本机的公司默认源。YApi 额外通过
+`--@zan:registry=https://npm.jubaozan.cn/` 下载 `@zan` 包；不能用全局
+`--registry` 将公共依赖一并指向公司源。TAPD 使用 Python 包源。
+
 Windows 使用同一份 Node.js 脚本，直接启动 `volta.exe` / `uvx.exe`；Volta
 负责解析 npx，无 Bash、`shell: true` 或手工拼接 `npx.cmd` 命令。其他平台
 启动 `volta` / `uvx`。本机未配置的服务会给出缺失字段并退出，不影响独立服务。

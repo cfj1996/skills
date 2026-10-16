@@ -86,7 +86,10 @@ invent a value or render a placeholder.
    branch entry, and append the affected scope to that entry's existing
    `影响范围` list. For a business project, also change `已合并` back to
    `未合并` when the new current-round commits are not contained in
-   `origin/master`; preserve an existing `未合并`. For a tooling project,
+   `origin/master`; preserve an existing `未合并`. A new functional submission
+   round also resets an existing `待合并` to `未合并`; a non-functional skip
+   retains the existing body. Only going-live writes 待合并 after exact open-MR
+   proof. For a tooling project,
    resolve `当前版本` using the channel evidence and minimal legacy-field
    replacement rules in `wiki-template.md`. Missing or conflicting status facts
    block. Never create a second entry for the same branch. For

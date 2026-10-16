@@ -20,6 +20,7 @@
 | zan:项目知识 | [`workspace-project-knowledge`](skills/workspace-project-knowledge/SKILL.md) | 根据业务词、仓库、服务名或页面/API 线索定位项目，读取项目知识，查 Jenkins Job 和共享包归属 | 项目路由/知识入口 |
 | zan:准备 TAPD 工作 | [`preparing-work`](skills/preparing-work/SKILL.md) | 只读读取 TAPD Bug、Story、Task，确认项目、仓库、范围、原始分支及创建/复用动作，输出内存交接定义 | 只读预检 |
 | zan:可视化编写计划 | [`writing-plans`](skills/writing-plans/SKILL.md) | 按远程 `origin/master` 收敛需求和验收；简单需求用对话，复杂需求用评审面板；绑定分支后写可执行 Plan | 范围/Plan |
+| zan:拆分需求任务 | [`breaking-down-requirement`](skills/breaking-down-requirement/SKILL.md) | 按需求拆分任务，核实开发人员，预估开发工时，确认清单后创建/更新 TAPD 并关联 Plan | 任务拆分/估时 |
 | zan:实施 TAPD 工作 | [`implementing-work`](skills/implementing-work/SKILL.md) | 在已确认的固定分支实现变更，运行相关验证并独立评审；不负责提测或发布 | 实现/评审 |
 | **zan:需求开发** | [`developing-requirement`](skills/developing-requirement/SKILL.md) | 编排一个 TAPD Story/Task 从范围、分支、Plan、实现到用户明确选择的提测或上线阶段 | 需求主入口 |
 | **zan:修复 TAPD 缺陷** | [`fixing-bug`](skills/fixing-bug/SKILL.md) | 对一个或多个 Bug 做统一只读预检、清单确认，按顺序修复和提测；用户明确要求时可继续上线 | Bug 主入口 |
@@ -81,9 +82,14 @@ refs/审批、合并和包含关系核验。不会每一步重新启动评审 Ag
 把待自动合并当成已合并。源码或目标变化、冲突、审批/CI 不通过会停止。
 没有合并权限时可用 `mergeMode=MANUAL` 创建/复用原 MR；自动模式遇到明确
 的无权限信号也会返回“等待有权限人员合并”，保留 MR 链接和已完成步骤。
+对 STANDARD 业务项目，上线清单预先包含对应 Wiki 的条件补丁；MR 创建/
+复用并读回仍未合并后，自动将该项目条目更新为“是否上线：待合并”并读回。
+同页其它项目保持原状，工具版本字段和 NO_WIKI 不走此更新；Wiki 失败单独
+报告，MR 仍保留待人工合并，不重试未知写入。
 人工合并后回复“已合并，继续上线”，只读核验同一个 MR、源码 SHA、CI
 和目标包含关系，再继续尚未完成的发包、依赖交付和 Wiki 更新。不会重建
-MR、反复尝试合并或重复发包；等待期间不执行清理。
+MR、反复尝试合并或重复发包；核验后将对应业务 Wiki 从待合并更新为已合并，
+等待期间不执行清理。
 
 `run-jenkins-release.mjs` 负责一次触发、等待确切队列/构建和参数/源码
 核验。等待时只输出状态变化，Agent 不反复查 Job、拉日志或读规则。
@@ -189,9 +195,10 @@ Story/Task 使用 `developing-requirement`。它要求一个准确的 TAPD Story
 flowchart LR
   A[项目路由与知识] --> B[对照 origin/master 收敛范围]
   B --> C[复杂度评审：对话或面板]
-  C --> D[只读准备项目、仓库和分支]
+  C --> D[只读拆分任务、核实人员与工时、准备分支]
   D --> E[展示统一清单并确认]
-  E --> F[写入并读回 branch-bound Plan]
+  E --> T[创建或复用 TAPD 任务并准确读回]
+  T --> F[写入并读回关联任务的 branch-bound Plan]
   F --> G[实现、验证、独立评审]
   G --> H{交付模式}
   H -->|IMPLEMENT| I[评审完成后结束]
@@ -215,7 +222,37 @@ flowchart LR
 - `SUBMIT`：在实现评审后进入提测流程。
 - `GO_LIVE`：在提测后继续进入 `going-live`；先验证工具包 latest，再验证对应项目依赖，完成两项检查后决定是否发布或升级，按原分支交付到 `master` 并更新 Wiki。业务应用的生产部署需另行明确请求。
 
-初始需求清单的确认只授权清单中列出的范围、分支动作、Plan 和实现。提测、合并 `master`、Wiki 写入和本地清理都要等各自的精确计划展示后再确认。
+初始需求清单的确认只授权清单中列出的范围、任务创建/更新、分支动作、Plan 和实现。提测、合并 `master`、Wiki 写入和本地清理都要等各自的精确计划展示后再确认。
+
+任务拆分由 `breaking-down-requirement` 负责。每个任务必须有核实后的开发人员
+TAPD 账号、预估工时、范围、依赖和验收。对话、确认表、任务描述和 Plan
+只展示最终预估工时，内部计算过程不对外展示。
+创建或更新前先展示完整任务清单、字段映射、旧/新值和实际拟写入内容，取得
+明确确认。编排可把任务表合入初始统一清单，但必须明确包含 TAPD 任务写入；
+只确认范围或 Plan 不授权创建任务。缺人员或工时只能保留草稿。
+
+同一页面/模块一份 Plan，可关联多个 TAPD Task，每个实施步骤归属一个 Task，
+工时只按 Task 计算一次。任务逐项准确读回后才能实施；结果不明时先核查，
+不重复创建。已有 Task 续接只处理选定任务。`PLAN_ONLY` 可以保存任务待确认
+的阶段 Plan，不自动写 TAPD；`BRANCH_ONLY` 跳过任务拆分。仅编写阶段 Plan
+不会使需求变为可实施。独立调用示例：
+
+```text
+使用 $breaking-down-requirement 拆分这个 TAPD Story：<TAPD URL>。
+列出开发人员和预估工时，创建前先让我确认任务清单。
+```
+
+开发周期在**开始实施时推荐**，拆分任务时无需预先固定起止日期。Agent 按
+已确认的预估工时、当前剩余范围、人员每天可投入时间及前置依赖，展示
+任务的建议开始/完成日期、总开发窗口和假设。没有人员容量资料时，可先
+按每天 4 小时给暂定推荐并标明假设；外部依赖日期不明则给出就绪后的
+工作日窗口。推荐后可继续已授权实施，不新增排期确认门禁；回写 TAPD 日期
+或更新正式 Plan 时，才展示具体变更并取得相应确认。详见
+[实施排期推荐](skills/implementing-work/references/implementation-schedule.md)。
+
+当前数值校验器支持小时字段与 0–4 位小数；日单位需有经过核实的换算适配器。
+执行时先发现 MCP 的任务创建/更新、读取和人员校验能力，能力缺失按工具路由
+处理并准确报告阻塞，不能声称已创建。本仓库测试使用模拟数据，不写真实 TAPD。
 
 需求分支格式为 `feature/<branch-owner>.<MMDD>.<短ID>.<描述slug>`。作者标识优先取目标仓库生效的 Git `user.name`，再取 Git 邮箱前缀，最后取本机用户名；身份无法安全规范化时会暂停并要求补充，不会硬编码某个同事的名字。
 
@@ -397,7 +434,7 @@ plugins/zan-workflows/
 ├── scripts/start-mcp.mjs     凭据读取、字段隔离和 MCP 启动器
 ├── references/               MCP、工具路由、模型路由与凭据示例
 ├── hooks/                     Git 安全和会话记忆生命周期 Hook
-└── skills/                    14 个可独立调用或由主入口编排的 Skills
+└── skills/                    可独立调用或由主入口编排的 Skills
 ```
 
 Codex 插件 marketplace 的官方说明见 [Package your plugin – OpenAI Developers](https://developers.openai.com/plugins/build/plugins)。

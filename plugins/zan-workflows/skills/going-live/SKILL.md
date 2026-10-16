@@ -66,11 +66,15 @@ blockers rather than guessed permission issues.
 
 The executor creates/reuses the exact MR and returns `AWAITING_MERGE`, its
 URL, repository/branches/source SHA, completed effects and read-only
-`resumePlan`. Report `等待有权限人员合并` with the exact link and paused next
+`resumePlan`. For a STANDARD business submission, update the matching Wiki entry
+to `是否上线：待合并` under the conditional patch authority described below;
+read it back before reporting the Wiki update as successful. Report
+`等待有权限人员合并` with the exact link, Wiki update result and paused next
 stage. Tell the user to reply `已合并，继续上线` after the maintainer merges.
 Do not repeat merge attempts, create a replacement MR, switch accounts,
 approve on the user's behalf or continue dependent publication, consumer
-delivery, Wiki updates or cleanup. This normal handoff is not a failed delivery;
+delivery, final merged/latest Wiki updates or cleanup. The sole waiting-stage
+write is the approved business `未合并 → 待合并` status patch. This normal handoff is not a failed delivery;
 conflict, CI and changed-source blockers remain distinct.
 
 On that reply, reuse the same in-conversation submissions and delivery plan.
@@ -86,6 +90,30 @@ authorization, refreshing mutable refs/latest/Wiki facts. Do not replay
 completed merges/publications. Changed action scope needs a new actual preview
 and confirmation. Keep the handoff in the conversation only; create no
 persistent recovery record or automatic scheduled monitor.
+
+### 待合并 Wiki 补丁
+
+上线清单中提前展示两条条件路径：正常合并后的 `未合并 → 已合并`，以及
+没有合并权限时的 `未合并 → 待合并 → 已合并`。列出准确 Wiki ID/父页/标题、
+项目条目标题、仓库和原分支、各阶段最小补丁及完整结果正文/指纹。一次确认
+可以覆盖完整展示的两条路径，不因转人工合并再重复确认相同补丁。
+原清单未包含待合并补丁时，先展示该补丁并取得授权，不能只继承 MR 创建许可。
+
+推荐通过 workflow session 的 merge 请求携带 `pendingWiki`，由
+[pending-merge-wiki.mjs](../../scripts/pending-merge-wiki.mjs) 在真实
+AWAITING_MERGE 后自动执行并读回。参数和预览见
+[脚本化交付说明](../../references/scripted-delivery.md#待合并-wiki-状态)。
+同页可能有多个项目共用分支名，必须用项目条目标题 + 仓库 + 原分支唯一
+定位，不得全页替换。先核实 MR 已创建/复用且仍打开、源 SHA 不变、目标是
+实际默认分支，再将该业务条目的唯一状态改为待合并；已有待合并且正文与
+批准结果完全一致时不重复写入。未成功创建 MR、冲突/CI/网络等其它失败
+不能冒充无合并权限。已合并条目不得回退为待合并。
+
+NO_WIKI 不读写 Wiki；TOOLING 保持当前版本字段，不新增是否上线。Wiki
+更新失败、权限不足或读回不符时保留已创建 MR，分别报告“等待人工合并”
+和 Wiki 阻塞，不宣称已更新，不自动重试未知写操作。继续上线前保留并
+核实待合并补丁读回的正文指纹；只允许以该明确中间结果为基准执行已获准
+的 `待合并 → 已合并`，任何其它正文变化都需新的实际预览与确认。
 
 ## Input gate
 
@@ -154,8 +182,9 @@ authorizes cleanup. `CLEANUP` never repeats the master MR or Wiki operations.
      publication and affected consumers at the registry's current latest;
    - for a tooling project with no involved publishable package, preserve its
      valid channel and record `SKIPPED_TOOL_PROJECT`; no version write is needed;
-   - for a business project, require current `是否上线：未合并` and plan only
-     the transition to `是否上线：已合并`. A missing field or any other value
+   - for a business project, accept current `是否上线：未合并` or verified
+     `是否上线：待合并`. Plan the exact conditional pending patch and final
+     transition to `是否上线：已合并`. A missing field or any other value
      blocks; do not migrate an old template. The transition requires verified
      master containment;
    - record `ALREADY_MERGED` when a business entry is already `已合并`.
@@ -168,7 +197,10 @@ authorizes cleanup. `CLEANUP` never repeats the master MR or Wiki operations.
    involved package still requires release and consumer checks.
    Duplicate/conflicting fields or ambiguous entries block
    before the merge. For `NO_WIKI`, record `SKIPPED_NO_WIKI`; never create a
-   Wiki.
+   Wiki. For STANDARD business delivery using workflow session, include the
+   confirmed `pendingWiki` conditional plan in the merge input. Standalone Git
+   executors require the caller to invoke the same pending-Wiki helper after
+   the exact awaiting result; the Git-only executor does not write TAPD.
 4. Run the private read-only
    [master-merge-validator.md](agents/master-merge-validator.md) before the
    first write. Supply the complete ordered tooling plan, derived-version rules
@@ -212,8 +244,10 @@ authorizes cleanup. `CLEANUP` never repeats the master MR or Wiki operations.
    still applies, reuse the prevalidated exact Wiki authority and invoke
    [ensure-test-wiki.mjs](../submitting-for-test/scripts/ensure-test-wiki.mjs)
    once in `--mode update --execute`, with the existing ID/parent/title,
-   original body SHA-256 and approved full resulting body. This mode performs
-   only Wiki update/readback, with no item/comment read or write. Require
+   original body SHA-256 and approved full resulting body.
+   For shared-page entries with the same branch, also bind entryHeading and
+   entryRepoUrl (CLI --entry-heading / --entry-repo-url) to the selected project.
+   This mode performs only Wiki update/readback, with no item/comment read or write. Require
    `UPDATED|UNCHANGED`, approved final body hash and exactly
    `是否上线：已合并`; for `ALREADY_MERGED`, verify the unchanged field instead.
    For involved tooling packages, first require verified existing or newly
@@ -228,7 +262,8 @@ authorizes cleanup. `CLEANUP` never repeats the master MR or Wiki operations.
    A `NO_WIKI` submission performs no Wiki read or write. No extra private
    Agent validation is needed for an unchanged fully displayed patch; a changed
    body/patch is a real exception and needs a new preview/authorization.
-8. On `AWAITING_MERGE`, return the exact handoff and completed effects, pause
+8. On `AWAITING_MERGE`, first finish or truthfully report the conditional
+   business pending-Wiki patch, then return the exact handoff and completed effects, pause
    dependent writes and follow the continuation above. Return `MERGED` only
    when all required merge, tooling release, consumer
    current-version verification and applicable Wiki readbacks pass;
@@ -247,7 +282,8 @@ authorizes cleanup. `CLEANUP` never repeats the master MR or Wiki operations.
 After reporting the actual merge, release/consumer and Wiki results, always
 report the cleanup outcome separately:
 
-For `AWAITING_MERGE`, show the exact MR link and `已合并，继续上线` next step
+For `AWAITING_MERGE`, show the exact MR link, Wiki `待合并` readback or its
+separate blocker, and `已合并，继续上线` next step
 instead of a deletion question. Resources remain retained until delivery ends.
 
 - `AWAITING_CONFIRMATION`: display the exact repository/current branch,

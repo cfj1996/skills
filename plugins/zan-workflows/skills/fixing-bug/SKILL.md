@@ -171,7 +171,9 @@ order:
    Preserve any returned `CleanupPlan`, but do not execute cleanup inside the
    per-Bug loop or while another confirmed Bug still uses the shared branch.
    On `AWAITING_MERGE`, pause the shared-branch queue, retaining remaining Bugs,
-   exact MR and completed effects in the conversation. Report
+   exact MR and completed effects in the conversation. Retain going-live's
+   confirmed business Wiki 待合并 patch/readback, or report its separate blocker;
+   final 已合并/latest still requires actual merge proof. Report
    `待确认：等待有权限人员合并` with its link and `已合并，继续上线` next step.
    Route that reply to `going-live`'s read-only continuation before remaining
    delivery writes; do not treat it as a failed Bug, start the next shared-branch

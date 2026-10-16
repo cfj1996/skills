@@ -1,6 +1,6 @@
 ---
 name: developing-requirement
-description: Use when one TAPD Story or Task and its PRD or prototype evidence must be developed end-to-end by routing affected projects, scoping against remote master, binding fixed branches, writing branch-bound Plans, implementing reviewed changes, and optionally submitting or taking them live with separate confirmations.
+description: Use when one TAPD Story or Task must be developed end-to-end from remote-master scope through confirmed developer-assigned and estimated TAPD Tasks, fixed branches, linked Plans, reviewed implementation, and optional test submission or go-live.
 ---
 
 # Develop Requirement
@@ -52,13 +52,17 @@ Use the skills in this order:
 1. `zan-workflows:workspace-project-knowledge`
 2. `zan-workflows:writing-plans` with `phase=SCOPE_REVIEW` and
    `confirmation_mode=DEFER_TO_ORCHESTRATOR`
-3. `zan-workflows:preparing-work` for exact TAPD project and branch binding
-4. `zan-workflows:writing-plans` with `phase=PLAN_WRITE`
-5. `zan-workflows:implementing-work` when
+3. `zan-workflows:breaking-down-requirement` with `phase=PLAN` for task
+   scope, verified developers and final workload estimates; skip for `BRANCH_ONLY`
+4. `zan-workflows:preparing-work` for exact TAPD project and branch binding
+5. After the combined checklist confirmation, `breaking-down-requirement`
+   with `phase=EXECUTE` only for explicitly approved task writes, then
+   `zan-workflows:writing-plans` with `phase=PLAN_WRITE`
+6. `zan-workflows:implementing-work` when
    `delivery_mode=IMPLEMENT|SUBMIT|GO_LIVE`
-6. `zan-workflows:submitting-for-test` when
+7. `zan-workflows:submitting-for-test` when
    `delivery_mode=SUBMIT|GO_LIVE`
-7. `zan-workflows:going-live` only when `delivery_mode=GO_LIVE`
+8. `zan-workflows:going-live` only when `delivery_mode=GO_LIVE`
 
 Do not skip ahead because the user supplied a plausible repository or branch.
 Exact user constraints are preserved and verified, not replaced.
@@ -129,6 +133,26 @@ combines it with branch and execution facts below.
 
 ## 3. Bind development branches
 
+Before branch preflight, except for `BRANCH_ONLY`, invoke
+`breaking-down-requirement phase=PLAN` with
+`confirmation_mode=DEFER_TO_ORCHESTRATOR` and the reviewed scope. Story input
+splits/compares its development Tasks; Task input only verifies or proposes
+changes to that selected Task under its actual parent Story. Require verified
+TAPD developer accounts and positive estimates calculated under the internal task policy, with
+stable module/function/task keys. Missing facts stay draft and block task writes
+and implementation. This is read-only and does not independently ask for
+confirmation: include its complete task table, payloads, field mapping and
+proposal fingerprint in the combined checklist below. Display only final
+estimated hours; internal base effort, coefficients, formulas and before/after
+calculation details must not appear in conversation, progress, confirmation
+tables, TAPD descriptions or formal Plans. Do not echo raw internal proposals
+or numerical-policy diagnostics; retain them only in the validation handoff.
+
+`PLAN_ONLY` may retain task proposals without external writes; explicitly show
+that Tasks are unconfirmed and implementation is not ready. It does not infer
+permission to create Tasks. `IMPLEMENT|SUBMIT|GO_LIVE` requires all selected
+Tasks to become `TASKS_READY` before an executable Plan or source edits.
+
 For every proposed project partition, resolve the branch owner with the bundled
 `scripts/resolve-branch-owner.mjs` against that repository, then derive the
 exact initial Story/Task branch as
@@ -151,7 +175,10 @@ Build one combined checklist from all project rows using
 [需求开发分支与单次确认](references/branch-checklist.md), show one authorization
 summary, include requirement/implementation blocker counts and unresolved rows,
 ask exactly `是否按此清单执行？`, then stop. Do not ask separately for
-scope or branch confirmation. The initial Story/Task request selects the work;
+scope or branch confirmation. When task writes are proposed, explicitly state
+that this question also asks permission to create/update the displayed TAPD
+Tasks; a Plan, branch or scope approval alone is not task-write approval.
+The initial Story/Task request selects the work;
 it does not confirm derived checklist fields.
 
 After confirmation, re-invoke `preparing-work` with the same visible facts and
@@ -161,6 +188,19 @@ refs/status and facts changed since preflight. Require a validated
 `CREATE|USE_EXISTING`, fixed branch, repository fingerprint, verified base
 ref/SHA when creating, and reusable branch authorization. Any visible change
 invalidates the confirmation and returns the updated full checklist.
+
+For `IMPLEMENT|SUBMIT|GO_LIVE`, before Plan writing or branch/source mutation, pass the
+unchanged proposal and its current-conversation task-list confirmation to
+`breaking-down-requirement phase=EXECUTE`. The child alone owns approved Task
+creates/updates and readbacks; this is distinct from downstream delivery writes.
+If no Task changes are needed, validate exact REUSE readbacks without a write.
+Require `TaskBreakdownResult.terminal_state=TASKS_READY`. A failed/unknown or
+partial task write stops implementation and returns known successful Task IDs
+without retrying/recreating them. Task creation does not change branch identity:
+keep the original Story/selected Task and existing per-project branch binding,
+not a new branch for every newly created child Task. For `PLAN_ONLY`, execute
+this step only if Task writes were explicitly included and confirmed; otherwise
+retain the proposal in a staged Plan without requiring TASKS_READY.
 
 For multi-project requirements, preflight every project before editing and
 refresh the definition immediately before each later implementation. Because
@@ -187,6 +227,13 @@ page/module Plans for each project. Each project partition records:
 - ordered implementation tasks, validation commands, risks and blockers; and
 - cross-project execution order when applicable.
 
+Pass the verified `TaskBreakdownResult` as well. Each implementation step binds
+one real TAPD Task key/ID; each Task retains its developer, normal and adjusted
+estimate, dependency and acceptance. A module Plan can contain several Tasks;
+do not make one Plan per Task or re-estimate/discount each step. `PLAN_ONLY`
+without approved task writes may save a clearly staged Plan with task proposals
+and `implementation_ready=false`; it must not invent real IDs or `TASKS_READY`.
+
 The Plan is executable only after its configured write/readback gate passes
 and every project partition remains bound to the same repository, remote
 baseline, scope, and branch definition.
@@ -196,11 +243,29 @@ stopped after branch readback and never enters this phase.
 
 ## 5. Execute and review
 
+After Task/Plan readiness passes and before the first source edit, generate and
+display one shared `scheduleRecommendation` under
+[实施排期推荐](../implementing-work/references/implementation-schedule.md).
+Use the selected Tasks' already-adjusted estimates, evidenced remaining scope,
+owner capacity and dependencies to recommend start/end dates or a conditional
+workday window. Share capacity across project partitions; do not reserve the
+same person's full day independently in each project. State capacity/calendar
+assumptions and compare with any existing plan without overwriting it.
+Task breakdown need not fix dates in advance. This recommendation stays in
+dialogue/memory and does not add a new implementation approval gate. Date
+writes or formal Plan changes require their own exact displayed changes and
+authorization; do not infer those writes from the development request.
+
 For `IMPLEMENT|SUBMIT|GO_LIVE`, preflight all project partitions, then execute
-in dependency order. Immediately before each project, refresh its actual
+in Task dependency order within the bound project partitions. Require matching
+`TASKS_READY` readbacks and Plan links, including the assigned developer and
+adjusted estimate; CONTINUE first verifies existing Task IDs instead of
+recreating Tasks. A changed scope, developer or estimate returns to the task
+diff/confirmation gate before affected implementation. Immediately before each project, refresh its actual
 repository, remote baseline, fixed branch, worktree status, TAPD status action,
 and preparation validation. Invoke `zan-workflows:implementing-work` with the
-matching `TapdWorkDefinition`, that project's Plan tasks, and the reusable
+matching `TapdWorkDefinition`, that project's Plan tasks, the shared
+`scheduleRecommendation`, and the reusable
 branch and implementation authorization from the confirmed checklist. Do not
 ask again while every visible checklist field still matches.
 
@@ -209,6 +274,11 @@ report any already-completed project changes truthfully; do not roll them into
 an unrelated branch or silently continue. Return `REVIEWED` only when every
 project is `REVIEWED` with `REVIEW_PASSED` and the combined changed paths remain
 within the confirmed Plan.
+
+Report progress and verification against each selected Task and its Plan steps.
+Do not implement unselected coworkers' Tasks merely because they share a Plan,
+and do not mark a Task done merely because one implementation step passed.
+Task status writes need their own explicitly requested operation and approval.
 
 For `IMPLEMENT`, return after all projects are `REVIEWED`. The initial combined
 checklist authorizes implementation only; it never authorizes submission,
@@ -246,7 +316,10 @@ When those exact facts are displayed, set
 `AWAITING_GO_LIVE_CONFIRMATION` and stop for that confirmation.
 
 An `AWAITING_MERGE` result pauses dependent project delivery with the exact MR
-link, completed effects and `已合并，继续上线` next step. Keep this waiting
+link, completed effects, business Wiki 待合并 update/readback or its separate
+blocker, and `已合并，继续上线` next step. The conditional pending patch must
+be included in the confirmed go-live checklist; do not mark 已合并 before proof.
+Keep this waiting
 stage instead of marking go-live failed or complete. On that reply, use
 `going-live`'s read-only exact-MR continuation, then run only unfinished
 authorized actions; do not repeat completed publication or merges.
@@ -291,11 +364,13 @@ never authorizes the next write-owning workflow.
 Return one in-memory `RequirementDevelopmentResult` containing requirement
 identity, affected-project evidence, confirmed scope, review mode, remote-master
 SHAs, branch definitions, Plan paths/fingerprints, per-project ReviewedChanges,
+task proposal/fingerprint, Task IDs/readbacks, developer/estimate/Plan bindings,
+`scheduleRecommendation` when implementation starts,
 per-project `TestSubmissionResult` and `MasterMergeResult` values when requested,
 cleanup plans/results, verification results, requirement-readiness checklist and blocker counts,
 `implementation_ready`, `current_stage`, `stage_status`, `completed_stages`,
 `blockers`, `recommended_next_action`, `available_actions`, `resume_prompt`, and
-`BRANCH_READY|PLAN_READY|REVIEWED|AWAITING_SUBMISSION_CONFIRMATION|SUBMITTED|AWAITING_GO_LIVE_CONFIRMATION|AWAITING_MERGE|AWAITING_CLEANUP_CONFIRMATION|MERGED|PENDING|BLOCKED|PAUSED|STOPPED`.
+`AWAITING_TASK_CONFIRMATION|TASKS_READY|TASK_WRITE_PARTIAL|BRANCH_READY|PLAN_READY|REVIEWED|AWAITING_SUBMISSION_CONFIRMATION|SUBMITTED|AWAITING_GO_LIVE_CONFIRMATION|AWAITING_MERGE|AWAITING_CLEANUP_CONFIRMATION|MERGED|PENDING|BLOCKED|PAUSED|STOPPED`.
 
 Do not create a workflow report, runtime ledger, raw requirement dump, or
 generated evidence directory.

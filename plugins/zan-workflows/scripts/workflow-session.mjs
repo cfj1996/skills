@@ -11,6 +11,7 @@ import { checkLocalCloseout } from './check-local-closeout.mjs';
 import { ensureTestWiki } from '../skills/submitting-for-test/scripts/ensure-test-wiki.mjs';
 import { sessionInput } from './session-input.mjs';
 import { resolveJenkinsJob } from './resolve-jenkins-job.mjs';
+import { markPendingMergeWiki, validatePendingWikiPlan } from './pending-merge-wiki.mjs';
 
 export class WorkflowSession {
   constructor({ allowExecute = false, pool = new McpClientPool(), reader = configuredJenkinsReader, io = {} } = {}) {
@@ -40,6 +41,7 @@ export class WorkflowSession {
     if (execute && this.pendingMerges.size) throw new Error('存在待人工合并 MR；先用 PLAN 和 VERIFY_ONLY 核验原 MR，后续写入暂不执行');
     const input = { ...request.input, execute };
     if (execute && input.confirmed !== true) throw new Error('执行缺少已展示清单的明确确认');
+    if (request.action === 'merge' && input.pendingWiki) validatePendingWikiPlan(input.pendingWiki, input);
     if (request.action === 'merge' && input.mergeMode === 'VERIFY_ONLY') {
       const pending = this.pendingMerges.get(`${input.projectId}:${input.mrIid}`);
       if (pending && !['originUrl', 'repositoryPath', 'sourceBranch', 'targetBranch', 'sourceSha',
@@ -60,6 +62,15 @@ export class WorkflowSession {
       }
       if (request.action === 'merge' && result.state === 'AWAITING_MERGE') {
         this.pendingMerges.set(`${result.projectId}:${result.mrIid}`, result.resumePlan);
+        if (execute && input.pendingWiki) {
+          try {
+            result.pendingWiki = await markPendingMergeWiki(call('gitlab-mcp'), call('tapd-mcp'), input.pendingWiki,
+              result, { execute: true, confirmed: input.confirmed });
+          } catch (error) {
+            this.executionBlocked = true;
+            result.pendingWiki = error.result || { state: 'BLOCKED', writes: 0, error: error.message };
+          }
+        }
       }
       if (request.action === 'merge' && input.mergeMode === 'VERIFY_ONLY' && result.state === 'MERGED') {
         const key = `${result.projectId}:${result.mrIid}`;

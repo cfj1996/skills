@@ -32,6 +32,16 @@ run `node --test plugins/zan-workflows/tests/git-branch-safety.test.mjs`. These
 tests evaluate the Hook without executing deletion commands and use one
 disposable local Git fixture for `git -C` branch lookup.
 
+For requirement task estimates, confirmation fingerprints, exact Task readbacks,
+and Plan-to-Task ownership/coverage checks, run
+`node --test plugins/zan-workflows/tests/task-breakdown.test.mjs`. These tests
+use in-memory task/field/member fixtures and perform no external writes.
+
+For the approved pending-merge Wiki patch, shared-page entry isolation,
+permission handoff, readback failure and workflow-session write barriers, run
+`node --test plugins/zan-workflows/tests/pending-merge-wiki.test.mjs`.
+These tests simulate GitLab and TAPD without external writes.
+
 ## Coding Style & Naming Conventions
 
 Write skill docs in concise Markdown with clear `#`/`##` headings, short rule lists, and fenced command examples. Preserve the existing mix of English headings and Chinese workflow detail where the skill already uses it. Name new skill folders with lowercase kebab-case, keep the entry file exactly `SKILL.md`, and use descriptive agent filenames such as `collector.md` or `reviewer.md`.

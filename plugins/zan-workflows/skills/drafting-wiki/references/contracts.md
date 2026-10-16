@@ -95,13 +95,19 @@
   `origin/master`; it is not a production-publication claim.
 - Reused valid content is immutable outside the declared minimal patch. A
   matching entry must already use the current status contract: business
-  `未合并|已合并`, or tooling `当前版本：canary|latest`.
+  `未合并|待合并|已合并`, or tooling `当前版本：canary|latest`.
   Exactly one legacy tooling `是否上线：无需上线` line may be replaced with
   the evidenced `当前版本` line in the declared minimal patch. Missing,
   conflicting or other non-current values block. Only the declared scope
   append, required business reset, and evidenced tooling status patch may change.
 - `VALIDATED` requires passing validation and a non-empty copyable Markdown
   body. `BLOCKED` requires a concise blocker and no rendered final body.
+
+- `待合并` is written only by `going-live` after an exact open default-target MR
+  is created/reused under the approved conditional patch. Drafting never
+  invents that evidence. A new functional submission round resets an existing
+  待合并 to 未合并 with its declared scope patch; a non-functional skip retains
+  the existing body. Final 已合并 still requires verified source containment.
 - The result contains no external-write authority, local path, runtime ID,
   recovery/history state, or private validator response.
 - Capability consumers receive the complete in-memory result. Only a direct

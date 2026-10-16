@@ -151,6 +151,41 @@ in-app Browser 打开；本地文件才启动临时 loopback 服务。使用运�
 
 ## 开发分支与 Plan
 
+### TAPD 开发任务关联
+
+TAPD 需求交接复用 `breaking-down-requirement` 的
+[任务与 Plan 契约](../breaking-down-requirement/references/contracts.md)。
+`SCOPE_REVIEW` 只输出稳定模块/功能编号和拆分依据，不创建任务。
+`PLAN_WRITE` 内部接收 `TaskBreakdownResult`：每个 Task 有真实 ID、经核实人员、
+内部估算数据、最终预计工时、依赖及验收，并经过准确读回。对话、确认和
+Plan 正文只展示最终预估工时，不展示计算系数、原始值、公式或折算前后对比。
+以一个页面/模块一份 Plan，同一 Plan 可包含多个 Task；实施步骤用
+`tapdTaskKey` 归属一个 Task。不要把步骤编号 `T-*` 当成 TAPD Task ID。
+
+实施 Plan 必须覆盖本项目/交付单元所有选定 Task 的功能，每个步骤不能越出
+所归属 Task 的范围。工时在 Task 层保留一次，不分发到每一步重复累加或
+再次折算。TAPD 模型附 `tapdRequirement` 绑定父 Story；规范化模型附可选
+`taskBreakdown`，由现有校验器调用任务校验
+验证真实 ID 读回、人员/工时、项目/模块归属和功能覆盖；字段不在 JSON
+台账持久化。Markdown 用关联表和每步归属表达同一事实。
+TAPD 模型进入可实施及后续状态时，缺少就绪任务会被校验器拒绝。
+
+Plan 阶段提供任务顺序、已确认工时、依赖与验收，不要求先固定开发起止日期。
+时间计划在开始实施时按
+[实施排期推荐](../implementing-work/references/implementation-schedule.md)
+结合最新剩余工作量和人员容量展示；默认保留在对话中，不自动改 Plan
+或 TAPD，也不把“尚无排期日期”当作 Plan/任务创建的缺失必填项。
+
+单独编写非 TAPD Plan 无需任务写入。仅请求 Plan 或尚无任务创建确认时，
+可以保留明确标为“任务待确认、不可实施”的阶段 Plan，写入仍走原有 Plan
+确认门禁，不伪造 Task ID 或 TASKS_READY；输出 `implementation_ready=false`。
+旧 Plan 续接先核对已有 Task，补齐关联后再实施，不能据缺字段自动重新创建。
+
+Plan 细化发现任务范围、人员或工时需变更时，返回受影响任务的旧/新差异，
+交回 `breaking-down-requirement phase=PLAN` 展示并确认，完成任务更新和读回
+后再确认受影响 Plan。实现证据补充本身不自动改变工作量。编排已携带完整
+有效结果时直接消费，不重复拆分或确认。
+
 范围与上下文确认后，才处理开发分支和 Plan：
 
 1. `phase=SCOPE_REVIEW` 返回 `ConfirmedRequirementScope` 并停止；不得自行越过分支绑定门禁。
@@ -186,6 +221,9 @@ Use the human-readable [页面交付 Plan 模板](assets/page-delivery-plan-temp
 `ConfirmedRequirementScope`，终态为 `CONFIRMED|PENDING|BLOCKED`；
 `DEFER_TO_ORCHESTRATOR` 返回 `ProposedRequirementScope`，终态为
 `READY_FOR_CHECKLIST|PENDING|BLOCKED`。
+
+`PLAN_WRITE` 的 TAPD 内部交接还保留 task proposal 指纹、Task ID/人员/内部估算与最终工时、
+读回证据和 Task→实施步骤关联。阶段 Plan 明确尚未确认的任务及不可实施原因。
 
 `PLAN_WRITE` 返回一个 branch-bound `ConfirmedRequirementPlan`：上述范围、每个项目的已验证
 `TapdWorkDefinition`、Plan 路径/指纹、任务顺序、验证方式和 `PLAN_READY|PENDING|BLOCKED`。

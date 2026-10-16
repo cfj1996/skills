@@ -115,6 +115,14 @@ Plan 与面板使用同一模块结构和稳定编号。Agent 语义读取 Markd
 
 ## 轮次与确认
 
+TAPD Plan 额外遵守 [任务与 Plan 交接契约](../../breaking-down-requirement/references/contracts.md)：
+模型以 `tapdRequirement` 绑定父需求，`taskBreakdown` 保存内存交接的清单指纹与
+准确 Task 读回，实施步骤以 `tapdTaskKey` 归属。已有 schemaVersion 2/3 不变；
+阶段 Plan 可保留未确认任务，但实施阶段必须具备对应人员、预估工时、
+真实 ID 和完整功能覆盖。对话和 Plan 仅展示最终预估，内部估算数据不外显。
+任务字段不加入浏览器 ReviewSession 白名单，
+也不嵌入 Markdown JSON；它们由 Agent 从 TAPD 与已确认清单构造并验证。
+
 首次全量生成模块与子模块；后续复评默认仅处理新增、修改、未评审、待修改、阻塞、重开项和证据变化项，已确认或不适用项保留结论。统一提交评审后，冻结本轮输入、核对证据并展示冲突、拟处理方式和 Plan 变更摘要；用户逐卡核对后，仍须单独点击确认更新 Plan 才能一次性回写同一 Plan。
 
 这是两阶段确认：产物位置规则确认与确认更新 Plan 相互独立。确认更新 Plan

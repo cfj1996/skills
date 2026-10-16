@@ -13,6 +13,7 @@
 | Baseline | before/after status, changed paths, unrelated paths, scope comparison |
 | Change | concise summary and exact diff reference available in the current execution |
 | Verification | each relevant command, exit status, concise result, and any blocker |
+| Schedule (requirement development) | shared or standalone `scheduleRecommendation`: current remaining effort, owner capacity/source, dependencies, proposed dates or conditional workday window, assumptions/risks, and `writeState=NOT_WRITTEN`; a recommendation grants no date/status write authority |
 | Review | `REVIEW_PASSED|REVIEW_FAILED|NOT_RUN` and normalized reason |
 | Terminal | `REVIEWED|BLOCKED` and blocker when applicable |
 

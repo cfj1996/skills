@@ -75,6 +75,9 @@ target-location, Wiki-ID, TAPD-comment, writeback, merge, or release narration.
 - `项目状态行` contains exactly one type-specific field:
   - Business: `- 是否上线：未合并` for test submission; use `已合并` only
     after the original branch is verified in `origin/master`.
+    `待合并` is a valid intermediate value maintained by going-live only after
+    exact original-source/default-target MR creation/reuse and open-state
+    readback; it does not mean production delivery or completed merge.
   - Tooling/library: `- 当前版本：canary` for `canary`, or
     `- 当前版本：latest` for `official`. Do not render `是否上线` for tooling.
     The Wiki uses package channel labels `canary|latest`; the release executor's
@@ -98,6 +101,8 @@ target-location, Wiki-ID, TAPD-comment, writeback, merge, or release narration.
   current round is not contained in `origin/master`. A tooling entry preserves
   its valid `当前版本` unless a newer release changes the channel under the
   verified-readback or conditional `DEPLOY` rule above.
+  An existing `待合并` likewise returns to `未合并` when a new functional
+  round is submitted; do not carry an old pending-MR claim into new work.
   Replace a legacy tooling `是否上线：无需上线` field with the evidenced
   `当前版本` line as an explicit minimal patch; no other legacy-field migration
   is allowed.

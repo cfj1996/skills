@@ -34,7 +34,13 @@
 | `NO_WIKI` submission with tooling packages | `SKIPPED_NO_WIKI`; still require latest publication and consumer verification, never create a Wiki. |
 | `STANDARD` submission skipped Wiki because the continue fix was non-functional | Reuse the retained existing target and maintain business merge status or the involved tooling latest field after its required gates. |
 | Merge/readback/containment fails | `BLOCKED`; do not change `是否上线` or claim go-live success. |
-| Developer can create an MR but cannot merge the protected target | Create/reuse the exact MR, return `AWAITING_MERGE` with its link and `已合并，继续上线` next step, and pause dependent writes. |
+| Developer can create an MR but cannot merge the protected target | Create/reuse the exact MR; for STANDARD business delivery apply/read back the approved `是否上线：待合并` patch, then return `AWAITING_MERGE` with its link and `已合并，继续上线` next step. Other dependent writes stay paused. |
+| Waiting business entry is already exactly 待合并 with the approved body | Record ALREADY_PENDING_MERGE with no duplicate write. |
+| Shared Wiki has multiple projects on the same branch | Select one exact project-entry heading + repository + source branch and preserve other statuses. |
+| Wiki is changed or denied after the MR was created | Preserve the waiting MR; report Wiki BLOCKED separately and do not retry an unknown write. |
+| MR creation fails, the same MR is closed/changed/merged, or the target is not the verified default | Do not write 待合并; investigate or verify actual merge before continuing. |
+| STANDARD business entry is 待合并 and the exact MR later merges | Use the authorized intermediate body hash; verify source containment before updating only its status to 已合并. |
+| NO_WIKI or TOOLING delivery awaits manual merge | No pending business-status write; tooling current-version semantics remain unchanged. |
 | Merge API explicitly returns 403 | Read back the same MR once; keep an open MR waiting without retrying, or require actual merged/containment proof if a maintainer already merged. Other errors remain blockers. |
 | Maintainer merges the same MR and deletes its source branch | Read-only `VERIFY_ONLY` checks exact MR/source SHA, CI and target containment, then continues only unfinished authorized actions. |
 | User says merged but the MR is still open | Keep `AWAITING_MERGE`; perform no downstream write. |

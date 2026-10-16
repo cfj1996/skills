@@ -137,6 +137,53 @@ failed write. The caller retains completed steps and runs only unfinished
 authorized actions. No durable recovery record, permission/account escalation
 or automatic background monitor is added.
 
+### 待合并 Wiki 状态
+
+业务项目上线时，将以下 `pendingWiki` 放入完整 merge PLAN 并展示两个
+条件路径的正文补丁：`未合并 → 已合并` 和 `未合并 → 待合并 → 已合并`。
+一并确认后，session 的 merge EXECUTE 仅在真实 AWAITING_MERGE 时调用
+`scripts/pending-merge-wiki.mjs`，不另开任意 Wiki 写入通道。
+
+```json
+{
+  "pendingWiki": {
+    "profile": "STANDARD",
+    "serviceType": "BUSINESS",
+    "workspaceId": 12345,
+    "wikiId": "<existing-wiki-id>",
+    "parentWikiId": "<verified-parent-id>",
+    "wikiTitle": "<exact-title>",
+    "entryHeading": "<exact-numbered-project-entry-heading>",
+    "beforeBodySha256": "<sha256-of-approved-current-markdown>",
+    "afterBodySha256": "<sha256-of-approved-pending-markdown>"
+  }
+}
+```
+
+预览时调用纯函数 `pendingWikiPatch(body, {entryHeading, sourceBranch, originUrl})`
+取得最小补丁结果，保留全文并计算指纹，不写文件。该函数定位条目标题、
+仓库和分支，允许同页其它项目共用分支，保留其它条目和原始换行。
+多项目共用一页时，按已展示顺序为每个补丁计算其准确前/后正文指纹；不能
+让后一个项目带旧整页指纹覆盖前一个项目的状态。未预览的组合变化重新确认。
+
+运行时只读复核准确 MR 的打开状态、默认目标、仓库和 source SHA，再读取
+准确 Wiki ID/父页/标题/正文并只修改该条目的唯一状态。成功返回
+UPDATED_PENDING_MERGE，已有准确批准的待合并正文返回 ALREADY_PENDING_MERGE；
+不写评论、工作项状态或工具版本。NO_WIKI、TOOLING 不进行该业务状态写入。
+失败时 session 保留 AWAITING_MERGE 和 pendingWiki 的独立 BLOCKED 结果，
+并阻止继续写入；未知结果不重试。普通后续 EXECUTE 仍受 pendingMerges 阻断。
+
+独立 Git helper 不写 TAPD；调用方使用同一函数
+`markPendingMergeWiki(gitlabCall, tapdCall, pendingWiki, mergeResult, {execute:true, confirmed:true})`
+处理真实待合并结果，沿用完全相同的预览/授权与读回规则。原清单未授权该
+补丁时先展示并确认。人工合并后仍只读 VERIFY_ONLY 核实原 MR，确认 source
+包含后，以待合并读回的准确正文指纹执行已授权的最终 已合并 补丁；不能
+拿最初的未合并正文指纹覆盖中间结果。
+同页其它条目共用分支时，最终 update-only helper 同时传入
+`entryHeading` / `entryRepoUrl`（CLI 为 `--entry-heading` / `--entry-repo-url`），
+成对限定准确项目条目；旧的单条目调用保持兼容。它仍要求已确认完整正文和
+原正文指纹，且不读取或写入评论/工作项。
+
 ## Jenkins deployment and package release
 
 `resolve-jenkins-job.mjs` (or session `job` PLAN) resolves an already routed

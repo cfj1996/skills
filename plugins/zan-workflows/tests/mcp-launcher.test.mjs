@@ -34,6 +34,25 @@ test('Windows uses native executables; config path follows home or explicit over
   assert.equal(configPath({ ZAN_WORKFLOWS_CONFIG: '/custom/file' }), '/custom/file');
 });
 
+test('npm launch options route public dependencies and only YApi company packages before the command', () => {
+  const inherited = { npm_config_registry: 'https://npm.jubaozan.cn/' };
+  for (const platform of ['linux', 'darwin', 'win32']) {
+    for (const name of ['gitlab-mcp', 'jenkins-mcp', 'yapi-mcp']) {
+      const { args } = buildLaunch(name, config, inherited, platform);
+      const commandIndex = args.findIndex(arg => arg === '@zereight/mcp-gitlab' ||
+        arg === '@kud/mcp-jenkins@latest' || arg === '--package=@zan/yapi-cli@latest');
+      const npmOptions = args.slice(args.indexOf('npx') + 1, commandIndex);
+      assert.ok(commandIndex > args.indexOf('npx'));
+      assert.deepEqual(npmOptions.filter(arg => arg.startsWith('--registry=')),
+        ['--registry=https://registry.npmjs.org/']);
+      assert.deepEqual(npmOptions.filter(arg => arg.startsWith('--@zan:registry=')),
+        name === 'yapi-mcp' ? ['--@zan:registry=https://npm.jubaozan.cn/'] : []);
+    }
+  }
+  assert.deepEqual(buildLaunch('tapd-mcp', config, inherited).args,
+    ['--from', 'zan-tapd-mcp==0.0.2', 'mcp-server-tapd']);
+});
+
 test('missing services, invalid schema and incomplete YApi credentials fail closed', () => {
   assert.throws(() => buildLaunch('constructor', config));
   assert.throws(() => buildLaunch('gitlab-mcp', { version: 2 }));

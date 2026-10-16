@@ -35,6 +35,7 @@ standard to compensate for model availability.
 | `managed-mr-review` | Conditional | Lead discovery and routine review are `BALANCED`; high-risk review and all merge decisions are `CRITICAL`. Reviewer agents use runtime defaults |
 | `drafting-wiki` | `BALANCED` | Read-only target resolution and deterministic Markdown/sequence calculation |
 | `writing-plans` | `BALANCED` | Resolves remote-master scope, chooses dialogue or panel review, and writes branch-bound Plans |
+| `breaking-down-requirement` | Conditional | Read-only task scope/estimates use `BALANCED`; confirmed TAPD creates/updates and recovery use `CRITICAL` |
 | `workspace-project-knowledge` | `BALANCED` | Read-heavy routing and graph/knowledge lookup |
 | `project-memory-context` | `BALANCED` | Bounded retrieval and evidence-aware memory synthesis |
 | `login-token-workflow` | `FAST` | Explicit, repeatable token retrieval and URL assembly |

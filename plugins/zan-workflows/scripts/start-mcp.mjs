@@ -5,7 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { StringDecoder } from 'node:string_decoder';
 
-const nodeArgs = ['run', '--node', '22.20.0', 'npx', '--yes'];
+// Public dependencies must not inherit a user's company-wide default registry.
+const nodeArgs = ['run', '--node', '22.20.0', 'npx', '--yes', '--registry=https://registry.npmjs.org/'];
 export const servers = {
   'gitlab-mcp': {
     command: 'volta',
@@ -24,7 +25,7 @@ export const servers = {
   },
   'yapi-mcp': {
     command: 'volta',
-    args: [...nodeArgs, '--registry=https://npm.jubaozan.cn/',
+    args: [...nodeArgs, '--@zan:registry=https://npm.jubaozan.cn/',
       '--package=@zan/yapi-cli@latest', 'zan-yapi-cli'],
     required: ['YAPI_BASE_URL'],
     optional: ['YAPI_USERNAME', 'YAPI_PASSWORD', 'YAPI_PROJECT_TOKEN'],

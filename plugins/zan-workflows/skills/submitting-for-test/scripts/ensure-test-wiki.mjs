@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 
 import { StdioMcpClient } from '../../../scripts/mcp-client.mjs';
+import { wikiEntry } from '../../../scripts/wiki-entry.mjs';
 export { StdioMcpClient } from '../../../scripts/mcp-client.mjs';
 const DEFAULT_ROOT_WIKI_ID = '1150372234001008260';
 const DEFAULT_WORKSPACE_ID = 50372234;
@@ -17,7 +18,7 @@ export function parseArgs(argv) {
     '--tapd-url', '--workspace-id', '--entry-type', '--entry-id', '--source-branch',
     '--creator', '--comment-author', '--body-file', '--wiki-title',
     '--month', '--root-wiki-id', '--expect-target', '--expected-month-id',
-    '--expected-wiki-id', '--expected-body-sha256', '--mode',
+    '--expected-wiki-id', '--expected-body-sha256', '--mode', '--entry-heading', '--entry-repo-url',
     '--execute', '--json',
   ]);
   for (let i = 0; i < argv.length; i++) {
@@ -79,6 +80,10 @@ export function parseArgs(argv) {
     throw new Error('link 模式必须指定 --expected-wiki-id，且不能提供 --body-file');
   }
   if (values['--mode'] === 'update' && !values['--expected-wiki-id']) throw new Error('update 模式必须指定 --expected-wiki-id');
+  if ((values['--entry-heading'] || values['--entry-repo-url']) &&
+      (values['--mode'] !== 'update' || !values['--entry-heading'] || !values['--entry-repo-url'])) {
+    throw new Error('项目条目标题和仓库必须成对提供，且仅用于 update 模式');
+  }
   return {
     workspaceId: Number(values['--workspace-id']),
     entryType: values['--entry-type'],
@@ -95,6 +100,7 @@ export function parseArgs(argv) {
     expectedWikiId: values['--expected-wiki-id'],
     expectedBodySha256: values['--expected-body-sha256']?.toLowerCase(),
     mode: values['--mode'] || 'ensure',
+    ...(values['--entry-heading'] ? { entryHeading: values['--entry-heading'], entryRepoUrl: values['--entry-repo-url'] } : {}),
     execute: Boolean(values['--execute']),
     json: Boolean(values['--json']),
   };
@@ -263,17 +269,21 @@ async function wikiByName(call, workspaceId, name, parentId) {
   return matches[0];
 }
 
-function assertBranch(wiki, sourceBranch) {
-  if (!hasBranchEntry(wiki.markdown_description, sourceBranch)) {
+function assertBranch(wiki, sourceBranch, selector) {
+  if (!hasBranchEntry(wiki.markdown_description, sourceBranch, selector)) {
     throw new Error(`Wiki ${wiki.id} 未包含原分支 ${sourceBranch}，不能判定属于本次交付`);
   }
 }
 
-function hasBranchEntry(body, sourceBranch) {
-  return branchEntryCount(body, sourceBranch) === 1;
+function hasBranchEntry(body, sourceBranch, selector) {
+  return branchEntryCount(body, sourceBranch, selector) === 1;
 }
 
-function branchEntryCount(body, sourceBranch) {
+function branchEntryCount(body, sourceBranch, selector) {
+  if (selector?.entryHeading) {
+    wikiEntry(body, { entryHeading: selector.entryHeading, sourceBranch, originUrl: selector.entryRepoUrl });
+    return 1;
+  }
   return String(body || '').split(/\r?\n/).filter(line => {
     const match = line.match(/^\s*-\s*代码分支名\s*[:：]\s*(\S+)\s*$/);
     return match?.[1] === sourceBranch;
@@ -313,6 +323,9 @@ export async function ensureTestWiki(call, input, now = new Date()) {
     throw new Error('link 模式必须指定 --expected-wiki-id，且不能提供 --body-file');
   }
   if (mode === 'update' && !input.expectedWikiId) throw new Error('update 模式必须指定 --expected-wiki-id');
+  if ((input.entryHeading || input.entryRepoUrl) && (mode !== 'update' || !input.entryHeading || !input.entryRepoUrl)) {
+    throw new Error('项目条目标题和仓库必须成对提供，且仅用于 update 模式');
+  }
   const itemTool = entryType === 'bug' ? 'get_bug' : 'get_stories_or_tasks';
   const itemOptions = entryType === 'bug'
     ? { id: entryId, limit: 1, fields: 'id,title,description' }
@@ -361,15 +374,15 @@ export async function ensureTestWiki(call, input, now = new Date()) {
     if (input.expectedMonthId && String(child.parent_wiki_id) !== String(input.expectedMonthId)) {
       throw new Error('月份 Wiki ID 与确认计划不一致');
     }
-    if (branchEntryCount(child.markdown_description, sourceBranch) > 1) {
+    if (branchEntryCount(child.markdown_description, sourceBranch, input) > 1) {
       throw new Error('已有 Wiki 存在重复的原分支条目，停止自动补充');
     }
     // A linked work item may add a new branch entry to its existing shared Wiki.
     if (!(mode === 'ensure' && approvedBody !== undefined && linkedIds.includes(String(child.id)))) {
-      assertBranch(child, sourceBranch);
+      assertBranch(child, sourceBranch, input);
     }
   }
-  if (approvedBody !== undefined && (!approvedBody.trim() || !hasBranchEntry(approvedBody, sourceBranch))) {
+  if (approvedBody !== undefined && (!approvedBody.trim() || !hasBranchEntry(approvedBody, sourceBranch, input))) {
     throw new Error('Wiki 正文必须非空并且只有一个准确的“代码分支名：<原分支>”行');
   }
   const target = child ? 'REUSE_EXISTING' : monthWiki ? 'CREATE_CHILD' : 'CREATE_MONTH_AND_CHILD';

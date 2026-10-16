@@ -13,7 +13,7 @@ packages and affected consumers.
 | Merge | source/target branches and SHAs, current-round commits, authorization, MR result, merge readback, master containment |
 | Tooling latest | `VERIFIED|NOT_APPLICABLE|AWAITING_MERGE|BLOCKED`; exact plan/authorization, latest precheck `VERIFIED_EXISTING|NEEDS_RELEASE|BLOCKED`, package owner delivery, `REUSED_LATEST|PUBLISHED_LATEST` and publication/source/registry evidence, Jenkins result only when a release is needed, affected consumer manifests/locks/resolved versions, upgrade review/checks/delivery, and final latest recheck |
 | Related deliveries | per-project repository/original branch/source and target SHA, scoped upgrade diff when used, review/verification, commit/push/MR readbacks and default-branch containment |
-| Wiki | `UPDATED_MERGED|ALREADY_MERGED|UPDATED_LATEST|ALREADY_LATEST|SKIPPED_TOOL_PROJECT|SKIPPED_NO_WIKI|BLOCKED|NOT_ATTEMPTED`, matching branch entry, project type, before/after type-specific status, target/patch authorization, and exact-body readback when used |
+| Wiki | `UPDATED_PENDING_MERGE|ALREADY_PENDING_MERGE|UPDATED_MERGED|ALREADY_MERGED|UPDATED_LATEST|ALREADY_LATEST|SKIPPED_TOOL_PROJECT|SKIPPED_NO_WIKI|BLOCKED|NOT_ATTEMPTED`, matching project/branch entry, project type, before/after type-specific status, target/patch authorization, exact-body readback and intermediate body hash when used |
 | Validation | `VALIDATION_PASSED|VALIDATION_FAILED|NOT_RUN` and normalized reason |
 | Local closeout | per completed project `CHECKED|PARTIAL|UNAVAILABLE|NOT_TRIGGERED`; related branch/worktree paths, association and delivery evidence, observed tip/target SHAs, dirty/ignored/occupancy findings, and per-resource `CANDIDATE|RETAIN|VERIFY` with reasons |
 | Cleanup | `NO_CANDIDATE|AWAITING_CONFIRMATION|CLEANED|PARTIAL|BLOCKED|NOT_TRIGGERED`; exact plan and confirmation when applicable, final-response cleanup question or no-candidate/blocker reason, refreshed evidence, worktree-removal and local-branch-deletion readbacks, and completed/retained resources |
@@ -25,7 +25,11 @@ packages and affected consumers.
   `user.can_merge=false`, or merge-call HTTP 403. Retain exact MR IID/URL,
   repository/branches/source SHA, completed effects, unfinished stage and
   read-only `resumePlan`; never infer completion or label this a failed merge.
-  Dependent publication, consumer delivery, Wiki and cleanup require `MERGED`.
+  Dependent publication, consumer delivery, final merged/latest Wiki updates
+  and cleanup require `MERGED`. The only exception is the explicitly authorized
+  business status `未合并 → 待合并`, after exact opened-MR/source readback.
+  Preserve the MR result separately if that Wiki write fails; never retry an
+  unknown write or claim `待合并` without exact-body readback.
 - Continuation uses `VERIFY_ONLY` without mutation tools. The user's reply is
   not proof: verify the same MR, unchanged source SHA, required CI and fetched
   target containment. A deleted source branch or unrelated target advancement
@@ -55,8 +59,17 @@ packages and affected consumers.
 - `UPDATED_MERGED` requires verified master containment, exact Wiki authorization
   for the exact minimal field patch, and a readback of exactly
   `是否上线：已合并`. The authorized patch must replace exactly one
-  `是否上线：未合并` field. Missing or non-current values block; no migration
+  `是否上线：未合并` field, or a verified `是否上线：待合并` field using the
+  explicitly authorized intermediate body hash. Missing or non-current values block; no migration
   or insertion is allowed.
+- `UPDATED_PENDING_MERGE` requires a STANDARD business entry, an exact open MR
+  on the original source SHA targeting the verified default, explicit conditional
+  Wiki-patch authorization, and readback of exactly `是否上线：待合并`. Scope
+  the patch by unique entry heading + repository + branch, including shared
+  branch names across projects; preserve every other byte. `ALREADY_PENDING_MERGE`
+  requires the same exact approved body and performs no write. NO_WIKI and
+  TOOLING do not add a pending business status. An already merged entry never
+  regresses. A waiting result retains its Wiki outcome and MR continuation.
 - `UPDATED_LATEST` requires verified official publication and same-registry latest
   readback for every required package, verified current consuming projects,
   their reviewed upgrade revisions delivered to the default target, exact Wiki
