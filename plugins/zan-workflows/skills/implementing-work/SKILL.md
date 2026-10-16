@@ -94,6 +94,15 @@ return `BLOCKED` and explain the overlap. Do not modify or erase them.
    of one step never authorizes a Task done/status write. Conversation and
    progress show final estimated hours only; do not disclose internal base
    effort, coefficients, formulas or calculation comparisons.
+   For existing functionality, identify which affected behaviors remain valid
+   and which the current request authorizes changing or removing. Reuse current
+   requirement/acceptance references and confirmed amendments; existing code or
+   a reference implementation does not authorize changing those requirements.
+   Keep this comparison in the existing scope/implementation summary, with
+   detail proportional to the affected behavior. For adopted Zan projects,
+   reuse the effective `ZAN-SCOPE-MINIMAL-001` rule from the supplied project
+   context (`standards/zan-system/rules/scope-minimization.md`); a newer central
+   version does not automatically change the project's adopted requirements.
 3. Implement the smallest coherent change. Add or update ordinary project
    tests when appropriate. During edits run focused tests, type/lint checks
    that exercise the changed files; run the broader required suite and build
@@ -104,8 +113,13 @@ return `BLOCKED` and explain the overlap. Do not modify or erase them.
    Verification output stays in the current execution; do not copy it into a
    workflow evidence directory.
 4. Compare the final diff with the starting status and approved scope. Exclude
-   unrelated paths.
-5. Give the exact diff, scope, repository/branch facts, and verification result
+   unrelated paths. Inspect deleted, replaced, moved or disconnected logic
+   against the affected behavior expectations: verify the authorized change or
+   reachable replacement and run risk-appropriate checks for behaviors that
+   must remain. Recheck affected behavior after later edits invalidate earlier
+   evidence; source deletion alone is not proof of behavior loss.
+5. Give the exact diff, scope, affected behavior expectations with their source
+   references, repository/branch facts, and verification results and gaps
    to [agents/change-reviewer.md](agents/change-reviewer.md) with
    `validation_phase=POST_CHANGE_REVIEW`. The reviewer is
    read-only and returns one private verdict line. Map it to

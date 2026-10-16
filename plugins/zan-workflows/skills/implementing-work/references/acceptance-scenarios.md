@@ -15,6 +15,9 @@
 | Existing unrelated changes overlap the approved files | `BLOCKED`; do not stash, reset, overwrite, or absorb them. |
 | Relevant verification fails | `BLOCKED` with the actual command/result; do not claim review success. |
 | Reviewer rejects scope or correctness | Map to `REVIEW_FAILED` and return `BLOCKED`. |
+| A presentation-only change removes a still-required behavior with no authorized scope change or reachable replacement | Detect the regression in the final diff and behavior check; return `REVIEW_FAILED` / `BLOCKED`, even when static checks pass. |
+| A refactor moves behavior into a shared implementation while callers still reach it and relevant checks pass | Accept equivalent behavior; do not reject solely because the old implementation was deleted. |
+| The confirmed request explicitly changes or removes an earlier behavior and verification matches the new requirements | Review against the current confirmed requirements; do not demand restoration of superseded behavior or repeated authorization. |
 | All checks and private review pass | Return in-memory `REVIEWED`; do not commit, push, submit, or publish. |
 
 No scenario creates a workflow report, recovery state, or generated evidence
