@@ -1,6 +1,6 @@
 {
   "name": "zan-workflows",
-  "version": "0.1.0+codex.20261019-hub-only",
+  "version": "0.1.0+codex.20261019-hub-all-tools",
   "description": "Company requirement development, TAPD and Wiki-link workflows, page review, MR review, debug token, identity, memory, and unified Hub-only project knowledge for Codex.",
   "author": {
     "name": "Local developer"
