@@ -19,6 +19,18 @@ projects require a user choice before handoff.
 
 ## Branch modes
 
+### New branch author
+
+When deriving an author segment for a new requirement or Bug branch, use the
+current tool's user-level prompt `USER_NAME`, then the target repository's
+Git `user.name`, then the OS username. Preserve Chinese names; do not use an
+email prefix. Use the shared
+[branch-owner resolver](../../developing-requirement/scripts/resolve-branch-owner.mjs)
+with `--cwd <repository-root>` and `--user-name <USER_NAME>` when present,
+or `--user-prompt-file <current-tool-user-prompt>` for its exact configured file.
+Do not read another tool's prompt or infer a TAPD assignee from this identity.
+An explicitly supplied exact branch and `CONTINUE` retain their original identity.
+
 ### Continue gate
 
 Run this before `AUTO|CREATE|USE_EXISTING`. Classify the work as `CONTINUE`

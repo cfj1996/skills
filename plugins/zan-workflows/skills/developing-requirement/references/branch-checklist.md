@@ -10,9 +10,12 @@ feature/<branch-owner>.<MMDD>.<短ID>.<中文描述>
 
 - `branch-owner`：为每个目标仓库运行本技能自带的
   `scripts/resolve-branch-owner.mjs --cwd <仓库根目录>`，使用其返回的
-  `branchOwner`。脚本依次尝试当前仓库生效的 `git config user.name`、
-  `git config user.email` 的 `@` 前缀和本机用户名，并规范化为小写 ASCII
-  kebab-case。清单同时记录脚本返回的 `source`；全部候选都无法生成安全值时
+  `branchOwner`。当前工具用户级提示词中有非空 `USER_NAME` 时，必须通过
+  `--user-name <USER_NAME>` 传入；也可用 `--user-prompt-file <当前工具实际用户提示词文件>`
+  精确读取（支持 init 确认过的自定义路径），不得扫描其他工具的提示词。
+  脚本依次尝试用户级提示词 `USER_NAME`、当前仓库生效的 `git config user.name`、
+  本机用户名，不使用 Git 邮箱前缀。保留中文姓名，英文字母转小写，空格及
+  不安全分隔符替换为单个 `-`。清单同时记录脚本返回的 `source`；全部候选都无法生成安全值时
   必须 `PENDING` 并让用户给出分支作者标识，不得猜测或沿用其他人的名字。
 - `MMDD`：生成确认清单当日的 Asia/Shanghai 月日，固定四位；清单确认后日期变化不重算。
 - `短ID`：TAPD 展示短 ID，不使用完整长 ID。

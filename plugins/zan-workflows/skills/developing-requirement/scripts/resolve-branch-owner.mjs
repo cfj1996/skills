@@ -2,6 +2,7 @@
 
 import { execFileSync } from "node:child_process";
 import os from "node:os";
+import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
 export function normalizeBranchOwner(value) {
@@ -11,21 +12,15 @@ export function normalizeBranchOwner(value) {
     .normalize("NFKD")
     .replace(/\p{Diacritic}/gu, "")
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/[^\p{L}\p{N}]+/gu, "-")
     .replace(/^-+|-+$/g, "")
     .replace(/-{2,}/g, "-");
 }
 
-function emailLocalPart(value) {
-  if (typeof value !== "string") return "";
-  const separator = value.indexOf("@");
-  return separator > 0 ? value.slice(0, separator) : "";
-}
-
-export function resolveBranchOwner({ gitUserName, gitUserEmail, osUserName }) {
+export function resolveBranchOwner({ userName, gitUserName, osUserName }) {
   const candidates = [
+    ["user-prompt-USER_NAME", userName],
     ["git-config-user.name", gitUserName],
-    ["git-config-user.email", emailLocalPart(gitUserEmail)],
     ["os-username", osUserName],
   ];
 
@@ -35,7 +30,7 @@ export function resolveBranchOwner({ gitUserName, gitUserEmail, osUserName }) {
   }
 
   throw new Error(
-    "Unable to resolve a safe branch owner from Git user.name, Git user.email, or the OS username.",
+    "Unable to resolve a safe branch owner from user-prompt USER_NAME, Git user.name, or the OS username.",
   );
 }
 
@@ -51,7 +46,22 @@ function readGitConfig(key, cwd) {
   }
 }
 
-export function resolveBranchOwnerFromSystem(cwd = process.cwd()) {
+function readPromptUserName(file) {
+  if (!file) return "";
+  let contents;
+  try {
+    contents = readFileSync(file, "utf8");
+  } catch (error) {
+    if (error.code === "ENOENT") return "";
+    throw error;
+  }
+  const names = [...contents.matchAll(/^USER_NAME=([^\r\n]*)\r?$/gm)]
+    .map(match => match[1].trim()).filter(Boolean);
+  if (new Set(names).size > 1) throw new Error("Conflicting USER_NAME values in the user prompt.");
+  return names[0] || "";
+}
+
+export function resolveBranchOwnerFromSystem(cwd = process.cwd(), { userName, userPromptFile } = {}) {
   let osUserName = "";
   try {
     osUserName = os.userInfo().username;
@@ -60,21 +70,32 @@ export function resolveBranchOwnerFromSystem(cwd = process.cwd()) {
   }
 
   return resolveBranchOwner({
+    userName: userName ?? readPromptUserName(userPromptFile),
     gitUserName: readGitConfig("user.name", cwd),
-    gitUserEmail: readGitConfig("user.email", cwd),
     osUserName,
   });
 }
 
-function parseCwd(argv) {
-  if (argv.length === 0) return process.cwd();
-  if (argv.length === 2 && argv[0] === "--cwd" && argv[1]) return argv[1];
-  throw new Error("Usage: resolve-branch-owner.mjs [--cwd <repository-root>]");
+function parseArgs(argv) {
+  const options = { cwd: process.cwd() };
+  const keys = { "--cwd": "cwd", "--user-name": "userName", "--user-prompt-file": "userPromptFile" };
+  for (let index = 0; index < argv.length; index += 2) {
+    const key = keys[argv[index]];
+    if (!key || !argv[index + 1] || Object.hasOwn(options, key) && key !== "cwd") {
+      throw new Error("Usage: resolve-branch-owner.mjs [--cwd <repository-root>] [--user-name <USER_NAME> | --user-prompt-file <current-tool-user-prompt>]");
+    }
+    options[key] = argv[index + 1];
+  }
+  if (options.userName !== undefined && options.userPromptFile !== undefined) {
+    throw new Error("Choose --user-name or --user-prompt-file, not both.");
+  }
+  return options;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
-    const result = resolveBranchOwnerFromSystem(parseCwd(process.argv.slice(2)));
+    const { cwd, ...options } = parseArgs(process.argv.slice(2));
+    const result = resolveBranchOwnerFromSystem(cwd, options);
     process.stdout.write(`${JSON.stringify(result)}\n`);
   } catch (error) {
     process.stderr.write(`${error.message}\n`);

@@ -81,7 +81,7 @@ class RequirementDevelopmentFlowTests(unittest.TestCase):
         self.assertIn("scripts/resolve-branch-owner.mjs", skill)
         self.assertIn("feature/alice.0918.1080800.供应商分账限制", branch_rules)
         self.assertIn("git config user.name", branch_rules)
-        self.assertIn("git config user.email", branch_rules)
+        self.assertIn("USER_NAME", branch_rules)
         self.assertIn("本机用户名", branch_rules)
         self.assertNotIn("feature/cfj.", skill)
         self.assertNotIn("feature/cfj.", branch_rules)
