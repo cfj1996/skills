@@ -268,6 +268,12 @@ TAPD 账号、预估工时、范围、依赖和验收。对话、确认表、任
 
 Bug 使用 `fixing-bug`。它可以接收一个 Bug URL 或有序列表；多个 Bug 共用一个已确认的项目、仓库和分支。
 
+开始修复时，状态与处理人必须一起流转：将 Bug 改为“修复中”，并将
+`current_owner` 设为已核实 TAPD 账号的修复人员；已经修复中也要核对处理人。
+原初始清单统一确认状态和“原处理人 → 修复人员”，两项读回一致后才能改源码。
+`CONTINUE` 已待测试时仍保留状态和测试处理人。详见
+[修复中状态与处理人](skills/implementing-work/references/bug-repair-owner.md)。
+
 1. `preparing-work` 对所有 Bug 做只读预检。
 2. 一次性展示项目/仓库、固定分支、修复范围、提测策略、部署选择和待确认项。
 3. 用户确认后，逐个刷新预检并调用 `implementing-work`。

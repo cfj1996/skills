@@ -33,9 +33,16 @@ Validate in order:
    requirement for Bug-specific commits, raw documents, generated test
    evidence, or prior workflow state.
 6. Status plan matches TAPD type and work mode/current evidence. Only a Bug may
-   use `WRITE_ACTIVE` to enter `修复中`; an already-active Bug uses `NO_CHANGE`,
+   use `WRITE_ACTIVE` to enter `修复中` or correct its repair owner; reject a
+   payload missing either status or `current_owner`. Require the selected
+   repair account, matching workspace/member evidence and old owner, all bound
+   by the displayed authorization. `NO_CHANGE` requires both active state and
+   the exact repair owner, never merely an already-active status,
    and `CONTINUE` Bug already in `待测试` uses
-   `SKIPPED_ALREADY_WAITING_TEST`. Story/Task uses exactly
+   `SKIPPED_ALREADY_WAITING_TEST` and keeps its current owner. Missing or
+   ambiguous repair identity is `PENDING`, except this no-write policy skip.
+   `USER_NAME`/Git/branch author alone does not verify a TAPD account.
+   Story/Task uses exactly
    `NOT_APPLICABLE_NON_BUG` and proposes no status target, payload,
    authorization, or write.
 7. `READY_FOR_HANDOFF` has confirmed scope, passing project/branch checks, and

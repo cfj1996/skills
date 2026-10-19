@@ -76,9 +76,14 @@ repository, or branch with a more plausible candidate.
    branch fact. Missing or changed confirmation keeps the definition `PENDING`;
    never ask again when the current-conversation confirmation still matches.
 7. Derive and display the status plan with the scope and branch facts. For a
-   Bug, use `WRITE_ACTIVE` for an initial item that must enter `修复中`,
-   `NO_CHANGE` when already active, or `SKIPPED_ALREADY_WAITING_TEST` for
-   `CONTINUE` already in `待测试`. For a Story or Task, use exactly
+   Bug, apply [修复中状态与处理人](../implementing-work/references/bug-repair-owner.md)
+   and its read-only helper. Resolve one verified TAPD repair account and bind
+   its source/member evidence plus the old `status,current_owner` to the plan.
+   Use `WRITE_ACTIVE` when entering `修复中` or correcting an already-active
+   Bug's owner; its payload must contain both status and `current_owner`.
+   Use `NO_CHANGE` only when both active status and repair owner match, or
+   `SKIPPED_ALREADY_WAITING_TEST` for `CONTINUE` already in `待测试`, preserving
+   status and owner without requiring a new repair account. For a Story or Task, use exactly
    `NOT_APPLICABLE_NON_BUG` with no target status, payload, authorization, or
    planned status write. Display the derived incremental scope, work mode, selected
    project/repository, selected/planned branch, and confidence/missing facts.
@@ -106,5 +111,8 @@ repository, or branch with a more plausible candidate.
   guess a base in `implementing-work`.
 - Only Bug definitions may carry a `WRITE_ACTIVE` status plan or target
   `修复中`; Story/Task definitions must use `NOT_APPLICABLE_NON_BUG`.
+- A missing/ambiguous repair account is `PENDING`, not a status-only write.
+  Do not infer a TAPD account from `USER_NAME`, Git, the branch author, tester,
+  or reporter. Status alone never proves an active Bug has the right owner.
 - Do not create `raw.md`, `raw.json`, `__test___`, `.zan-workflows`, or any
   other preparation artifact.

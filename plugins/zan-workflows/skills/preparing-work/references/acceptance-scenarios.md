@@ -12,8 +12,11 @@
 | Continue work has a prior Wiki/MR branch and a newly derived branch name | Ignore the new name and reuse the evidenced original branch. |
 | Continue work original branch is missing or candidates conflict | `PENDING` with evidence/candidates; never create from `develop`. |
 | Continue request explicitly names the incremental scope and bound facts are unchanged | Reuse prior project/branch confirmation; do not require a full checklist confirmation again. |
-| Initial Bug is not active | Plan one authorized `WRITE_ACTIVE` transition to `修复中`. |
-| Continue Bug is already `待测试` | Plan `SKIPPED_ALREADY_WAITING_TEST`; no status write. |
+| Initial Bug is not active | Plan one authorized `WRITE_ACTIVE` payload containing both `修复中` status and the verified repair account in `current_owner`. |
+| Bug is already `修复中` but still belongs to a tester, another person or nobody | Plan an authorized `WRITE_ACTIVE` owner correction; never select `NO_CHANGE` by status alone. |
+| Bug active status and verified repair account both match | Plan `NO_CHANGE` with current status/owner evidence. |
+| Repair account is missing, ambiguous or not verified in this workspace | `PENDING`; no status-only payload or inferred account from USER_NAME/Git/tester. |
+| Continue Bug is already `待测试` | Plan `SKIPPED_ALREADY_WAITING_TEST`; no status or owner write and no new repair-account requirement. |
 | Story or Task in any current status | Plan `NOT_APPLICABLE_NON_BUG`; never construct or write a Bug `修复中` payload. |
 | Local and remote branch SHAs differ | `BLOCKED` with both observed SHAs. |
 | Fixed project or repository mismatches actual fingerprint | `BLOCKED`; never route to a similarly named project. |

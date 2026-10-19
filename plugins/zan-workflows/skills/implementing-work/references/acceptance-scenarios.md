@@ -10,6 +10,9 @@
 | A visible checklist field changed | `BLOCKED` before branch action and return the updated checklist for confirmation. |
 | TAPD active-state write is not exactly authorized or fails pre-write validation/readback | `BLOCKED` before source editing. |
 | Confirmed fixing-bug checklist already binds the active-state write | Reuse it and do not ask for another status confirmation. |
+| Start authorization binds status but omits repair-owner change | Return the complete updated checklist; do not broaden old authorization to personnel writes. |
+| Bug is already repairing but still assigned to tester | Use authorized `WRITE_ACTIVE` to set the verified repair account with the same active status, then read back both. |
+| Active status readback passes but owner is missing, unchanged or includes another person | `BLOCKED` before source edits; preserve actual effects without automatic retry/rollback. |
 | Continue Bug is already `待测试` | Keep the status unchanged and implement on the original branch. |
 | Story or Task reaches implementation | Require `NOT_APPLICABLE_NON_BUG`; do not validate or write a Bug `修复中` status. |
 | Existing unrelated changes overlap the approved files | `BLOCKED`; do not stash, reset, overwrite, or absorb them. |

@@ -67,10 +67,16 @@ The checklist and confirmation live only in the current conversation. They do
 not add request fields, persistence, runtime IDs, or recovery state.
 
 For `INITIAL`, checklist confirmation also authorizes the displayed exact
-branch action/base, active-state transition, and implementation. For
+branch action/base, active-state transition, and implementation. Its authorization
+summary also binds each Bug's old status/`current_owner`, verified repair account
+and evidence, and the combined status+owner payload. The person summary is a
+visible bound fact even though the seven checklist columns stay unchanged.
+An already-active Bug with a different handler still requires this authorized
+correction; only matching status and repair owner allow `NO_CHANGE`. Missing or
+ambiguous repair identity is `PENDING`. For
 `CONTINUE`, an already-`待测试` Bug has
 `status_action=SKIPPED_ALREADY_WAITING_TEST`; no active/final status rewrite or
-duplicate test-version write is allowed.
+repair-owner rewrite or duplicate test-version write is allowed.
 
 Normal repair and submission have at most two confirmation points: initial
 scope/implementation authorization when needed, then one consolidated

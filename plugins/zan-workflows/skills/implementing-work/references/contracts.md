@@ -9,7 +9,7 @@
 | Source | TAPD URL/type/short ID and approved scope from the definition |
 | Repository | expected and actual project, path, Git root, origin, starting/final HEAD |
 | Branch | action `CREATE|USE_EXISTING`, expected branch, actual branch, exact approved base ref/SHA when created, and reusable current-conversation confirmation source |
-| TAPD status | item type and `WRITE_ACTIVE|NO_CHANGE|SKIPPED_ALREADY_WAITING_TEST|NOT_APPLICABLE_NON_BUG`; exact target/payload/purpose, authorization source, validation/write/readback only for a Bug `WRITE_ACTIVE` |
+| TAPD status | item type and `WRITE_ACTIVE|NO_CHANGE|SKIPPED_ALREADY_WAITING_TEST|NOT_APPLICABLE_NON_BUG`; current status/owner, verified repairOwner account/workspace/source/member evidence, combined status+owner target/payload/purpose, authorization source, validation/write/readback only for a Bug `WRITE_ACTIVE` |
 | Baseline | before/after status, changed paths, unrelated paths, scope comparison |
 | Change | concise summary and exact diff reference available in the current execution |
 | Verification | each relevant command, exit status, concise result, and any blocker |
@@ -39,6 +39,10 @@
 - A required TAPD active-state write requires exact display, authorization,
   `PRE_STATUS_WRITE=VALIDATION_PASSED`, and matching readback before source
   edits. Final review uses a separate `POST_CHANGE_REVIEW` call.
+- Apply [修复中状态与处理人](bug-repair-owner.md): the write and readback must
+  include both status and `current_owner`. Already-active state alone cannot
+  select `NO_CHANGE`; verify the handler too. Missing/incorrect/partial owner
+  readback blocks source edits without an automatic retry or rollback.
 - A matching current-conversation `fixing-bug` checklist authorization is
   reusable and must not trigger another prompt. `CONTINUE` with current status
   `待测试` performs no status write; `NO_CHANGE`/skip states require current

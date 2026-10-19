@@ -69,17 +69,27 @@ return `BLOCKED` and explain the overlap. Do not modify or erase them.
    - for Story/Task, require `NOT_APPLICABLE_NON_BUG` and perform no status
      validation, authorization request, write, or readback;
    - only for Bug, apply the remaining status rules below;
+   - read [修复中状态与处理人](references/bug-repair-owner.md), reuse the prepared
+     verified `repairOwner`, and refresh actual `status,current_owner` plus
+     repair-identity evidence before writing. Changed facts require an updated
+     checklist; missing/ambiguous repair identity blocks the write;
    - reuse the confirmed `fixing-bug` checklist authorization when it binds the
-     same item, current state, `修复中` payload, purpose, branch, and scope;
+     same item, current state/owner, verified repair account, combined
+     `修复中`+`current_owner` payload, purpose, branch, and scope;
    - for standalone invocation, display those exact facts and obtain one
      authorization;
    - for `CONTINUE` already in `待测试`, use
-     `SKIPPED_ALREADY_WAITING_TEST` and perform no status write;
-   - for an item already `修复中`, use `NO_CHANGE`.
+     `SKIPPED_ALREADY_WAITING_TEST` and perform no status or owner write;
+   - use `NO_CHANGE` only when the item is already `修复中` and its handler
+     matches the verified repair account. Otherwise use `WRITE_ACTIVE`, even
+     if only the owner needs correction.
    Call [agents/change-reviewer.md](agents/change-reviewer.md) with
-   `validation_phase=PRE_STATUS_WRITE` only for `WRITE_ACTIVE`. Read the write
-   back immediately. Never ask again merely because authorization came from
-   the confirmed checklist.
+   `validation_phase=PRE_STATUS_WRITE` only for `WRITE_ACTIVE`. Send one
+   `tapd-mcp` `update_bug` with both status and `current_owner`, then immediately
+   read both fields back and run the helper's readback validation. A successful
+   status-only readback is `BLOCKED` before source edits; retain actual effects
+   without automatic rollback or retry. Never ask again merely because
+   authorization came from the confirmed checklist.
 2. Diagnose the Bug or plan the requested Story/Task within the approved scope.
    For requirement development, consume the selected `TASKS_READY` Task records
    and the Plan's `tapdTaskKey` links under the

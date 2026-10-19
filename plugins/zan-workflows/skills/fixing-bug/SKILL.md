@@ -98,9 +98,15 @@ Before invoking `implementing-work` or performing any other write:
 3. For `INITIAL`, show one authorization summary below the checklist:
    include exact branch action and verified base ref/SHA when creating, the
    active-state transition to `修复中` when required, and implementation of the
-   listed scope on the listed branch. For
+   listed scope on the listed branch. For every applicable Bug, also display
+   current status and `current_owner` → verified repair person's exact TAPD
+   account/source under [修复中状态与处理人](../implementing-work/references/bug-repair-owner.md).
+   Bind the combined status+owner payload in this same authorization, including
+   an already-active Bug that needs only its handler corrected. A missing or
+   ambiguous repair account stays `PENDING`; never change just the status.
+   For
    `CONTINUE`, preserve the current TAPD status; if it is already `待测试`,
-   record `SKIPPED_ALREADY_WAITING_TEST` and perform no status write. Reuse
+   record `SKIPPED_ALREADY_WAITING_TEST` and perform no status or owner write. Reuse
    prior project/branch confirmation when still current, and ask only when the
    incremental scope is not explicit or a bound fact changed.
 4. Return the checklist/summary followed by the single question
@@ -111,7 +117,8 @@ Before invoking `implementing-work` or performing any other write:
    `待确认` and keep the whole request read-only. The user must supply the
    missing decision or explicitly exclude that Bug before preflight is rebuilt.
 6. Treat confirmation as binding only while every visible checklist field is
-   unchanged. After interruption, rebuild the checklist rather than relying on
+   unchanged, including the repair-person summary, old owner and exact payload.
+   After interruption, rebuild the checklist rather than relying on
    hidden conversation state.
 
 The visible `分支` field binds the exact branch identity only. It excludes the
@@ -140,7 +147,8 @@ order:
    `USE_EXISTING` for every later Bug. This switch is current-execution control
    flow, not persisted state or a visible checklist change.
 2. Compare the refreshed definition's project/repository, exact branch
-   identity, and scope with the confirmed row. If a visible field changed,
+   identity, scope, status/owner snapshot and verified repair account with the
+   confirmed row and authorization summary. If a visible field changed,
    show the updated checklist and stop before `implementing-work`;
    confirmation is no longer current. If execution-time `preparing-work`
    returns `PENDING` or `BLOCKED`, pause the entire queue, show the updated

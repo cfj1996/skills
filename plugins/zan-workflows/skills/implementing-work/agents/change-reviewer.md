@@ -18,6 +18,14 @@ displayed payload/purpose, and current explicit authorization. Require all to
 match and require no future write/readback evidence. Reject a missing or
 different target, payload, purpose, or authorization.
 
+For Bug `WRITE_ACTIVE`, reject a status-only payload. Require the exact
+`status`+`current_owner` payload, old status/owner, one repair account with
+matching workspace/member evidence, and the displayed handler change bound to
+the authorization. The repairer is not inferred from a tester, reporter,
+`USER_NAME`, Git or branch author. Already-active status with a different owner
+still needs this authorized write; only matching state and handler permit
+`NO_CHANGE`. `CONTINUE` already waiting keeps both fields unchanged.
+
 A current-conversation `fixing-bug` checklist confirmation is valid
 authorization when it binds those exact facts. `NO_CHANGE`,
 `SKIPPED_ALREADY_WAITING_TEST`, and `NOT_APPLICABLE_NON_BUG` are read-only
@@ -41,6 +49,10 @@ verification results and gaps. Check in order:
 4. Relevant verification is present and truthful; failures are not hidden.
 5. No workflow record/evidence files were created as part of the change.
 6. No submission, Wiki, merge, or release operation is included.
+7. An applicable Bug activation has exact status and repair-owner readbacks,
+   verified by `scripts/bug-repair-status.mjs`. Matching status with a missing,
+   stale or partial handler readback fails; preserve the no-write waiting-test
+   continuation exception and never apply a Bug owner write to Story/Task.
 
 Loss of a still-required behavior without an equivalent reachable replacement
 fails review. Equivalent refactoring and explicitly authorized changes/removals

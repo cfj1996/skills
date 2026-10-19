@@ -45,6 +45,11 @@ permission handoff, readback failure and workflow-session write barriers, run
 `node --test plugins/zan-workflows/tests/pending-merge-wiki.test.mjs`.
 These tests simulate GitLab and TAPD without external writes.
 
+For Bug repair-state and repair-owner planning/readback checks, run
+`node --test plugins/zan-workflows/tests/bug-repair-owner.test.mjs`. These tests
+use in-memory Bug/member fixtures and the read-only helper CLI; they perform no
+TAPD writes.
+
 ## Coding Style & Naming Conventions
 
 Write skill docs in concise Markdown with clear `#`/`##` headings, short rule lists, and fenced command examples. Preserve the existing mix of English headings and Chinese workflow detail where the skill already uses it. Name new skill folders with lowercase kebab-case, keep the entry file exactly `SKILL.md`, and use descriptive agent filenames such as `collector.md` or `reviewer.md`.

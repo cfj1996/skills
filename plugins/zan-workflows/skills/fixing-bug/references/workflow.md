@@ -26,8 +26,11 @@ re-prepare -> implement -> submit PLAN -> confirmation -> submit EXECUTE -> opti
 ```
 
 Only a matching `READY_FOR_HANDOFF` may reach implementation. If refreshed
-project/repository, branch, or scope differs from the confirmed row, return the
-updated checklist and wait for confirmation again.
+project/repository, branch, scope, old status/owner or verified repair person
+differs from the confirmed row/authorization summary, return the updated
+checklist and wait for confirmation again. The original start confirmation
+binds both `修复中` and its repair handler; write/read back both together.
+An already-active Bug is `NO_CHANGE` only when its handler also matches.
 
 If the request selected `CREATE`, only the item that actually creates and
 reads back the fixed branch uses `CREATE`; every later item uses
@@ -54,7 +57,7 @@ same Bug feedback -> recover original branch/Wiki -> implement increment
 ```
 
 Do not create another branch or reset TAPD status. If the Bug is already
-`待测试`, keep that status throughout. Reuse prior project/branch confirmation
+`待测试`, keep that status and its current handler throughout. Reuse prior project/branch confirmation
 when unchanged; ask only for unclear incremental scope and the final
 consolidated submission plan.
 

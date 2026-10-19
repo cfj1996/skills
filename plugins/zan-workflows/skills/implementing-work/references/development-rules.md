@@ -15,8 +15,12 @@ Do not edit until all are true:
 - current branch equals that fixed branch; and
 - required Bug active-state payload was displayed and authorized in the
   current standalone call or confirmed `fixing-bug` checklist, then privately
-  validated/written/read back; or the evidence-backed status action is
+  validated/written/read back with both status and verified repair-owner
+  `current_owner`; or the evidence-backed status action is
   `NO_CHANGE|SKIPPED_ALREADY_WAITING_TEST|NOT_APPLICABLE_NON_BUG`;
+- Bug `NO_CHANGE` proves both active status and the verified repair handler;
+  an already-active Bug still owned by a tester needs an authorized correction.
+  A waiting-test continuation preserves both state and owner;
 - overlapping pre-existing changes have been reconciled or block the work.
 
 ## Direct branch rule

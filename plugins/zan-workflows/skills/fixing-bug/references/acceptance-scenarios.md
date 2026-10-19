@@ -10,7 +10,9 @@
 | Effective action changes from `CREATE` to `USE_EXISTING` | Keep the confirmation valid because the exact visible branch identity is unchanged. |
 | Confirmed checklist with an existing fixed branch | Re-prepare every Bug with `USE_EXISTING` before implementation. Do not require prior Bug-specific evidence. |
 | Same Bug still fails after deployment | Use `CONTINUE`, reuse the original branch/Wiki, and run the same implementation/submission pipeline. |
-| Continue Bug is already `待测试` | Keep the status unchanged; do not write `修复中`, `待测试`, or the same test-version field again. |
+| Continue Bug is already `待测试` | Keep status and handler unchanged; do not write `修复中`, `待测试`, repair owner or the same test-version field again. |
+| Initial Bug enters `修复中` | Original start authorization includes old handler → verified repair TAPD account; write status and handler together and read back both. |
+| Already repairing Bug still belongs to a tester | Plan an authorized owner correction, not `NO_CHANGE`. |
 | Continue request explicitly supplies incremental scope and bound facts are unchanged | Skip a repeated full checklist confirmation and proceed to implementation. |
 | Confirmed checklist field changes during re-prepare | Show the changed checklist and wait for confirmation again. |
 | Execution-time preparation becomes `PENDING` or `BLOCKED` | Pause the entire queue, show the updated checklist, and perform no later writes until reconfirmed. |

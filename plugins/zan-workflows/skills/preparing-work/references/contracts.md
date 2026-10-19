@@ -13,7 +13,7 @@
 | Scope | in-scope work, excluded work, acceptance criteria, confirmation state |
 | Project | selected project, canonical repository path, Git root, origin remote, verification result |
 | Branch | requested mode, fixed branch, action `CREATE|USE_EXISTING`, selected/planned branch, local/remote ref facts, for `CREATE` exact verified base ref/SHA, and matching current-conversation confirmation source |
-| TAPD status plan | item type, current status, `WRITE_ACTIVE|NO_CHANGE|SKIPPED_ALREADY_WAITING_TEST|NOT_APPLICABLE_NON_BUG`; exact target/payload/purpose and confirmation source only for a Bug `WRITE_ACTIVE` |
+| TAPD status plan | item type, current status/`current_owner`, `WRITE_ACTIVE|NO_CHANGE|SKIPPED_ALREADY_WAITING_TEST|NOT_APPLICABLE_NON_BUG`; for applicable Bugs verified `repairOwner={account,workspaceId,source,evidence}`; exact status+owner target/payload/purpose and confirmation source only for a Bug `WRITE_ACTIVE` |
 | Validation | public mapped state and normalized failure reason |
 | Terminal | `READY_FOR_HANDOFF|PENDING|BLOCKED` and blocker/next decision when needed |
 
@@ -40,6 +40,11 @@
   `PENDING`.
 - Story/Task always uses `NOT_APPLICABLE_NON_BUG`; it carries no `修复中`
   target, payload, authorization, validation, write, or readback.
+- Bug status and owner follow
+  [修复中状态与处理人](../../implementing-work/references/bug-repair-owner.md).
+  `WRITE_ACTIVE` binds the old owner, verified repair account and a single
+  status+`current_owner` payload. `NO_CHANGE` requires both values to match;
+  `CONTINUE` already waiting preserves both without any repair-owner write.
 
 ## Terminal invariants
 
