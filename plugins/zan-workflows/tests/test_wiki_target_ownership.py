@@ -1,5 +1,4 @@
 from pathlib import Path
-import re
 import unittest
 
 
@@ -31,10 +30,6 @@ LOCAL_CLOSEOUT = (
 ).read_text()
 PROJECT_KNOWLEDGE = (
     PLUGIN_ROOT / "skills/workspace-project-knowledge/SKILL.md"
-).read_text()
-PROJECT_RELATIONS = (
-    PLUGIN_ROOT
-    / "skills/workspace-project-knowledge/references/project-relations.yaml"
 ).read_text()
 
 
@@ -99,12 +94,13 @@ class WikiTargetOwnershipTests(unittest.TestCase):
     def test_wiki_service_type_is_normalized_by_project_knowledge(self):
         normalization = PROJECT_KNOWLEDGE.split(
             "Wiki service-type normalization:", 1
-        )[1].split("Important routing examples:", 1)[0]
+        )[1].split("## Modification Preflight", 1)[0]
+        # Preserve supported Wiki categories without requiring a local project catalog.
         categories = {
-            match.strip().strip("'\"")
-            for match in re.findall(
-                r"^\s+category:\s*([^\n#]+)", PROJECT_RELATIONS, re.MULTILINE
-            )
+            "Atlas业务模块", "管理后台", "管理后台Monorepo", "商城类", "服务商",
+            "仓配系统前端", "仓配管理系统", "仓配作业系统", "仓配移动端",
+            "基础库", "组件库", "平台库", "Atlas跨平台基座", "文档", "技能库",
+            "AI技能", "MCP服务", "DevOps", "CLI工具", "本地CLI工具",
         }
         missing = sorted(
             category for category in categories if f"`{category}`" not in normalization

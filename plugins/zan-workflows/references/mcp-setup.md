@@ -9,7 +9,9 @@
 `graphify-hub` 使用 Codex 原生 HTTP 连接，地址为公司内网
 `http://172.16.1.152:24100/mcp`。当前服务不要求认证，不向四个 STDIO
 进程传递 Hub 配置，也不把 Hub 当作 `start-mcp.mjs` 的服务参数。
-首次使用需能访问该内网；失败由统一知识入口回退本地。
+首次使用需能访问该内网。图谱、业务知识和功能定位仅通过 Hub 查询；
+连接失败、未覆盖或结果不足时由统一知识入口报告具体缺口，返回
+`partial` / `unavailable`，不回退本地知识库、内置快照或本地图谱。
 
 插件配置仅开放查询工具，覆盖项目发现、功能定位、图谱/Wiki 检索和按需分析。
 `save_solution`、`feedback`、`submit_knowledge`、`submit_file`、`rescan_projects`、

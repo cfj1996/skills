@@ -32,7 +32,7 @@ The script calls `ai-session-memory context-pack`. Treat command failure as a re
 
 ## Memory Semantics
 
-Use memory as leads for attention, not as final proof. Current user intent, current source code, tests, and durable `project-knowledge` outrank memory.
+Use memory as leads for attention, not as final proof. Current user intent, current source code, tests, sourced Hub knowledge and authoritative project rules outrank memory.
 
 Primary context-pack signals:
 
@@ -87,7 +87,7 @@ Lower usefulness comes from:
 8. Ignore `rejected`, `superseded`, `retracted`, `outdated`, `contradicted`, and `failed` memory by default.
 9. If memory conflicts with current source code, prefer current source code and mention that the memory appears stale.
 10. Preserve source references when memory affects a decision.
-11. Do not let memory replace current source reading, tests, or durable `project-knowledge`.
+11. Do not let memory replace current source reading, tests, sourced Hub knowledge or authoritative project rules.
 
 ## Context Pack Fields
 
@@ -113,11 +113,11 @@ If `selected_memory` is empty, continue with normal project/source analysis and 
 - The retrieval query can miss useful memory if the task wording is vague.
 - The command can fail when `ai-session-memory` is not installed, not configured, or its SQLite state is unavailable.
 - Obsidian notes are human-readable output, not the trust boundary.
-- `project-knowledge` remains the durable knowledge source; `ai-session-memory` is the local evidence layer.
+- Graphify Hub is the sole graph, business-knowledge and feature-lookup provider; `ai-session-memory` retains prior AI decisions and failures only. Do not use memory packs as a local replacement or fallback for Hub knowledge queries.
 
 ## When Not To Use
 
 - General programming questions with no local project context.
 - Tasks where current source code is enough and history is irrelevant.
-- High-confidence project facts already available in `project-knowledge`.
+- Project facts already available through Graphify Hub. Do not duplicate them into memory as an offline knowledge catalog.
 - Requests that explicitly ask not to use remembered context.

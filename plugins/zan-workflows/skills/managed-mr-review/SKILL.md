@@ -134,7 +134,7 @@ description: Use when the user asks to find, review, or remotely merge open GitL
 ### 项目级 Preflight 与证据复用
 
 先按项目分组，再为每个项目读取一次集中配置、目标分支状态、项目审核模式和公共治理证据。项目知识通过
-[workspace-project-knowledge](../workspace-project-knowledge/SKILL.md) 获取：传入 canonical 项目/子项目、审核需要回答的问题和 `purpose: review`，复用已有有效 `KnowledgeContext`，只补充缺失知识。由该入口选择 Hub 或本地来源，MR 流程和 reviewer 不另行选择 provider 或强制检查本地图谱。生成 project preflight packet，至少包含：
+[workspace-project-knowledge](../workspace-project-knowledge/SKILL.md) 获取：传入 canonical 项目/子项目、审核需要回答的问题和 `purpose: review`，复用已有有效 `KnowledgeContext`，只补充缺失知识。图谱、业务知识和功能定位只由该入口查询 Hub，MR 流程和 reviewer 不另行查询本地知识库、内置快照或本地图谱。Hub 不足时返回具体缺口。生成 project preflight packet，至少包含：
 
 - project id/path、目标分支 SHA、接入模式与判定证据；
 - 项目明确声明的 pipeline/approval/test 要求；
