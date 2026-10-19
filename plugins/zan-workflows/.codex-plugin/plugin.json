@@ -1,7 +1,7 @@
 {
   "name": "zan-workflows",
-  "version": "0.1.0+codex.20261019-hub-all-tools",
-  "description": "Company requirement development, TAPD and Wiki-link workflows, page review, MR review, debug token, identity, memory, and unified Hub-only project knowledge for Codex.",
+  "version": "0.1.0+codex.20261019-hub-fallback",
+  "description": "Company requirement development, TAPD and Wiki-link workflows, page review, MR review, debug token, identity, memory, and unified Hub-first project knowledge for Codex.",
   "author": {
     "name": "Local developer"
   },
@@ -10,7 +10,7 @@
   "interface": {
     "displayName": "Zan Workflows",
     "shortDescription": "TAPD task breakdown, development and delivery workflows.",
-    "longDescription": "Bundles requirement task breakdown with verified developers, final workload estimates and confirmation before TAPD writes; then linked branch-bound Plans, implementation, optional test submission, master delivery and local cleanup. Also includes TAPD Bug handling, Wiki workflows, GitLab MR review, debug tokens, team identity and project memory. Project knowledge queries use one entrypoint with Graphify Hub as the sole graph, business-knowledge and feature-lookup provider, retaining source and revision evidence.",
+    "longDescription": "Bundles requirement task breakdown with verified developers, final workload estimates and confirmation before TAPD writes; then linked branch-bound Plans, implementation, optional test submission, master delivery and local cleanup. Also includes TAPD Bug handling, Wiki workflows, GitLab MR review, debug tokens, team identity and project memory. Project knowledge queries use one entrypoint with Graphify Hub first and local knowledge fallback, retaining source and revision evidence.",
     "developerName": "Local developer",
     "category": "Productivity",
     "capabilities": [
@@ -27,8 +27,7 @@
       "Use $writing-plans to scope requirements against remote master, choose dialogue or panel review by complexity, and write a branch-bound Plan.",
       "Use $breaking-down-requirement to split a TAPD Story into Tasks with verified developers and final estimated hours; display only final estimated hours in the complete task list and wait for human confirmation before creating or updating Tasks, then link exact Task readbacks to Plan steps.",
       "Use $developing-requirement to orchestrate project routing, remote-master scope, conditional review, branch binding, Plan writing, implementation, and explicitly requested test submission or master delivery with separate cleanup confirmation.",
-      "Use $linking-tapd-wiki to safely backfill or verify an existing 提测 Wiki link in a TAPD Bug, Story, or Task comment without rerunning submission.",
-      "Use $workspace-project-knowledge for graph, business-knowledge and feature queries through Graphify Hub only; report gaps instead of querying local knowledge files, snapshots or Graphify CLI."
+      "Use $linking-tapd-wiki to safely backfill or verify an existing 提测 Wiki link in a TAPD Bug, Story, or Task comment without rerunning submission."
     ]
   }
 }

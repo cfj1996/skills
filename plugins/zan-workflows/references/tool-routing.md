@@ -2,7 +2,7 @@
 
 ## 总则
 
-访问公司外部系统时，默认按以下优先级选择工具；项目知识遵循下方统一入口的 Hub 专用策略：
+访问公司外部系统时，默认按以下优先级选择工具；项目知识遵循下方统一入口的专用回退策略：
 
 ```text
 专用 MCP → 官方 API/受控 CLI → 浏览器降级
@@ -18,7 +18,7 @@
 | GitLab | `gitlab-mcp` | 项目、MR、diff、冲突、pipeline、审批、创建/更新/合并 MR |
 | Jenkins | `jenkins-mcp` | Job 查询、参数读取、触发构建、队列/构建跟踪、结果与日志读取 |
 | YApi | `yapi-mcp` | 项目、分类、接口、请求/响应字段及契约事实查询 |
-| 项目知识 | `workspace-project-knowledge` 统一入口 | 仅通过 `graphify-hub` MCP 查询图谱、业务知识、功能定位；无本地回退 |
+| 项目知识 | `workspace-project-knowledge` 统一入口 | 内部优先 `graphify-hub` MCP，只读检索；不可用、未覆盖或不足时回退本地集中知识 |
 | 本地 Git | `git` CLI | status、diff、fetch、branch、commit、push、包含性校验 |
 
 本地 Git CLI 不替代 GitLab MCP 的 MR/审批/合并能力；GitLab MCP 也不替代本地源码 diff 和 commit。
@@ -28,13 +28,11 @@
 需求、开发、Plan、评审等调用方只向
 [workspace-project-knowledge](../skills/workspace-project-knowledge/SKILL.md)
 提供 canonical 项目/子项目（可未知）、问题和目的，并消费统一 `KnowledgeContext`。
-Hub 身份核验、范围过滤、工具选择、失败复用和缺口处理统一遵循入口的
+Hub 映射、范围过滤、工具选择、失败复用和本地回退统一遵循入口的
 [查询约定](../skills/workspace-project-knowledge/references/knowledge-query.md)。
 
-此类检索不使用下述通用 API/浏览器降级：Hub 未启用、不可用、未覆盖或结果不足时，
-返回 `partial` / `unavailable` 和具体缺口，不读取本地知识库、内置快照或本地图谱，
-也不以源码搜索补做知识查询。不创建临时 HTTP 客户端绕过宿主配置。
-查询不包含知识写回、反馈或图谱重建。
+此类检索不使用下述通用 API/浏览器降级：Hub 未启用或不可用时回退本地，
+不创建临时 HTTP 客户端绕过宿主配置。查询不包含知识写回、反馈或图谱重建。
 工程规则、治理配置、精确部署映射及当前源码仍从各自权威来源核验。
 
 ## 调用流程

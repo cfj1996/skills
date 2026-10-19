@@ -17,7 +17,7 @@
 
 | Codex 显示名称 | Skill ID | 作用 | 类型 |
 | --- | --- | --- | --- |
-| zan:项目知识 | [`workspace-project-knowledge`](skills/workspace-project-knowledge/SKILL.md) | 仅通过 Graphify Hub 查询图谱、业务知识和功能定位；精确服务与 Jenkins 配置独立核验 | 项目路由/知识入口 |
+| zan:项目知识 | [`workspace-project-knowledge`](skills/workspace-project-knowledge/SKILL.md) | 统一查询项目知识，优先 Graphify Hub，必要时回退本地；定位项目、代码入口、Jenkins Job 和共享包归属 | 项目路由/知识入口 |
 | zan:准备 TAPD 工作 | [`preparing-work`](skills/preparing-work/SKILL.md) | 只读读取 TAPD Bug、Story、Task，确认项目、仓库、范围、原始分支及创建/复用动作，输出内存交接定义 | 只读预检 |
 | zan:可视化编写计划 | [`writing-plans`](skills/writing-plans/SKILL.md) | 按远程 `origin/master` 收敛需求和验收；简单需求用对话，复杂需求用评审面板；绑定分支后写可执行 Plan | 范围/Plan |
 | zan:拆分需求任务 | [`breaking-down-requirement`](skills/breaking-down-requirement/SKILL.md) | 按需求拆分任务，核实开发人员，预估开发工时，确认清单后创建/更新 TAPD 并关联 Plan | 任务拆分/估时 |
@@ -148,20 +148,52 @@ worktree、refs、完整 tip 包含关系、状态和忽略数据，并使用一
 提供“确认清理 / 保留开发环境”。没有安全候选或检查受阻时说明原因。
 确认清理后只复查并删除已确认的本地资源，不重复上线；选择保留则结束流程。
 
-### Hub 项目知识查询
+### 集中项目知识库
 
-`workspace-project-knowledge` 是统一查询入口。调用方提供项目（可未知）、问题和用途，图谱、业务知识、功能定位、候选代码入口和跨项目关系全部通过插件内的 `graphify-hub` MCP 查询。无需在本机检出知识库、安装 Graphify 或维护本地知识快照。
+`workspace-project-knowledge` 是统一查询入口。调用方提供项目（可未知）、问题和用途，入口优先调用插件内的 `graphify-hub`，在未启用、不可用、未覆盖或结果不足时回退本地集中知识与 Graphify。结果统一携带来源、索引版本（或 unknown）及知识缺口；调用方不选择数据源。
 
-Hub 未启用、不可用、未覆盖或结果不足时，入口返回 `partial` / `unavailable` 和具体缺口，不查询本地知识库、生成的 `AI_CONTEXT.md`、图谱文件、CLI 或内置快照，也不把知识查询改成源码搜索。结果统一携带原始来源、索引版本（缺失为 `unknown`）和范围限制；未检索到不能证明功能不存在。
+独立的 `project-knowledge` 仓库继续维护项目身份、Hub 项目/子目录映射、工作区规则、工程标准和 Jenkins 等精确配置，并提供本地知识回退。Hub 检索结果用于定位和补充上下文；当前实现仍核验目标分支源码。未检索到不能证明功能不存在。
 
-需求开发、Plan、提测和 MR 审核等 Skill 复用入口返回的 `KnowledgeContext`，不另选本地知识提供者。工具选择、身份/子目录范围核验和失败处理见 [统一查询约定](skills/workspace-project-knowledge/references/knowledge-query.md)。
+需求开发、Plan、提测和 MR 审核等 Skill 复用入口返回的 `KnowledgeContext`。Hub 工具选择、查询范围和回退约定见 [统一查询约定](skills/workspace-project-knowledge/references/knowledge-query.md)。项目映射由中央知识库维护，团队成员无需重复配置。
 
-#### 使用准备与独立配置
+#### 团队成员需要准备什么
 
-- 启用插件的 `graphify-hub` MCP，并确保能访问公司内网端点。连接和同名 MCP 迁移见 [MCP 配置](references/mcp-setup.md)。
-- 工作区/项目规则、工程标准、MR 管辖配置、精确服务/Jenkins 映射仍按各自流程从维护源读取；这些是治理或执行配置，不是本地知识查询或 Hub 回退来源。缺少必需配置时只暂停依赖它的操作，不猜测配置。
-- 本地源码仅用于已明确目标的开发、验证和审核；Hub 的索引信息不能证明个人分支或未提交代码的当前行为。Hub 不可用时若任务已有足够规则和源码证据可继续，并单独报告知识缺口。
-- 原有工作区提示词若仍要求先读本地知识库、图谱或执行本地 Graphify 查询，应同步移除这些查询步骤，避免覆盖 Hub 专用策略。工作区规则安装、Git Hook 和治理配置的维护方式不属于本次知识查询迁移，按其各自维护流程处理。
+1. 将知识库项目检出到本机工作区的 `project-knowledge` 目录：
+
+   ```bash
+   cd /path/to/workspace
+   git clone http://git.jubaozan.cn/chenfangjie/project-knowledge.git project-knowledge
+   ```
+
+2. 首次使用时，在知识库项目目录安装依赖：
+
+   ```bash
+   cd /path/to/workspace/project-knowledge
+   npm install
+   ```
+
+3. 运行统一初始化命令：
+
+   ```bash
+   cd /path/to/workspace/project-knowledge
+   npm run init
+   ```
+
+   按提示选择 Codex、Claude Code、Gemini CLI 中一个或多个平台，并输入本机 `WORKSPACE_ROOT`。初始化会把 `WORKSPACE_RULE_LOADING_RULE.md` 中的路径写入对应的用户级提示词文件，再同步工作区开发规范；Hook 管理方式以该仓库当前说明为准。执行前会展示目标路径和处理方式。提示词文件已存在时，可选择覆盖、追加或跳过。
+
+   只需要重新同步工作区开发规范时，也可以单独运行：
+
+   ```bash
+   npm run agent-rules:install -- --workspace /path/to/workspace --platform codex
+   ```
+
+4. 经常更新本地知识库，保持项目归属、上下文和团队规范与当前仓库状态一致；拉取更新后，如果用户提示词模板或工作区规则有变化，再运行 `npm run init` 同步：
+
+   ```bash
+   git -C /path/to/workspace/project-knowledge pull --ff-only
+   cd /path/to/workspace/project-knowledge
+   npm run init
+   ```
 
 ## 2. 需求开发流程
 
