@@ -156,7 +156,7 @@ Tasks to become `TASKS_READY` before an executable Plan or source edits.
 For every proposed project partition, resolve the branch owner with the bundled
 `scripts/resolve-branch-owner.mjs` against that repository, then derive the
 exact initial Story/Task branch as
-`feature/<branch-owner>.<MMDD>.<短ID>.<描述slug>` and complete the read-only
+`feature/<branch-owner>.<MMDD>.<短ID>.<中文描述>` and complete the read-only
 existence/base checks in [需求开发分支与单次确认](references/branch-checklist.md).
 Record both the normalized owner and its resolution source. If no safe owner
 can be resolved, return `PENDING` instead of inventing or reusing an identity.

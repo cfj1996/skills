@@ -44,12 +44,33 @@ function model() {
 }
 const messages = result => result.errors.map(error => error.message).join('\n');
 
-test('normal workload is discounted once with decimal half-up rounding at evidenced precision', () => {
-  for (const [normal, precision, expected] of [[5, 2, 4], [7.5, 2, 6], [0.15, 2, 0.12], [1.25625, 2, null], [0.1562, 2, 0.12], [0.1563, 2, 0.13], [1.875, 0, 2], [1.2345, 4, 0.9876]]) {
-    if (expected === null) assert.throws(() => estimateHours(normal, precision));
-    else assert.equal(estimateHours(normal, precision), expected);
+test('normal workload is discounted once and half-up rounded to whole hours', () => {
+  for (const [normal, expected] of [[5, 4], [7.5, 6], [3, 2], [0.15, 0], [1.25625, null], [1.8749, 1], [1.875, 2], [1.8751, 2], [1.2345, 1]]) {
+    if (expected === null) assert.throws(() => estimateHours(normal));
+    else assert.equal(estimateHours(normal), expected);
   }
   assert.deepEqual(validateTaskBreakdown(proposal()), { valid: true, errors: [] });
+});
+
+test('field decimal precision never permits fractional final hours in proposals, payloads or Plan bindings', () => {
+  for (const precision of [0, 1, 2, 3, 4]) {
+    const input = proposal();
+    input.fieldBinding.precision = precision;
+    input.tasks[0].estimate.normalHours = 3;
+    input.tasks[0].estimate.parts = [{ label: '开发', hours: 3 }];
+    input.tasks[0].estimate.hours = input.tasks[0].payload.effort = 2;
+    assert.equal(validateTaskReadbacks(input, records(input)).valid, true);
+
+    input.tasks[0].estimate.hours = input.tasks[0].payload.effort = 2.4;
+    assert.match(messages(validateTaskBreakdown(input)), /positive integer/);
+    assert.equal(validateTaskReadbacks(input, records(input)).valid, false);
+    const value = model();
+    value.taskBreakdown = binding(input);
+    assert.equal(validatePagePlanModel(value).valid, false);
+
+    input.tasks[0].estimate.hours = 2;
+    assert.equal(validateTaskBreakdown(input).valid, false);
+  }
 });
 
 test('missing developer, normal effort, basis, components or final effort prevents executable proposals', () => {

@@ -77,9 +77,9 @@ class RequirementDevelopmentFlowTests(unittest.TestCase):
             PLUGIN_ROOT
             / "skills/developing-requirement/references/branch-checklist.md"
         ).read_text()
-        self.assertIn("feature/<branch-owner>.<MMDD>.<短ID>.<描述slug>", skill)
+        self.assertIn("feature/<branch-owner>.<MMDD>.<短ID>.<中文描述>", skill)
         self.assertIn("scripts/resolve-branch-owner.mjs", skill)
-        self.assertIn("feature/alice.0918.1080800.supplier-split-bill-restrictions", branch_rules)
+        self.assertIn("feature/alice.0918.1080800.供应商分账限制", branch_rules)
         self.assertIn("git config user.name", branch_rules)
         self.assertIn("git config user.email", branch_rules)
         self.assertIn("本机用户名", branch_rules)

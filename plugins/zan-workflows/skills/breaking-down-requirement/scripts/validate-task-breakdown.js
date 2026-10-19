@@ -8,7 +8,7 @@ const canonical = value => Array.isArray(value) ? value.map(canonical) : object(
 const equal = (a, b) => JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
 const fingerprintProposal = proposal => createHash('sha256').update(JSON.stringify(canonical(proposal))).digest('hex');
 
-// Fixed-point arithmetic: up to four decimal places, never discount a rounded result.
+// Fixed-point inputs support up to four decimal places; final estimates use whole hours.
 function units(value) {
   if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return null;
   const match = /^(\d+)(?:\.(\d{1,4}))?$/.exec(String(value));
@@ -16,12 +16,12 @@ function units(value) {
   return BigInt(match[1]) * 10000n + BigInt((match[2] || '').padEnd(4, '0'));
 }
 
-function estimateHours(normalHours, precision = 2) {
+function estimateHours(normalHours) {
   const normal = units(normalHours);
-  if (normal === null || !Number.isInteger(precision) || precision < 0 || precision > 4) throw new Error('Invalid normal hours or precision');
-  const numerator = normal * 4n * (10n ** BigInt(precision));
+  if (normal === null) throw new Error('Invalid normal hours');
+  const numerator = normal * 4n;
   const denominator = 50000n;
-  return Number((numerator * 2n + denominator) / (denominator * 2n)) / (10 ** precision);
+  return Number((numerator * 2n + denominator) / (denominator * 2n));
 }
 
 function validateTaskBreakdown(proposal) {
@@ -61,8 +61,8 @@ function validateTaskBreakdown(proposal) {
     check(validParts && units(estimate.normalHours) !== null, `${task.key}: positive normal workload and parts are required`);
     if (validParts && units(estimate.normalHours) !== null) check(parts.reduce((sum, part) => sum + units(part.hours), 0n) === units(estimate.normalHours), `${task.key}: normal workload must equal parts total`);
     check(estimate.factor === 0.8 && text(estimate.basis), `${task.key}: estimate policy validation failed`);
-    check(units(estimate.hours) !== null, `${task.key}: final estimate must be positive`);
-    if (units(estimate.normalHours) !== null && precisionValid) check(estimate.hours === estimateHours(estimate.normalHours, binding.precision), `${task.key}: final estimate calculation is invalid`);
+    check(Number.isSafeInteger(estimate.hours) && estimate.hours > 0, `${task.key}: final estimate must be a positive integer number of hours`);
+    if (units(estimate.normalHours) !== null) check(estimate.hours === estimateHours(estimate.normalHours), `${task.key}: final estimate calculation is invalid`);
     const payload = task.payload || {};
     const stableIdentity = text(payload.description) && (payload.description.includes(`zan-task:${requirement.id}:${task.key}`) || (task.action === 'REUSE' && text(task.linkEvidence)));
     check(payload.name === task.name && stableIdentity, `${task.key}: payload requires approved title and stable description marker or evidenced REUSE identity`);

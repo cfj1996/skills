@@ -5,7 +5,7 @@
 新分支固定为：
 
 ```text
-feature/<branch-owner>.<MMDD>.<短ID>.<描述slug>
+feature/<branch-owner>.<MMDD>.<短ID>.<中文描述>
 ```
 
 - `branch-owner`：为每个目标仓库运行本技能自带的
@@ -16,7 +16,7 @@ feature/<branch-owner>.<MMDD>.<短ID>.<描述slug>
   必须 `PENDING` 并让用户给出分支作者标识，不得猜测或沿用其他人的名字。
 - `MMDD`：生成确认清单当日的 Asia/Shanghai 月日，固定四位；清单确认后日期变化不重算。
 - `短ID`：TAPD 展示短 ID，不使用完整长 ID。
-- `描述slug`：从需求标题提炼的简短小写 ASCII kebab-case，只保留 `a-z`、`0-9` 和单个 `-`，去掉首尾分隔符。
+- `中文描述`：从需求标题提炼的简短中文描述，必须包含中文，不翻译为英文或拼音；可保留必要的英文字母、数字和单个 `-`，移除空白及其余标点，去掉首尾分隔符。生成后使用 `git check-ref-format --branch <完整分支名>` 验证。
 - Story/Task 使用 `feature/`；Bug 不进入本技能，由 `fixing-bug` 处理。
 - `CONTINUE` 必须复用已证实的原始分支，不按当前日期重新生成。
 - 用户显式指定的新分支也必须符合该格式；不符合时在清单中标记待确认，不静默改名。
@@ -24,7 +24,7 @@ feature/<branch-owner>.<MMDD>.<短ID>.<描述slug>
 示例：
 
 ```text
-feature/alice.0918.1080800.supplier-split-bill-restrictions
+feature/alice.0918.1080800.供应商分账限制
 ```
 
 ## 只读预检
@@ -55,7 +55,7 @@ feature/alice.0918.1080800.supplier-split-bill-restrictions
 - intended operation：`PLAN_ONLY|BRANCH_ONLY|IMPLEMENT|SUBMIT|GO_LIVE` 以及实际 `CREATE|USE_EXISTING`；
 - purpose：实现清单内已确认的 Story/Task 范围；
 - source branch/base：精确 `origin/master` ref 与 SHA，或已存在分支 ref/SHA；
-- target branch：精确 `feature/<branch-owner>.<MMDD>.<短ID>.<描述slug>`；
+- target branch：精确 `feature/<branch-owner>.<MMDD>.<短ID>.<中文描述>`；
 - Story/Task 状态：`NOT_APPLICABLE_NON_BUG`，无 TAPD Bug 状态写入。
 - 除 `BRANCH_ONLY` 外，附完整 TAPD 任务拆分表、字段映射、拟写入描述/必填
   字段和 proposal 指纹：逐项展示 CREATE/REUSE/UPDATE、真实旧 ID、项目/模块/

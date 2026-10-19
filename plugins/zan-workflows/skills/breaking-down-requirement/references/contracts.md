@@ -9,7 +9,7 @@
 | --- | --- |
 | `requirement` | `workspaceId`、完整 `id`（均为字符串）、`type=story`；URL 和读取证据可附在对象内 |
 | `scopeFingerprint` | 本次范围、origin/master 基线、功能编号与验收的指纹；变化需重开受影响确认 |
-| `fieldBinding` | `storyField`、`ownerField`、`estimateField`、`unit=hours`、`precision=0..4`、实际字段配置 `evidence`；字段不能相同 |
+| `fieldBinding` | `storyField`、`ownerField`、`estimateField`、`unit=hours`、`precision=0..4`、实际字段配置 `evidence`；字段不能相同；precision 记录字段能力，不改变最终工时取整规则 |
 | `tasks[]` | 下表定义；非空，key 唯一，依赖无环 |
 
 | 任务字段 | 内容 |
@@ -19,7 +19,7 @@
 | `project` / `deliveryUnitKey` / `featureRefs` | 仓库身份、稳定页面/模块键、非空功能编号；编号在交付单元内解析 |
 | `name` / `scope` / `exclusions` | 非空标题和责任范围；排除项数组可以为空 |
 | `owner` | `account`、核实空间成员/可分配身份的 `evidence` |
-| `estimate` | `parts=[{label,hours}]`、`normalHours`、`factor=0.8`、`hours`、`basis`；组成只计算实际开发投入 |
+| `estimate` | `parts=[{label,hours}]`、`normalHours`、`factor=0.8`、`hours`、`basis`；组成只计算实际开发投入；最终 hours 按 1 小时四舍五入且必须为正整数，payload、读回和 Plan 使用同一整数值 |
 | `dependsOn` / `acceptance` | 清单内 key 数组、非空验收数组；外部依赖/假设可另记并进入指纹 |
 | `payload` | 实际创建/更新（或 REUSE 核对）的全部批准字段；含标题 `name`、描述 `description`、已解析父需求/人员/预计工时字段及其它实际必填字段 |
 
