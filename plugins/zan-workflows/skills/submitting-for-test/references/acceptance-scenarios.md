@@ -61,3 +61,16 @@
 
 No scenario creates runtime, recovery, audit-ledger, or generated evidence
 files.
+
+## Shared Wiki delivery
+
+| Scenario | Expected result |
+| --- | --- |
+| One Story/Bug has several projects/branches | One sharedWikiPlan and page, all included Git/deployment gates before its one body write, then per-item links/registration. |
+| First child Task creates the Wiki | Create one page using the parent Story title, write/read back owner anchor before current Task link. |
+| Second child Task or another Bug project submits later | Reuse exact linked page, append current repository/branch entry with fresh body/hash, and link the same ID. |
+| Separate read-only project previews both proposed creation, first project has now delivered | Old second CREATE_CHILD plan blocks; refresh REUSE_EXISTING instead of changing title and creating another page. |
+| Shared same-name branches in different repositories | Exact entryRepoUrl plus original branch selects only the current project; duplicate pair still blocks. |
+| Owner anchor readback fails after page creation | Report actual page creation and failing phase; no current Task comment or later registration and no retry. |
+| Confirmed Task changes parent Story before execute | Expected owner binding blocks all writes. |
+| Repeated complete submission | No new page, no duplicate owner/current Task comments and no unrelated entry changes. |

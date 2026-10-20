@@ -21,6 +21,11 @@ Read [contracts.md](references/contracts.md),
 edge case or regression check. TAPD
 and Wiki reads use `tapd-mcp`; browser automation is not a discovery fallback.
 
+Use [shared-test-wiki.md](../../references/shared-test-wiki.md) for owner
+discovery and multi-project grouping. One Story/Bug has one target; its page
+may contain multiple repository/branch entries. Produce the complete shared
+body, retaining all included projects and their distinct status fields.
+
 ## Inputs
 
 For a standalone call, use the current TAPD work identifier from the request or
@@ -46,7 +51,11 @@ invent a value or render a placeholder.
    [ensure-test-wiki.mjs](../submitting-for-test/scripts/ensure-test-wiki.mjs)
    once without `--execute` to obtain the target, existing body/hash and
    comment-check evidence; creator/body-file are not needed for discovery.
-   It reads the exact TAPD item and comments once. When count is absent,
+   It reads the exact TAPD item and comments once, resolves a Task’s parent
+   Story and, when its anchor is absent, checks exact sibling Tasks for legacy
+   links. Retain `wikiOwner`, ownership evidence and `commentOperations`. A
+   linked owner page may return `APPEND_ENTRY` before the current project’s
+   branch exists; this is a valid read-only draft target. When count is absent,
    continue full pages until a short page; otherwise exhaust the reported
    count. Repeated or inconsistent pages block. Never repeat an identical comment query.
    If a matching 提测 Wiki link exists, reuse its exact ID and readback; read
@@ -79,12 +88,15 @@ invent a value or render a placeholder.
    required. An exact developer name already present in TAPD or the reviewed
    handoff needs no team-roster or GitLab identity lookup; use the identity
    skill only to resolve an actual missing or conflicting mapping.
-5. Use exactly one evidenced original `feature/*` or `fixbug/*` branch. Never
-   use a `merge/*` branch. Use that branch to identify an existing current
-   entry.
-6. For a `FUNCTIONAL_IMPACT` continuation, locate `# 前端`, reuse the matching
-   branch entry, and append the affected scope to that entry's existing
-   `影响范围` list. For a business project, also change `已合并` back to
+5. Each project entry uses exactly one evidenced original `feature/*` or
+   `fixbug/*` branch, paired with its verified repository (`entryRepoUrl`).
+   Never use `merge/*`. The page may contain multiple branches and the same
+   branch name in different repositories; select the entry by repository plus
+   branch, not by a page-wide branch count.
+6. For a `FUNCTIONAL_IMPACT` continuation, locate `# 前端`. If this
+   repository/branch has no entry, append its complete new canonical entry.
+   Otherwise reuse the matching entry and append the affected scope to its
+   existing `影响范围` list. For a business project, also change `已合并` back to
    `未合并` when the new current-round commits are not contained in
    `origin/master`; preserve an existing `未合并`. A new functional submission
    round also resets an existing `待合并` to `未合并`; a non-functional skip
@@ -92,7 +104,7 @@ invent a value or render a placeholder.
    proof. For a tooling project,
    resolve `当前版本` using the channel evidence and minimal legacy-field
    replacement rules in `wiki-template.md`. Missing or conflicting status facts
-   block. Never create a second entry for the same branch. For
+   block. Never create a second entry for the same repository/branch identity. For
    `INITIAL`, render
    a complete body beginning with `# 前端` and sequence `1`, initializing each
    new entry with `是否上线：未合并` for a business project, or

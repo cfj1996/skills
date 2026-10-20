@@ -95,6 +95,12 @@ and records `SKIPPED_BY_INTENT`. Exact metadata-only lookup to evidence a
 STANDARD Wiki's missing canonical Job URL is allowed; it is not deployment
 evidence and cannot imply published parameters or versions.
 
+For Wiki operations, apply [shared-test-wiki.md](../../../references/shared-test-wiki.md).
+Require one target per Story (including its Tasks) or Bug, a complete combined
+body with repository+branch entry identities, owner relationship/readback and
+all owner/Task comment targets. Reject per-Task/per-project pages unless the
+user explicitly requested a separate split plan. In a shared batch, every
+included project must pass Git/deployment before the one page write.
 For Wiki operations, require the TAPD workspace from the current work item.
 Require `tool_route=tapd-mcp` for every Wiki, TAPD comment, TAPD status and
 test-version operation.

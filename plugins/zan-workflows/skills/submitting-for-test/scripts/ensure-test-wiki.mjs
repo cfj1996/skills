@@ -7,6 +7,7 @@ import { resolve } from 'node:path';
 
 import { StdioMcpClient } from '../../../scripts/mcp-client.mjs';
 import { wikiEntry } from '../../../scripts/wiki-entry.mjs';
+import { repositoryKey } from '../../../scripts/workflow-runtime.mjs';
 export { StdioMcpClient } from '../../../scripts/mcp-client.mjs';
 const DEFAULT_ROOT_WIKI_ID = '1150372234001008260';
 const DEFAULT_WORKSPACE_ID = 50372234;
@@ -19,7 +20,7 @@ export function parseArgs(argv) {
     '--creator', '--comment-author', '--body-file', '--wiki-title',
     '--month', '--root-wiki-id', '--expect-target', '--expected-month-id',
     '--expected-wiki-id', '--expected-body-sha256', '--mode', '--entry-heading', '--entry-repo-url',
-    '--execute', '--json',
+    '--expected-owner-type', '--expected-owner-id', '--execute', '--json',
   ]);
   for (let i = 0; i < argv.length; i++) {
     const key = argv[i];
@@ -67,7 +68,7 @@ export function parseArgs(argv) {
       !['REUSE_EXISTING', 'CREATE_CHILD', 'CREATE_MONTH_AND_CHILD'].includes(values['--expect-target'])) {
     throw new Error('expect-target 必须是 REUSE_EXISTING、CREATE_CHILD 或 CREATE_MONTH_AND_CHILD');
   }
-  for (const key of ['--expected-month-id', '--expected-wiki-id']) {
+  for (const key of ['--expected-month-id', '--expected-wiki-id', '--expected-owner-id']) {
     if (values[key] && !/^\d+$/.test(values[key])) throw new Error(`${key} 必须是数字`);
   }
   if (values['--expected-body-sha256'] && !/^[a-f\d]{64}$/i.test(values['--expected-body-sha256'])) {
@@ -80,10 +81,8 @@ export function parseArgs(argv) {
     throw new Error('link 模式必须指定 --expected-wiki-id，且不能提供 --body-file');
   }
   if (values['--mode'] === 'update' && !values['--expected-wiki-id']) throw new Error('update 模式必须指定 --expected-wiki-id');
-  if ((values['--entry-heading'] || values['--entry-repo-url']) &&
-      (values['--mode'] !== 'update' || !values['--entry-heading'] || !values['--entry-repo-url'])) {
-    throw new Error('项目条目标题和仓库必须成对提供，且仅用于 update 模式');
-  }
+  validateSelectors({ entryHeading: values['--entry-heading'], entryRepoUrl: values['--entry-repo-url'],
+    expectedOwnerType: values['--expected-owner-type'], expectedOwnerId: values['--expected-owner-id'] });
   return {
     workspaceId: Number(values['--workspace-id']),
     entryType: values['--entry-type'],
@@ -100,7 +99,8 @@ export function parseArgs(argv) {
     expectedWikiId: values['--expected-wiki-id'],
     expectedBodySha256: values['--expected-body-sha256']?.toLowerCase(),
     mode: values['--mode'] || 'ensure',
-    ...(values['--entry-heading'] ? { entryHeading: values['--entry-heading'], entryRepoUrl: values['--entry-repo-url'] } : {}),
+    entryHeading: values['--entry-heading'], entryRepoUrl: values['--entry-repo-url'],
+    expectedOwnerType: values['--expected-owner-type'], expectedOwnerId: values['--expected-owner-id'],
     execute: Boolean(values['--execute']),
     json: Boolean(values['--json']),
   };
@@ -284,10 +284,99 @@ function branchEntryCount(body, sourceBranch, selector) {
     wikiEntry(body, { entryHeading: selector.entryHeading, sourceBranch, originUrl: selector.entryRepoUrl });
     return 1;
   }
+  if (selector?.entryRepoUrl) {
+    const repo = repositoryKey(selector.entryRepoUrl);
+    // Only canonical project entries count; fenced examples and scope sublists do not.
+    let fence;
+    const lines = String(body || '').split(/\r?\n/).map(line => {
+      const match = line.match(/^\s*(`{3,}|~{3,})/);
+      if (match) {
+        if (!fence) fence = match[1];
+        else if (match[1][0] === fence[0] && match[1].length >= fence.length) fence = undefined;
+        return '';
+      }
+      return fence ? '' : line;
+    });
+    const starts = lines.flatMap((line, i) => /^[1-9]\d*[.、]\s*\S/.test(line) ? [i] : []);
+    return starts.filter(start => {
+      let end = lines.findIndex((line, i) => i > start && /^(?:[1-9]\d*[.、]\s*\S|#{1,6}\s)/.test(line));
+      if (end < 0) end = lines.length;
+      const entry = lines.slice(start, end).join('\n');
+      const branches = [...entry.matchAll(/^\s*-\s*代码分支名\s*[:：]\s*(\S+)\s*$/gm)];
+      const repos = [...entry.matchAll(/^\s*-\s*项目名称\s*[:：]\s*\[[^\]]+\]\(([^)]+)\)/gm)];
+      const matchesRepo = repos.some(match => repositoryKey(match[1]) === repo);
+      if (!matchesRepo) return false;
+      if (branches.length > 1 && branches.some(match => match[1] === sourceBranch)) {
+        throw new Error('Wiki 项目条目包含重复的原分支字段');
+      }
+      return branches.length === 1 && branches[0][1] === sourceBranch;
+    }).length;
+  }
   return String(body || '').split(/\r?\n/).filter(line => {
     const match = line.match(/^\s*-\s*代码分支名\s*[:：]\s*(\S+)\s*$/);
     return match?.[1] === sourceBranch;
   }).length;
+}
+
+function validateSelectors(input) {
+  if (input.entryHeading && !input.entryRepoUrl) throw new Error('项目条目标题必须同时提供仓库');
+  if (input.entryRepoUrl) repositoryKey(input.entryRepoUrl);
+  if ((input.expectedOwnerType || input.expectedOwnerId) &&
+      (!['stories', 'tasks', 'bug'].includes(input.expectedOwnerType) || !/^\d+$/.test(String(input.expectedOwnerId || '')))) {
+    throw new Error('Wiki 归属必须成对提供准确的类型和 ID');
+  }
+}
+
+async function readWork(call, workspaceId, entryType, entryId) {
+  const tool = entryType === 'bug' ? 'get_bug' : 'get_stories_or_tasks';
+  const kind = entryType === 'bug' ? 'Bug' : entryType === 'tasks' ? 'Task' : 'Story';
+  const options = { id: entryId, limit: 1, fields: entryType === 'bug' ? 'id,title,description'
+    : `id,name,description${entryType === 'tasks' ? ',story_id' : ''}` };
+  if (entryType !== 'bug') options.entity_type = entryType;
+  const result = await call(tool, { workspace_id: workspaceId, options });
+  const item = checkedRecords(result, kind, tool).find(row => String(row.id) === String(entryId));
+  if (!item) throw new Error(`TAPD ${entryType} ${entryId} 不存在`);
+  if (entryType === 'tasks' && !/^\d+$/.test(String(item.story_id ?? ''))) {
+    throw new Error('Task 缺少可验证的 story_id，不能确定共用 Wiki 归属');
+  }
+  return { entryType, entryId: String(entryId), item };
+}
+
+async function workWithComments(call, workspaceId, entryType, entryId) {
+  const [work, comments] = await Promise.all([
+    readWork(call, workspaceId, entryType, entryId), listAllComments(call, workspaceId, entryType, entryId),
+  ]);
+  return { ...work, comments };
+}
+
+function workWikiIds(work, workspaceId) {
+  return wikiIdsFromComments([{ description: work.item.description }, ...work.comments], workspaceId);
+}
+
+async function siblingWorks(call, workspaceId, storyId, current) {
+  const rows = [], seen = new Set();
+  for (let page = 1; page <= 20; page++) {
+    const result = await call('get_stories_or_tasks', { workspace_id: workspaceId,
+      options: { entity_type: 'tasks', story_id: storyId, page, limit: PAGE_SIZE,
+        fields: 'id,name,description,story_id', order: 'id ASC' } });
+    const batch = checkedRecords(result, 'Task', 'get_stories_or_tasks');
+    for (const row of batch) {
+      if (!row.id || seen.has(String(row.id)) || String(row.story_id) !== storyId) {
+        throw new Error('同需求 Task 分页重复、缺少 ID 或父需求不一致');
+      }
+      seen.add(String(row.id)); rows.push(row);
+    }
+    const count = totalCount(result);
+    if (count !== undefined && (count < rows.length || (batch.length < PAGE_SIZE && count > rows.length))) {
+      throw new Error('同需求 Task 数量与分页结果不一致');
+    }
+    if (count !== undefined ? rows.length >= count : batch.length < PAGE_SIZE) {
+      return Promise.all(rows.filter(row => current.entryType !== 'tasks' || String(row.id) !== current.entryId)
+        .map(async item => ({ entryType: 'tasks', entryId: String(item.id), item,
+          comments: await listAllComments(call, workspaceId, 'tasks', String(item.id)) })));
+    }
+  }
+  throw new Error('同需求 Task 超过 20 页，停止自动选择 Wiki');
 }
 
 function wikiUrl(workspaceId, wikiId) {
@@ -323,29 +412,31 @@ export async function ensureTestWiki(call, input, now = new Date()) {
     throw new Error('link 模式必须指定 --expected-wiki-id，且不能提供 --body-file');
   }
   if (mode === 'update' && !input.expectedWikiId) throw new Error('update 模式必须指定 --expected-wiki-id');
-  if ((input.entryHeading || input.entryRepoUrl) && (mode !== 'update' || !input.entryHeading || !input.entryRepoUrl)) {
-    throw new Error('项目条目标题和仓库必须成对提供，且仅用于 update 模式');
-  }
-  const itemTool = entryType === 'bug' ? 'get_bug' : 'get_stories_or_tasks';
-  const itemOptions = entryType === 'bug'
-    ? { id: entryId, limit: 1, fields: 'id,title,description' }
-    : { entity_type: entryType, id: entryId, limit: 1, fields: 'id,name,description' };
-  const [itemResult, comments, approvedBody, boundWiki] = await Promise.all([
-    mode === 'update' ? undefined : call(itemTool, { workspace_id: workspaceId, options: itemOptions }),
-    mode === 'update' ? [] : listAllComments(call, workspaceId, entryType, entryId),
+  validateSelectors(input);
+  const [current, approvedBody, boundWiki] = await Promise.all([
+    mode === 'update' ? { entryType, entryId: String(entryId), item: { id: entryId }, comments: [] }
+      : workWithComments(call, workspaceId, entryType, entryId),
     input.bodyFile ? readFile(input.bodyFile, 'utf8') : undefined,
     input.expectedWikiId ? wikiById(call, workspaceId, input.expectedWikiId) : undefined,
   ]);
-  const itemKind = entryType === 'bug' ? 'Bug' : entryType === 'tasks' ? 'Task' : 'Story';
-  const item = mode === 'update' ? { id: entryId }
-    : checkedRecords(itemResult, itemKind, itemTool).find(row => String(row.id) === String(entryId));
-  if (!item) throw new Error(`TAPD ${entryType} ${entryId} 不存在`);
+  const { comments, item } = current;
+  // Story owns all its Tasks; a Bug always owns its own cross-project submission.
+  const owner = mode !== 'update' && entryType === 'tasks' && String(item.story_id) !== '0'
+    ? await workWithComments(call, workspaceId, 'stories', String(item.story_id)) : current;
+  const wikiOwner = { entryType: owner.entryType, entryId: owner.entryId };
+  if (input.expectedOwnerId && (input.expectedOwnerType !== wikiOwner.entryType ||
+      String(input.expectedOwnerId) !== wikiOwner.entryId)) throw new Error('Wiki 归属与确认计划不一致');
+  const ownerIds = workWikiIds(owner, workspaceId);
+  const related = [owner, ...(owner === current ? [] : [current])];
+  // Old submissions may only be linked from a sibling Task. Never create another
+  // page just because the current Task or parent has no comment yet.
+  if (mode === 'ensure' && owner.entryType === 'stories' && ownerIds.length === 0) {
+    related.push(...await siblingWorks(call, workspaceId, owner.entryId, current));
+  }
   const commentIds = wikiIdsFromComments(comments, workspaceId);
   const detailIds = wikiIdsFromComments([{ description: item.description }], workspaceId);
-  const linkedIds = [...new Set([
-    ...detailIds, ...commentIds,
-  ])];
-  if (linkedIds.length > 1) throw new Error('详情或评论存在多个不同的提测 Wiki 链接，停止自动选择');
+  const linkedIds = [...new Set(related.flatMap(work => workWikiIds(work, workspaceId)))];
+  if (linkedIds.length > 1) throw new Error('同一需求或 Bug 的详情或评论存在多个不同的提测 Wiki 链接，停止自动选择');
   if (input.expectedWikiId && linkedIds.length && linkedIds[0] !== String(input.expectedWikiId)) {
     throw new Error('当前 Wiki ID 与确认计划不一致');
   }
@@ -353,7 +444,7 @@ export async function ensureTestWiki(call, input, now = new Date()) {
   const month = input.month || date.month;
   const rootWikiId = input.rootWikiId ||
     (workspaceId === DEFAULT_WORKSPACE_ID ? DEFAULT_ROOT_WIKI_ID : undefined);
-  const title = input.wikiTitle || `${date.day}: ${item.name || item.title}`;
+  const title = input.wikiTitle || `${date.day}: ${owner.item.name || owner.item.title}`;
   let child = boundWiki || (linkedIds.length ? await wikiById(call, workspaceId, linkedIds[0]) : undefined);
   let monthWiki;
   if (!child) {
@@ -366,7 +457,12 @@ export async function ensureTestWiki(call, input, now = new Date()) {
     }
     child = monthWiki && await wikiByName(call, workspaceId, title, monthWiki.id);
   }
+  if (!child && owner !== current && input.wikiTitle &&
+      input.wikiTitle.replace(/^\d{2}-\d{2}: /, '') !== (owner.item.name || owner.item.title)) {
+    throw new Error('同需求 Task 创建必须使用父 Story 标题，不能按项目或 Task 分开创建 Wiki');
+  }
   if (child) {
+    if (typeof child.markdown_description !== 'string') throw new Error('已有 Wiki 缺少可验证的 Markdown 正文');
     if (String(child.id) === String(rootWikiId) || /^\d{4}-\d{2}$/.test(child.name)) {
       throw new Error('Wiki 目标是根页或月份目录，不能作为提测子页');
     }
@@ -377,8 +473,9 @@ export async function ensureTestWiki(call, input, now = new Date()) {
     if (branchEntryCount(child.markdown_description, sourceBranch, input) > 1) {
       throw new Error('已有 Wiki 存在重复的原分支条目，停止自动补充');
     }
-    // A linked work item may add a new branch entry to its existing shared Wiki.
-    if (!(mode === 'ensure' && approvedBody !== undefined && linkedIds.includes(String(child.id)))) {
+    // A verified owner link establishes page ownership even before this project's
+    // branch entry exists. Read-only discovery must allow drafting that addition.
+    if (!(mode === 'ensure' && linkedIds.includes(String(child.id)))) {
       assertBranch(child, sourceBranch, input);
     }
   }
@@ -386,6 +483,19 @@ export async function ensureTestWiki(call, input, now = new Date()) {
     throw new Error('Wiki 正文必须非空并且只有一个准确的“代码分支名：<原分支>”行');
   }
   const target = child ? 'REUSE_EXISTING' : monthWiki ? 'CREATE_CHILD' : 'CREATE_MONTH_AND_CHILD';
+  const entryOperation = child && branchEntryCount(child.markdown_description, sourceBranch, input) === 0
+    ? 'APPEND_ENTRY' : child ? 'REUSE_ENTRY' : 'NEW_PAGE';
+  if (execute && mode === 'ensure' && entryOperation === 'APPEND_ENTRY' && approvedBody === undefined) {
+    throw new Error('共用 Wiki 尚无当前项目分支条目；必须先预览并确认追加后的完整正文');
+  }
+  if (mode === 'ensure' && entryOperation === 'APPEND_ENTRY' && approvedBody !== undefined) {
+    const before = child.markdown_description;
+    let prefix = 0;
+    while (prefix < before.length && before[prefix] === approvedBody[prefix]) prefix++;
+    if (approvedBody.length <= before.length || !approvedBody.endsWith(before.slice(prefix))) {
+      throw new Error('追加项目条目必须保留已有 Wiki 全部正文，只允许在一个位置插入新条目');
+    }
+  }
   if (input.expectTarget && input.expectTarget !== target) {
     throw new Error(`Wiki 目标动作变为 ${target}，与确认计划不一致`);
   }
@@ -393,30 +503,41 @@ export async function ensureTestWiki(call, input, now = new Date()) {
   if (child && typeof beforeBody !== 'string') throw new Error('已有 Wiki 缺少可验证的 Markdown 正文');
   const beforeBodySha256 = child ? contentHash(beforeBody) : null;
   const wikiOperation = child ? (approvedBody !== undefined && approvedBody !== beforeBody ? 'UPDATE' : 'NONE') : 'CREATE';
-  const commentOperation = mode === 'update' || (child && commentIds.includes(String(child.id))) ? 'NONE' : 'CREATE';
+  const linkTargets = mode === 'update' ? [] : mode === 'link' ? [current]
+    : [owner, ...(owner === current ? [] : [current])];
+  const commentOperations = linkTargets.map(work => ({ entryType: work.entryType, entryId: work.entryId,
+    operation: child && wikiIdsFromComments(work.comments, workspaceId).includes(String(child.id)) ? 'NONE' : 'CREATE' }));
+  const commentOperation = commentOperations.some(link => link.operation === 'CREATE') ? 'CREATE' : 'NONE';
   const noWrite = wikiOperation === 'NONE' && commentOperation === 'NONE';
   if (input.expectedBodySha256 && input.expectedBodySha256.toLowerCase() !== beforeBodySha256 &&
       !(noWrite && approvedBody === beforeBody)) {
     throw new Error('Wiki 原正文已变化，与确认计划的 SHA-256 不一致');
   }
   const plan = {
-    workspaceId, entryType, entryId, sourceBranch,
+    workspaceId, entryType, entryId, sourceBranch, wikiOwner,
+    ownershipEvidence: related.map(work => ({ entryType: work.entryType, entryId: work.entryId,
+      storyId: work.item.story_id == null ? null : String(work.item.story_id),
+      wikiIds: workWikiIds(work, workspaceId) })),
     target, month: child ? input.month || null : month,
     rootWikiId: child ? null : String(rootWikiId),
     monthWikiId: child ? String(child.parent_wiki_id) : monthWiki ? String(monthWiki.id) : null,
     wikiId: child ? String(child.id) : null, wikiUrl: child ? wikiUrl(workspaceId, child.id) : null,
     wikiTitle: child ? child.name : title,
-    beforeBody, beforeBodySha256, wikiOperation, commentOperation,
+    beforeBody, beforeBodySha256, wikiOperation, entryOperation, commentOperation, commentOperations,
     commentEvidence: { checked: mode !== 'update', checkedCount: comments.length, wikiIds: commentIds, detailWikiIds: detailIds },
     comment: mode === 'update' ? null : child ? commentBody(workspaceId, child.id) : '创建后用实际 Wiki ID 生成链接',
   };
   if (!execute) return {
-    ...plan, state: mode === 'update' && wikiOperation === 'NONE' ? 'UNCHANGED'
+    ...plan, state: entryOperation === 'APPEND_ENTRY' ? 'PLANNED_APPEND_ENTRY'
+      : mode === 'update' && wikiOperation === 'NONE' ? 'UNCHANGED'
       : wikiOperation === 'UPDATE' ? 'PLANNED_UPDATE'
       : child ? (noWrite ? 'ALREADY_LINKED' : 'PLANNED_LINK')
         : monthWiki ? 'PLANNED_CREATE_CHILD' : 'PLANNED_CREATE_MONTH_AND_CHILD', writes: 0,
   };
   if (!noWrite) {
+    if (mode === 'ensure' && owner !== current && (!input.expectedOwnerId || !input.expectedOwnerType)) {
+      throw new Error('Task 写入前必须固定确认计划中的 --expected-owner-type 和 --expected-owner-id');
+    }
     if (!input.expectTarget) throw new Error('写入前必须提供确认计划中的 --expect-target');
     if (child && (!input.expectedWikiId || !input.expectedBodySha256 || !input.expectedMonthId || !input.wikiTitle)) {
       throw new Error('已有 Wiki 写入必须提供 --expected-wiki-id、--expected-body-sha256、--expected-month-id 和 --wiki-title');
@@ -431,7 +552,7 @@ export async function ensureTestWiki(call, input, now = new Date()) {
   }
 
   const result = {
-    workspaceId, entryType, entryId, sourceBranch,
+    workspaceId, entryType, entryId, sourceBranch, wikiOwner, entryOperation, links: [],
     target, wikiId: child ? String(child.id) : null, wikiTitle: child ? child.name : title,
     wikiUrl: child ? wikiUrl(workspaceId, child.id) : undefined,
     monthWikiId: plan.monthWikiId, wikiState: child ? 'UNCHANGED' : 'NOT_CREATED',
@@ -482,33 +603,41 @@ export async function ensureTestWiki(call, input, now = new Date()) {
     result.wikiUrl = wikiUrl(workspaceId, child.id);
     result.bodySha256 = contentHash(child.markdown_description);
     if (mode === 'update') return { ...result, state: result.wikiState };
-    phase = 'CHECK_COMMENT';
-    // The initial parallel reads are fresh for comment-only work. Refresh after Wiki writes.
-    const latestComments = wikiOperation === 'NONE' ? comments
-      : await listAllComments(call, workspaceId, entryType, entryId);
-    const latestIds = wikiIdsFromComments(latestComments, workspaceId);
-    result.commentEvidence = { checkedCount: latestComments.length, wikiIds: latestIds, detailWikiIds: detailIds };
-    if (latestIds.length > 1 || (latestIds.length === 1 && latestIds[0] !== String(child.id))) {
-      throw new Error('发现另一条提测 Wiki 评论；保留已完成的 Wiki 操作，不写冲突评论');
+    for (const work of linkTargets) {
+      phase = 'CHECK_COMMENT';
+      // Owner first: its durable link makes subsequent projects discover this page.
+      // Always refresh a separate parent at its comment boundary, including when
+      // the Wiki body is unchanged and only the Task comment is missing.
+      const latestComments = wikiOperation === 'NONE' && owner === current ? work.comments
+        : await listAllComments(call, workspaceId, work.entryType, work.entryId);
+      const latestIds = wikiIdsFromComments(latestComments, workspaceId);
+      if (latestIds.length > 1 || (latestIds.length === 1 && latestIds[0] !== String(child.id))) {
+        throw new Error('发现另一条提测 Wiki 评论；保留已完成的 Wiki 操作，不写冲突评论');
+      }
+      if (latestIds.length === 1) {
+        result.links.push({ entryType: work.entryType, entryId: work.entryId, state: 'ALREADY_LINKED' });
+        continue;
+      }
+      phase = 'LINK_COMMENT';
+      const payload = commentBody(workspaceId, child.id);
+      result.commentState = 'UNKNOWN';
+      assertSuccess(await call('create_comments', {
+        workspace_id: workspaceId,
+        options: { entry_type: work.entryType, entry_id: work.entryId,
+          author: input.commentAuthor || input.creator, description: payload },
+      }), 'create_comments');
+      result.writes++;
+      phase = 'READ_COMMENT';
+      const readback = await listAllComments(call, workspaceId, work.entryType, work.entryId);
+      const readbackIds = wikiIdsFromComments(readback, workspaceId);
+      result.commentEvidence = { checkedCount: readback.length, wikiIds: readbackIds, detailWikiIds: detailIds };
+      if (readbackIds.length !== 1 || readbackIds[0] !== String(child.id)) {
+        throw new Error('评论读回缺少目标链接或出现冲突；不要盲目重试');
+      }
+      result.links.push({ entryType: work.entryType, entryId: work.entryId, state: 'LINKED' });
     }
-    if (latestIds.length === 1) return { ...result, state: 'ALREADY_LINKED', commentState: 'ALREADY_LINKED' };
-    phase = 'LINK_COMMENT';
-    const payload = commentBody(workspaceId, child.id);
-    result.commentState = 'UNKNOWN';
-    assertSuccess(await call('create_comments', {
-      workspace_id: workspaceId,
-      options: { entry_type: entryType, entry_id: entryId,
-        author: input.commentAuthor || input.creator, description: payload },
-    }), 'create_comments');
-    result.writes++;
-    phase = 'READ_COMMENT';
-    const readback = await listAllComments(call, workspaceId, entryType, entryId);
-    const readbackIds = wikiIdsFromComments(readback, workspaceId);
-    result.commentEvidence = { checkedCount: readback.length, wikiIds: readbackIds, detailWikiIds: detailIds };
-    if (readbackIds.length !== 1 || readbackIds[0] !== String(child.id)) {
-      throw new Error('评论读回缺少目标链接或出现冲突；不要盲目重试');
-    }
-    return { ...result, state: 'LINKED', commentState: 'LINKED', comment: payload };
+    const state = result.links.some(link => link.state === 'LINKED') ? 'LINKED' : 'ALREADY_LINKED';
+    return { ...result, state, commentState: state, comment: commentBody(workspaceId, child.id) };
   } catch (error) {
     error.result = { ...result, state: 'BLOCKED', phase, error: error.message };
     throw error;

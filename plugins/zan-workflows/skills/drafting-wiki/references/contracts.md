@@ -11,6 +11,7 @@
 | Claims | resolved value and read-only source for each material field |
 | Conflicts | competing values, sources, criticality |
 | Deployment context | Resolved `DEPLOY|SKIP`; a standalone Wiki-only request uses `SKIP` for parameter requirements. |
+| Shared ownership | owner Story/Bug type/ID/workspace, Task parent readback, ownership discovery evidence, included repository/branch entries, one target/body and all owner/Task comment targets; see [shared-test-wiki.md](../../../references/shared-test-wiki.md) |
 | Current entry | sequence, Jenkins Job name/URL, selected build/release parameter names and values (only already-evidenced selections required under `SKIP`), project name, project category/service type, repository, developer, description, branch, scope, tester, business merge status or tooling current-version channel and release evidence |
 | Work mode | `INITIAL|CONTINUE`, impact classification, and incremental-scope evidence when continuing |
 | Wiki decision | `UPDATE|SKIP_NON_FUNCTIONAL` and normalized reason |
@@ -31,7 +32,7 @@
   unfiltered Wiki list or repeat unchanged queries to prove absence.
 - The `提测文档` root Wiki ID is `1150372234001008260`. Use the submission date
   in `Asia/Shanghai`: the month title is `YYYY-MM`, and the child title is
-  `MM-DD: {任务标题中文简述}`. A missing
+  `MM-DD: {归属需求或Bug标题}`. A missing
   month yields `CREATE_MONTH_AND_CHILD`; an existing month without a related
   child yields `CREATE_CHILD`.
 - Any linked or exact-title existing child must be read and reused. An inaccessible
@@ -79,8 +80,9 @@
   unless a newer release changes the channel under the verified-readback or
   conditional `DEPLOY` rule in `wiki-template.md`. Do
   not create a duplicate entry or duplicate an identical scope already listed.
-- The effective branch must be exactly one evidenced `feature/*` or `fixbug/*`
-  source branch.
+- Each entry has exactly one evidenced `feature/*` or `fixbug/*` source branch.
+  The whole page may contain multiple branches; select entries by repository
+  plus branch. Same branch names across repositories are not duplicate entries.
 - A newly created child starts with `# 前端` and sequence `1`. A new entry under
   an existing empty `# 前端` also uses sequence `1`; otherwise it uses the
   greatest existing canonical top-level entry sequence plus one. A missing

@@ -55,19 +55,26 @@ change or conflict gets its own exact plan; no history rewrite or duplicate MR.
 
 ## Standard Wiki
 
+Apply [shared-test-wiki.md](../../../references/shared-test-wiki.md): default
+to one owner Story/Bug page across projects, branches and child Tasks. One
+shared body/target is planned for a batch; project plans cannot silently split
+it into Task-titled pages. Preserve separate repository/branch entries.
+
 Give current work handoffs—not a user-supplied Wiki URL—to
 `zan-workflows:drafting-wiki`. Require `terminal_state=VALIDATED` and one target
 plan, or `terminal_state=SKIPPED_BY_POLICY` with
 `skip_reason=NON_FUNCTIONAL_CONTINUE` and no Wiki operation. Discovery order is
 mandatory for the validated path:
 
-1. Read the exact TAPD item and comments once, including detail-only 提测 Wiki
+1. Resolve the common owner and check its/current-item links; when the Story
+   has no link, check its exact child Tasks and their comments as described in
+   the shared rule. Read the exact TAPD item and comments once, including detail-only 提测 Wiki
    links. If count is absent, continue full comment pages until a short page;
    with count, require the complete reported set. Repeated/inconsistent pages
    block. Reuse a matching linked Wiki ID immediately, including older months.
 2. Otherwise query `get_wiki(name=YYYY-MM)` and select the result whose
    returned `parent_wiki_id` is root `1150372234001008260`.
-3. Query the deterministic child title once and compare returned parent IDs.
+3. Query the owner-based deterministic child title once and compare returned parent IDs.
    Reuse the unique matching child or plan `MM-DD: 中文简述` creation. Never pass
    unsupported `parent_wiki_id` to `get_wiki`, list all Wiki pages, or repeat
    an unchanged query with a different page size/order.
@@ -165,6 +172,11 @@ Immediately read back every created/updated page. A create response without a
 real Wiki ID, a parent mismatch, or a body readback mismatch blocks all later
 Wiki comments, TAPD status changes, and test-version writes.
 
+Task ensure bundles write/read back the owner anchor first, then the originating
+Task link, with both exact targets displayed in `commentOperations`. Bind the
+preview `wikiOwner` using `--expected-owner-type` and `--expected-owner-id`, and
+select a shared-page entry with `--entry-repo-url` plus the original branch.
+Independent `--mode link` still writes only the originating item comment.
 The helper writes or verifies exactly:
 
 ```text

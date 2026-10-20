@@ -15,7 +15,12 @@ or changes TAPD, a Wiki, Git, an MR, source files, deployments, or local state.
 
 Validate these invariants in order:
 
-1. The result has exactly one target plan:
+1. Apply [shared-test-wiki.md](../../../references/shared-test-wiki.md). The
+   owner Story/Bug and its participating Tasks/projects share one page unless
+   the user explicitly requested splitting. Check owner/Task relationship,
+   related link evidence, repository+branch entry identities, combined body
+   and all planned comment targets. A linked owner page need not already
+   contain the new project/branch during discovery. The result has exactly one target plan:
    `REUSE_EXISTING|CREATE_CHILD|CREATE_MONTH_AND_CHILD`. TAPD details, all
    historical-comment pages (with a short-page fallback when count is absent)
    were checked first. A complete helper preview is valid read-only discovery
@@ -56,7 +61,7 @@ Validate these invariants in order:
 4. For `REUSE_EXISTING`, the current child body/hash is present and placement
    matches its visible `# 前端`: a missing or empty section creates sequence
    `1`; a distinct entry uses the greatest canonical top-level sequence plus
-   one; one branch match receives an impact-scope patch and no new sequence. For a
+   one; one repository+branch match receives an impact-scope patch and no new sequence. For a
    create plan, `before_content_hash=NEW_PAGE` and the complete body begins with
    `# 前端` and sequence `1`. The monthly parent never receives the entry body.
    Under `CONTINUE`, one matching source-branch entry receives the current

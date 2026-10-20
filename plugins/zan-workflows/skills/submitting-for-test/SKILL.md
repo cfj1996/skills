@@ -48,6 +48,15 @@ history do not need another read. Batch independent read-only checks, then
 stop on the first actual mismatch. Never rerun the full Wiki discovery after
 the exact target was identified in `PLAN`.
 
+## Shared Wiki ownership
+
+Follow [shared-test-wiki.md](../../references/shared-test-wiki.md). One Story
+(including its Tasks) or Bug defaults to one Wiki across projects and original
+branches. Carry one `sharedWikiPlan` through PLAN/EXECUTE; per-project Git and
+deployment plans do not imply separate pages. No Task-title split is permitted
+without an explicit user request. Bind owner, repository/branch entries and
+all owner/Task comment targets in the consolidated plan.
+
 ## Input gate
 
 Require:
@@ -138,7 +147,12 @@ business source.
    `STANDARD` only when the drafter returned `VALIDATED`. For creation,
    functional `CONTINUE` supplementation, or unchanged reuse, run
    [ensure-test-wiki.mjs](scripts/ensure-test-wiki.mjs) once with the exact
-   item, original branch and approved complete body file. Copy the confirmed
+   item, `entryRepoUrl`, original branch and approved complete shared body file.
+   Copy preview `wikiOwner` into `expectedOwnerType/expectedOwnerId` for a Task,
+   and confirm every returned `commentOperations` target, including its parent
+   Story anchor. For a multi-project batch, finish all included Git/deployment
+   gates before writing the page once; then link each delivered Task to that
+   exact ID/hash without another page write. Copy the confirmed
    target into `--expect-target`; for an existing Wiki pass its exact
    `--expected-wiki-id`, `--expected-month-id`, approved title and
    `--expected-body-sha256`; for creation pass the fixed `--month`, title,

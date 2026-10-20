@@ -18,6 +18,12 @@ Read [contracts.md](references/contracts.md), [workflow.md](references/workflow.
 [acceptance-scenarios.md](references/acceptance-scenarios.md), and the shared
 [tool-routing policy](../../references/tool-routing.md) before acting.
 
+Follow [shared-test-wiki.md](../../references/shared-test-wiki.md) for submission:
+one Bug defaults to one Wiki across all involved projects and original branches,
+with separate repository/branch entries. Different Bugs are not grouped merely
+because they share a branch or related Story. Carry the common owner, combined
+body, all project gates and exact links into one confirmed `sharedWikiPlan`.
+
 ## Inputs
 
 Accept:

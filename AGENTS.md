@@ -26,6 +26,11 @@ The `npx` command fetches TAPD data for workflow execution. Run Git commands fro
 The registration checks also cover waiting-test owner selection (`te` before
 `reporter`), assignment drift and partial owner readback, without real TAPD writes.
 
+For shared Story/Bug Wiki ownership, sibling Task discovery, cross-repository
+same-name branches, body-less append previews and idempotent links, run
+`node --test plugins/zan-workflows/tests/shared-test-wiki.test.mjs`. These tests
+simulate TAPD and workflow sessions with no external writes.
+
 For manual merge permission handoff and read-only continuation checks, run
 `node --test plugins/zan-workflows/tests/manual-merge.test.mjs`. These tests
 simulate GitLab and workflow sessions, with no external writes.

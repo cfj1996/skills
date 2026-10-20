@@ -17,6 +17,7 @@ complete visible `SubmissionPlan`, bound-fact fingerprint, exact
 | Authorization | one consolidated plan/confirmation, bound facts, deterministic derived values, and any reauthorization reason |
 | Git delivery | original source branch, target `develop`, current-round commits, commit/push/MR/merge results, develop containment |
 | Deployment | `DEPLOYED|SKIPPED_BY_INTENT|FAILED|UNKNOWN|NOT_ATTEMPTED`, Jenkins job/environment/ref/version/channel/purpose and trigger/readback evidence when applicable |
+| Shared Wiki | `sharedWikiPlan`, `wikiOwner` (workspace/type/ID), owner/Task relationship readback, one target per Story/Bug, repository+branch entry identities, complete combined body/hash, all comment targets and included project gates; same final page ID in every participating result |
 | Wiki | `WRITTEN|SKIPPED_BY_POLICY|BLOCKED|NOT_ATTEMPTED`, auto-resolved target plan when written or retained for `going-live`, hierarchy evidence, create/update authorizations and readbacks when written, actual final child ID/URL and source-branch identity when available, business merge-status or tooling current-version/channel readback, and final body when applicable |
 | TAPD | exact status action, waiting-test owner and source (`te` or `reporter`) for Bug transitions, owner write/readback result, exact `Bug|Story|Task` Wiki-link result when applicable, duplicate/conflict evidence, and write/readback results |
 | Test version | `WRITTEN|SKIPPED_ALREADY_WAITING_TEST|BLOCKED|NOT_ATTEMPTED`, structured payload and readback when written |

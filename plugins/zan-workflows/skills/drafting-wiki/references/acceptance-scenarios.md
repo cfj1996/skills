@@ -41,3 +41,15 @@
 | Called by `submitting-for-test` | Return the complete in-memory `ValidatedWikiDraft` to the consumer; do not collapse the handoff to a string. |
 
 All scenarios are read-only and create no state or record files.
+
+## Shared owner regression cases
+
+| Scenario | Expected result |
+| --- | --- |
+| One Story has H5 and mini-program Tasks in different repositories | One owner target/title and combined page; each project has a separate canonical entry. |
+| Current Task has no link, sibling Task has an older linked Wiki | Find it by exact parent Story/Task evidence, reuse it across months, and plan the missing owner/current Task links. |
+| Linked owner page lacks the current repository/branch | Read-only preview returns APPEND_ENTRY and body/hash; draft the addition without creating another page. |
+| Two repositories have the same branch name | Select by repository plus branch; preserve both entries and their independent status/version fields. |
+| Same repository has two original branches | Append separate entries in the same page; duplicate repository/branch identity blocks. |
+| Different project Tasks supply project-prefixed creation titles | Reject the split and use the parent Story title. |
+| Parent or sibling Tasks contain different Wiki IDs | Block; never create a third page or silently migrate historical pages. |

@@ -45,9 +45,10 @@ function makeFake({ linked = false, monthExists = true, childExists = false, des
     calls.push({ name, args });
     const override = await onCall?.(name, args, { wikis, comments, calls });
     if (override !== undefined) return override;
+    if (name === 'get_stories_or_tasks' && args.options.story_id) return response('Task', []);
     if (name === 'get_stories_or_tasks') return response(
       args.options.entity_type === 'tasks' ? 'Task' : 'Story',
-      [{ id: entryId, name: '门店发货单前端适配', description }],
+      [{ id: entryId, name: '门店发货单前端适配', description, story_id: '0' }],
     );
     if (name === 'get_bug') return response('Bug', [{ id: entryId, title: '门店发货单前端适配', description }]);
     if (name === 'get_comments') {

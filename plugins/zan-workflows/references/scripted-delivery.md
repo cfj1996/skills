@@ -400,3 +400,29 @@ confirmed cleanup under the existing rules.
 
 API references: [GitLab merge requests](https://docs.gitlab.com/api/merge_requests/)
 and [Jenkins remote API](https://www.jenkins.io/doc/book/using/remote-access-api/).
+
+## Shared test Wiki ownership
+
+Follow [shared-test-wiki.md](shared-test-wiki.md). `action=wiki` / `mode=ensure`
+resolves a Task's parent Story as `wikiOwner`; Story/Bug owns itself. A new
+Task submission uses its parent's title, never a project-prefixed Task title.
+When the Story has no anchor, exact sibling Tasks/comments are checked for an
+older linked page. Different linked page IDs block.
+
+PLAN returns `wikiOwner`, `ownershipEvidence`, `commentOperations`,
+`entryOperation=NEW_PAGE|APPEND_ENTRY|REUSE_ENTRY` and the exact body/hash.
+For APPEND_ENTRY, no body is needed for discovery, but execution needs the
+approved complete resulting body. Pass `entryRepoUrl` (`--entry-repo-url`) to
+select a repository/branch entry, allowing the same branch name across repos.
+For Task ensure EXECUTE copy `wikiOwner.entryType/entryId` into
+`expectedOwnerType/expectedOwnerId` (`--expected-owner-type/--expected-owner-id`).
+Include both owner anchor and current Task comment targets in confirmation;
+helper writes/readbacks the owner first. `mode=link` remains current-item only;
+`mode=update` remains exact-page/body only. Neither mode creates Wiki pages.
+
+For one multi-project batch, carry one combined body/target in sharedWikiPlan,
+complete all included Git/deployment gates before writing it once, then link
+all delivered items to that page and finish registration. Same-owner Wiki
+writes are serial; later plans use the actual resulting body hash. Repeated
+calls do not duplicate the page/comments. An old CREATE_CHILD plan cannot be
+executed after the common owner already links a page.

@@ -107,11 +107,21 @@ target-location, Wiki-ID, TAPD-comment, writeback, merge, or release narration.
   `当前版本` line as an explicit minimal patch; no other legacy-field migration
   is allowed.
 
+Apply [shared-test-wiki.md](../../../references/shared-test-wiki.md) before
+these target/body rules. The target belongs to the Story (including Tasks) or
+Bug; each canonical entry belongs to one repository/original-branch pair.
+All branch matching below means that pair. Different repositories may use the
+same branch name; different branches in one repository have separate entries.
+A new multi-project body starts at sequence 1 and numbers each further entry
+sequentially under the same `# 前端`, with all required fields per entry.
+
 ## Wiki target resolution
 
 Do not request a Wiki URL from the user. Resolve the target in this order:
 
-1. Read the exact TAPD item and comments, including links in the description.
+1. Resolve the owner Story/Bug and its/current item links, checking exact sibling
+   Tasks when the Story has no anchor. Read the exact TAPD item and comments,
+   including links in the description.
    `get_comments` may omit count: then page through full pages until a short
    page. With count, require the full reported set; inconsistent or repeated
    pages block. If one matching 提测 Wiki link is associated with this
@@ -129,7 +139,8 @@ Do not request a Wiki URL from the user. Resolve the target in this order:
    body evidences the original branch. `get_wiki` accepts `name` and `id`, but
    not `parent_wiki_id` as a query option; never send that unsupported filter,
    paginate the unfiltered Wiki list, or repeat identical requests.
-4. If no related child exists, use title `MM-DD: {任务标题中文简述}`. Plan
+4. If no related child exists, use title `MM-DD: {归属需求或Bug标题}`;
+   a child Task uses its parent Story title, not its project-prefixed Task title. Plan
    `CREATE_CHILD` when the month exists, otherwise
    `CREATE_MONTH_AND_CHILD`. Derive the required creator from authenticated
    TAPD/current-work evidence.
@@ -142,8 +153,8 @@ belongs in the child Wiki.
 ## Body calculation and patch rules
 
 For `CREATE_CHILD|CREATE_MONTH_AND_CHILD`, render a complete new child body as
-`# 前端`, one blank line, then the canonical entry above with `序号=1` and the
-resolved `项目状态行`.
+`# 前端`, one blank line, then all included project/branch entries starting at
+`序号=1`, each with its own resolved `项目状态行`.
 
 For `REUSE_EXISTING`, operate only on the current child body read from TAPD:
 

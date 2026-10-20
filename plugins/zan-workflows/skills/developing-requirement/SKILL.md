@@ -289,6 +289,11 @@ master merge, Wiki delivery maintenance, or local cleanup.
 
 ## 6. Submit reviewed changes
 
+Apply [shared-test-wiki.md](../../references/shared-test-wiki.md). For one
+Story, all selected projects/branches and child Tasks share one `sharedWikiPlan`
+with one target and complete combined body. Pass the common owner and entry
+list to submission; never turn “two project checklists” into two Wiki pages.
+
 For `SUBMIT|GO_LIVE`, call `submitting-for-test` with
 `submission_phase=PLAN` for every `ReviewedChange` in dependency order. Collect
 and display every complete current `SubmissionPlan`, set
@@ -297,7 +302,10 @@ deployment, Wiki, or TAPD write.
 
 A later confirmation is valid only when it explicitly answers the displayed
 unchanged plan set. Then call `submitting-for-test` with
-`submission_phase=EXECUTE` for each project in the same order. Re-read bound
+`submission_phase=EXECUTE` for each project in the same order. For a shared
+page, collect every included project’s Git/deployment gate before one shared
+Wiki write, then link each delivered Task and finish per-item registration;
+carry the same page ID and distinct entry identity into every result. Re-read bound
 facts as required by that capability and stop on the first failed or changed
 plan, reporting already completed submissions truthfully. Return `SUBMITTED`
 for `SUBMIT` only when every project returns
