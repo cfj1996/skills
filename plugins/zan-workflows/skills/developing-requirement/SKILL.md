@@ -223,7 +223,14 @@ Reuse the same TAPD/project/branch evidence from scope review; do not perform
 a second broad project or historical-Wiki discovery.
 
 Build one combined checklist from all project rows using
-[需求开发分支与单次确认](references/branch-checklist.md), show one authorization
+[需求开发分支与单次确认](references/branch-checklist.md). The final confirmation
+response MUST render its Markdown project table for every profile, including
+QUICK and a single project. Use one row per project/repository/branch binding;
+show each project's scope, actual current branch, exact target/action, base
+ref/SHA, operations, readiness and unresolved items. Do not replace that table
+with prose, bullet points, or only a field/feature table. Attach larger brief,
+Task or Plan details with explicit project associations rather than widening
+the main table. Show one authorization
 summary, include requirement/implementation blocker counts and unresolved rows,
 ask exactly `是否按此清单执行？`, then stop. Do not ask separately for
 scope or branch confirmation. When task writes are proposed, explicitly state
