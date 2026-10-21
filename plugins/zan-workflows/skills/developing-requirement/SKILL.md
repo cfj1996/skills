@@ -412,6 +412,9 @@ An `AWAITING_MERGE` result pauses dependent project delivery with the exact MR
 link, completed effects, business Wiki 待合并 update/readback or its separate
 blocker, and `已合并，继续上线` next step. The conditional pending patch must
 be included in the confirmed go-live checklist; do not mark 已合并 before proof.
+Surface `userAction.message` explicitly asking the user to contact a colleague
+with permission to merge the named branch into the exact target. Preserve this
+action reminder even when the Wiki patch blocks; a waiting status is insufficient.
 Keep this waiting
 stage instead of marking go-live failed or complete. On that reply, use
 `going-live`'s read-only exact-MR continuation, then run only unfinished
@@ -431,6 +434,21 @@ confirmation invokes
 the confirmed local worktree and local branch resources. Never infer cleanup
 authorization from `GO_LIVE` or merge confirmation.
 `保留开发环境` ends the flow without deletion or a repeated cleanup question.
+Include evidenced test-submission `merge/*` branches and their worktrees in
+the local inventory, using their own merged targets. Include their associated
+remote `merge/*` refs in the same concise three-row cleanup preview only after
+the remote checks pass. For that combined scope replace the local-only prompt
+with `是否清理以上资源（含远程临时分支）？` and require
+`确认清理（含远程临时分支）`; one reply covers both displayed scopes.
+Remote development branches remain retained and require a separate explicit
+request via `operation=CLEANUP_REMOTE`. Preserve separate per-scope outcomes;
+generic local cleanup confirmation never authorizes remote deletion.
+Preserve the [shared ACB handoff](../../references/conflict-merge.md) from
+submission/delivery. Its exact upfront default C cleanup authority is separate
+from original-development cleanup: execute when its own MR and resource gates
+pass, without another prompt or waiting for unrelated project delivery. Honor
+explicit retention and skip already cleaned/absent or RETAINED_BY_USER C
+resources in the final default checklist. Retain deferred reasons and authority.
 
 Return `MERGED` only when every project has a verified master delivery, all
 involved tooling packages have verified latest releases, affected projects

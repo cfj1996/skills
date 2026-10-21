@@ -50,11 +50,23 @@ function fixture({ existing = true, canMerge, denied, override } = {}) {
 }
 const mutations = fake => fake.calls.filter(row => /^(create|merge)_/.test(row.name));
 
+function assertContactAction(result, targetBranch = 'master') {
+  assert.equal(result.userAction.type, 'CONTACT_MERGER');
+  assert.equal(result.userAction.resumePrompt,
+    ['master', 'main'].includes(targetBranch) ? '已合并，继续上线' : '已合并，继续交付');
+  for (const fact of [result.mrUrl, result.sourceBranch, targetBranch, result.userAction.resumePrompt]) {
+    assert.ok(result.userAction.message.includes(fact));
+  }
+  assert.match(result.userAction.message, /请联系有权限的同事/);
+}
+
 test('manual handoff creates one exact MR and retains a read-only continuation plan', async () => {
   const fake = fixture({ existing: false });
   const result = await mergeReviewedBranch(fake.call, { ...input(), mergeMode: 'MANUAL' }, fake.io);
   assert.equal(result.state, 'AWAITING_MERGE');
   assert.equal(result.reason, 'MANUAL_MERGE_REQUESTED');
+  assertContactAction(result);
+  assert.doesNotMatch(result.userAction.message, /当前账号没有合并权限/);
   assert.equal(result.writes, 1);
   assert.equal(result.mergeReadback, false);
   assert.equal(result.containment, false);
@@ -71,6 +83,8 @@ test('an explicit denied permission reuses the MR without attempting a merge', a
   const result = await mergeReviewedBranch(fake.call, { ...input(), mrIid: '7' }, fake.io);
   assert.equal(result.state, 'AWAITING_MERGE');
   assert.equal(result.reason, 'MERGE_PERMISSION_DENIED');
+  assertContactAction(result);
+  assert.match(result.userAction.message, /当前账号没有合并权限/);
   assert.equal(result.writes, 0);
   assert.deepEqual(mutations(fake), []);
 });
@@ -84,6 +98,7 @@ test('merge-only 403 responses become a manual handoff after exact MR readback',
     const result = await mergeReviewedBranch(fake.call, { ...input(), mrIid: '7' }, fake.io);
     assert.equal(result.state, 'AWAITING_MERGE');
     assert.equal(result.reason, 'MERGE_PERMISSION_DENIED');
+    assertContactAction(result);
     assert.equal(result.writes, 0);
     assert.equal(fake.calls.filter(row => row.name === 'merge_merge_request').length, 1);
     assert.equal(fake.state.proofCalls, 0);
@@ -113,6 +128,9 @@ test('rechecking an open MR stays waiting, tolerates unrelated target advancemen
   const result = await mergeReviewedBranch(fake.call, pending.resumePlan, fake.io);
   assert.equal(result.state, 'AWAITING_MERGE');
   assert.equal(result.reason, 'MANUAL_MERGE_PENDING');
+  assertContactAction(result);
+  assert.match(result.userAction.message, /MR 仍未合并/);
+  assert.doesNotMatch(result.userAction.message, /当前账号没有合并权限/);
   assert.deepEqual(mutations(fake), []);
 });
 
@@ -136,6 +154,7 @@ test('manual merge continuation verifies source containment even after the sourc
   assert.equal(result.containment, true);
   assert.equal(result.observedTargetSha, advancedSha);
   assert.equal(result.defaultTargetVerified, true);
+  assert.equal(result.userAction, undefined);
   assert.equal(result.writes, 0);
   assert.equal(fake.calls.some(row => row.name === 'get_branch' && row.args.branch_name === input().sourceBranch), false);
   assert.deepEqual(mutations(fake), []);
@@ -202,6 +221,7 @@ test('workflow session pauses downstream writes until its exact pending MR is ve
   await assert.rejects(session.dispatch({ id: 'publish', action: 'release', phase: 'EXECUTE', input: { confirmed: true } }), /待人工合并/);
   const waiting = await session.dispatch({ id: 'still-open', action: 'merge', phase: 'PLAN', input: pending.resumePlan });
   assert.equal(waiting.state, 'AWAITING_MERGE');
+  assertContactAction(waiting);
   assert.equal(session.pendingMerges.size, 1);
   for (const change of [{ sourceSha: advancedSha }, { pipelineRequired: false }, { reviewPassed: false }]) {
     await assert.rejects(session.dispatch({ id: 'changed-' + Object.keys(change)[0], action: 'merge', phase: 'PLAN',
@@ -218,4 +238,21 @@ test('workflow session pauses downstream writes until its exact pending MR is ve
   assert.equal(repeated.state, 'MERGED');
   assert.deepEqual(mutations(fake), []);
   session.close();
+});
+
+test('manual reminders use the actual target and distinguish go-live from dev delivery', async () => {
+  for (const targetBranch of ['main', 'develop', 'dev']) {
+    const fake = fixture();
+    const call = (name, args) => {
+      if (name === 'get_project') return Promise.resolve(reply({ id: 1,
+        default_branch: targetBranch === 'main' ? 'main' : 'master', ssh_url_to_repo: originUrl }));
+      if (name === 'get_merge_request') return Promise.resolve(reply({ ...fake.mr(), target_branch: targetBranch }));
+      return fake.call(name, args);
+    };
+    const result = await mergeReviewedBranch(call,
+      { ...input(), targetBranch, mergeMode: 'MANUAL', mrIid: '7' }, fake.io);
+    assertContactAction(result, targetBranch);
+    assert.equal(result.resumePlan.targetBranch, targetBranch);
+    assert.deepEqual(mutations(fake), []);
+  }
 });

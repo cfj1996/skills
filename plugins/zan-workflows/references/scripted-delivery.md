@@ -65,7 +65,9 @@ Required plan facts: `projectId`, `repositoryPath`, exact `originUrl`, original
 `sourceSha`, `targetSha` and any exact `mrIid`. Execute also needs the matching
 confirmation (`confirmed=true`). Targets are `develop|dev|master` or `main`
 only after it is verified as the actual default. Source remains the original
-`feature/*|fixbug/*`; conflict branches need their separate authorized flow.
+`feature/*|fixbug/*`; conflict branches use the shared
+[A → C → B flow](conflict-merge.md), with exact temporary cleanup included
+in its confirmation by default and an explicit user retention override.
 
 ```bash
 node scripts/merge-reviewed-branch.mjs --json <<'PLAN'
@@ -128,7 +130,17 @@ on explicit `user.can_merge=false` or merge-call HTTP 403 after exact readback;
 it never retries a denied merge. Read/approval/creation failures, other HTTP
 errors and unknown outcomes stay blocking.
 
-Show the MR link and `等待有权限人员合并`; after `已合并，继续上线`, invoke
+Every awaiting result includes `userAction` with `type=CONTACT_MERGER`,
+`message` and `resumePrompt`. Show the message to the user: contact a colleague
+with permission to review and merge the named source into the exact target,
+using the included MR link. Preserve this reminder even if the pending Wiki
+patch fails. Manual mode describes a planned handoff; only explicit denial
+claims missing permission. A still-open VERIFY_ONLY result repeats the reminder
+without writes. No enterprise WeChat notification or team lookup is involved.
+The resume prompt is `已合并，继续上线` for master/main and
+`已合并，继续交付` for develop/dev.
+
+Show `等待有权限人员合并` alongside that action; after the resume reply, invoke
 `resumePlan` without `--execute`, or session `action=merge`, `phase=PLAN`,
 `mergeMode=VERIFY_ONLY`. It uses no mutation tool and requires exact IID/source
 SHA, required CI and fetched target containment before `MERGED`. A deleted

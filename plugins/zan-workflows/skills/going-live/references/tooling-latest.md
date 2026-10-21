@@ -50,7 +50,9 @@ consumer must use the verified latest package before its final master merge.
 
 Every owner/consumer merge supports the manual handoff in `going-live`.
 On `AWAITING_MERGE`, retain its exact MR/read-only continuation and completed
-effects; pause dependent actions and show `等待有权限人员合并`. An owner
+effects; pause dependent actions and surface `userAction.message`, asking the
+user to contact a colleague with merge permission using the exact MR link.
+An owner
 awaiting merge prevents its required publication and dependent upgrades/delivery.
 A consumer awaiting merge prevents final Wiki/latest completion and cleanup.
 After `已合并，继续上线`, verify that exact MR with `VERIFY_ONLY`, then run

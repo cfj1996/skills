@@ -236,6 +236,9 @@ order:
    confirmed business Wiki 待合并 patch/readback, or report its separate blocker;
    final 已合并/latest still requires actual merge proof. Report
    `待确认：等待有权限人员合并` with its link and `已合并，继续上线` next step.
+   Include `userAction.message`, explicitly asking the user to contact a
+   colleague with permission to merge the named branch into the exact target,
+   even when the pending Wiki patch blocks. A waiting status alone is insufficient.
    Route that reply to `going-live`'s read-only continuation before remaining
    delivery writes; do not treat it as a failed Bug, start the next shared-branch
    repair or repeat completed steps.
@@ -247,6 +250,18 @@ order:
    `AWAITING_CLEANUP_CONFIRMATION`. A later exact confirmation calls
    `going-live` with `operation=CLEANUP`; merge, submission, or generic
    continuation confirmation is never cleanup authorization.
+   Include associated test-submission `merge/*` branches and their worktrees,
+   checking each against its own merged target. After the remote checks pass,
+   include their associated remote `merge/*` refs in the same concise cleanup
+   table. For the combined scope ask `是否清理以上资源（含远程临时分支）？`
+   and require `确认清理（含远程临时分支）` once for both displayed scopes.
+   Remote development branches stay retained unless separately requested via
+   `operation=CLEANUP_REMOTE`; a generic local reply never authorizes them.
+   The shared [ACB flow](../../references/conflict-merge.md) may already have
+   authority to clean exact C resources after its own verified MR; this does
+   not wait for the remaining shared-branch queue. Never include original A
+   in that scope. Preserve retention overrides and exclude already absent or
+   RETAINED_BY_USER resources from the final default cleanup checklist.
 8. Record only a concise in-conversation result for this Bug. Only
    `implementing-work`, `submitting-for-test`, or `going-live` may return a
    per-Bug `PENDING` or `BLOCKED` that skips the remaining capabilities for

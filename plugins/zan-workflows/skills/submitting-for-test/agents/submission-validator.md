@@ -69,6 +69,17 @@ Do not require future readbacks before execution. Individual-operation modes
 remain for a genuine standalone action; do not expand a bundle back into four
 private reviewer calls or review every CI poll.
 
+An actual conflict may instead use the explicitly confirmed shared
+[A → C → B flow](../../../references/conflict-merge.md). Validate the separate
+exact C/B MR scope, resolution review and original A identity; do not require
+the ordinary source-restricted executor to accept C. Default conditional C
+cleanup is authorized only when exact local/remote C, worktree and purpose
+were included in that ACB confirmation. Respect later retention instructions,
+require exact C → B merged and full-tip containment proof plus fresh resource
+safety checks, and never include original A deletion. This authority can be
+consumed without another prompt after C → develop/dev, independent of master
+go-live. Carry the complete ConflictMergeHandoff and per-resource outcomes.
+
 For `PRE_SUBMISSION_WRITE`, accept exactly one operation:
 `JENKINS_TEST_DEPLOY|WIKI_WRITE_AND_LINK_BUNDLE|TAPD_REGISTRATION_BUNDLE|WIKI_MONTH_CREATE|WIKI_CHILD_CREATE|WIKI_UPDATE|TAPD_COMMENT|TAPD_STATUS|TEST_VERSION`.
 Require successful prior dependencies and validate only that operation. A

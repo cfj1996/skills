@@ -16,6 +16,7 @@ complete visible `SubmissionPlan`, bound-fact fingerprint, exact
 | Repository | expected/actual path, Git root, origin, verification result |
 | Authorization | one consolidated plan/confirmation, bound facts, deterministic derived values, and any reauthorization reason |
 | Git delivery | original source branch, target `develop`, current-round commits, commit/push/MR/merge results, develop containment |
+| Conflict handoff | when A → C → B was used, exact ConflictMergeHandoff including original A/B, C MR/revisions/containment, temporary resources, upfront cleanup authority, latest retention policy and per-resource cleanup/deferred outcome; retain it even if C is absent |
 | Deployment | `DEPLOYED|SKIPPED_BY_INTENT|FAILED|UNKNOWN|NOT_ATTEMPTED`, Jenkins job/environment/ref/version/channel/purpose and trigger/readback evidence when applicable |
 | Shared Wiki | `sharedWikiPlan`, `wikiOwner` (workspace/type/ID), owner/Task relationship readback, one target per Story/Bug, repository+branch entry identities, complete combined body/hash, all comment targets and included project gates; same final page ID in every participating result |
 | Wiki | `WRITTEN|SKIPPED_BY_POLICY|BLOCKED|NOT_ATTEMPTED`, auto-resolved target plan when written or retained for `going-live`, hierarchy evidence, create/update authorizations and readbacks when written, actual final child ID/URL and source-branch identity when available, business merge-status or tooling current-version/channel readback, and final body when applicable |
@@ -42,6 +43,14 @@ complete visible `SubmissionPlan`, bound-fact fingerprint, exact
 - The Git sequence is commit when needed, push when needed, MR create/update,
   then MR merge. Include every step in the displayed validated bundle, perform
   its fresh bound checks, execute and read back before the next.
+- An explicitly confirmed conflict uses the shared
+  [A → C → B flow](../../../references/conflict-merge.md). A remains the
+  original business branch; C's exact MR and A/C containment in B are distinct
+  evidence, not a substituted business source. The initial ACB confirmation
+  includes default local/remote C and temporary-worktree cleanup; verified
+  merge and safety checks trigger that unchanged scope without another prompt.
+  User retention revokes the affected deletion authority and survives go-live.
+  Preserve exact related-branch association and cleanup outcomes in the handoff.
 - One displayed `GIT_DELIVERY_BUNDLE` and pre-write validation cover that
   unchanged sequence; internal fresh checks/readbacks remain mandatory without
   per-step Agent validators. The merge executor supplies the actual delivered

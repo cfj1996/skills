@@ -9,7 +9,7 @@ Preferred lead model profile: `CRITICAL`. Read the shared
 [model-routing policy](../../references/model-routing.md) when model selection
 or delegation is available; model availability never weakens merge gates.
 
-Accept `operation=DELIVER|CLEANUP`. `DELIVER` consumes one
+Accept `operation=DELIVER|CLEANUP|CLEANUP_REMOTE`. `DELIVER` consumes one
 `TestSubmissionResult` plus related submitted projects when tooling dependencies
 are involved, and returns one in-memory `MasterMergeResult`. Merge each original
 fixed branch directly to `master`. Before tooling delivery writes, first check
@@ -25,15 +25,29 @@ only when remote evidence confirms it as the default; keep that exact name in
 the visible plan, executor and containment refs. Never infer it from cwd.
 
 After verified master delivery, `DELIVER` also checks associated local branches
-and worktrees and creates an exact `CleanupPlan` for safe candidates. It never
-deletes them in the delivery turn. `CLEANUP` consumes the prior merged result
+and worktrees, including evidenced temporary test-merge branches and their
+worktrees, and creates an exact `CleanupPlan` for safe candidates. Original
+development resources are never deleted in the delivery turn. A conflict's
+temporary C resources may already be cleaned under the exact upfront authority
+in [conflict-merge.md](../../references/conflict-merge.md); retain that outcome.
+`CLEANUP` consumes the prior merged result
 and a separate exact cleanup confirmation, revalidates every candidate, and may
-remove only those confirmed local resources.
+remove the confirmed local resources plus explicitly listed remote temporary
+test-merge branches under the remote checks below.
+
+Include the delivery's associated remote temporary `merge/*` branches in the
+same concise cleanup preview after the checks in
+[remote-cleanup.md](references/remote-cleanup.md). A combined confirmation must
+explicitly include remote temporary branches. Remote feature/fixbug development
+branches remain retained unless separately requested with exact authority;
+that separate operation is `CLEANUP_REMOTE`. A generic local cleanup reply
+never authorizes remote deletion.
 
 Every delivery final response must include the local cleanup outcome. After
 all required delivery gates pass and the completed check yields safe
 candidates, show their exact plan and end
-with `是否删除以上本地开发环境？`; a cleanup-state code or a generic cleanup
+with `是否删除以上本地开发环境？` for a local-only plan, or
+`是否清理以上资源（含远程临时分支）？` for a combined plan; a cleanup-state code or a generic cleanup
 recommendation alone is insufficient. When invoked by an orchestrator,
 preserve this next step for its final response after the whole delivery ends.
 
@@ -70,7 +84,14 @@ URL, repository/branches/source SHA, completed effects and read-only
 to `是否上线：待合并` under the conditional patch authority described below;
 read it back before reporting the Wiki update as successful. Report
 `等待有权限人员合并` with the exact link, Wiki update result and paused next
-stage. Tell the user to reply `已合并，继续上线` after the maintainer merges.
+stage. Surface the executor's `userAction.message` in the final response:
+explicitly ask the user to contact a colleague with permission to review and
+merge the original branch into the exact target, then reply
+`已合并，继续上线`. A waiting status alone is insufficient. Known permission
+denial may say `当前账号没有合并权限`; a planned manual merge must not invent
+that evidence. If a later check finds the MR still open, repeat the action
+reminder with the same MR link. This handoff takes place in the conversation;
+it needs no enterprise WeChat robot, team hierarchy lookup or external message.
 Do not repeat merge attempts, create a replacement MR, switch accounts,
 approve on the user's behalf or continue dependent publication, consumer
 delivery, final merged/latest Wiki updates or cleanup. The sole waiting-stage
@@ -155,8 +176,24 @@ For `operation=CLEANUP`, require:
   `worktree_to_remove`; and
 - the same verified repository and association evidence used by that plan.
 
+When `CleanupPlan.remoteTemporary` exists, also require its complete
+`RemoteCleanupPlan` and the explicit reply `确认清理（含远程临时分支）` (or
+equivalent exact authority). That scope accepts only associated `merge/*`
+refs, never remote feature/fixbug branches. Validate the entire combined plan
+before any deletion; execute local cleanup first, then the remote temporary
+stage under the same unchanged confirmation. A failed stage stops later writes.
+
 A request to go live, a merge authorization, or a generic earlier “继续” never
 authorizes cleanup. `CLEANUP` never repeats the master MR or Wiki operations.
+
+For `operation=CLEANUP_REMOTE`, require the completed delivery and explicit
+remote-deletion request, then bind the exact repository, remote push URL,
+full branch refs and observed SHAs in a `RemoteCleanupPlan`. Apply the separate
+preview, confirmation and fresh checks in [remote-cleanup.md](references/remote-cleanup.md).
+Local cleanup completion or local candidate status is not a prerequisite or
+proof of remote candidacy. A generic `确认清理` authorizes local resources only;
+for a combined plan it is insufficient, so perform no deletion until the
+user specifies whether to include or exclude the remote temporary rows.
 
 ## Delivery procedure
 
@@ -225,11 +262,19 @@ authorizes cleanup. `CLEANUP` never repeats the master MR or Wiki operations.
    containment; pending auto-merge is not completion. Do not repeat whole
    preparation, review, private validation or Agent polling between its steps.
    A real metadata edit or conflict needs its own exact authorized action.
+   For a conflict, use the shared [A → C → B flow](../../references/conflict-merge.md)
+   with default temporary cleanup included in its initial exact confirmation
+   and the user's retention override. Keep A as the business source; retain
+   separate C → B merge/containment evidence rather than passing C to the
+   ordinary original-branch executor.
 6. After each successful merge readback and `origin/master` containment, run the
    read-only [local closeout check](references/local-closeout.md) through
    [check-local-closeout.mjs](../../scripts/check-local-closeout.mjs) once.
    Supply only the original branch and explicitly evidenced related branches
-   and current task location. It automatically collects one fresh scoped
+   and current task location. Include the temporary `merge/*` branches used for
+   test submission and their worktrees from exact submission/MR evidence; check
+   them against their own merged dev/develop target, not master. Explicitly
+   report absent resources or missing association evidence. It automatically collects one fresh scoped
    Codex task/process snapshot; a supported external collector snapshot may
    replace that collection when already available.
    It batches target fetch/ref/worktree reads and parallel local inspections;
@@ -270,26 +315,39 @@ authorizes cleanup. `CLEANUP` never repeats the master MR or Wiki operations.
    otherwise return `BLOCKED` with actual completed effects. Include the local
    check result separately, with paths/branches, reasons, and cleanup advice.
    If master delivery was not verified, mark the local check `NOT_TRIGGERED`.
-   For a merged result, convert only `CANDIDATE` resources into one exact
-   `CleanupPlan`. Use `NO_CANDIDATE` only when the check completed and found no
-   safe candidates; use `BLOCKED` when cleanup evidence is partial or
+   For a merged result, convert only local `CANDIDATE` resources into one exact
+   `CleanupPlan`. Read-only preview associated remote temporary merge refs
+   under remote-cleanup.md and attach safe candidates as `remoteTemporary`;
+   retain blocked remote refs with reasons. This can produce a remote-only
+   temporary plan even when no local candidates remain. The local helper's
+   cleanupState describes local scope only; do not copy its NO_CANDIDATE over
+   a nonempty remoteTemporary plan. Use `NO_CANDIDATE` only when all selected
+   scope checks completed and found no safe candidates; use `BLOCKED` when cleanup evidence is partial or
    unavailable. Otherwise set `cleanup_state=AWAITING_CONFIRMATION`, display
    the plan and apply the completion response below, then stop without deleting
-   anything.
+   original development resources. Previously confirmed conflict-C cleanup
+   follows the shared conflict flow and does not require another confirmation.
 
 ## Completion response and next turn
 
 After reporting the actual merge, release/consumer and Wiki results, always
 report the cleanup outcome separately:
 
-For `AWAITING_MERGE`, show the exact MR link, Wiki `待合并` readback or its
-separate blocker, and `已合并，继续上线` next step
+For `AWAITING_MERGE`, show `userAction.message` (contact a colleague with merge
+permission, exact MR link/target and `已合并，继续上线` next step), plus Wiki
+`待合并` readback or its separate blocker
 instead of a deletion question. Resources remain retained until delivery ends.
 
 - `AWAITING_CONFIRMATION`: display the exact repository/current branch,
-  worktree paths, local branches, ordered deletion actions and purpose from
-  `CleanupPlan`. State that nothing has been deleted, then end with
-  `是否删除以上本地开发环境？` and offer `确认清理` or `保留开发环境`.
+  concise cleanup table and purpose from `CleanupPlan`. Use three rows where
+  possible: `开发分支｜本地：<branch>`; `临时合并分支｜本地：<branch>；远程：<remote>/<branch>`;
+  `工作树｜<exact paths>`. Mark absent/retained scopes explicitly and list each
+  exact name; no wildcards. Keep SHAs, MR/containment/protection evidence and
+  deletion order in the in-memory plan rather than expanding the visible table.
+  State `远程开发分支保留`. For a combined plan ask
+  `是否清理以上资源（含远程临时分支）？`, offering
+  `确认清理（含远程临时分支）` or `保留开发环境`. For a local-only plan ask
+  `是否删除以上本地开发环境？`, offering `确认清理` or `保留开发环境`.
   Never finish with only “上线完成” or bury this question in progress updates.
 - `NO_CANDIDATE`: say `目前没有可安全清理的本地资源。` and give any retention
   reason, especially a current branch/worktree or active task. Do not ask to
@@ -300,12 +358,28 @@ instead of a deletion question. Resources remain retained until delivery ends.
   cleanup has not started.
 
 An immediate `确认清理` or `执行清理` answering the unchanged exact displayed
-plan confirms only that list and starts `operation=CLEANUP` on the next turn.
+local-only plan confirms only that list and starts `operation=CLEANUP` on the next turn.
+For a combined plan require the explicit remote-temporary confirmation above;
+one reply covers the complete displayed local and remote-temporary scopes.
 Reuse the prior merged result; do not restart merge, release or Wiki work.
 `保留开发环境` ends the flow with no deletion and no repeated cleanup prompt
 unless the user later requests it. A changed plan needs a fresh confirmation.
 An orchestrator combines duplicate candidates and asks once after all required
 deliveries pass; it must preserve retained/blocked reasons in its final output.
+Group the plan into development branches, temporary test-merge branches
+(label local/remote separately), and worktree paths. Remote development branches
+are retained unless explicitly requested; never infer that authority from a
+remote-temporary cleanup confirmation.
+
+Conflict-generated temporary resources follow the shared
+[A → C → B policy](../../references/conflict-merge.md). Its initial exact
+confirmation includes conditional temporary cleanup by default; after the
+verified conflict MR and safety checks use that unchanged authority rather
+than another go-live cleanup question. The user's explicit retention choice
+overrides the default. Preserve per-resource outcomes, exclude already absent
+or RETAINED_BY_USER C resources from default cleanup proposals, and keep concise
+reasons. Original development resources still use the ordinary post-delivery
+cleanup confirmation above.
 
 ## Cleanup procedure
 
@@ -321,15 +395,23 @@ Run only for `operation=CLEANUP` after its exact confirmation:
 3. Reject protected/baseline branches (`main|master|develop|dev`), the current
    checked-out branch, the current task's worktree, active or locked worktrees,
    dirty/untracked worktrees, unpreserved ignored data, undelivered tips, and
-   uncertain occupancy. Remote branches are outside cleanup scope.
+   uncertain occupancy. Local candidacy never proves remote candidacy; a
+   combined plan's remoteTemporary rows require the independent remote checks.
 4. For each unchanged confirmed candidate, remove its associated worktree first
    with ordinary `git worktree remove <exact-absolute-path>` and no force flag;
    read back that the path and worktree registration are gone. Then delete the
    exact local branch from a safe remaining worktree with
    `git branch -d -- <exact-branch>` and read back that the local ref is absent.
    A branch without an associated worktree skips the first operation.
+   For a test-merge branch whose verified target is dev/develop, use the
+   verified upstream handling in
+   [local-closeout.md](references/local-closeout.md#confirmed-cleanup) so `-d`
+   checks that exact fetched target even when HEAD is master. Keep the fresh
+   full-tip proof; do not force-delete or switch branches to make it succeed.
 5. Never use `rm -rf`, `git branch -D`, `git worktree remove --force`, broad
-   pruning, branch switching, process termination, or remote branch deletion.
+   pruning, branch switching, or process termination. The local stage never
+   deletes remote refs; the explicitly confirmed remoteTemporary stage uses
+   [remote-cleanup.md](references/remote-cleanup.md) after local success.
    Stop on the first failure and preserve every unprocessed resource.
 6. Return cleanup state `CLEANED` only when every confirmed operation and
    readback succeeds. Otherwise return `PARTIAL|BLOCKED` with completed and

@@ -310,6 +310,35 @@ test('unverified default delivery and deletion switches never run a local check'
   await assert.rejects(checkLocalCloseout({ ...closeInput(), execute: true }, fake.io), /只读模式/);
 });
 
+test('associated test-merge branches are checked against their own dev target, independently of master', async () => {
+  for (const targetBranch of ['dev', 'develop']) {
+    const temporary = 'merge/delivery-to-' + targetBranch, tempTip = 'c'.repeat(40), devTip = 'd'.repeat(40);
+    for (const contained of [true, false]) {
+      const fake = gitFake({ onGit: (_cwd, args) => {
+        if (args[0] === 'for-each-ref') return { code: 0, stdout:
+          `refs/heads/${branch}\t${tip}\nrefs/remotes/origin/master\t${target}\n`
+          + `refs/heads/${temporary}\t${tempTip}\nrefs/remotes/origin/${targetBranch}\t${devTip}\n` };
+        if (args[0] === 'merge-base' && args[2] === tempTip) {
+          assert.equal(args[3], devTip);
+          return { code: contained ? 0 : 1, stdout: '' };
+        }
+      } });
+      const input = closeInput();
+      input.relatedBranches = [{ branch: temporary, targetBranch, association: {
+        state: 'MERGED', mrIid: '12', repositoryPath: root, originUrl: input.originUrl,
+        sourceBranch: temporary, targetBranch,
+      } }];
+      input.occupancyEvidence.push({ ...input.occupancyEvidence[0], branch: temporary, path: null });
+      const result = await checkLocalCloseout(input, fake.io);
+      const resource = result.resources.find(row => row.branch === temporary);
+      assert.equal(resource.disposition, contained ? 'CANDIDATE' : 'VERIFY');
+      assert.equal(resource.path, null); // A branch without a worktree is still inventoried.
+      assert.equal(resource.targetBranch, targetBranch);
+      assert.equal(fake.calls.some(row => row.args[0] === 'push'), false);
+    }
+  }
+});
+
 test('worktree paths with spaces remain intact in NUL-delimited porcelain', () => {
   const result = parseWorktrees(`worktree /fixture/path with spaces\0branch refs/heads/${branch}\0locked reason\0\0`);
   assert.equal(result[0].path, '/fixture/path with spaces');

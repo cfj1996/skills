@@ -33,7 +33,9 @@ simulate TAPD and workflow sessions with no external writes.
 
 For manual merge permission handoff and read-only continuation checks, run
 `node --test plugins/zan-workflows/tests/manual-merge.test.mjs`. These tests
-simulate GitLab and workflow sessions, with no external writes.
+simulate GitLab and workflow sessions, including actionable contact reminders,
+exact MR/target links, and go-live versus dev-delivery continuation prompts,
+with no external writes.
 
 For Git safety Hook deletion classification and retained creation/rebase gates,
 run `node --test plugins/zan-workflows/tests/git-branch-safety.test.mjs`. These
@@ -52,6 +54,16 @@ For the approved pending-merge Wiki patch, shared-page entry isolation,
 permission handoff, readback failure and workflow-session write barriers, run
 `node --test plugins/zan-workflows/tests/pending-merge-wiki.test.mjs`.
 These tests simulate GitLab and TAPD without external writes.
+
+For local test-merge branch cleanup and exact remote deletion commands, run
+`node --test plugins/zan-workflows/tests/cleanup-branches.test.mjs`. These tests
+use disposable local repositories and a local bare remote to verify worktree
+protection, dev-target `-d` checks without persisted tracking, exact-ref deletion,
+and rejection when the remote SHA changes. They never contact a company remote.
+They also cover --no-follow-tags with push.followTags enabled and existing
+upstream normalization/readback before ordinary temporary-branch deletion.
+`registration-closeout.test.mjs` also covers temporary test-merge branches checked
+against their own dev/develop targets, including branches without a worktree.
 
 For Bug repair-state and repair-owner planning/readback checks, run
 `node --test plugins/zan-workflows/tests/bug-repair-owner.test.mjs`. These tests
