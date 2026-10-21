@@ -1,6 +1,6 @@
 ---
 name: writing-plans
-description: Use when a requirement or prototype must be routed to the affected project, scoped against current remote master code, reviewed in dialogue or a panel according to complexity, bound to a development branch, and turned into an executable Plan.
+description: Use when a requirement or prototype needs verified project scope and acceptance, with a concise execution brief for bounded work or a branch-bound formal Plan when planning depth requires it.
 ---
 
 # Writing Plans
@@ -12,11 +12,34 @@ remain unchanged at every profile.
 
 Turn a requirement or prototype into verified project scope and a branch-bound Plan ready for an implementation workflow. Do not turn uncertainty into implementation commitments.
 
+Accept `workflow_profile=AUTO|QUICK|STANDARD|FULL` and
+`verification_risk=NORMAL|HIGH` under
+[按工作规模选择流程](../../references/adaptive-workflow.md). Reuse the
+orchestrator's resolved choice; standalone AUTO resolves after minimal scope
+discovery. QUICK is limited to one repository and one cohesive boundary with
+clear behavior, acceptance, an evidenced implementation approach and no
+blockers. Its output is scope plus an in-memory `implementationBrief`, not a
+formal Plan. Verification risk is independent; QUICK+HIGH retains the needed
+verification and independent implementation review.
+
+An explicit formal Plan, `phase=PLAN_WRITE`, Task write or multi-owner
+breakdown requires at least STANDARD. STANDARD uses a concise Plan; FULL
+supports complex coordination. Both preserve the existing formal Plan model
+and validators. An existing Plan/TaskBreakdown cannot be downgraded to QUICK
+to evade its blockers or readbacks; an old handoff without a profile retains
+STANDARD requirements. Workflow profile does not determine DIALOGUE/PANEL.
+
 Accept `phase=SCOPE_REVIEW|PLAN_WRITE|AUTO`. `SCOPE_REVIEW` stops after producing
 the configured confirmed or proposed scope, `PLAN_WRITE` requires a confirmed scope plus validated branch
 definitions, and `AUTO` may run both only when those branch definitions are
 already available. End-to-end requirement implementation is orchestrated by
 `zan-workflows:developing-requirement`.
+For QUICK, AUTO performs only SCOPE_REVIEW and returns the brief. It never
+continues into PLAN_WRITE, artifact-location setup or Task creation.
+For an orchestrator's `delivery_mode=BRANCH_ONLY` scope review, collect the
+scope and branch-relevant evidence only. Retain implementation-only gaps
+without requiring an implementation approach, brief or formal Plan; they do
+not block an otherwise valid branch-only handoff.
 
 Accept `confirmation_mode=STANDALONE|DEFER_TO_ORCHESTRATOR`, defaulting to
 `STANDALONE`. Deferred mode returns a proposed scope for a combined downstream
@@ -39,6 +62,11 @@ prototype inspection at every `SCOPE_REVIEW` / `PLAN_WRITE` handoff.
 6. 消费已验证的分支定义，基于确认范围、远程基线和项目上下文编写并确认 Plan。
 7. 输出 branch-bound Plan；本技能不直接修改业务源码，端到端请求交回 `zan-workflows:developing-requirement` 编排执行。
 
+步骤 1–5 适用于各档位。QUICK 在步骤 5 返回范围及 `implementationBrief`，
+由编排复用准备/分支门禁后实施；步骤 6–7 及正式产物规则仅适用于
+STANDARD/FULL。简短摘要包含行为、排除项、证据、有序步骤和验证入口/预期/局限，
+不创建 ReviewSession、PagePlan 或形式上的 TAPD Task，也不报告 PLAN_READY。
+
 以一个页面或模块为主要交付单元；模块必须具备可独立开发、对接和验收的内聚边界。拒绝项目级“大 Plan”；
 跨项目需求允许一个协调范围，但每个项目必须有独立的仓库证据、分支绑定、交付单元 Plan、任务和验证方式。
 
@@ -49,6 +77,12 @@ prototype inspection at every `SCOPE_REVIEW` / `PLAN_WRITE` handoff.
 3. 对每个候选仓库验证 Git root、origin 和远程 `master`，执行只读 fetch，并记录实际 `origin/master` SHA。源码搜索只在项目确定后进行。
 4. 用 `origin/master` 中与本次交付有关的路由、页面、组件、服务、API、状态与测试证据整理功能清单、排除项和未决问题。UI/交互任务先核对现有页面与数据绑定；只有新增或改变实际网络消费时才展开接口契约搜索。需求或原型描述与代码冲突时显式展示冲突，不自行选边。
 5. 展示项目列表、远程基线、范围摘要和推荐评审模式。Resolve unresolved matters from evidence and ask only for missing decisions. If available, `superpowers:brainstorming` may assist; it is optional and must not launch a separate workflow.
+
+需求问题按依赖推进：先解决会改变后续方案的决定，再问前提已确定的问题。
+每题给出推荐与影响，只追问本次交付、风险或返工成本相关的取舍；代码和
+接口事实由 Agent 先查证。已明确的决定直接复用，不为填全模板重复提问。
+需要运行才能确定的问题应说明待验证假设、探索边界和停止条件，遵守当前
+只读/实施边界，不能把待验证方案当成已知事实来满足 QUICK。
 
 在项目、远程基线和范围证据齐全前保持只读；此时不得创建分支、写 Plan 或改源码。
 `phase=SCOPE_REVIEW` 不自行创建或选择分支。`STANDALONE` 在用户确认范围后返回；
@@ -65,6 +99,10 @@ prototype inspection at every `SCOPE_REVIEW` / `PLAN_WRITE` handoff.
 实现方案时保留需求结论，并展示技术变更待复核。具体快照、合并与同步步骤见 [对话补充功能](references/feature-review-runtime.md#对话补充功能)。
 
 ## 产物位置规则
+
+本节只处理实际需要正式 Plan/Draft 的 STANDARD/FULL 路径；QUICK 不查找或
+确认新的产物目录，也不为保存执行摘要修改 Agent 文件。已有正式 Plan 的
+约束仍须识别，不能通过 QUICK 忽略。
 
 仅 `phase=PLAN_WRITE` 可以确认并写入产物位置规则。`SCOPE_REVIEW` 只读取现有规则、
 检查已有 Plan/Draft 和文档目录并返回候选位置；不得写 `AGENTS.md`、创建目录或固化规则。
@@ -90,12 +128,20 @@ prototype inspection at every `SCOPE_REVIEW` / `PLAN_WRITE` handoff.
 
 ## 范围与功能点
 
-Read an existing Plan semantically when present; scripts must not parse Markdown. Record a Plan 内容指纹. 首次按功能模块与子模块全量整理，页面也是模块；后续默认查看新增、修改和未决项，同时保留完整模块清单。
+以下行为、证据和阻塞判断适用于所有档位。QUICK 以对话和内存摘要保留
+这些适用事实；模块卡、规范化模型和正式 Plan 的结构仅用于对应的评审/产物，
+不为一个简短执行摘要启动浏览器或构造完整模型。
+
+Narrowly check for an existing Plan linked to the selected item/module; read it
+semantically when present, without scanning unrelated artifact directories.
+Scripts must not parse Markdown. An existing formal Plan retains its contract
+and Plan 内容指纹. STANDARD/FULL 首次按功能模块与子模块全量整理，页面也是模块；
+后续默认查看新增、修改和未决项，同时保留完整模块清单。
 
 每个功能点至少包含职责与边界、输入、输出、行为规则、验收例子、代码落点或缺口、来源证据和本次变更。
 功能清单必须能回答“改哪个项目、为什么改、现有 `origin/master` 已有什么、还要增加什么、明确不改什么”。
 
-新会话使用 `schemaVersion=2` 的模块卡。每张卡按“职责与范围 → 输入输出 → 行为规则与验收例子 → 待确认问题 → 本次变更”组织，内部实现默认折叠。只有职责、输入输出与验收能够独立说明时才拆子模块；布局、API、权限等技术维度是 Agent 后台检查清单，不再按维度或 API 消费点强制拆卡。
+STANDARD/FULL 的新评审会话使用 `schemaVersion=2` 的模块卡。每张卡按“职责与范围 → 输入输出 → 行为规则与验收例子 → 待确认问题 → 本次变更”组织，内部实现默认折叠。只有职责、输入输出与验收能够独立说明时才拆子模块；布局、API、权限等技术维度是 Agent 后台检查清单，不再按维度或 API 消费点强制拆卡。
 
 Agent 根据 [API 契约阶段](references/api-contract-stages.md) 只为本次新增或改变的网络消费建立需求清单。纯布局、文案、交互重排或已批准的 Mock 状态，可复用现有数据绑定证据并标记“无新增契约”；不要依次遍历 YApi、OpenAPI、Query Contract 和 Swagger 来证明一个未请求的后端改动。真实数据必须新增字段时，再开展正式来源搜索；未查清的事实进入该消费点的实现阻塞项，不扩展整个 UI 范围。Treat 能力归属、运行时范围 and 本次交付关系 as separate facts; never assign an API to a page or module.
 
@@ -104,9 +150,9 @@ Agent 根据 [API 契约阶段](references/api-contract-stages.md) 只为本次�
 `REQUIREMENT_BLOCKER` 未清零时范围保持 `PENDING|BLOCKED`；仅有
 `IMPLEMENTATION_BLOCKER` 时允许确认需求，但实现方案必须保持 blocked，禁止进入实施。
 
-For every module card, build the canonical `implementationPlan` from applicable 项目规范、依赖、现有源码、PRD、原型和 API 证据. Use the compact four-block contract in [产物规则与评审卡规范](references/page-review-standard.md). 实现证据不足时设 `implementationPlan.status=blocked` 并说明缺口；需求 `conclusion` 独立，允许需求“已确认”同时实现方案待补充，不自动把需求改为“阻塞”。需要用户决定的行为问题和 Agent 能自行查证的技术问题分别标明责任方。
+For STANDARD/FULL module cards, build the canonical `implementationPlan` from applicable 项目规范、依赖、现有源码、PRD、原型和 API 证据. Use the compact four-block contract in [产物规则与评审卡规范](references/page-review-standard.md). 实现证据不足时设 `implementationPlan.status=blocked` 并说明缺口；需求 `conclusion` 独立，允许需求“已确认”同时实现方案待补充，不自动把需求改为“阻塞”。需要用户决定的行为问题和 Agent 能自行查证的技术问题分别标明责任方。QUICK 只在 brief 中语义核对同样的行为、证据和阻塞，不构造四块对象或调用正式 Plan 校验器。
 
-Keep the page state only as “评审中” or “阻塞” while reviewing. 不得生成 Draft OpenAPI. Use [状态模型](references/status-model.md) for evidence gates and objective counts; never report a single page completion percentage.
+For a formal review, keep the page state only as “评审中” or “阻塞” while reviewing and use [状态模型](references/status-model.md) for evidence gates and objective counts. 不得生成 Draft OpenAPI；不得报告单一页面完成百分比。QUICK 直接报告范围和验证事实，不创建页面状态模型。
 
 ## 评审模式选择
 
@@ -120,8 +166,10 @@ Keep the page state only as “评审中” or “阻塞” while reviewing. 不
 
 ## 简单需求：对话模式
 
-在对话中给出受影响项目与 `origin/master` SHA、范围、功能点、排除项、实现摘要，以及完整的需求确认前检查清单和推荐分支动作。
-`STANDALONE` 由用户确认该摘要后进入“开发分支与 Plan”；
+在对话中给出受影响项目与 `origin/master` SHA、范围、功能点、排除项、实现摘要和推荐分支动作。
+STANDARD/FULL 附完整的需求确认前检查清单；QUICK 按检查清单的简短展示规则
+汇总适用事实和阻塞计数，确认后返回范围和 brief。
+STANDARD/FULL 的 `STANDALONE` 由用户确认该摘要后进入“开发分支与 Plan”；
 `DEFER_TO_ORCHESTRATOR` 不单独提问，把摘要交给需求开发清单统一确认。两者都无需打开
 in-app 浏览器、注入 Shadow DOM、启动通知桥或要求统一提交。
 用户的增量修正只重开受影响项；没有冲突时不重复确认整份范围。
@@ -150,6 +198,8 @@ in-app Browser 打开；本地文件才启动临时 loopback 服务。使用运�
 不得在确认前写 Plan。
 
 ## 开发分支与 Plan
+
+本节只适用于 STANDARD/FULL 的正式 Plan；QUICK 已在范围阶段返回。
 
 ### TAPD 开发任务关联
 
@@ -195,6 +245,21 @@ Plan 细化发现任务范围、人员或工时需变更时，返回受影响任
 5. 按产物位置规则生成 Plan，记录项目、仓库、`origin/master` 基线、开发分支、功能点、代码落点、任务顺序、验证方式、风险和未决项。
 6. `DIALOGUE` 模式展示 Plan 摘要并取得明确确认；`PANEL` 模式使用已回填结果和“确认更新 Plan”门禁。写入后读回核对。
 
+### 计划内容的质量检查
+
+写入前按“独立接手”检查内容：只读所选任务、Plan 和引用的项目规则，能否
+知道交付行为、排除项、关键选择及理由、真实依赖和完成证据。去掉依赖
+“前面讨论”“按原来处理”的指代，补齐实际缺口即可；不新增用户审批或
+必跑的独立 Agent。复杂交接可让只读 reviewer 检查容易被误解的部分。
+
+业务行为、关键约束与选择理由是稳定约定；文件位置、组件组合和步骤是
+当前基线上的实施导航。保留有用的路径和证据，实施前核对其有效性；技术
+导航变化按既有增量规则处理，不自动重开未改变的业务结论。
+
+在既有 Task 内按可验证行为组织步骤，优先跑通最可能推翻方案的完整路径，
+再扩展其他场景。每步给出可观察结果和验证入口/预期/局限，不按组件、字段
+或技术层机械拆票。保持真实责任边界，不把跨仓库联调承诺成单方已完成。
+
 ## 确认更新 Plan
 
 Write the Plan only after the user explicitly confirms the displayed update.
@@ -217,6 +282,8 @@ Use the human-readable [页面交付 Plan 模板](assets/page-delivery-plan-temp
 `SCOPE_REVIEW` 返回需求身份、受影响项目、每个项目的 origin/master SHA、范围、功能点、
 排除项、代码证据、评审模式、风险、未决问题、检查清单、
 `requirement_blocker_count`、`implementation_blocker_count` 和 `implementation_ready`。
+同时携带已解析的 `workflow_profile`、`verification_risk` 和简短理由；QUICK
+附同一份 `implementationBrief`，不伪造 Plan 路径、任务 ID 或就绪状态。
 `STANDALONE` 返回
 `ConfirmedRequirementScope`，终态为 `CONFIRMED|PENDING|BLOCKED`；
 `DEFER_TO_ORCHESTRATOR` 返回 `ProposedRequirementScope`，终态为
@@ -227,6 +294,9 @@ Use the human-readable [页面交付 Plan 模板](assets/page-delivery-plan-temp
 
 `PLAN_WRITE` 返回一个 branch-bound `ConfirmedRequirementPlan`：上述范围、每个项目的已验证
 `TapdWorkDefinition`、Plan 路径/指纹、任务顺序、验证方式和 `PLAN_READY|PENDING|BLOCKED`。
+
+档位和验证风险属于 Agent 交接上下文，不添加到浏览器 ReviewSession 或
+PagePlan 校验模型白名单；不得用 QUICK 标记免除正式 TAPD Plan 的任务校验。
 
 Plan 写入并读回通过后交回调用方。端到端需求由 `zan-workflows:developing-requirement` 将
 `ConfirmedRequirementPlan` 和对应 `TapdWorkDefinition` 交给 `zan-workflows:implementing-work`。

@@ -42,6 +42,10 @@ feature/alice.0918.1080800.供应商分账限制
 
 ## 单次确认清单
 
+沿用已解析的 `workflow_profile` 和 `verification_risk`，含义见
+[按工作规模选择流程](../../../references/adaptive-workflow.md)。所有档位使用
+同一精确范围/分支授权；QUICK 省去未请求的任务和正式 Plan 写入。
+
 将范围与分支合并为一张表，每个项目一行：
 
 | TAPD | 项目/仓库 | `origin/master` | 当前分支 | 分支作者（来源） | 需求范围/排除项 | 需求确认 | 实施准备 | 目标开发分支 | 动作与基准 | 本次执行 | 待确认 |
@@ -60,21 +64,29 @@ feature/alice.0918.1080800.供应商分账限制
 - source branch/base：精确 `origin/master` ref 与 SHA，或已存在分支 ref/SHA；
 - target branch：精确 `feature/<branch-owner>.<MMDD>.<短ID>.<中文描述>`；
 - Story/Task 状态：`NOT_APPLICABLE_NON_BUG`，无 TAPD Bug 状态写入。
-- 除 `BRANCH_ONLY` 外，附完整 TAPD 任务拆分表、字段映射、拟写入描述/必填
+- 本次 `workflow_profile`、`verification_risk` 及简短理由；风险不由档位推导。
+- QUICK 且本轮包含实施：准确的所选 Story/Task、范围与 `implementationBrief`，说明行为、
+  排除项、证据、有序步骤、验证入口/预期/局限；既有 Task 保留其范围和人员
+  归属，不扩大到未选任务。本轮不创建/更新 Task、不补估时、不写正式 Plan。
+- `BRANCH_ONLY` 只展示所需范围/分支事实，不为将来实施补 brief、任务、排期
+  或实现证据；已有实施缺口可以保留，不能据此阻塞范围明确的分支准备。
+- `STANDARD|FULL` 且非 `BRANCH_ONLY` 时，附完整 TAPD 任务拆分表、字段映射、拟写入描述/必填
   字段和 proposal 指纹：逐项展示 CREATE/REUSE/UPDATE、真实旧 ID、项目/模块/
   功能编号、开发人员 TAPD 账号及核实来源、预估工时、依赖、验收及旧/新值。
   仅汇总最终预估工时；内部正常工时、计算系数和公式不进入会话或拟写入描述。
 - 本轮需创建/更新任务时，授权摘要明确包含这些 TAPD 操作；初始需求或
   范围/Plan 确认不能单独替代任务清单确认。人员、预计工时或必填字段未补齐
   时保持草稿，不询问创建确认、不创建空任务。PLAN_ONLY 可保留任务提案但
-  不因此授权外部写入；实施前必须 TASKS_READY。
+  不因此授权外部写入；STANDARD/FULL 需求实施前必须 TASKS_READY。
+  QUICK 不伪造该状态；已有正式 Plan/TaskBreakdown 的阻塞和读回要求不能用
+  QUICK 绕过。需要任务写入或正式 Plan 时先升级并展示对应变更。
 - 如本轮要写 Plan：列出精确路径和拟写入内容或差异。该内容已完整展示且
   确认后未变时，同一次清单确认可用于 Plan 写入；若仅列路径而未展示内容，
   写入前仍须展示实际 Plan 变更并确认。
 
 只问一次：`是否按此清单执行？`
 
-用户确认后，该确认同时绑定范围、项目/仓库、远程基准、分支身份、分支动作、用途、Plan 写入和本次执行模式，以及已明确展示的 TAPD 任务创建/更新清单；即使模式为 `SUBMIT|GO_LIVE`，该确认也只授权到实现与评审，后续提测、合并 master、Wiki 和本地清理仍使用各自产生后的精确确认。
+用户确认后，该确认同时绑定范围、项目/仓库、远程基准、分支身份、分支动作、用途和本次执行模式，以及实际展示的 brief、Plan 写入或 TAPD 任务创建/更新清单；没有展示的写入不在授权中。即使模式为 `SUBMIT|GO_LIVE`，该确认也只授权到实现与评审，后续提测、合并 master、Wiki 和本地清理仍使用各自产生后的精确确认。
 任何可见字段变化都会使确认失效，必须展示更新后的整张清单；`CREATE` 完成后同一分支转为 `USE_EXISTING` 是预期执行状态变化，不要求重复确认。
 
 执行 `CREATE` 时使用等价于

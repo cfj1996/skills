@@ -44,7 +44,7 @@ class BugFlowStateAndConfirmationTests(unittest.TestCase):
         self.assertIn("FAILED|UNKNOWN", SUBMITTING)
         self.assertIn("blocks every later Wiki/TAPD write", SUBMITTING)
 
-    def test_normal_flow_uses_two_confirmations_and_reuses_derived_ids(self):
+    def test_submission_flow_uses_two_confirmations_and_reuses_derived_ids(self):
         self.assertIn("exact branch action and verified base ref/SHA", FIXING)
         self.assertIn(
             "scope/start confirmation -> consolidated submit confirmation",
@@ -53,6 +53,28 @@ class BugFlowStateAndConfirmationTests(unittest.TestCase):
         self.assertIn("one complete `SubmissionPlan`", DEPLOYMENT)
         self.assertIn("do not require another confirmation", DEPLOYMENT)
         self.assertIn("commit SHA, MR ID, Wiki/month/child ID", DEPLOYMENT)
+
+    def test_repair_endpoint_stops_before_any_submission_capability(self):
+        self.assertIn("delivery_mode=IMPLEMENT|SUBMIT|GO_LIVE", FIXING)
+        self.assertRegex(FIXING, r"“修复” defaults to\s+`IMPLEMENT`")
+        self.assertIn(
+            "For `IMPLEMENT`, do not resolve or ask about Wiki/deployment settings",
+            FIXING,
+        )
+        self.assertIn("Do not call\n   `submitting-for-test`, even its read-only PLAN phase", FIXING)
+        implementation_end = FIXING.index("If it returns `REVIEWED` and `delivery_mode=IMPLEMENT`")
+        submission = FIXING.index("Only for `SUBMIT|GO_LIVE`, call `submitting-for-test`")
+        self.assertLess(implementation_end, submission)
+        self.assertIn("then continue with the next confirmed Bug", FIXING)
+
+    def test_continue_does_not_infer_submission_from_existing_state(self):
+        self.assertRegex(
+            FIXING,
+            r"Existing Wiki links,\s+`待测试` status or test-environment feedback never\s+select submission by themselves",
+        )
+        self.assertIn("reuse the previously explicit", FIXING)
+        self.assertRegex(FIXING, r"later requests submission of an `IMPLEMENT` result, reuse its\s+still-current `ReviewedChange`")
+        self.assertIn("later submission still requires its own exact `SubmissionPlan` confirmation", FIXING)
 
     def test_submission_profile_is_explicit_and_submission_plan_stops_before_writes(self):
         self.assertIn("submission_profile=AUTO|STANDARD|NO_WIKI", FIXING)

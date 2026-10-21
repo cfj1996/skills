@@ -12,6 +12,11 @@ description: Use when a TAPD Story must be split into development Tasks, or exis
 本技能只负责任务清单及其确认后的 TAPD 创建/更新，不绑定分支、编写正式
 Plan、改业务代码、流转任务状态或交付代码。
 
+按共享 [流程分级](../../references/adaptive-workflow.md)，本能力用于确实需要的
+任务拆分/更新及正式 TAPD Plan。QUICK 开发直接复用准确条目和窄范围摘要，
+无需仅为实施而调用本技能。用户明确要求拆任务或改任务时，至少 STANDARD 并
+执行本技能的完整任务确认/读回；既有正式任务结果不能靠降为 QUICK 绕过缺口。
+
 ## Inputs and handoff
 
 接受精确 Story URL、PRD/原型和人员约束，以及可复用的
@@ -19,8 +24,10 @@ Plan、改业务代码、流转任务状态或交付代码。
 `phase=PLAN|EXECUTE`，默认 `PLAN`；接受
 `confirmation_mode=STANDALONE|DEFER_TO_ORCHESTRATOR`（默认 STANDALONE）。
 DEFER_TO_ORCHESTRATOR 只返回完整提案，交编排统一展示并确认，不另行提问。
-EXECUTE 必须携带当前对话中对完整任务
-清单的明确确认。独立调用先经 `workspace-project-knowledge` 和
+EXECUTE 包含 CREATE/UPDATE 时必须携带当前对话中对完整拟写入任务
+清单的明确确认。全部为 REUSE 且无拟写入字段时，只读核对所选任务即可，
+不申请创建/更新授权；实施范围与分支的确认仍由对应能力负责。
+独立调用先经 `workspace-project-knowledge` 和
 `writing-plans phase=SCOPE_REVIEW` 取得项目、origin/master、范围和验收证据。
 复用有效证据，不重新启动评审。需求阻塞未清零时只整理草稿。
 
@@ -101,7 +108,11 @@ node <skill-dir>/scripts/validate-task-breakdown.js
 | 动作/稳定编号 | 现有任务 ID | 项目/模块/功能编号 | 标题/范围/排除项 | 开发人员（TAPD 账号） | 预估工时 | 依赖/验收 | 旧值→拟写入值 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 
-仅人员、工时、范围、必填字段及能力均已核实才询问：
+纯 REUSE 清单直接完成只读准确读回；结果一致时返回 TASKS_READY，不询问
+创建/更新确认，也不调用写工具。若核对发现范围、人员或工时等需要修改，
+转为 UPDATE 提案并执行下述写入确认，不能把不同事实作为 REUSE 接受。
+
+只有清单包含 CREATE/UPDATE，且人员、工时、范围、必填字段及能力均已核实才询问：
 `是否按此拆分清单创建或更新 TAPD 任务？`
 然后返回 `AWAITING_TASK_CONFIRMATION`，等待用户回答。最初“开发需求”、
 评审面板提交、Plan 确认或超时均不是该任务清单的确认。编排可将此表与范围/
@@ -109,7 +120,7 @@ node <skill-dir>/scripts/validate-task-breakdown.js
 
 ## EXECUTE：确认后的写入与读回
 
-确认必须绑定未变化的清单指纹。范围、人员、工时、目标、字段映射或任何
+CREATE/UPDATE 的确认必须绑定未变化的清单指纹。范围、人员、工时、目标、字段映射或任何
 拟写入内容变化时，展示差异并重新确认。只读刷新 Story、字段、成员和已有
 Task；被他人改动或出现相同关联标记时停止，先核对，不直接覆盖/重复创建。
 

@@ -44,6 +44,9 @@ For requirement task estimates, confirmation fingerprints, exact Task readbacks,
 and Plan-to-Task ownership/coverage checks, run
 `node --test plugins/zan-workflows/tests/task-breakdown.test.mjs`. These tests
 use in-memory task/field/member fixtures and perform no external writes.
+They also verify that QUICK labels or execution briefs cannot bypass formal
+Plan Task readiness, owner readbacks or step bindings. The Python suite covers
+implementation-only Bug routing and conditional submission preparation.
 
 For the approved pending-merge Wiki patch, shared-page entry isolation,
 permission handoff, readback failure and workflow-session write barriers, run

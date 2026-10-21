@@ -44,6 +44,15 @@ Accept exactly one TAPD URL plus optional hard constraints:
   confirmation binds the exact project/repository, scope, fixed branch,
   source/base, target branch, operation and purpose.
 
+An orchestrator may also supply `workflow_profile`, `verification_risk` and
+an in-memory `implementationBrief` under
+[按工作规模选择流程](../../references/adaptive-workflow.md). Preserve these
+with their evidence; QUICK does not require a formal Plan or TaskBreakdown.
+Validate the brief against the same selected item, scope and branch. Never
+reclassify an existing formal Plan as a brief to bypass its unresolved gates.
+Absent profile on a legacy handoff means STANDARD; none of these fields
+changes the branch, scope, Bug status/owner or authorization requirements.
+
 Constraints are requirements, not hints. Never replace a supplied project,
 repository, or branch with a more plausible candidate.
 

@@ -14,17 +14,22 @@ skills own all business validation and external writes.
 | `fixed_branch` | yes | Exact repair branch shared by every Bug. |
 | `work_mode` | yes | `INITIAL|CONTINUE`; infer from current and prior work evidence. |
 | `branch_mode` | yes | `AUTO`, `CREATE`, or `USE_EXISTING`. |
+| `delivery_mode` | yes | `IMPLEMENT|SUBMIT|GO_LIVE`; “修复” defaults to `IMPLEMENT`; submission/go-live require the corresponding user intent. |
+| `workflow_profile` / `verification_risk` | derived per Bug | Shared adaptive-workflow rules select preparation depth and independent verification risk from that Bug's scope/evidence; the same branch may hold different profiles. Neither expands delivery authority. |
+| `implementationBrief` | eligible QUICK Bug | Reuse the existing scope summary with `behaviors`, `exclusions`, `evidence`, `steps`, `verification`; carry it through preparation into implementation without new persistence or confirmation. |
 | `create_base_ref` | conditional | Exact base when creation may occur, unless verified workspace policy supplies it. |
-| `submission_profile` | yes | `AUTO|STANDARD|NO_WIKI`; resolve AUTO only from named policy, otherwise show `PENDING_SUBMISSION_PROFILE` and both exact choices. |
-| `deployment_mode` | yes | `AUTO|DEPLOY|SKIP`; infer explicit publish/direct-submit wording. |
-| `go_live` | yes | `true` only after an explicit current-conversation request. |
+| `submission_profile` | for `SUBMIT|GO_LIVE` | `AUTO|STANDARD|NO_WIKI`; resolve AUTO only from named policy, otherwise show `PENDING_SUBMISSION_PROFILE` and both exact choices. Not required or resolved for `IMPLEMENT`. |
+| `deployment_mode` | for `SUBMIT|GO_LIVE` | `AUTO|DEPLOY|SKIP`; infer explicit publish/direct-submit wording. Not required or resolved for `IMPLEMENT`. |
 
 `USE_EXISTING` means begin this Bug on the supplied existing branch. It is not
 a resume request and carries no requirement for prior Bug-specific evidence.
 
-`CONTINUE` is the same implementation/submission pipeline with reused context.
-It requires the original branch and Wiki when available, calculates only the
-incremental scope, and never creates a follow-up branch.
+`CONTINUE` reuses context, the original branch and only the incremental scope;
+it never creates a follow-up branch. Reuse the previously explicit delivery
+endpoint when still applicable and not changed by the current request; the
+current explicit endpoint takes precedence.
+Status, existing Wiki or test feedback alone never selects submission. Reuse
+the original Wiki only when entering the selected submission flow.
 
 A Wiki URL is not a request field. Under `STANDARD`, the submission capability
 derives the target by checking TAPD details/comments and the fixed Wiki
@@ -39,7 +44,9 @@ later failure, the next item uses `USE_EXISTING`.
 ## Preflight checklist
 
 Before any write, the orchestrator derives one user-visible row from each
-producer-owned preflight snapshot:
+producer-owned preflight snapshot. Display the delivery endpoint above the
+table and bind it to confirmation. `IMPLEMENT` uses the five common columns;
+only `SUBMIT|GO_LIVE` adds the two submission columns:
 
 | Column | Source |
 | --- | --- |
@@ -47,8 +54,8 @@ producer-owned preflight snapshot:
 | 项目/仓库 | verified selected project and canonical repository |
 | 分支 | exact fixed branch identity; exclude `CREATE` or `USE_EXISTING` |
 | 修复范围 | concise producer-derived in-scope work |
-| 提测策略 | exact `STANDARD（Wiki）` or `NO_WIKI（无 Wiki 调用）` |
-| 部署 | exact resolved `DEPLOY` or `SKIP` |
+| 提测策略 (submission only) | exact `STANDARD（Wiki）` or `NO_WIKI（无 Wiki 调用）` |
+| 部署 (submission only) | exact resolved `DEPLOY` or `SKIP` |
 | 待确认 | normalized missing decision/blocker, or `无` |
 
 The initial repair request is item selection, not checklist confirmation. An
@@ -56,7 +63,8 @@ unconfirmed checklist permits no write capability. A `PENDING` or `BLOCKED`
 snapshot remains producer-owned, appears in `待确认`, and keeps the whole
 request read-only.
 
-After explicit confirmation, each Bug is prepared again immediately before
+After explicit confirmation or valid `CONTINUE` incremental-scope authorization,
+each Bug is prepared again immediately before
 implementation. Only a `READY_FOR_HANDOFF` whose visible project/repository,
 branch, and scope match the confirmed row may become a handoff. Any changed
 visible field invalidates confirmation and returns the updated checklist.
@@ -70,7 +78,7 @@ For `INITIAL`, checklist confirmation also authorizes the displayed exact
 branch action/base, active-state transition, and implementation. Its authorization
 summary also binds each Bug's old status/`current_owner`, verified repair account
 and evidence, and the combined status+owner payload. The person summary is a
-visible bound fact even though the seven checklist columns stay unchanged.
+visible bound fact outside the checklist columns.
 An already-active Bug with a different handler still requires this authorized
 correction; only matching status and repair owner allow `NO_CHANGE`. Missing or
 ambiguous repair identity is `PENDING`. For
@@ -78,7 +86,9 @@ ambiguous repair identity is `PENDING`. For
 `status_action=SKIPPED_ALREADY_WAITING_TEST`; no active/final status rewrite or
 repair-owner rewrite or duplicate test-version write is allowed.
 
-Normal repair and submission have at most two confirmation points: initial
+`IMPLEMENT` stops at `REVIEWED` after the necessary initial authorization and
+independent review. It neither asks for submission settings nor calls submission
+PLAN. Repair with submission has at most two confirmation points: initial
 scope/implementation authorization when needed, then one consolidated
 submission authorization. `going-live` remains a separate master/Wiki
 confirmation, and local cleanup is another separate exact confirmation only
@@ -91,15 +101,21 @@ the first confirmation never authorizes submission writes.
 | Producer | Successful output | Next consumer |
 | --- | --- | --- |
 | `preparing-work` | `TapdWorkDefinition` with `READY_FOR_HANDOFF` | `implementing-work` |
-| `implementing-work` | `ReviewedChange` with `REVIEWED` | `submitting-for-test` |
+| `implementing-work` | `ReviewedChange` with `REVIEWED` | final per-Bug result for `IMPLEMENT`; `submitting-for-test` only for `SUBMIT|GO_LIVE` |
 | `submitting-for-test` | `TestSubmissionResult` with `SUBMITTED` | optional `going-live`, as the complete input |
 | `going-live` `DELIVER` | `MasterMergeResult` with `MERGED`, involved tooling latest release/consumer verification/Wiki readbacks, and cleanup state/plan | final summary or deferred cleanup confirmation |
 | `going-live` `CLEANUP` | updated cleanup result with `CLEANED|PARTIAL|BLOCKED` | final summary |
 | `going-live` waiting | `AWAITING_MERGE`, exact MR/read-only continuation and completed effects | pause the shared-branch queue; `已合并，继续上线` requests verification before remaining delivery |
 
 Preflight snapshots are not handoffs. Handoffs live only for the current
-execution, begin only after checklist confirmation and execution-time
-re-preparation, and are not serialized or written to the repository.
+execution, begin only after checklist confirmation or valid `CONTINUE`
+incremental-scope authorization plus execution-time re-preparation, and are not
+serialized or written to the repository.
+
+A later explicit submission request may reuse a still-current `ReviewedChange`
+after the receiver verifies repository, branch, exact diff and verification.
+Refresh invalidated evidence, not the whole repair flow. Initial repair
+authorization never authorizes the later submission writes.
 
 ## Per-Bug result
 

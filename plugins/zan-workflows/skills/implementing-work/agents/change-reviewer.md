@@ -34,7 +34,13 @@ status actions and must not be sent as `PRE_STATUS_WRITE` operations.
 For `POST_CHANGE_REVIEW`, inspect the supplied approved scope, current
 requirement/acceptance references and confirmed amendments, repository/branch
 facts, starting baseline, exact final diff, TAPD status readback, and
-verification results and gaps. Check in order:
+verification results and gaps, plus the applicable Plan, implementation brief
+or Bug investigation summary, resolved workflow profile and independent
+verification risk. Missing
+profile uses legacy `STANDARD`. A valid `QUICK` brief is sufficient planning
+input without manufactured Task/Plan/estimate/schedule artifacts; an existing
+formal contract and its blockers remain binding. Every profile requires this
+independent review. Check in order:
 
 1. Actual repository path, Git root, origin, and current branch match the
    prepared fixed target.
@@ -53,6 +59,14 @@ verification results and gaps. Check in order:
    verified by `scripts/bug-repair-status.mjs`. Matching status with a missing,
    stale or partial handler readback fails; preserve the no-write waiting-test
    continuation exception and never apply a Bug owner write to Story/Task.
+8. Engineering design fits the approved scope and project constraints: module
+   responsibilities and interfaces are coherent, existing capabilities are
+   reused where appropriate, and tests observe behavior rather than copying
+   implementation details. Keep this check distinct from requirement coverage;
+   one reviewer may cover both. Avoid unrelated redesign suggestions.
+9. Verification depth matches risk independently of preparation profile.
+   `HIGH` requires evidence for relevant failure paths, compatibility and
+   preserved behavior at the affected boundaries, including `QUICK` changes.
 
 Loss of a still-required behavior without an equivalent reachable replacement
 fails review. Equivalent refactoring and explicitly authorized changes/removals

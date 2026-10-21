@@ -1,6 +1,6 @@
 {
   "name": "zan-workflows",
-  "version": "0.1.0+codex.20261019-hub-fallback",
+  "version": "0.1.0+codex.20261021-adaptive-workflow",
   "description": "Company requirement development, TAPD and Wiki-link workflows, page review, MR review, debug token, identity, memory, and unified Hub-first project knowledge for Codex.",
   "author": {
     "name": "Local developer"
@@ -11,8 +11,8 @@
     "displayName": "Zan Workflows",
     "composerIcon": "./assets/logo.png",
     "logo": "./assets/logo.png",
-    "shortDescription": "TAPD task breakdown, development and delivery workflows.",
-    "longDescription": "Bundles requirement task breakdown with verified developers, final workload estimates and confirmation before TAPD writes; then linked branch-bound Plans, implementation, optional test submission, master delivery and local cleanup. Also includes TAPD Bug handling, Wiki workflows, GitLab MR review, debug tokens, team identity and project memory. Project knowledge queries use one entrypoint with Graphify Hub first and local knowledge fallback, retaining source and revision evidence.",
+    "shortDescription": "按复杂度分流的 TAPD 需求、Bug 开发与交付。",
+    "longDescription": "Routes requirements and Bugs through QUICK, STANDARD or FULL preparation, with independent risk-based verification and explicit delivery endpoints. QUICK uses a scoped execution brief; formal task and Plan workflows retain verified owners, estimates and readbacks. Includes test submission, master delivery, Wiki, MR review, debug tokens, identity and Hub-first project knowledge.",
     "developerName": "Local developer",
     "category": "Productivity",
     "capabilities": [
@@ -21,14 +21,15 @@
     ],
     "defaultPrompt": [
       "Use the appropriate Zan workflow skill for this task.",
+      "Use the shared adaptive-workflow policy: choose workflow_profile by complexity and uncertainty, verification_risk by impact, and delivery_mode only from user intent. QUICK never bypasses existing formal Plan, branch, status, review or delivery gates.",
       "Apply the bundled model-routing policy to lead decisions and explicitly bound validators; let the runtime choose models for managed MR reviewer agents.",
       "Before initial Bug work, show a concise project/repository, branch, and scope checklist and wait for confirmation; for CONTINUE work, reuse unchanged bound facts and confirm only unclear incremental scope.",
-      "Reuse original branch, Wiki, and TAPD status for CONTINUE work; use one consolidated submission confirmation and resolve Jenkins deployment as AUTO, DEPLOY, or SKIP.",
+      "Reuse original branch and TAPD status for CONTINUE work. Ordinary Bug repair stops after implementation and review; only requested submission resolves Wiki/deployment policy and uses the consolidated submission confirmation.",
       "Resolve and scope each TAPD work item before changing code.",
       "Repair, automatically locate or create the required TAPD Wiki, submit for test, or merge to master and maintain its merge-status field with the matching functional skill.",
-      "Use $writing-plans to scope requirements against remote master, choose dialogue or panel review by complexity, and write a branch-bound Plan.",
+      "Use $writing-plans for scoped requirement review; QUICK returns an in-memory execution brief. Write a formal branch-bound Plan only for STANDARD/FULL or an explicit Plan request, preserving its Task/readback requirements.",
       "Use $breaking-down-requirement to split a TAPD Story into Tasks with verified developers and final estimated hours; display only final estimated hours in the complete task list and wait for human confirmation before creating or updating Tasks, then link exact Task readbacks to Plan steps.",
-      "Use $developing-requirement to orchestrate project routing, remote-master scope, conditional review, branch binding, Plan writing, implementation, and explicitly requested test submission or master delivery with separate cleanup confirmation.",
+      "Use $developing-requirement to choose QUICK, STANDARD or FULL, bind the exact branch, implement and review, then enter test submission or master delivery only when requested.",
       "Use $linking-tapd-wiki to safely backfill or verify an existing 提测 Wiki link in a TAPD Bug, Story, or Task comment without rerunning submission."
     ]
   }
