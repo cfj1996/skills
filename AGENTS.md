@@ -68,6 +68,15 @@ The `zan-workflows` plugin includes the Writing Plans skill's Node tests under `
 
 ## Commit & Pull Request Guidelines
 
+Before creating any new working branch, apply the workspace Git naming rule:
+`<feature|fixbug>/<author>.<MMDD>.<TAPD-short-ID>.<Chinese-description>` when a
+real TAPD item is associated, or `<feature|fixbug>/<author>.<MMDD>.<Chinese-description>`
+otherwise. Repository maintenance and tooling use the same author/date/Chinese
+description requirements; omit only the ID segment and never invent an ID.
+Read the applicable `git-safety.md`, resolve the author from `USER_NAME`, Git
+`user.name`, then the OS username, and validate the full name before creation.
+Continue on an existing branch without renaming it to satisfy the new rule.
+
 Recent history in `tapd-workflow` uses short conventional-style subjects such as `docs: ...` and `refactor: ...`. Follow that pattern, for example `docs: clarify worktree cleanup` or `feat: add reviewer guidance`. PRs should describe the affected skill, summarize behavior changes, link the TAPD item or issue when applicable, and include example output or screenshots whenever prompts, generated docs, or review artifacts change.
 
 ## Security & Configuration Tips

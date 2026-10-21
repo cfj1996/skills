@@ -283,6 +283,13 @@ TAPD 账号、预估工时、范围、依赖和验收。对话、确认表、任
 
 需求分支格式为 `feature/<branch-owner>.<MMDD>.<短ID>.<中文描述>`。描述从需求标题提炼，必须包含中文，不翻译为英文或拼音；示例：`feature/alice.0918.1080800.供应商分账限制`。新需求及 Bug 分支的作者标识优先取当前工具用户级提示词中的 `USER_NAME`，缺失时依次取目标仓库生效的 Git `user.name` 和本机用户名，不使用邮箱前缀；保留中文姓名并规范化不安全分隔符。`project-knowledge` 的 `npm run init` 会确认并写入 `USER_NAME`，默认取 Git 用户名，没有则取电脑用户名。身份无法安全规范化时会暂停并要求补充，不会硬编码某个同事的名字；继续已有工作时复用原分支。
 
+上述作者、日期和中文描述要求同样适用于所有新建工作分支。无关联 TAPD 的
+仓库维护、文档或工具优化使用 `<prefix>/<branch-owner>.<MMDD>.<中文描述>`，
+只省略 ID 段，不编造编号；例如 `feature/alice.1021.需求与缺陷流程分级优化`。
+`prefix` 为 `feature` 或 `fixbug`，日期按 Asia/Shanghai。创建前先按工作区
+`git-safety.md` 核对完整格式，再运行 `git check-ref-format --branch`；已有分支
+继续复用。无 TAPD 命名规则不改变需求/Bug 技能必须提供真实 TAPD 条目的要求。
+
 ## 3. Bug 修复流程
 
 Bug 使用 `fixing-bug`。它可以接收一个 Bug URL 或有序列表；多个 Bug 共用一个已确认的项目、仓库和分支。
