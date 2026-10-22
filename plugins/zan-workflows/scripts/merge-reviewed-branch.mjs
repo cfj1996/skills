@@ -113,8 +113,14 @@ function awaitingMerge(result, plan, mr, reason) {
   const readiness = mergeState(mr, plan);
   if (readiness.error) throw new Error(readiness.error);
   requireText(mr.web_url, '待人工合并 MR 链接');
+  const resumePrompt = ['master', 'main'].includes(plan.targetBranch) ? '已合并，继续上线' : '已合并，继续交付';
+  const explanation = reason === 'MERGE_PERMISSION_DENIED' ? '当前账号没有合并权限。'
+    : reason === 'MANUAL_MERGE_PENDING' ? 'MR 仍未合并。' : '本次采用人工合并。';
   return { ...result, state: 'AWAITING_MERGE', phase: 'WAIT_MANUAL_MERGE', mrUrl: mr.web_url,
     reason, targetSha: plan.targetSha, readiness: readiness.state,
+    userAction: { type: 'CONTACT_MERGER', resumePrompt,
+      message: `${explanation}请联系有权限的同事审核并将 ${plan.sourceBranch} 合并到 ${plan.targetBranch}。`
+        + `\nMR：[查看 MR](${mr.web_url})\n合并完成后，回复“${resumePrompt}”。` },
     resumePlan: { ...plan, mrIid: result.mrIid, mergeMode: 'VERIFY_ONLY', execute: false, confirmed: false } };
 }
 

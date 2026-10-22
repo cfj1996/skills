@@ -224,6 +224,31 @@ test('staged TAPD Plans can retain proposals, while implementation requires read
   assert.match(messages(validatePagePlanModel(value)), /TASKS_READY/);
 });
 
+test('a QUICK label or execution brief cannot bypass formal TAPD Plan readiness', () => {
+  for (const profile of ['QUICK', 'STANDARD', 'FULL']) {
+    const value = model();
+    value.workflow_profile = profile;
+    value.verification_risk = 'NORMAL';
+    value.implementationBrief = { behaviors: ['失败时反馈并允许重试'], steps: ['修复并验证'] };
+    value.deliveryUnit.status = '可实施';
+    delete value.taskBreakdown;
+    assert.match(messages(validatePagePlanModel(value)), /TASKS_READY/);
+  }
+});
+
+test('QUICK cannot hide stale ownership or missing step bindings in an existing formal Plan', () => {
+  for (const invalidate of [
+    value => { value.taskBreakdown.records[0].readback.ownerAccount = 'different-owner'; },
+    value => { delete value.tasks[0].tapdTaskKey; },
+    value => { value.taskBreakdown.records = []; },
+  ]) {
+    const value = model();
+    value.workflow_profile = 'QUICK';
+    invalidate(value);
+    assert.equal(validatePagePlanModel(value).valid, false);
+  }
+});
+
 test('an existing exact Task can be reused without rewriting its historical description', () => {
   const input = proposal(), task = input.tasks[0];
   task.action = 'REUSE'; task.id = 'existing-task'; task.beforeFingerprint = 'snapshot';

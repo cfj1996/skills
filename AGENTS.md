@@ -33,7 +33,9 @@ simulate TAPD and workflow sessions with no external writes.
 
 For manual merge permission handoff and read-only continuation checks, run
 `node --test plugins/zan-workflows/tests/manual-merge.test.mjs`. These tests
-simulate GitLab and workflow sessions, with no external writes.
+simulate GitLab and workflow sessions, including actionable contact reminders,
+exact MR/target links, and go-live versus dev-delivery continuation prompts,
+with no external writes.
 
 For Git safety Hook deletion classification and retained creation/rebase gates,
 run `node --test plugins/zan-workflows/tests/git-branch-safety.test.mjs`. These
@@ -44,11 +46,24 @@ For requirement task estimates, confirmation fingerprints, exact Task readbacks,
 and Plan-to-Task ownership/coverage checks, run
 `node --test plugins/zan-workflows/tests/task-breakdown.test.mjs`. These tests
 use in-memory task/field/member fixtures and perform no external writes.
+They also verify that QUICK labels or execution briefs cannot bypass formal
+Plan Task readiness, owner readbacks or step bindings. The Python suite covers
+implementation-only Bug routing and conditional submission preparation.
 
 For the approved pending-merge Wiki patch, shared-page entry isolation,
 permission handoff, readback failure and workflow-session write barriers, run
 `node --test plugins/zan-workflows/tests/pending-merge-wiki.test.mjs`.
 These tests simulate GitLab and TAPD without external writes.
+
+For local test-merge branch cleanup and exact remote deletion commands, run
+`node --test plugins/zan-workflows/tests/cleanup-branches.test.mjs`. These tests
+use disposable local repositories and a local bare remote to verify worktree
+protection, dev-target `-d` checks without persisted tracking, exact-ref deletion,
+and rejection when the remote SHA changes. They never contact a company remote.
+They also cover --no-follow-tags with push.followTags enabled and existing
+upstream normalization/readback before ordinary temporary-branch deletion.
+`registration-closeout.test.mjs` also covers temporary test-merge branches checked
+against their own dev/develop targets, including branches without a worktree.
 
 For Bug repair-state and repair-owner planning/readback checks, run
 `node --test plugins/zan-workflows/tests/bug-repair-owner.test.mjs`. These tests
@@ -64,6 +79,15 @@ Write skill docs in concise Markdown with clear `#`/`##` headings, short rule li
 The `zan-workflows` plugin includes the Writing Plans skill's Node tests under `plugins/zan-workflows/skills/writing-plans/tests/`; run the complete suite and both official validators for every plugin change. For a standalone skill, run its owning workflow's targeted command, validate `skills/<skill-name>` with `skill-creator/scripts/quick_validate.py`, inspect generated artifacts when applicable, and confirm documented paths and commands still match the repository layout. Keep new scripts and tests inside their owning skill or plugin directory and document the exact command here.
 
 ## Commit & Pull Request Guidelines
+
+Before creating any new working branch, apply the workspace Git naming rule:
+`<feature|fixbug>/<author>.<MMDD>.<TAPD-short-ID>.<Chinese-description>` when a
+real TAPD item is associated, or `<feature|fixbug>/<author>.<MMDD>.<Chinese-description>`
+otherwise. Repository maintenance and tooling use the same author/date/Chinese
+description requirements; omit only the ID segment and never invent an ID.
+Read the applicable `git-safety.md`, resolve the author from `USER_NAME`, Git
+`user.name`, then the OS username, and validate the full name before creation.
+Continue on an existing branch without renaming it to satisfy the new rule.
 
 Recent history in `tapd-workflow` uses short conventional-style subjects such as `docs: ...` and `refactor: ...`. Follow that pattern, for example `docs: clarify worktree cleanup` or `feat: add reviewer guidance`. PRs should describe the affected skill, summarize behavior changes, link the TAPD item or issue when applicable, and include example output or screenshots whenever prompts, generated docs, or review artifacts change.
 

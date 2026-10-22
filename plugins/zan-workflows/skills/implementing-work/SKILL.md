@@ -21,6 +21,12 @@ authorized TAPD status write uses `tapd-mcp`, never browser automation by defaul
 Read [acceptance-scenarios.md](references/acceptance-scenarios.md) only for an
 edge case or regression check.
 
+Use [adaptive-workflow.md](../../references/adaptive-workflow.md) for
+`workflow_profile=AUTO|QUICK|STANDARD|FULL` and independent
+`verification_risk=NORMAL|HIGH`. An omitted profile uses the legacy `STANDARD`
+contract. Resolve `AUTO` from the actual scope before choosing the execution
+input; high risk increases verification depth, not preparation paperwork.
+
 ## Input gate
 
 Accept only `terminal_state=READY_FOR_HANDOFF` with:
@@ -36,7 +42,8 @@ Accept only `terminal_state=READY_FOR_HANDOFF` with:
 
 Re-read actual repository path, Git root, origin, branch refs, HEAD, and
 `git status --short`. A mismatch blocks before edits.
-Reuse verified project knowledge, Plan and scope from the handoff. Check the
+Reuse verified project knowledge, the applicable Plan/implementation brief or
+Bug investigation summary, and scope from the handoff. Check the
 project's Node/package-manager version and relevant verification commands
 before the first project verification command so an avoidable runtime mismatch does not start a
 trial-and-error sequence.
@@ -58,12 +65,26 @@ return `BLOCKED` and explain the overlap. Do not modify or erase them.
 
 ## Implementation
 
-需求开发在第一项业务源码修改前，按
+For an eligible `QUICK` change without an existing formal Plan/Task breakdown,
+accept an in-memory `implementationBrief` with `behaviors`, `exclusions`,
+`evidence`, `steps`, and `verification`. It describes the approved observable
+behavior, boundaries, current source/contract evidence, executable behavior
+slices and how each result is checked. Resolve material unknowns before edits;
+the brief reuses the approved `TapdWorkDefinition` and its authorization. It
+does not require a formal Plan, Task creation, estimates or schedule. Preserve
+an existing formal Plan/Task contract and its blockers; selecting `QUICK` cannot
+bypass them. `STANDARD|FULL` requirement development keeps `TASKS_READY` and
+Plan-to-Task checks. Bug repairs do not acquire requirement Task/Plan gates
+merely because their profile is `STANDARD|FULL`; their scoped investigation and
+implementation summary may remain in the conversation.
+
+使用正式 Task/Plan 的需求开发在第一项业务源码修改前，按
 [实施排期推荐](references/implementation-schedule.md) 展示所选 Task 的建议
 起止日期/工作日窗口：复用已确认的预估工时、当前剩余范围、人员可用时间
 和依赖。复用编排传入的共享 `scheduleRecommendation`，独立调用则自行生成。
 它是推荐，不要求新增确认才能继续已授权实施，也不写 TAPD 日期或 Plan；
-用户另行要求回写时再展示精确日期变更并确认。Bug 保持原有流程。
+用户另行要求回写时再展示精确日期变更并确认。纯 `QUICK` brief 和 Bug 不强制
+估时排期；用户明确要求时间建议时可以按已知信息给出，不虚构 Task 或工时。
 
 1. After the repository/branch/scope gate passes, handle TAPD status by item type:
    - for Story/Task, require `NOT_APPLICABLE_NON_BUG` and perform no status
@@ -91,8 +112,9 @@ return `BLOCKED` and explain the overlap. Do not modify or erase them.
    without automatic rollback or retry. Never ask again merely because
    authorization came from the confirmed checklist.
 2. Diagnose the Bug or plan the requested Story/Task within the approved scope.
-   For requirement development, consume the selected `TASKS_READY` Task records
-   and the Plan's `tapdTaskKey` links under the
+   For requirement development using `STANDARD|FULL` or an existing formal
+   Plan/Task breakdown, consume the selected `TASKS_READY` Task records and the
+   Plan's `tapdTaskKey` links under the
    [task contract](../breaking-down-requirement/references/contracts.md).
    Verify the real Task IDs, assigned developers, positive final workload
    estimates, dependencies and acceptance against current readbacks before
@@ -100,7 +122,8 @@ return `BLOCKED` and explain the overlap. Do not modify or erase them.
    the original bound branch. Missing Task data, stale scope/person/hours or
    unmapped steps return to task breakdown/confirmation; never create Tasks or
    infer permission to edit a coworker's unselected Task. Non-TAPD/Bug flows
-   retain their existing contract. Report Task-level verification; completion
+   retain their existing contract. Report verification for the selected formal
+   Tasks; completion
    of one step never authorizes a Task done/status write. Conversation and
    progress show final estimated hours only; do not disclose internal base
    effort, coefficients, formulas or calculation comparisons.
@@ -113,8 +136,18 @@ return `BLOCKED` and explain the overlap. Do not modify or erase them.
    reuse the effective `ZAN-SCOPE-MINIMAL-001` rule from the supplied project
    context (`standards/zan-system/rules/scope-minimization.md`); a newer central
    version does not automatically change the project's adopted requirements.
-3. Implement the smallest coherent change. Add or update ordinary project
-   tests when appropriate. During edits run focused tests, type/lint checks
+3. Implement the smallest coherent change in observable behavior slices.
+   Validate the assumption most likely to invalidate the approach first, then
+   complete and check each slice before expanding the next. A slice follows a
+   behavior through the layers in scope, rather than completing every file of
+   one technical layer first. Choose project tests, reproduction or browser
+   checks for the behavior; when tests are appropriate, exercise public
+   interfaces instead of mirroring private implementation details. For
+   `verification_risk=HIGH`, cover the relevant failure paths, compatibility
+   and preserved behavior at the actual affected boundaries. `QUICK` never
+   lowers this depth; an unavailable required check remains a blocker.
+   Add or update ordinary project tests when appropriate. During edits run
+   focused tests, type/lint checks
    that exercise the changed files; run the broader required suite and build
    once after the coherent diff is stable. Repeat a broad gate only if a later
    change can invalidate its result. Do not rerun `git status`, diff statistics
@@ -128,13 +161,17 @@ return `BLOCKED` and explain the overlap. Do not modify or erase them.
    reachable replacement and run risk-appropriate checks for behaviors that
    must remain. Recheck affected behavior after later edits invalidate earlier
    evidence; source deletion alone is not proof of behavior loss.
-5. Give the exact diff, scope, affected behavior expectations with their source
-   references, repository/branch facts, and verification results and gaps
+5. Give the exact diff, scope, applicable Plan/implementation brief or Bug
+   investigation summary, resolved profile/risk, affected behavior expectations
+   with their source references,
+   repository/branch facts, and verification results and gaps
    to [agents/change-reviewer.md](agents/change-reviewer.md) with
    `validation_phase=POST_CHANGE_REVIEW`. The reviewer is
    read-only and returns one private verdict line. Map it to
    `REVIEW_PASSED|REVIEW_FAILED|NOT_RUN`, retain only a normalized reason, and
    discard the private line.
+   Every profile requires independent review of both requirement behavior and
+   engineering design/test coupling; this does not require two reviewer agents.
    One coherent final diff gets one independent review. If review feedback
    causes a change, recheck the affected paths and review that delta; do not
    restart the whole preparation and implementation workflow.

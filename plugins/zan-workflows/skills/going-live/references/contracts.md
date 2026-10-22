@@ -13,11 +13,14 @@ packages and affected consumers.
 | Merge | source/target branches and SHAs, current-round commits, authorization, MR result, merge readback, master containment |
 | Tooling latest | `VERIFIED|NOT_APPLICABLE|AWAITING_MERGE|BLOCKED`; exact plan/authorization, latest precheck `VERIFIED_EXISTING|NEEDS_RELEASE|BLOCKED`, package owner delivery, `REUSED_LATEST|PUBLISHED_LATEST` and publication/source/registry evidence, Jenkins result only when a release is needed, affected consumer manifests/locks/resolved versions, upgrade review/checks/delivery, and final latest recheck |
 | Related deliveries | per-project repository/original branch/source and target SHA, scoped upgrade diff when used, review/verification, commit/push/MR readbacks and default-branch containment |
+| Conflict handoff | exact A/B/C association and ConflictMergeHandoff from submission or delivery, C MR/SHAs and A/C containment in B, upfront conditional cleanup authority, latest retention choice and per-resource outcomes, including already absent resources |
 | Wiki | `UPDATED_PENDING_MERGE|ALREADY_PENDING_MERGE|UPDATED_MERGED|ALREADY_MERGED|UPDATED_LATEST|ALREADY_LATEST|SKIPPED_TOOL_PROJECT|SKIPPED_NO_WIKI|BLOCKED|NOT_ATTEMPTED`, matching project/branch entry, project type, before/after type-specific status, target/patch authorization, exact-body readback and intermediate body hash when used |
 | Validation | `VALIDATION_PASSED|VALIDATION_FAILED|NOT_RUN` and normalized reason |
 | Local closeout | per completed project `CHECKED|PARTIAL|UNAVAILABLE|NOT_TRIGGERED`; related branch/worktree paths, association and delivery evidence, observed tip/target SHAs, dirty/ignored/occupancy findings, and per-resource `CANDIDATE|RETAIN|VERIFY` with reasons |
 | Cleanup | `NO_CANDIDATE|AWAITING_CONFIRMATION|CLEANED|PARTIAL|BLOCKED|NOT_TRIGGERED`; exact plan and confirmation when applicable, final-response cleanup question or no-candidate/blocker reason, refreshed evidence, worktree-removal and local-branch-deletion readbacks, and completed/retained resources |
+| Remote cleanup | `NOT_REQUESTED|AWAITING_CONFIRMATION|NO_CANDIDATE|CLEANED|PARTIAL|BLOCKED`; associated remote merge refs may be attached as `CleanupPlan.remoteTemporary` under one explicit combined confirmation; remote development refs default NOT_REQUESTED and require a separate request; retain repository/remote/push URL/full refs/SHAs, own MR targets, protection/shared-use and containment evidence, conditional deletion and per-ref absence readback |
 | Terminal | `MERGED|AWAITING_MERGE|BLOCKED`; exact pending MR/read-only continuation when waiting, or blocker when applicable |
+| User action | For `AWAITING_MERGE`, `userAction.type=CONTACT_MERGER`, a message naming the exact MR/source/target and asking the user to contact a colleague with merge permission, and `resumePrompt=已合并，继续上线`; surface this in the final response even when the pending Wiki patch blocks |
 
 ## Invariants
 
@@ -25,6 +28,10 @@ packages and affected consumers.
   `user.can_merge=false`, or merge-call HTTP 403. Retain exact MR IID/URL,
   repository/branches/source SHA, completed effects, unfinished stage and
   read-only `resumePlan`; never infer completion or label this a failed merge.
+  Show `userAction.message` rather than only a waiting status. Preserve it
+  through owner/consumer and orchestrator handoffs, including repeated open-MR
+  checks. Manual mode alone does not prove permission denial. The reminder is
+  conversational and requires no team hierarchy or external notification.
   Dependent publication, consumer delivery, final merged/latest Wiki updates
   and cleanup require `MERGED`. The only exception is the explicitly authorized
   business status `未合并 → 待合并`, after exact opened-MR/source readback.
@@ -47,6 +54,11 @@ packages and affected consumers.
   success alone cannot satisfy the overall delivery result.
 - `develop -> master`, `dev -> master`, `merge/*`, release branches, or a
   substituted source are always blocked.
+  Here source means the original business source. An explicitly confirmed
+  [A → C → B conflict](../../../references/conflict-merge.md) retains original
+  A and distinct C → B MR evidence; it never passes C as A to the ordinary
+  merge executor. Require both reviewed A and C containment in B before
+  recording completion. This exception does not permit develop/dev → master.
 - A `STANDARD` submission, including `SKIPPED_BY_POLICY`, requires its
   pre-existing exact Wiki target and one uniquely matching source-branch entry.
   An involved tooling package yields `UPDATED_LATEST|ALREADY_LATEST`, with
@@ -135,7 +147,12 @@ packages and affected consumers.
   claim.
 - Every delivery final response includes the cleanup outcome. An
   `AWAITING_CONFIRMATION` result displays the exact plan and ends with
-  `是否删除以上本地开发环境？`, offering `确认清理` or `保留开发环境`.
+  `是否删除以上本地开发环境？`, offering `确认清理` or `保留开发环境`,
+  for local-only scope. A combined plan uses the concise three-row format in
+  local-closeout.md, asks `是否清理以上资源（含远程临时分支）？`, and requires
+  `确认清理（含远程临时分支）` or equivalent explicit scope. Preserve exact
+  evidence in memory; show repository, exact local/remote names and paths,
+  retained remote development branches and concise exclusion reasons.
   A state code or generic recommendation cannot replace this question.
   Orchestrators retain the plan and surface one combined question only after
   all required delivery gates pass. Other states explain why cleanup is
@@ -144,14 +161,49 @@ packages and affected consumers.
   plan; `CLEANUP` reuses the prior merge result and rechecks candidates without
   repeating delivery writes. Choosing to retain resources performs no deletion
   and ends the cleanup prompt until a later explicit request.
-- Cleanup may remove only confirmed local worktrees followed by their exact
-  local branches. It never removes the current task path/branch, protected
+- Combined confirmation authorizes local cleanup and only its listed associated
+  remote `merge/*` refs, never remote feature/fixbug refs. Generic `确认清理`
+  is ambiguous for a combined plan and performs no deletion pending scope
+  clarification. Validate both scopes before starting; local cleanup precedes
+  remote temporary deletion, with no extra confirmation for unchanged scopes.
+- A confirmed ACB preview may itself supply exact conditional local/remote C
+  and temporary-worktree cleanup authority. Once its own MR and safety checks
+  pass, default DELETE_AFTER_MERGE executes only that scope without another
+  confirmation; an explicit retention instruction revokes it and persists.
+  Keep original development resources outside this authority. Do not re-prompt
+  for cleaned/absent or RETAINED_BY_USER resources in later go-live cleanup;
+  deferred or failed scope retains its exact authority and reason, never
+  triggers a blind retry. This temporary cleanup also applies after C → dev,
+  independently of master-delivery completion.
+- The local stage of `CLEANUP` may remove only confirmed local worktrees followed by their exact
+  local development or temporary test-merge branches. Temporary branches are
+  checked against their own merged MR target, including dev/develop, rather
+  than requiring integration-only commits in master. Missing association is
+  VERIFY. It never removes the current task path/branch, protected
   branches, dirty/active/locked/uncertain resources, remote branches, or any
-  resource not classified `CANDIDATE` in the unchanged confirmed plan.
-- Cleanup uses ordinary `git worktree remove` and `git branch -d` only. Force
+  resource not classified `CANDIDATE` in the unchanged confirmed plan. The
+  remoteTemporary stage uses its separately verified remote evidence and
+  explicit combined confirmation. Local NO_CANDIDATE does not discard a
+  nonempty remoteTemporary plan; both scopes must be empty for overall NO_CANDIDATE.
+- Local cleanup uses ordinary `git worktree remove` and `git branch -d` only;
+  a temporary test-merge branch with no configured merge values may use
+  command-scoped upstream settings. Existing upstreams must be verified or
+  normalized and read back under local-closeout.md, with exact restoration on
+  failure when unchanged. Force
   deletion, raw filesystem deletion, broad pruning, branch switching, process
-  termination, and remote deletion are forbidden. A cleanup failure is
+  termination, and remote deletion are forbidden in this local operation. A cleanup failure is
   reported separately and never changes a verified merge into an unmerged one.
+- Remote operations follow [remote-cleanup.md](remote-cleanup.md), either as
+  the explicitly confirmed remoteTemporary stage or separately requested
+  `CLEANUP_REMOTE`. Local-only confirmation, local absence or
+  safe local tips cannot authorize or prove safe remote deletion. Bind exact
+  remote refs/SHAs, verify their complete tips against their own merged targets,
+  protected/default/current-branch and shared-use restrictions, then require
+  an explicit remote instruction. Use Git CLI expected-SHA lease deletion with
+  `--no-follow-tags` and
+  exact absence readback, never GitLab MCP/API or MR auto-delete. Changed or
+  unknown evidence blocks; no automatic retry. Keep remote and local outcomes
+  separate, including when only one cleanup scope was requested or completed.
 - The result may report only evidenced official tooling-package publication;
   it contains no business-application production-deployment claim, runtime/recovery fields,
   persisted local workflow record paths, or private validator response. Inspected

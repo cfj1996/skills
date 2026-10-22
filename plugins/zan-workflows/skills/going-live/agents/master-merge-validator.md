@@ -74,6 +74,17 @@ For the proposed scoped operations, validate:
    publication and consumer evidence; master containment alone is insufficient.
 8. No local record, recovery metadata, or private prior verdict is used.
 
+For the separate explicitly authorized
+[A → C → B conflict path](../../../references/conflict-merge.md), keep original
+A as business source and validate the exact C/B MR, reviewed resolution and
+A/C containment in B. The normal executor still rejects a substituted C.
+An upfront ACB confirmation may include default cleanup of exact local/remote
+C and its temporary worktree after verified merge and fresh safety checks.
+Do not demand another confirmation for that unchanged scope. A later user
+retention instruction revokes deletion authority, and cleaned/absent or
+retained resources are not offered again in ordinary go-live cleanup. This
+exception never authorizes original development or remote feature/fixbug deletion.
+
 Do not require future readbacks for bundle pre-validation. The merge
 plan may use `MANUAL` for a developer without merge permission. An
 `AWAITING_MERGE` handoff is valid: all dependent publication, consumer, final

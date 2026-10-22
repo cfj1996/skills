@@ -32,8 +32,17 @@ same branch.
 
 ## Change and verification
 
+- Use the shared adaptive profile and independent verification risk. Legacy
+  calls without a profile use `STANDARD`. Eligible `QUICK` work can use an
+  in-memory behavior/evidence/steps/verification brief, without inventing a
+  Plan, Task, estimate or schedule. Existing formal Plan/Task blockers remain
+  binding; profile selection cannot evade them.
 - Diagnose before changing code and keep the implementation within approved
   scope.
+- Implement and verify observable behavior slices. Check the highest-impact
+  uncertain assumption early, and observe behavior through the public boundary
+  relevant to this change. `HIGH` includes affected exceptional, compatibility
+  and preserved-behavior cases even for a narrow `QUICK` change.
 - Use project-native formatting, static checks, tests, builds, or focused
   reproduction commands relevant to the change.
 - Never claim an unrun check passed. Report unavailable or failing required
@@ -48,3 +57,7 @@ same branch.
 The reviewer receives current in-memory facts and the exact source diff. Its
 one-line Chinese response is private. Map the response to a public review state
 and discard the raw line after extracting a concise failure reason.
+Every profile requires this independent review. Supply the applicable Plan,
+brief or Bug investigation summary and risk; examine both requested behavior
+and engineering design/test
+coupling without requiring a fixed number of reviewers.

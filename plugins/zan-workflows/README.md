@@ -10,8 +10,8 @@
 
 | Codex 显示名称 | 调用方式 | 适用场景 |
 | --- | --- | --- |
-| **zan:需求开发** | `$developing-requirement` | TAPD Story/Task：范围确认 → 分支与 Plan → 实现评审 → 按要求提测/上线 |
-| **zan:修复 TAPD 缺陷** | `$fixing-bug` | 一个或多个 TAPD Bug：统一预检和确认 → 顺序修复/提测 → 明确要求时上线 |
+| **zan:需求开发** | `$developing-requirement` | TAPD Story/Task：按复杂度选择摘要或正式 Plan → 分支与实现评审 → 按要求提测/上线 |
+| **zan:修复 TAPD 缺陷** | `$fixing-bug` | 一个或多个 TAPD Bug：按复杂度准备 → 修复与审查；明确要求时才提测/上线 |
 
 ## 1. 能力地图
 
@@ -19,11 +19,11 @@
 | --- | --- | --- | --- |
 | zan:项目知识 | [`workspace-project-knowledge`](skills/workspace-project-knowledge/SKILL.md) | 统一查询项目知识，优先 Graphify Hub，必要时回退本地；定位项目、代码入口、Jenkins Job 和共享包归属 | 项目路由/知识入口 |
 | zan:准备 TAPD 工作 | [`preparing-work`](skills/preparing-work/SKILL.md) | 只读读取 TAPD Bug、Story、Task，确认项目、仓库、范围、原始分支及创建/复用动作，输出内存交接定义 | 只读预检 |
-| zan:可视化编写计划 | [`writing-plans`](skills/writing-plans/SKILL.md) | 按远程 `origin/master` 收敛需求和验收；简单需求用对话，复杂需求用评审面板；绑定分支后写可执行 Plan | 范围/Plan |
+| zan:可视化编写计划 | [`writing-plans`](skills/writing-plans/SKILL.md) | 按远程 `origin/master` 收敛需求和验收；QUICK 返回摘要，正式 Plan 继续按复杂度选择对话或面板 | 范围/Plan |
 | zan:拆分需求任务 | [`breaking-down-requirement`](skills/breaking-down-requirement/SKILL.md) | 按需求拆分任务，核实开发人员，预估开发工时，确认清单后创建/更新 TAPD 并关联 Plan | 任务拆分/估时 |
 | zan:实施 TAPD 工作 | [`implementing-work`](skills/implementing-work/SKILL.md) | 在已确认的固定分支实现变更，运行相关验证并独立评审；不负责提测或发布 | 实现/评审 |
-| **zan:需求开发** | [`developing-requirement`](skills/developing-requirement/SKILL.md) | 编排一个 TAPD Story/Task 从范围、分支、Plan、实现到用户明确选择的提测或上线阶段 | 需求主入口 |
-| **zan:修复 TAPD 缺陷** | [`fixing-bug`](skills/fixing-bug/SKILL.md) | 对一个或多个 Bug 做统一只读预检、清单确认，按顺序修复和提测；用户明确要求时可继续上线 | Bug 主入口 |
+| **zan:需求开发** | [`developing-requirement`](skills/developing-requirement/SKILL.md) | 按 QUICK/STANDARD/FULL 编排范围、分支、实施与验证，正式 Plan 按需生成，交付止于明确目标 | 需求主入口 |
+| **zan:修复 TAPD 缺陷** | [`fixing-bug`](skills/fixing-bug/SKILL.md) | 对一个或多个 Bug 做统一预检与确认、顺序修复和审查；仅按明确交付目标提测或上线 | Bug 主入口 |
 | zan:起草提测 Wiki | [`drafting-wiki`](skills/drafting-wiki/SKILL.md) | 只读定位现有提测 Wiki 或计算新 Wiki 正文，不直接写入 | Wiki 规划 |
 | zan:补写提测 Wiki 链接 | [`linking-tapd-wiki`](skills/linking-tapd-wiki/SKILL.md) | 将已验证的提测 Wiki 链接幂等地添加到或核对 TAPD Bug、Story、Task 评论 | TAPD 评论 |
 | zan:提交测试 | [`submitting-for-test`](skills/submitting-for-test/SKILL.md) | 在提测计划确认后，负责代码交付到 `develop`、可选 Jenkins 测试部署、Wiki、TAPD 评论/状态/测试版本 | 提测执行 |
@@ -199,27 +199,48 @@ worktree、refs、完整 tip 包含关系、状态和忽略数据，并使用一
 
 Story/Task 使用 `developing-requirement`。它要求一个准确的 TAPD Story/Task URL；只有 PRD 或原型、没有 TAPD 项时，流程会停在待补 TAPD 身份状态。
 
+需求与 Bug 共用 [按工作规模选择流程](references/adaptive-workflow.md)。入口自动选择
+`workflow_profile` 并说明理由，无需用户先填写表格；`verification_risk=NORMAL|HIGH`
+独立决定验证强度，`delivery_mode` 独立决定本次终点。
+
+| 路径 | 适用范围 | 产物与执行 |
+| --- | --- | --- |
+| QUICK | 单仓库、内聚且明确的行为，实施依赖已查清，没有正式 Plan/任务管理要求 | 对话中的执行摘要，直接交接准备、实施、验证和独立审查 |
+| STANDARD | 若干关联行为、少量设计决定，或明确需要正式 Plan/任务拆分 | 紧凑的正式任务与 Plan，分步执行和审查 |
+| FULL | 跨项目、复杂状态/依赖、多组独立决定 | 协调范围与各模块 Plan，按依赖实施和审查 |
+
+高风险的小改动可 QUICK+HIGH；复杂调查可 FULL+IMPLEMENT。分级不以行数、工时或
+需求/Bug 类型判断，也不自动选择 Wiki 策略。出现新事实时只补受影响的分析，
+保留有效证据和确认。所有路径保留固定分支、Bug 状态与处理人保护、相关验证、
+独立审查及外部写入授权。
+
+QUICK 复用准确 Story/Task 及当前范围，不强制创建子任务、正式 Plan 或排期。
+已有 Task 只执行选定的责任范围；已有正式 Plan/TaskBreakdown 不得通过降级绕开
+阻塞、人员或读回要求。请求正式 Plan/任务写入时至少 STANDARD；下游旧交接
+没有档位时保留 STANDARD 语义。
+
+最终请求执行确认时，QUICK/STANDARD/FULL 统一使用项目表格，单项目也保留
+一行，多项目分别列出范围、当前/目标分支、动作、基准 ref/SHA、本轮操作及
+需求/实施准备度和待确认项。字段、任务或 Plan 的详细说明按项目关联补充；
+不以散列项或字段表替代执行主清单，也不因此新增确认轮次。
+
 ```mermaid
 flowchart LR
-  A[项目路由与知识] --> B[对照 origin/master 收敛范围]
-  B --> C[复杂度评审：对话或面板]
-  C --> D[只读拆分任务、核实人员与工时、准备分支]
-  D --> E[展示统一清单并确认]
-  E --> T[创建或复用 TAPD 任务并准确读回]
-  T --> F[写入并读回关联任务的 branch-bound Plan]
-  F --> G[实现、验证、独立评审]
-  G --> H{交付模式}
-  H -->|IMPLEMENT| I[评审完成后结束]
-  H -->|SUBMIT / GO_LIVE| J[提测 PLAN 并展示完整计划]
-  J --> K[用户确认后执行提测]
-  K --> L{GO_LIVE?}
-  L -->|否：SUBMIT| M[提测完成]
-  L -->|是| N[独立确认 master 合并/Wiki 计划]
-  N --> O[上线读回与本地资源检查]
-  O --> P{有清理候选?}
-  P -->|否| Q[结束]
-  P -->|是| R[独立确认清理清单]
-  R --> S[重新检查后清理 worktree 和本地分支]
+  A[项目与范围证据] --> B{流程深度}
+  B -->|QUICK| C[行为与验证摘要]
+  B -->|STANDARD / FULL| D[关键决定与任务提案]
+  C --> E[确认准确范围和分支]
+  E --> G[实施、验证、独立审查]
+  D --> F[统一确认任务与分支]
+  F --> P[任务读回与正式 Plan]
+  P --> G
+  G --> H{交付终点}
+  H -->|IMPLEMENT| I[返回实现与审查结果]
+  H -->|SUBMIT / GO_LIVE| J[展示提测计划]
+  J --> K[精确确认后执行提测]
+  K --> L{明确 GO_LIVE}
+  L -->|是| M[独立确认后上线与资源检查]
+  L -->|否| N[返回提测结果]
 ```
 
 `delivery_mode` 可以是：
@@ -231,6 +252,8 @@ flowchart LR
 - `GO_LIVE`：在提测后继续进入 `going-live`；先验证工具包 latest，再验证对应项目依赖，完成两项检查后决定是否发布或升级，按原分支交付到 `master` 并更新 Wiki。业务应用的生产部署需另行明确请求。
 
 初始需求清单的确认只授权清单中列出的范围、任务创建/更新、分支动作、Plan 和实现。提测、合并 `master`、Wiki 写入和本地清理都要等各自的精确计划展示后再确认。
+
+以下任务与正式 Plan 规则适用于 STANDARD/FULL 需求；QUICK 不调用这些能力来制造额外产物。
 
 任务拆分由 `breaking-down-requirement` 负责。每个任务必须有核实后的开发人员
 TAPD 账号、预估工时、范围、依赖和验收。对话、确认表、任务描述和 Plan
@@ -250,7 +273,7 @@ TAPD 账号、预估工时、范围、依赖和验收。对话、确认表、任
 列出开发人员和预估工时，创建前先让我确认任务清单。
 ```
 
-开发周期在**开始实施时推荐**，拆分任务时无需预先固定起止日期。Agent 按
+正式任务流程的开发周期在**开始实施时推荐**，拆分任务时无需预先固定起止日期。Agent 按
 已确认的预估工时、当前剩余范围、人员每天可投入时间及前置依赖，展示
 任务的建议开始/完成日期、总开发窗口和假设。没有人员容量资料时，可先
 按每天 4 小时给暂定推荐并标明假设；外部依赖日期不明则给出就绪后的
@@ -264,9 +287,21 @@ TAPD 账号、预估工时、范围、依赖和验收。对话、确认表、任
 
 需求分支格式为 `feature/<branch-owner>.<MMDD>.<短ID>.<中文描述>`。描述从需求标题提炼，必须包含中文，不翻译为英文或拼音；示例：`feature/alice.0918.1080800.供应商分账限制`。新需求及 Bug 分支的作者标识优先取当前工具用户级提示词中的 `USER_NAME`，缺失时依次取目标仓库生效的 Git `user.name` 和本机用户名，不使用邮箱前缀；保留中文姓名并规范化不安全分隔符。`project-knowledge` 的 `npm run init` 会确认并写入 `USER_NAME`，默认取 Git 用户名，没有则取电脑用户名。身份无法安全规范化时会暂停并要求补充，不会硬编码某个同事的名字；继续已有工作时复用原分支。
 
+上述作者、日期和中文描述要求同样适用于所有新建工作分支。无关联 TAPD 的
+仓库维护、文档或工具优化使用 `<prefix>/<branch-owner>.<MMDD>.<中文描述>`，
+只省略 ID 段，不编造编号；例如 `feature/alice.1021.需求与缺陷流程分级优化`。
+`prefix` 为 `feature` 或 `fixbug`，日期按 Asia/Shanghai。创建前先按工作区
+`git-safety.md` 核对完整格式，再运行 `git check-ref-format --branch`；已有分支
+继续复用。无 TAPD 命名规则不改变需求/Bug 技能必须提供真实 TAPD 条目的要求。
+
 ## 3. Bug 修复流程
 
 Bug 使用 `fixing-bug`。它可以接收一个 Bug URL 或有序列表；多个 Bug 共用一个已确认的项目、仓库和分支。
+
+普通“修复 Bug”默认 `delivery_mode=IMPLEMENT`。明确“修复并提测”才选择 SUBMIT，
+明确上线才选择 GO_LIVE。IMPLEMENT 不提前询问 Wiki 或部署策略；FULL 也不扩大
+交付目标。CONTINUE 复用当前会话仍明确的终点，已有 Wiki 或“待测试”状态不能
+单独推导提测请求。各档位按实际调查需要准备，不强制 Bug 生成 PRD 或需求 Task。
 
 开始修复时，状态与处理人必须一起流转：将 Bug 改为“修复中”，并将
 `current_owner` 设为已核实 TAPD 账号的修复人员；已经修复中也要核对处理人。
@@ -275,13 +310,13 @@ Bug 使用 `fixing-bug`。它可以接收一个 Bug URL 或有序列表；多个
 [修复中状态与处理人](skills/implementing-work/references/bug-repair-owner.md)。
 
 1. `preparing-work` 对所有 Bug 做只读预检。
-2. 一次性展示项目/仓库、固定分支、修复范围、提测策略、部署选择和待确认项。
+2. 说明本次交付终点并一次展示项目/仓库、固定分支、修复范围与待确认项；仅 SUBMIT/GO_LIVE 另含提测策略与部署选择。
 3. 用户确认后，逐个刷新预检并调用 `implementing-work`。
-4. 评审通过后，`submitting-for-test` 先展示完整 `SubmissionPlan` 并停止；之后只有针对未变化计划的确认才进入执行。
+4. `delivery_mode=IMPLEMENT` 在修复与审查完成后返回，继续处理下一条已确认 Bug；仅 SUBMIT/GO_LIVE 调用 `submitting-for-test` 展示完整 `SubmissionPlan`，之后针对未变化计划的确认才进入执行。
 5. 用户明确要求上线时，才对已提测结果调用 `going-live`。master 合并/Wiki 确认独立于修复和提测确认。
 6. 多 Bug 共用分支时，清理计划等队列全部处理完后再汇总，避免提前删除后续 Bug 仍要使用的环境。
 
-`CONTINUE` 表示继续原 Bug：复用原分支和已有 Wiki，只处理增量范围；若 Bug 已在“待测试”，不重复切换状态或重复写测试版本。
+`CONTINUE` 表示继续原 Bug：复用原分支，只处理增量范围；进入提测时复用已有 Wiki。若 Bug 已在“待测试”，不重复切换状态或重复写测试版本。
 
 ## 4. 提测、Wiki 评论和上线边界
 
@@ -398,9 +433,13 @@ codex plugin add zan-workflows@cfj-skills
 将 TAPD 链接和明确意图直接写在任务里：
 
 ```text
-使用 $developing-requirement 开发这个 TAPD Story：<TAPD URL>。先确认范围和 Plan，完成实现评审后提测，测试环境部署选择 SKIP。
+使用 $developing-requirement 开发这个小需求：<TAPD URL>。自动选择流程深度，本次只完成实现与验证。符合 QUICK 时使用执行摘要。
 
-使用 $fixing-bug 修复这个 TAPD Bug：<TAPD URL>。使用项目 X 的仓库和 fixbug/... 分支，走 STANDARD Wiki，跳过测试环境部署。
+使用 $developing-requirement 开发这个 TAPD Story：<TAPD URL>。需要正式 Plan，完成实现评审后提测，测试环境部署选择 SKIP。
+
+使用 $fixing-bug 修复这个 TAPD Bug：<TAPD URL>。使用项目 X 的仓库和 fixbug/... 分支，本次只修复与验证。
+
+使用 $fixing-bug 修复并提测这个 TAPD Bug：<TAPD URL>。使用项目 X 的仓库和 fixbug/... 分支，submission_profile=STANDARD，跳过测试环境部署。
 
 使用 $linking-tapd-wiki 为这个 TAPD Task 补上已有提测 Wiki 链接：<TAPD URL>，Wiki：<已确认的 Wiki URL>。
 

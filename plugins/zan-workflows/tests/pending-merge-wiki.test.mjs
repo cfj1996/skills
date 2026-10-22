@@ -181,6 +181,9 @@ test('session retains the waiting MR and reports a separate Wiki blocker without
   const result = await session.dispatch({ id: 'go-live', action: 'merge', phase: 'EXECUTE', input: mergeInput(fake) });
   assert.equal(result.state, 'AWAITING_MERGE'); assert.equal(result.pendingWiki.state, 'BLOCKED');
   assert.equal(result.pendingWiki.writeOutcome, 'UNKNOWN'); assert.equal(session.executionBlocked, true);
+  assert.equal(result.userAction.type, 'CONTACT_MERGER');
+  assert.ok(result.userAction.message.includes(result.mrUrl));
+  assert.equal(result.userAction.resumePrompt, '已合并，继续上线');
   assert.equal(session.pendingMerges.size, 1);
   await assert.rejects(session.dispatch({ id: 'retry', action: 'merge', phase: 'EXECUTE', input: mergeInput(fake) }), /不允许/);
   assert.equal(fake.calls.filter(row => row.name === 'update_wiki').length, 1);

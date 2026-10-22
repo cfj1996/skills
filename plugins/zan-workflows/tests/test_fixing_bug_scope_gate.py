@@ -13,10 +13,14 @@ SCENARIOS = (
 
 class FixingBugScopeGateTests(unittest.TestCase):
     def test_preflight_has_exact_visible_contract(self):
+        self.assertIn("| Bug | 项目/仓库 | 分支 | 修复范围 | 待确认 |", SKILL)
         self.assertIn("| Bug | 项目/仓库 | 分支 | 修复范围 | 提测策略 | 部署 | 待确认 |", SKILL)
+        self.assertIn("For `IMPLEMENT`, use only these columns", SKILL)
+        self.assertIn("For `SUBMIT|GO_LIVE`, use these columns", SKILL)
         self.assertIn("`是否按此清单执行？`", SKILL)
         self.assertIn("Before confirmation", SKILL)
         self.assertIn("do not create a branch", SKILL)
+        self.assertRegex(SKILL, r"every visible checklist field and\s+the delivery endpoint are unchanged")
 
     def test_branch_confirmation_binds_identity_not_action(self):
         self.assertIn(

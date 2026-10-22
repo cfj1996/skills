@@ -43,7 +43,8 @@
 | NO_WIKI or TOOLING delivery awaits manual merge | No pending business-status write; tooling current-version semantics remain unchanged. |
 | Merge API explicitly returns 403 | Read back the same MR once; keep an open MR waiting without retrying, or require actual merged/containment proof if a maintainer already merged. Other errors remain blockers. |
 | Maintainer merges the same MR and deletes its source branch | Read-only `VERIFY_ONLY` checks exact MR/source SHA, CI and target containment, then continues only unfinished authorized actions. |
-| User says merged but the MR is still open | Keep `AWAITING_MERGE`; perform no downstream write. |
+| User says merged but the MR is still open | Keep `AWAITING_MERGE`; repeat `userAction.message` asking the user to contact a colleague with merge permission, with the same MR link and exact target; perform no downstream write. |
+| Manual merge is planned, permission is denied, or the pending Wiki patch blocks | Surface `userAction.message` and `已合并，继续上线` in the final response. Only explicit denial claims the account lacks permission; Wiki failure preserves the MR/action reminder. No team hierarchy lookup or enterprise WeChat notification is required. |
 | Manual continuation finds another MR, changed source, closed MR, bad CI or missing containment | Block/investigate and retain completed effects; never recreate or force merge. |
 | Consumer waits for manual merge after successful publication | Preserve publication, pause final Wiki/cleanup, then resume after exact consumer merge proof without publishing again. |
 | Wiki changes after authorization | Preserve the changed page and require a fresh patch/authorization; report any already completed merge truthfully. |
@@ -54,7 +55,21 @@
 | User confirms the exact unchanged cleanup plan | Recheck every candidate, remove its worktree without force, delete its local branch with `git branch -d`, and verify both readbacks. |
 | Cleanup candidate facts changed after confirmation | Delete nothing; return the refreshed plan or classify the resource `RETAIN|VERIFY`. |
 | Worktree removal or local branch deletion fails | Stop remaining cleanup, report `PARTIAL|BLOCKED`, and preserve the verified merge/Wiki outcome. |
-| Cleanup targets a protected/current branch, current/active/locked worktree, remote branch, or unconfirmed resource | `BLOCKED`; do not switch, force-delete, prune broadly, stop processes, or use raw filesystem deletion. |
+| Local CLEANUP targets a protected/current branch, current/active/locked worktree, remote branch, or unconfirmed resource | `BLOCKED`; do not switch, force-delete, prune broadly, stop processes, or use raw filesystem deletion. |
+| Temporary test-merge branch is proven merged to dev/develop, with integration-only commits absent from master | Include the exact local branch/worktree using its own MR target. After confirmation, remove the idle clean worktree, then use ordinary `-d` with command-scoped upstream for the verified fetched target; no forced deletion or branch switch. |
+| User confirms local cleanup or says only 清理开发环境 | Remote cleanup remains NOT_REQUESTED; do not delete remote refs or look up team hierarchy. |
+| Completed delivery has safe associated remote temporary merge branches | Show one concise table: local development branch, local/remote temporary merge branches, and exact worktree paths. Preserve remote development branches. Ask once for 确认清理（含远程临时分支）; verify both scopes before local cleanup and then remote temporary cleanup. |
+| Generic 确认清理 replies to a combined plan | Delete nothing until the user explicitly includes remote temporary branches or selects a refreshed local-only plan. Never infer remote-development deletion. |
+| User explicitly requests deletion of exact related remote branches | Prepare independent RemoteCleanupPlan with exact push destination, refs/SHAs, own merged MR targets, protection/shared-use and full remote-tip containment evidence. Execute only under exact remote authority with an expected-SHA lease and absence readback. |
+| Local branch is absent or delivered but remote tip has later unmerged commits | Preserve remote ref; local evidence cannot prove remote candidacy. |
+| Remote tip advances after confirmation or before conditional deletion | Stop; stale expected-SHA lease must reject deletion. Refresh the preview instead of retrying without the lease. |
+| Remote branch is protected/current/default, referenced by an open MR, still shared, or ownership/protection is unknown | RETAIN or VERIFY; no deletion even when local cleanup succeeded. |
+| Remote delete or its readback fails after some refs were removed | Report PARTIAL/BLOCKED with each completed/retained/unknown ref; no retry, recreation, pruning or change to the delivered result. |
+| push.followTags=true and an unpublished annotated tag exists | Remote branch deletion explicitly uses --no-follow-tags; the tag stays local and default branches remain unchanged. |
+| Temporary merge branch already tracks a different upstream | Do not append a command-scoped merge value to override it. Normalize/read back the verified target using ordinary Git, then -d; restore prior configuration on failure when unchanged. |
+| ACB confirmation already included conditional local/remote C and temporary-worktree deletion | After its own C → B merged/containment and resource checks, consume that exact authority without another cleanup question. Original development resources still need their normal cleanup confirmation. |
+| Submission handoff reports C already cleaned/absent, or user requested retention | Preserve outcomes/association; do not offer those C resources in default cleanup or silently reset the user's retention policy. |
+| A previous conflict cleanup is deferred or failed | Keep the exact scope/authority/reason, check fresh facts at a normal completion point, and never infer success or automatically retry an unknown deletion. |
 | MR is open, auto-merge is pending, or only dev was merged | Local closeout is `NOT_TRIGGERED`; do not claim master completion. |
 | Local source gained an undelivered commit after the MR merged | Report `RETAIN`; old merged-source evidence does not cover the new local tip. |
 | Associated worktree has edits, untracked files, valuable ignored configuration, or is current/active/locked | Report `RETAIN` with reason; do not switch branches or remove files/worktrees. |

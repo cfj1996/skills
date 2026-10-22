@@ -31,6 +31,27 @@ or `--user-prompt-file <current-tool-user-prompt>` for its exact configured file
 Do not read another tool's prompt or infer a TAPD assignee from this identity.
 An explicitly supplied exact branch and `CONTINUE` retain their original identity.
 
+### New branch names
+
+Read the applicable workspace `git-safety.md` before every branch-creation
+proposal, including repository maintenance and tooling work. Its naming rule is:
+
+| Work identity | Format |
+| --- | --- |
+| Verified TAPD Story/Task/Bug | `<prefix>/<branch-owner>.<MMDD>.<短ID>.<中文描述>` |
+| No associated TAPD item | `<prefix>/<branch-owner>.<MMDD>.<中文描述>` |
+
+Use `feature` for features/maintenance and `fixbug` for defect repair. Keep the
+same owner resolution, Asia/Shanghai proposal date and Chinese description in
+both formats; omit only the ID segment for non-TAPD work, never fabricate one.
+Check the complete format and Chinese description, then run
+`git check-ref-format --branch <name>` before creation. Git's ref check alone
+does not enforce the naming convention. Existing branches keep their identity.
+`merge/*` follows the separate authorized conflict-flow naming.
+
+The non-TAPD naming format applies to ordinary repository work; it does not
+remove this skill's exact TAPD URL requirement or allow a fake work item.
+
 ### Continue gate
 
 Run this before `AUTO|CREATE|USE_EXISTING`. Classify the work as `CONTINUE`

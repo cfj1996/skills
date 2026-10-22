@@ -45,12 +45,27 @@ uses the existing exact deletion authorization rules below.
 
 ## Scope and evidence
 
+Preserve the submission's [ConflictMergeHandoff](../../../references/conflict-merge.md).
+Its upfront ACB authority may already have cleaned local/remote C and the
+temporary worktree. Keep absent results without another deletion prompt;
+exclude RETAINED_BY_USER resources from default cleanup. Deferred scope keeps
+its existing exact authority and reason. The commands in Confirmed cleanup
+below are also reusable for that scope after C → B proof; the master-only
+executor itself must not be given fabricated master evidence for C → dev.
+
 1. Use the verified repository and original source branch from the submission.
    Read `git worktree list --porcelain` to locate associated worktrees. Include
    temporary branches only when submission/MR/session evidence links them to
    this delivery. Names and `merge/*` prefixes alone do not establish ownership.
    Report missing association evidence instead of guessing or scanning the
    whole workspace.
+   Inventory all three local resource types: original feature/fixbug branches,
+   temporary `merge/*` branches used for test submission, and their registered
+   worktrees. Take temporary-branch associations from the submission's exact
+   conflict-MR handoff; include them through `relatedBranches`, with their own
+   `association` (MERGED, MR IID, repository/origin, source and target branches).
+   A local branch without a worktree is still checked. Missing resources are
+   `ABSENT`; missing association evidence is `VERIFY`, not an empty inventory.
 2. Refresh the relevant remote refs with `git fetch origin` and retain the
    observed SHAs. Compare the current local development tip with
    `origin/master` using `git merge-base --is-ancestor <local-tip> <target-tip>`.
@@ -94,8 +109,9 @@ disposition:
 
 In the final response, summarize the findings with concrete paths/branches and
 reasons, separately from merge/Wiki status. After all delivery gates pass,
-display the exact cleanup plan and ask `是否删除以上本地开发环境？` in the
-final response; a cleanup suggestion or status code alone is insufficient.
+display the concise exact cleanup plan in the final response and ask
+`是否删除以上本地开发环境？` for local-only scope, or
+`是否清理以上资源（含远程临时分支）？` for a combined plan; a status code alone is insufficient.
 If none exist after a complete check, say `目前没有可安全清理的本地资源。`
 and explain any retained current/active resources. For incomplete checks, state
 what was checked and what remains unknown. Always make clear no deletion was
@@ -105,9 +121,24 @@ merge outcome to `BLOCKED` solely because this inspection could not complete.
 ## Cleanup plan
 
 After the delivery and required Wiki readbacks succeed, turn only `CANDIDATE`
-resources into a user-visible plan. Each row contains repository, current
-branch, exact worktree path or `无`, exact local branch, observed local tip,
-verified containment target/SHA, intended operations in order, and purpose.
+resources into a plan retaining repository/current branch, exact worktree paths,
+local branch names/tips, containment targets/SHAs, deletion order and purpose.
+Keep this evidence in memory. Show only a short context line and exact names,
+combining scopes into three rows where possible:
+
+| 资源 | 清理范围 |
+| --- | --- |
+| 开发分支 | 本地：`fixbug/example` |
+| 临时合并分支 | 本地：`merge/example-to-dev`；远程：`origin/merge/example-to-dev` |
+| 工作树 | `<exact-development-path>`、`<exact-test-merge-path>` |
+
+Use actual verified names, not these examples or wildcards. State
+`远程开发分支保留`. Explicitly mark absent or retained resources and their
+short reason. Associated remote temporary branches use
+[remote-cleanup.md](remote-cleanup.md) checks and are attached as
+`CleanupPlan.remoteTemporary`; local candidacy does not authorize or prove
+remote cleanup. If the remote checks are blocked, exclude those rows with a
+reason rather than silently adding them to local authorization.
 
 The authorization summary must bind:
 
@@ -118,13 +149,22 @@ The authorization summary must bind:
 - every exact `worktree_to_remove`; and
 - every exact `branch_to_delete`.
 
-Ask exactly `是否删除以上本地开发环境？`, offer `确认清理` or
-`保留开发环境`, and stop. The merge confirmation does not authorize this plan.
-An immediate `确认清理` or `执行清理` replying to the unchanged exact plan
+For a local-only plan ask `是否删除以上本地开发环境？`, offering `确认清理`
+or `保留开发环境`. For a combined plan ask
+`是否清理以上资源（含远程临时分支）？`, offering
+`确认清理（含远程临时分支）` or `保留开发环境`. Stop for that exact reply;
+merge confirmation does not authorize cleanup. In a combined plan a generic
+`确认清理` is insufficient and performs no deletion until scope is explicit.
+An immediate `确认清理` or `执行清理` replying to an unchanged local-only plan
 starts the confirmed cleanup below; `保留开发环境` ends the flow without
 deletion or another prompt. An orchestrator must surface the combined plan
 and this question after all required deliveries pass, rather than dropping
 them from its final summary.
+An exact upfront ACB confirmation that explicitly included default C cleanup
+already authorizes that conditional temporary scope. Do not repeat the above
+prompt for it; apply the latest retention override and shared conflict flow.
+The prompt still applies to original development resources and to old
+temporary resources whose earlier confirmation did not include deletion.
 
 ## Confirmed cleanup
 
@@ -135,9 +175,40 @@ fact invalidates the plan and permits no deletion. For each unchanged row:
    never use `--force` or raw filesystem deletion.
 2. Verify the worktree path and registration are absent.
 3. Delete the exact local branch with ordinary `git branch -d`; never use
-   `-D`, and never delete a remote branch.
+   `-D`. A temporary test-merge branch may contain dev/develop-only integration
+   commits that are absent from HEAD/master. After freshly proving its full
+   tip is contained in its own fetched, merged MR target, inspect the effective
+   upstream and every configured `branch.<name>.merge` value. If no merge
+   values are configured, bind the target for this command only:
+
+   ```bash
+   git -c 'branch.<exact-branch>.remote=origin' \
+       -c 'branch.<exact-branch>.merge=refs/heads/<verified-target>' \
+       branch -d -- '<exact-branch>'
+   ```
+
+   Substitute the exact approved branch and target with proper shell quoting,
+   or pass each argument through `execFile`. These `-c` options do not persist
+   tracking changes. If an upstream already exists, do not append `-c ...merge`
+   values: Git can keep using the first old value. A matching effective upstream
+   uses ordinary `-d`. Otherwise retain the exact prior branch remote/merge
+   configuration in memory, include upstream normalization in the cleanup
+   operation, and run `git branch --set-upstream-to=origin/<verified-target> <exact-branch>`.
+   Read back the effective upstream and require it to equal the freshly proven
+   `refs/remotes/origin/<verified-target>` before `-d`. Unknown configuration
+   origins or a mismatched readback block deletion. If deletion fails and the
+   branch/configuration still match this operation, restore the saved values
+   and report the failure; do not overwrite concurrent configuration changes.
+   A successfully deleted branch removes its branch configuration normally.
+   This remains ordinary `-d`: the branch must be contained
+   in its verified target and not checked out in any worktree. A failure stops
+   cleanup; do not fall back to `-D`, switch branches or rewrite history.
+   This local procedure must never delete a remote branch.
 4. Verify the local ref is absent.
 
 The current task path/branch, protected branches, dirty or occupied worktrees,
 unpreserved data, and any `RETAIN|VERIFY` resource are never executable cleanup
 targets. Stop on the first failure and report partial effects truthfully.
+For a combined plan, validate both scopes before starting; after local success
+run only the confirmed `remoteTemporary` stage under remote-cleanup.md. Its
+lease/readback checks and outcome remain independent of local success.

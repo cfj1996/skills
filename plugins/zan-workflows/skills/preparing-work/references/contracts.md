@@ -9,6 +9,7 @@
 | --- | --- |
 | Identity | TAPD URL, type, item ID, short ID, title |
 | Context | cited requirement facts, conflicts, missing facts, confidence and reasons |
+| Workflow (optional) | resolved `workflow_profile=QUICK|STANDARD|FULL`, reason, `verification_risk=NORMAL|HIGH` and risk evidence; QUICK may carry the in-memory `implementationBrief` from the same selected item and scope |
 | Work mode | `INITIAL|CONTINUE`, trigger evidence, reused confirmation facts, and original-branch recovery evidence when applicable |
 | Scope | in-scope work, excluded work, acceptance criteria, confirmation state |
 | Project | selected project, canonical repository path, Git root, origin remote, verification result |
@@ -62,6 +63,13 @@
 Use `PENDING` only for missing evidence or a named user choice that could make
 the definition valid. Use `BLOCKED` for a proven mismatch or conflict. Neither
 state advertises an eligible handoff or performs a write.
+
+Apply [按工作规模选择流程](../../../references/adaptive-workflow.md) when an
+orchestrator supplies a profile. A QUICK brief supplies execution/verification
+context, not permission or a formal Plan. Do not require TaskBreakdown or Plan
+solely to validate a QUICK definition, and do not drop an existing formal
+Plan's unresolved requirements. Legacy handoffs without a profile retain
+STANDARD semantics. The terminal invariants above apply to every profile.
 
 The definition must not include runtime IDs, persistence paths, prior-run
 history, generated evidence paths, or private validator output.

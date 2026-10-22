@@ -126,7 +126,13 @@ business source.
    GET. Reuse the final result and delivered target revision for deployment;
    the source branch SHA is not automatically the target merge commit SHA.
    A genuine metadata update or conflict needs its exact authorized action,
-   not a new broad preparation/review run.
+   not a new broad preparation/review run. Conflicts use the shared
+   [A → C → B flow](../../references/conflict-merge.md): include exact local/
+   remote C and temporary-worktree cleanup in the initial ACB confirmation by
+   default. After verified C → develop/dev and safety checks, clean that scope
+   without a second prompt unless the user requested retention. Keep A as the
+   business source and retain the complete ConflictMergeHandoff, association
+   and cleanup/retention/deferred outcomes in TestSubmissionResult for go-live.
 7. Resolve the deployment gate through `jenkins-mcp`:
    - `DEPLOY`: validate `JENKINS_TEST_DEPLOY` once, then run
      [run-jenkins-release.mjs](../../scripts/run-jenkins-release.mjs) once with

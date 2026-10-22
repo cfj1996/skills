@@ -58,6 +58,11 @@
 | Workflow/custom-field definitions changed after registration preview | Block before update; verify the real new mapping instead of reusing old field/status codes. |
 | Status changes but version is not read back | Report the actual status write and unverified version, stop and never roll back/retry. |
 | Story/Task registration | Apply only an explicitly applicable version policy; no Bug waiting-test status. |
+| Own A → develop MR conflicts | Show one exact ACB plan including default local/remote C and temporary-worktree cleanup. After confirmation, resolve only on C, review and deliver C → develop, and preserve original A plus the ConflictMergeHandoff. |
+| C → dev/develop is verified merged and its temporary resources are safe/idle | Consume the upfront conditional cleanup authority without another prompt or a master-delivery prerequisite; verify actual deletion and retain association/outcomes for go-live. |
+| User says 保留中间分支 or 不清理 before confirmation or later | Record RETAIN_BY_USER for the exact affected local/remote C/worktree scope; perform no deletion and carry that override through later go-live. |
+| Old ACB confirmation did not include deletion, or C MR remains open/CI fails | No default deletion; obtain only missing exact cleanup authority when needed, or wait for actual merged/containment proof. |
+| C is current, dirty, occupied, protected, or needed by a build/another MR | Retain/defer with reason; do not force-delete, stop unrelated tasks or silently discard data. Recheck deferred scope at its next normal completion point under unchanged authority. |
 
 No scenario creates runtime, recovery, audit-ledger, or generated evidence
 files.
