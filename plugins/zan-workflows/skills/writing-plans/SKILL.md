@@ -77,6 +77,8 @@ before execution confirmation. Material scope/approach or delivery-choice change
 re-display the complete current checklist, writes and choices before confirming.
 “合并并构建” means verified dev/develop plus
 that project's Jenkins test environment, subject to later delivery write gates.
+For Bugs, append the final TAPD target under 合并与测试环境 according to the shared
+checklist; full test delivery targets 待测试, while implementation-only retains 修复中.
 
 Reuse the orchestrator's evidenced TAPD/prototype, exact project,
 `origin/master` SHA and scope when supplied. Refresh a mutable fact before a

@@ -131,6 +131,8 @@ requires a refreshed confirmation. Never rebuild on the test target or use
    handoffs retain their original structure; no new workflow ledger is needed.
    Preview registration to automatically resolve actual state labels,
    transitions, required-field values and native/custom test-version mapping.
+   For a Bug, show `TAPD 状态：待测试（提测交付完成后流转）` under 合并与测试环境,
+   separate from the actual current status; an already-waiting continuation states 保持不变.
    For a Bug transition, read `te`, `reporter` and `current_owner`; assign the
    waiting-test owner to non-empty `te`, otherwise `reporter`, and bind these
    old values and the selected owner in the preview. Missing both blocks;
@@ -222,6 +224,8 @@ requires a refreshed confirmation. Never rebuild on the test target or use
    requires its explicit policy. Do not manually repeat reads or validate the
    fields separately. Give the final readbacks to `POST_WRITE`; return
    `SUBMITTED` only on a passing verdict.
+   Report the actual readback status in the result, never the checklist's target
+   as a completed transition while merge/deployment/Wiki prerequisites remain pending.
 
 ## Failure behavior
 
