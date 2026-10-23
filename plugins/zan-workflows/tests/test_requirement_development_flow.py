@@ -51,7 +51,7 @@ class RequirementDevelopmentFlowTests(unittest.TestCase):
         self.assertIn("../../references/execution-checklist.md", SKILL)
         self.assertIn("| 项目 | 分支 | 交付范围 | 实施方案 | 验收标准 | 待决事项 |", SKILL)
         self.assertIn("#01", SKILL)
-        self.assertIn("是否按以上清单执行？", SKILL)
+        self.assertIn("是否按以上确定清单执行？", SKILL)
         self.assertIn("不另问一轮范围或分支", SKILL)
         self.assertIn("真实", SKILL)
         self.assertIn("等待批准算成缺口", SKILL)

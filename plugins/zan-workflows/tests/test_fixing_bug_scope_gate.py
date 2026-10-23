@@ -14,7 +14,7 @@ class FixingBugScopeGateTests(unittest.TestCase):
     def test_shared_checklist_is_the_only_presentation_contract(self):
         self.assertIn("../../references/execution-checklist.md", SKILL)
         self.assertIn("| 项目 | 分支 | 交付范围 | 实施方案 | 验收标准 | 待决事项 |", SKILL)
-        for required in ["#01", "TAPD 更新与修复记录", "是否按以上清单执行？"]:
+        for required in ["#01", "TAPD 更新与修复记录", "是否按以上确定清单执行？"]:
             self.assertIn(required, SKILL)
         self.assertIn("等待授权不是缺口", SKILL)
         self.assertIn("确认前只读", SKILL)

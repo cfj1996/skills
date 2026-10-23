@@ -82,7 +82,8 @@ repository, or branch with a more plausible candidate.
    branch fact. Missing or changed confirmation keeps the definition `PENDING`;
    never ask again when the current-conversation confirmation still matches.
 7. Derive the status plan with scope and branch facts. Display the concrete
-   changes in Chinese under the shared execution checklist; keep raw status
+   changes in Chinese under the shared 确定清单 before approval; its confirmed
+   current content becomes 执行清单. Keep raw status
    codes/payload, identity-source details and full SHA in the verified internal
    definition. The readable preview must still map exactly to those facts. For a
    Bug, apply [修复中状态与处理人](../implementing-work/references/bug-repair-owner.md)

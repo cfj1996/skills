@@ -25,19 +25,20 @@ Preferred lead model profile: `CRITICAL`。可选模型时使用
   不新建“后续修复”分支。先前明确的交付终点仍适用时可复用，本次明确要求优先。
 - `branch_mode=AUTO|CREATE|USE_EXISTING`：按准确分支和已核实基准判断；
   已有分支不要求已经包含当前 Bug 的提交、测试或文档。
-- `delivery_mode=IMPLEMENT|SUBMIT|GO_LIVE`：普通“修复”默认 `IMPLEMENT`；
-  明确提测才选 `SUBMIT`，明确上线才选 `GO_LIVE`。已有 Wiki、待测试状态、
-  测试反馈本身不推导提测。“合并并构建”表示 dev/develop 与项目测试环境。
+- `delivery_mode=IMPLEMENT|SUBMIT|GO_LIVE`：普通“修复”默认 `SUBMIT`，包含合并
+  实际 dev/develop、构建测试环境和提测 Wiki；清单确认及正式提测计划门禁仍必需。
+  明确“只修复验证/只开发、不提测”才选 `IMPLEMENT`；明确上线才选 `GO_LIVE`。
+  已有 Wiki、待测试状态、测试反馈不覆盖本轮明确终点。“合并并构建”表示 dev/develop 与项目测试环境。
 
 只在选择提测或上线时解析 `submission_profile=AUTO|STANDARD|NO_WIKI` 和
-`deployment_mode=AUTO|DEPLOY|SKIP`。明确需要 Wiki 选 `STANDARD`，明确免 Wiki
-选 `NO_WIKI`；AUTO 无项目政策可依据时，展示“需要提测 Wiki（会创建/更新）”
-与“不需要提测 Wiki”。测试发布选 DEPLOY，直接提测/跳过发布选 SKIP。
+`deployment_mode=AUTO|DEPLOY|SKIP`。明确需要提测 Wiki（会创建/更新）或未关闭时选 `STANDARD`；
+明确不需要提测 Wiki 选 `NO_WIKI`。`AUTO` 默认 Wiki 需要、测试构建/部署 `DEPLOY`，
+仍有效的明确选择优先；明确直接提测/跳过发布选 `SKIP`，不另弹 Wiki 选择题。
 其余默认和实际交付门禁由 `submitting-for-test` 负责。
 不向用户索要 Wiki URL：该能力负责定位或创建 Wiki；缺少用户提供的
 Wiki 链接不能进入“待决事项”。只修复时不解析、不询问 Wiki/Jenkins 设置。
 
-## 2. 只读定位与一次清单
+## 2. 只读定位与确定清单
 
 1. 为每个 Bug 的每个必要项目调用 `zan-workflows:preparing-work` 只读预检，
    每次仍返回单项目定义。同仓库子项目可保留多份定义，合并执行时保留全部
@@ -48,13 +49,15 @@ Wiki 链接不能进入“待决事项”。只修复时不解析、不询问 Wi
 2. 按 [准备深度与验证](../../references/adaptive-workflow.md) 形成可执行的
    范围说明。局部修复直接保留内存 `implementationBrief`；复杂调查按实际
    依赖展开，已有 Plan 则引用同一份内容，不强制 Bug 生成需求 Task 或 Plan。
-3. 按 [执行确认清单](../../references/execution-checklist.md) 展示一次主表：
+3. 按 [确定与执行清单规范](../../references/execution-checklist.md) 展示 `确定清单`：
+   先列可包含多个项目的执行项目名称、执行事项、关联记录和本轮目标，再展示主表：
 
    | 项目 | 分支 | 交付范围 | 实施方案 | 验收标准 | 待决事项 |
    | --- | --- | --- | --- | --- | --- |
 
    Bug 链接保留在每个项目格；长内容用全清单连续的 `#01` 备注。TAPD 写入和
-   合并/测试环境意图沿用共享排版，不另列分支或验证安排。
+   合并/测试环境的三项意图沿用共享排版，普通修复默认都需要；需要 Wiki 时先展示
+   本次模板预览。不另列分支或验证安排。
 4. 每个 Bug 只用一个“TAPD 更新与修复记录”区块，预览准确状态/处理人变化、评论
    账号、开始记录，以及评审通过后补充完整结果的操作。核实修复人使用
    [状态与处理人规则](../implementing-work/references/bug-repair-owner.md)；
@@ -62,11 +65,15 @@ Wiki 链接不能进入“待决事项”。只修复时不解析、不询问 Wi
    保留平铺字段，没有关联需求省略该行；历史引入事实未知就如实说明。
 5. 有实际需求、闭环、接口/字段或外部条件缺口时先解决或明确排除受影响 Bug。
    等待授权不是缺口，不写“执行确认 1 项”。没有适用缺口写“无”，最后只问
-   `是否按以上清单执行？`。原始修复请求只选择条目，不批准尚未展示的清单。
+   `是否按以上确定清单执行？`。原始修复请求只选择条目，不批准尚未展示的清单。
 
 确认绑定表格、编号详情、所引 Plan、准确分支/基准、修复人员和实际写入。
 完整 SHA、原始 payload 和校验证据保留内部；实质内容变化只重开受影响部分。
 同一分支创建后的 CREATE → USE_EXISTING、排版变化不增加确认。
+确认当前完整确定清单后，才称 `执行清单` 并按其推进，不为名称变化重复确认。
+用户修改范围/方案或合并、Wiki、部署选项时，返回确定阶段，按共享规范重新展示完整确定清单及
+需要的 Wiki 模板，再等待执行确认；选项回答或“其余沿用”不能替代完整清单。
+已完成效果标明不重复，不重建分支或重发原记录。
 确认前只读，不创建分支、改 TAPD、写测试、改源码、提交或推送。
 
 ## 3. 修复、验证与独立评审

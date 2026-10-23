@@ -2,7 +2,7 @@
 
 分支动作由 preparing-work 核实，创建由 implementing-work 或明确 BRANCH_ONLY
 操作执行。清单排版和确认边界统一使用
-[执行确认清单](../../../references/execution-checklist.md)，本文件只定义分支事实。
+[确定与执行清单规范](../../../references/execution-checklist.md)，本文件只定义分支事实。
 
 ## 名称与作者
 

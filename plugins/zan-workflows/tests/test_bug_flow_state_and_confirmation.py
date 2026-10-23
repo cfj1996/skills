@@ -30,14 +30,15 @@ class BugFlowStateAndConfirmationTests(unittest.TestCase):
         self.assertIn("验证及独立评审通过后写完成评论", FIXING)
         self.assertIn("评论失败保留已有代码与评审结果", FIXING)
 
-    def test_repair_endpoint_stops_before_submission_even_plan(self):
+    def test_explicit_implementation_endpoint_stops_before_submission_even_plan(self):
         self.assertIn("delivery_mode=IMPLEMENT|SUBMIT|GO_LIVE", FIXING)
-        self.assertIn("普通“修复”默认 `IMPLEMENT`", FIXING)
+        self.assertIn("普通“修复”默认 `SUBMIT`", FIXING)
+        self.assertIn("只修复验证/只开发、不提测", FIXING)
         stop = FIXING.index("`IMPLEMENT` 在 `REVIEWED` 结束")
         delivery = FIXING.index("## 4. 按请求交付")
         self.assertIn("不调用 `submitting-for-test`，包括其 PLAN 阶段", FIXING[stop:delivery])
         self.assertIn("只修复时不解析、不询问 Wiki/Jenkins", FIXING)
-        self.assertIn("测试反馈本身不推导提测", FIXING)
+        self.assertIn("测试反馈不覆盖本轮明确终点", FIXING)
         self.assertIn("复用仍有效的 `ReviewedChange`", FIXING)
 
     def test_submission_remains_explicit_optional_and_two_phase(self):
@@ -46,7 +47,7 @@ class BugFlowStateAndConfirmationTests(unittest.TestCase):
                        "submission_phase=PLAN", "submission_phase=EXECUTE", "dev/develop"]:
             self.assertIn(marker, FIXING)
         self.assertIn("初始修复清单不能替代提测计划确认", FIXING)
-        self.assertIn("otherwise select `SKIP`", DEPLOYMENT)
+        self.assertIn("Select `DEPLOY`; preserve an explicit `SKIP`", DEPLOYMENT)
         self.assertIn("SKIPPED_BY_INTENT", DEPLOYMENT)
         self.assertIn("one complete `SubmissionPlan`", DEPLOYMENT)
         self.assertIn("commit SHA, MR ID, Wiki/month/child ID", DEPLOYMENT)

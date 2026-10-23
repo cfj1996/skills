@@ -18,6 +18,38 @@ target-location, Wiki-ID, TAPD-comment, writeback, merge, or release narration.
 {项目状态行}
 ```
 
+## Preview boundary
+
+The rules below govern the final validated body. For an earlier execution
+checklist, use the distinct template-preview boundary below; never submit that
+preview as a validated body.
+
+## 确定清单中的模板预览
+
+用户明确需要 Wiki 时，入口在初次或调整后的完整确定清单中、执行确认问题前
+展示 `### 提测 Wiki 模板预览`。复用上面的 canonical 结构及最终页面的 `# 前端`
+标题；多项目按本次选定范围展示各项目/原分支条目，不增加另一套 Wiki 模板。
+
+- 明确标注“执行前模板预览，尚未写入 Wiki”。已核实的项目、仓库、负责人、
+  计划分支、影响范围和 Job 信息填实际值；分支未创建时在正文外说明计划动作。
+  不把已有 Wiki/已完成登记当成尚未执行的新写入，也不改变其历史条目。
+- 最终序号、页面地址或字段尚未核实，写 `〈定位后确定〉` 或 `〈待核实：字段〉`；
+  不猜 URL、人员、参数、状态或版本。模板预览不要求先有 `ReviewedChange`，
+  不为填完模板提前调用正式提测流程或定位/创建月份页。
+- 功能内容先展示已确认的拟修复/开发行为。尚未发生的实际修复、验证、构建
+  和发布结果写 `〈执行后按实际结果补充〉`，明确它们不是已通过事实。
+  这些计划待填项不是“待决事项”；必要的身份、接口或目标缺口仍按影响阶段
+  列入原清单，不能靠模板占位符清除真实阻塞。
+- 此预览不返回 `VALIDATED`，不产生目标/body hash 或 Wiki 写入授权；含未核实
+  字段的结构不能传给写入脚本、评论或当成可提测结果。
+- 正式提测前，`drafting-wiki` 仍依据当前已审查改动、真实字段/目标和交付事实
+  生成无占位符的完整正文或最小补丁。在 `SubmissionPlan` 展示后取得该计划
+  的准确确认，满足原 Git/部署门禁后才允许 Wiki/评论写入与读回。
+
+普通修复/开发的“是否需要提测 Wiki”默认“需要”，因此确定清单先展示模板。
+明确关闭 Wiki 或本轮仅开发/计划/分支时不展示空模板、不查询 Wiki；已有明确
+选择继续保留。默认意图或单个选项回答不授权合并、部署或提前写入。
+
 ## Field rules
 
 - `序号` is calculated from the resolved child Wiki under `# 前端`; a new child

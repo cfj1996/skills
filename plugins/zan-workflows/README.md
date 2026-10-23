@@ -4,17 +4,17 @@
 
 | 入口 | 适用工作 | 默认终点 |
 | --- | --- | --- |
-| `$fixing-bug` | 一条或一组 TAPD Bug | 修复、验证、独立评审及修复记录 |
-| `$developing-requirement` | 一条 TAPD Story 或选定 Task | 开发、验证、独立评审及任务结果 |
+| `$fixing-bug` | 一条或一组 TAPD Bug | 修复、验证、独立评审、记录及测试交付 |
+| `$developing-requirement` | 一条 TAPD Story 或选定 Task | 开发、验证、独立评审及测试交付 |
 
 ## 两条主流程
 
 **Bug：** 读取与定位 → 六列清单确认 → 固定分支与修复状态/开始记录 →
-修复验证 → 独立评审 → 完成记录 → 按明确要求交付。
+修复验证 → 独立评审 → 完成记录 → 确认准确测试计划后交付。
 
 **需求：** 读取需求/所选任务与缺口 → 准备必要的任务和方案 → 六列清单确认 →
 执行已批准的 Task/分支/Plan 写入 → 实施验证 → 独立评审 → 按任务返回结果 →
-按明确要求交付。
+确认准确测试计划后交付。
 
 - 小改动使用简短执行说明；确需正式 Plan、任务创建/更新、多人协作或已有
   正式计划时，才进入对应 Task/Plan 能力。见[准备与验证规则](references/adaptive-workflow.md)。
@@ -24,12 +24,18 @@
   通常同时 2 个开发子代理、最多 3 个。主代理统一控制共享操作、集成与评审。
 - 初始清单统一确认已展示的范围、分支及本轮写入。继续同一工作时使用原始
   分支，已有有效确认不重复问；实质变化只重开受影响内容。
-- 默认不提测、不合并、不构建测试环境。用户明确要求交付后，展示准确计划，
-  确认后由对应交付能力执行。“合并并构建”指实际 dev/develop 和项目测试环境。
+- 普通修复/开发默认合并实际 dev/develop、构建测试环境和提测 Wiki，先展示
+  确定清单和模板，再按正式交付计划确认执行。明确只开发/计划/分支或关闭某项
+  时覆盖默认；上线仍须明确要求。“合并并构建”指实际测试分支和项目测试环境。
 
-## 执行清单
+## 确定清单与执行清单
 
 使用[统一清单](references/execution-checklist.md)，始终保留六列：
+
+确认前叫“确定清单”，确认后同一内容转为“执行清单”；实质调整后返回
+确定阶段并重印完整清单，确认后继续。顶部概览列执行项目名称（可多个）、
+执行事项、关联记录及本轮目标。合并和部署按项目分别说明；同一 Bug/Story
+共用一个 Wiki 选择及包含各项目条目的模板，不按项目另建页面。
 
 | 项目 | 分支 | 交付范围 | 实施方案 | 验收标准 | 待决事项 |
 | --- | --- | --- | --- | --- | --- |
@@ -42,8 +48,11 @@
 每项说明影响、责任方、补齐条件和阻塞范围。等待执行确认、未开始编码或
 计划测试尚未运行不计入；未查到不能直接当成不存在，密钥值不进入记录。
 
-Bug 的 TAPD 更新与开始评论合并展示，并明确“合并到 dev”“构建测试环境”
-两项意图。方案就绪后只问一次“是否按以上清单执行？”。
+Bug 的 TAPD 更新与开始评论合并展示；“合并与测试环境”明确合并、是否需要
+提测 Wiki、构建三项，普通修复/开发默认都需要。需要 Wiki 时，确认前先
+展示本次模板预览。用户调整范围/方案或交付选项后重新展示完整清单，不能
+只说沿用上次清单或把单个选项回答当成执行确认；方案就绪后只问一次
+“是否按以上确定清单执行？”。正式 Wiki 正文仍在提测计划中确认后按门禁写入。
 
 ## Bug 与 Task 的区别
 
@@ -68,7 +77,7 @@ Bug 使用[修复人员规则](skills/implementing-work/references/bug-repair-ow
 | [writing-plans](skills/writing-plans/SKILL.md) | 需求范围/验收、必要的正式 Plan | 需求分析；确需计划时 |
 | [breaking-down-requirement](skills/breaking-down-requirement/SKILL.md) | Task 提案、获准创建/更新和精确读回 | 实际需要任务管理时 |
 | [implementing-work](skills/implementing-work/SKILL.md) | 固定分支实现、验证、独立评审及 Bug 记录 | 已确认实施时 |
-| [submitting-for-test](skills/submitting-for-test/SKILL.md) | dev/develop 交付、所选测试部署、Wiki 和适用 TAPD 登记 | 明确要求提测/合并构建时 |
+| [submitting-for-test](skills/submitting-for-test/SKILL.md) | dev/develop 交付、所选测试部署、Wiki 和适用 TAPD 登记 | 默认测试交付，或明确要求提测/合并构建时 |
 | [going-live](skills/going-live/SKILL.md) | 原分支主线交付、适用包发布/升级、Wiki 与清理计划 | 明确要求上线时 |
 
 交付脚本负责执行与读回，参数只在[脚本化交付说明](references/scripted-delivery.md)
@@ -146,7 +155,7 @@ codex plugin add zan-workflows@cfj-skills --json
 ## 调用示例
 
 ```text
-使用 $fixing-bug 修复这个 Bug：<TAPD URL>。先展示执行清单。
+使用 $fixing-bug 修复这个 Bug：<TAPD URL>。先展示确定清单。
 使用 $developing-requirement 开发这个需求：<TAPD URL>。本次只完成开发和验证。
 使用 $developing-requirement 开发这个 Task：<TAPD URL>。仅处理所选任务。
 修复完成后合并到 dev，并构建项目测试环境。

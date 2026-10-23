@@ -22,7 +22,7 @@
 
 ## 六列清单中的呈现
 
-继续使用 [六列执行清单](../../../references/execution-checklist.md)，不增加
+继续使用 [确定与执行清单规范](../../../references/execution-checklist.md)，不增加
 Task 列，也不为每个 Task 重印项目、分支和整份方案。
 
 - 表前给父需求及本轮选定范围。项目格按需带所选 Task 真实链接；任务

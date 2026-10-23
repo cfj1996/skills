@@ -39,6 +39,11 @@ checklist and must not ask a separate dialogue scope-confirmation question.
 When handing scope or a Plan to an execution workflow, use the shared
 [six-column checklist](../../references/execution-checklist.md):
 `项目 | 分支 | 交付范围 | 实施方案 | 验收标准 | 待决事项`.
+Before approval its visible title is 确定清单; only confirmed current content
+is called 执行清单. The overview lists all actual execution projects, item,
+links and goal. Merge/deployment choices are per project; the Story/Bug has
+one Wiki choice and a shared multi-project template. Material changes return
+to a complete 确定清单, preserving already-completed effects.
 The checklist summarizes the same Plan content; it does not create a second
 detail artifact. Long scope/approach/acceptance/decision cells use “详见下方 #01”
 with a useful summary. Below the table, use only `### #01`, `### #02` headings,
@@ -53,9 +58,14 @@ raw payloads and personnel checks stay internal unless needed. Exact branch,
 write and readiness binding remains enforced. Necessary Task/Plan material
 writes remain visible per project, including developer/hour/scope changes.
 No business/implementation decision means 无; final execution approval is
-separate. Render endpoint and actual risk in Chinese. The orchestrator also shows the two explicit
-“合并与测试环境” choices; ordinary development defaults both to 否, and
-unselected Jenkins is not queried. “合并并构建” means verified dev/develop plus
+separate. Render endpoint and actual risk in Chinese. The orchestrator also shows the three explicit
+“合并与测试环境” choices: ordinary repair/development defaults all three to
+需要, with a canonical Wiki template preview. Explicit implementation-only,
+plan-only, branch-only or disabled choices override these defaults; unselected
+Jenkins/Wiki is not queried. A selected Wiki adds its canonical template preview
+before execution confirmation. Material scope/approach or delivery-choice changes
+re-display the complete current checklist, writes and choices before confirming.
+“合并并构建” means verified dev/develop plus
 that project's Jenkins test environment, subject to later delivery write gates.
 
 Reuse the orchestrator's evidenced TAPD/prototype, exact project,

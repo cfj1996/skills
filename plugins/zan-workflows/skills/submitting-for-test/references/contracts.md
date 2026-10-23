@@ -27,6 +27,20 @@ complete visible `SubmissionPlan`, bound-fact fingerprint, exact
 
 ## Invariants
 
+- Explicit checklist choices are preserved. Without overrides, selected test
+  delivery defaults to merge plus `STANDARD` and `DEPLOY`, including `AUTO`;
+  defaults do not authorize writes or override explicit non-delivery scope.
+  No separate preference question is needed. The initial checklist shows all three
+  choices, with a canonical template preview when Wiki is requested. That
+  preview is not `ValidatedWikiDraft` or authorization for unknown body fields.
+  The visible pre-approval/revised checklist is 确定清单; only its confirmed
+  current content is 执行清单. Per-project merge/deploy choices and one shared
+  Story/Bug Wiki choice remain distinct.
+- Material scope/approach/operation or merge/Wiki/deployment changes require
+  the complete current checklist/plan and applicable Wiki content to be shown
+  again before execution confirmation. Retain completed effects and omit their
+  repeated writes. Unchanged approvals and deterministic receipts retain their
+  original reuse rules.
 - `PLAN` performs no commit, push, MR, deployment, Wiki, TAPD, status or test
   version write. It always returns and stops at `AWAITING_CONFIRMATION`.
 - `EXECUTE` requires the exact current `PlannedTestSubmission` plus a later

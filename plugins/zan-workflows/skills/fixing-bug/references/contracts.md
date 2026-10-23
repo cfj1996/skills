@@ -1,6 +1,6 @@
 # 编排交接约定
 
-`fixing-bug` 只负责有序预检、一次执行清单、能力交接与结果汇总。
+`fixing-bug` 只负责有序预检、确定清单、确认后的执行清单、能力交接与结果汇总。
 实际分支/状态/源码/评论/交付写入由对应能力负责，精确事实和授权不能省略。
 
 ## 输入
@@ -13,20 +13,24 @@
 | `branch_mode` | `CREATE|USE_EXISTING`，AUTO 由现有分支事实解析；创建需准确 base ref/SHA |
 | `delivery_mode` | `IMPLEMENT|SUBMIT|GO_LIVE`，仅来自当前或仍有效的明确交付意图 |
 | 实施依据 | 同一范围的 `implementationBrief`、调查说明或已有 Plan；小修复不强制文件 |
-| 提测设置 | 仅请求提测/上线时使用 `submission_profile=AUTO|STANDARD|NO_WIKI` 和 `deployment_mode=AUTO|DEPLOY|SKIP` |
+| 提测设置 | 普通修复默认测试交付，解析 `submission_profile=AUTO|STANDARD|NO_WIKI` 和 `deployment_mode=AUTO|DEPLOY|SKIP`，未关闭时为 STANDARD/DEPLOY；明确仅实施则不加载交付能力 |
 
 Wiki URL 不是必要输入。缺少用户提供的 Wiki URL 不阻塞预检。
 Wiki 目标由提测能力查证，入口不派生、不写 Wiki。
 
 ## 确认与执行
 
-展示遵循 [统一执行清单](../../../references/execution-checklist.md)，不另维护模板。
+展示遵循 [确定与执行清单规范](../../../references/execution-checklist.md)，不另维护模板。
+确认前含调整后的待确认内容均叫确定清单；当前内容获确认后才叫执行清单。
+概览列全部实际项目，主表保留各仓库/固定分支的范围及验收映射。
 确认覆盖六列与编号详情、当前 Plan 内容、分支操作/基准、Bug 状态/准确人员、
 开始评论和评审后完整完成评论。旧授权没有包含评论时，只补所缺写入授权。
 未知引入人/时间不自动成为修复阻塞；记录按事实完善，不虚构归因。
 
 - 只读预检快照不是可执行交接；准确事实和必要授权通过才可 READY_FOR_HANDOFF。
 - 实质范围、分支/基准、人员、状态或拟写入变化，重开受影响确认。
+  重新展示完整六列清单、实际写入和合并/Wiki/构建三项；普通修复默认三项需要，
+  明确需要时先展示本次模板预览。选项回答不授权尚未重印的完整调整清单。
 - CREATE 后同一分支变为 USE_EXISTING 是预期执行变化，不重复确认。
 - CONTINUE 已待测试时保留 status/current_owner，不重复状态或测试版本写入。
 - 写前可变事实核验与写后读回始终保留；“无待决事项”不表示已授权执行。

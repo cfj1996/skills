@@ -1,6 +1,6 @@
 {
   "name": "zan-workflows",
-  "version": "0.3.0+codex.20261023-parallel-implementation",
+  "version": "0.4.0+codex.20261023-checklist-stages",
   "description": "TAPD Bug repair and requirement development with scoped plans, task links, verified implementation and explicit delivery.",
   "author": {
     "name": "Local developer"
@@ -12,7 +12,7 @@
     "composerIcon": "./assets/logo.png",
     "logo": "./assets/logo.png",
     "shortDescription": "TAPD Bug 修复与需求开发，按实际需要准备和交付。",
-    "longDescription": "Two main workflows for TAPD Bug repair and requirement development. Reuse a concise execution brief or an actual Task-linked Plan, confirm the six-column checklist, implement and independently review, then deliver to testing or the main branch only when requested.",
+    "longDescription": "Two main workflows for TAPD Bug repair and requirement development. Confirm a multi-project six-column checklist, implement with proportionate planning and independent review, then default to test-branch merge, test build and shared Wiki through an exact delivery plan. Explicit narrower requests override defaults; go-live requires an explicit request.",
     "developerName": "Local developer",
     "category": "Productivity",
     "capabilities": [
@@ -22,9 +22,9 @@
     "defaultPrompt": [
       "Use $fixing-bug for TAPD Bugs and $developing-requirement for Story/Task development. Load each capability only at its stage.",
       "Prepare a concise scope, implementation and verification brief. Use formal Task/Plan capabilities only when actually needed or explicitly requested, preserving existing task readbacks and confirmed scope.",
-      "Before initial writes, show the six-column Chinese execution checklist with indexed notes and concrete TAPD/delivery operations. Reuse unchanged authorization; keep real requirement, interface and environment gaps visible.",
+      "Before initial writes, show 确定清单 with multi-project overview, six columns, indexed notes and concrete writes. Ordinary repair/development defaults to verified test-branch merge, test build/deploy and one Story/Bug Wiki; explicit narrower scope or disabled choices override defaults. Preview the Wiki template before confirmation. Approved content becomes 执行清单; material changes require a complete revised 确定清单 and confirmation. Reuse unchanged authorization and completed effects.",
       "Use the original fixed branch for continued work. Bug implementation includes verified repair ownership and start/completion records. Requirement implementation covers only selected Tasks and their acceptance.",
-      "Complete relevant verification and independent final review. Ordinary repair/development stops there; merge/build means the verified dev/develop target and project test environment, subject to the delivery plan.",
+      "Complete relevant verification and independent final review before default test delivery. Explicit implementation-only requests stop at REVIEWED. Merge/build means the verified dev/develop target and project test environment, subject to the exact delivery plan; go-live requires an explicit request.",
       "Use submitting-for-test and going-live only for the requested delivery stage. Their exact write plans, readbacks, manual-merge handoff and separately confirmed cleanup remain authoritative."
     ]
   }

@@ -26,6 +26,13 @@ discovery and multi-project grouping. One Story/Bug has one target; its page
 may contain multiple repository/branch entries. Produce the complete shared
 body, retaining all included projects and their distinct status fields.
 
+An entrypoint's pre-execution template preview uses the existing
+[template-preview rules](references/wiki-template.md#确定清单中的模板预览) and
+does not invoke this formal drafting procedure before implementation is reviewed.
+It has no `VALIDATED` state, target/body fingerprint or write authority. When
+submission is actually planned, replace preview placeholders with evidenced facts
+and show the final draft under the existing confirmation/write gates.
+
 ## Inputs
 
 For a standalone call, use the current TAPD work identifier from the request or

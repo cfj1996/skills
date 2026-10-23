@@ -9,7 +9,7 @@
 | User requests “发布测试环境后提测” | Select `DEPLOY`; require Jenkins `SUCCESS` and expected confirmed-target SHA proof before Wiki/TAPD waiting-test writes. |
 | User requests “直接提测” or “跳过发布” | Select `SKIP`, make no build/deploy/parameter/poll call, record `SKIPPED_BY_INTENT`, and continue direct提测; only missing canonical Wiki Job metadata may be read. |
 | Registration PLAN returns a supported TAPD list wrapper after fixing decoding | Complete fresh read-only preview, with no mutation replay and no repeated implementation review. |
-| Plain “提测” with no named project deployment policy | `AUTO` selects `SKIP`; do not ask a separate deployment question. |
+| Plain “提测” without explicit disabled choices | `AUTO` selects `DEPLOY` and `STANDARD`; show merge/build/Wiki and the Wiki preview before confirmation. Explicit `SKIP`/`NO_WIKI` remain authoritative. |
 | Jenkins fails or build ref/SHA cannot be proved | Return `BLOCKED`; keep current Bug status and perform no later Wiki/status/version writes. |
 | `STANDARD` without a supplied Wiki URL | Inspect TAPD links and Wiki hierarchy; never stop to request a Wiki target. |
 | TAPD contains an existing Wiki link | Reuse/update/read back that child and never create a duplicate. |

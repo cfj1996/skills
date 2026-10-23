@@ -12,6 +12,13 @@ or delegation is available; model availability never weakens write gates.
 Consume one `TapdWorkDefinition` and matching `ReviewedChange`, or one Bug's
 `work_definitions` and `reviewed_changes` collections. Normalize either input
 into per-repository delivery rows and one in-memory `TestSubmissionResult`.
+Reuse the checklist's current explicit choices. Without overrides, resolve
+`STANDARD` and `DEPLOY` by default, including incoming `AUTO`: merge to the
+verified test target, build/deploy its test environment and include Wiki.
+An explicit `NO_WIKI`/`SKIP` remains authoritative. Show the complete plan and
+Wiki preview before confirmation; defaults never authorize writes, and no
+separate Wiki preference question is needed.
+
 Execute exactly one profile:
 
 - `STANDARD`: Git delivery, optional Jenkins test deployment, Wiki
@@ -79,6 +86,9 @@ fresh authorization is required only when a bound fact changes.
 
 `STANDARD` does not require a user-supplied Wiki URL. Wiki discovery and
 creation planning are producer-owned behavior, not an input gate.
+An unspecified Wiki choice is resolved to the stated default before this gate,
+not returned as a missing user decision. A template preview from the initial
+checklist is not a final draft or authorization to write Wiki content.
 
 For a multi-repository Bug, group all `work_definitions` by verified canonical
 repository/root, origin and fixed branch, and match each group to its one

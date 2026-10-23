@@ -1,6 +1,6 @@
 # Bug 溯源与修复记录
 
-由 `fixing-bug` 在原执行清单中预览并取得授权，`implementing-work`
+由 `fixing-bug` 在确定清单中预览并取得授权，确认后的执行清单交 `implementing-work`
 在原 Bug 评论下写入。独立调用 `implementing-work` 时复用同一规则。
 只适用于 Bug；Story/Task 不写此记录。记录属于修复阶段，不依赖提测、
 Wiki 或部署，不能由提测 Wiki 链接评论替代。
@@ -37,7 +37,7 @@ Wiki 或部署，不能由提测 Wiki 链接评论替代。
 
 ## 授权与执行位置
 
-对话中的预览按 [执行确认清单](../../../references/execution-checklist.md)
+对话中的预览按 [确定与执行清单规范](../../../references/execution-checklist.md)
 排版：TAPD 状态、处理人、评论账号、记录时点和下面的正文预览合并到
 一个“TAPD 更新与修复记录”区块。记录标题下逐条列出字段，字段名加粗；
 不要另起“开始评论预览”区块或展示原始 payload。实际写入保留相同的

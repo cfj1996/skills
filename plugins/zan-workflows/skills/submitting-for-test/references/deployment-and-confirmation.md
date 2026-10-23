@@ -1,5 +1,20 @@
 # Test deployment and confirmation
 
+## Wiki choice
+
+Reuse a still-valid explicit choice from the current checklist; otherwise use
+`STANDARD` by default, including `AUTO`; ordinary repair/development defaults
+to test delivery with merge, test build/deploy and Wiki all selected. Respect
+explicit implementation-only, plan-only, branch-only or disabled choices.
+Show “是否需要提测 Wiki：需要/不需要” with merge and test-build
+choices in the same complete checklist, without a separate preference prompt.
+Before confirmation, label it 确定清单; approved current content is 执行清单.
+Its overview lists all selected projects. Show merge/deployment per project,
+with one Story/Bug Wiki choice and the applicable multi-project template.
+For `STANDARD`, show the canonical template preview before the implementation
+confirmation, and the complete validated body/patch in the later submission plan.
+The early template has no write authority and cannot contain claims of future success.
+
 ## Deployment mode
 
 Resolve exactly one mode without creating a separate prompt when user intent is
@@ -9,12 +24,14 @@ clear:
 | --- | --- | --- |
 | `DEPLOY` | “发布测试环境”“发布版本”“部署并提测” or a named project policy requiring deployment | Jenkins test deployment must succeed and prove the expected ref/SHA |
 | `SKIP` | “直接提测”“跳过发布”“不发测试环境” | No build/deploy/parameter/poll calls; allow only missing canonical Wiki Job metadata lookup; record `SKIPPED_BY_INTENT` |
-| `AUTO` | No explicit deployment wording | Use a named project policy when present; otherwise select `SKIP` |
+| `AUTO` | No explicit override within selected test delivery | Select `DEPLOY`; preserve an explicit `SKIP` or overall non-delivery scope |
 
 Never silently downgrade an explicit `DEPLOY` request. If the user changes from
-`DEPLOY` to `SKIP` before Jenkins is triggered, that instruction itself is the
-new authorization; display the updated concise plan but do not ask an extra
-yes/no question.
+`DEPLOY` to `SKIP` before Jenkins is triggered, update the choice and show the
+complete current plan again, then wait for its confirmation; do not treat the
+changed option as approval of an undisplayed operation set. Retain actual
+completed effects rather than replaying them. This uses the same confirmation
+question, not a separate deployment preference prompt.
 
 ## Consolidated submission authorization
 
@@ -33,8 +50,8 @@ first submission write. `submission_phase=PLAN` displays it and returns
 - deterministic `Bug|Story|Task` Wiki-link comment and final TAPD status/test-version actions;
 - status behavior from `work_mode`.
 
-The plan must show the exact profile as `STANDARD（Wiki）` or
-`NO_WIKI（无 Wiki 调用）`, never “标准流程”. For `NO_WIKI`, list Wiki discovery,
+The plan shows “需要提测 Wiki” or “不需要提测 Wiki”, mapped internally to
+`STANDARD|NO_WIKI`; do not show only “标准流程” or raw profile codes. For `NO_WIKI`, list Wiki discovery,
 read, create, update and comment as omitted operations.
 
 Initial Bug checklist confirmation, implementation authorization, “修复完成就
@@ -51,6 +68,12 @@ Require fresh authorization only when project/repository, reviewed paths or
 diff, source/target branch, operation set, Wiki target/body semantics, Jenkins
 Job/environment/ref/parameters, TAPD payload, or purpose changes; also require
 it for conflict handling or any `master` operation.
+When those facts or the merge/Wiki/deployment choices change, re-display the
+whole current checklist and submission operation set, including applicable Wiki
+body/patch, before asking for confirmation. A changed preference alone does not
+authorize remaining writes; an unchanged affirmative answer consumes the valid
+plan without another loop. Follow the shared
+[revised-checklist rules](../../../references/execution-checklist.md#用户调整后的重新展示).
 
 ## Execution order
 
