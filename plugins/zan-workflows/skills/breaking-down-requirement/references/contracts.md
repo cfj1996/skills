@@ -60,6 +60,12 @@ proposal 指纹并通过完整准确读回校验。发现差异需要 UPDATE 时
 服务额外字段可保留，但全部批准字段必须一致；验证器不替代实际远端读取。
 全部记录验证通过才能 `TASKS_READY`；部分成功以 PARTIAL 交回，不伪造完整 records。
 
+三列表中的【新建】【复用】【调整】只是上述 action 的中文展示，不加到 name。
+原预估来自操作前 Task 读回，拟预估来自本轮已展示 payload；本轮剩余是当前
+所选未完成范围的预测，单独放在对话/brief 或获准正文，不添加到 Proposal、
+readback.estimateHours、payload 或模型字段。仅在任务行展示两种口径，不追加汇总，不拿剩余量
+覆盖任务最终预估，也不因预测改变将 REUSE 转成 UPDATE 或重算创建指纹。
+
 ## Plan handoff
 
 开发起止日期不是 TaskBreakdownProposal 的必填字段。只有用户请求排期或

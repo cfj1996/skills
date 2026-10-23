@@ -49,6 +49,11 @@ For selected TAPD Tasks, place a three-column `序号 | 标题 | 工时` table b
 use stable `#F01`/`#F02` display indexes, distinct from detail `#01` and model
 feature IDs. Preserve actual Task key/ID and Plan-step bindings internally;
 the display indexes neither alter the model nor require new Tasks/estimates.
+Prefix titles with the current operation 【新建】/【复用】/【调整】. Distinguish
+the Task's original/proposed full estimate from evidence-based remaining work
+in the same hours cell. Show only the Task list, with no totals, subtotals or
+missing-value counts. Follow the shared checklist's unknown-value rules; predictions do
+not overwrite Task estimates, add model fields or trigger date scheduling.
 The checklist summarizes the same Plan content; it does not create a second
 detail artifact. Long scope/approach/acceptance/decision cells use “详见下方 #01”
 with a useful summary. Below the table, use only `### #01`, `### #02` headings,
@@ -263,7 +268,8 @@ TAPD 需求交接复用 `breaking-down-requirement` 的
 `create_task`/`create_tasks`；本技能只消费其结果，不直接创建或补建任务。
 `PLAN_WRITE` 内部接收 `TaskBreakdownResult`：每个 Task 有真实 ID、经核实人员、
 内部估算数据、最终预计工时、依赖及验收，并经过准确读回。对话、确认和
-Plan 正文只展示最终预估工时，不展示计算系数、原始值、公式或折算前后对比。
+Plan 正文仅展示对外最终任务预估及有依据的本轮剩余预测，不展示计算系数、
+内部原始值、公式或折算前后对比；两类工时按共享清单规范分开，不替换模型中的任务预估。
 以一个页面/模块一份 Plan，同一 Plan 可包含多个 Task；实施步骤用
 `tapdTaskKey` 归属一个 Task。不要把步骤编号 `T-*` 当成 TAPD Task ID。
 
