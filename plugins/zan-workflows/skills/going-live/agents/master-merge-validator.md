@@ -21,8 +21,10 @@ For the proposed scoped operations, validate:
    target is exactly the verified default `master` (or actual default `main`);
    source/target SHAs and current-round commits are
    present and consistent.
-3. Explicit authorization binds the displayed repository, source, target,
-   SHAs, commits, operation, and purpose.
+3. Explicit standalone-plan confirmation, or a main entry's complete execution
+   checklist, binds repository/source/target, operation and purpose. Exact SHAs,
+   reviewed commits and permitted patches are evidence-derived and scope-checked
+   before writing; a true flag or repair/test-only permission is insufficient.
 4. The plan excludes `develop/dev -> master`, business production deployment,
    local package publication, smoke tests, TAPD writes, test-version writes,
    and Wiki creation. Involved tooling packages first have a read-only latest
@@ -78,6 +80,9 @@ For the separate explicitly authorized
 [A → C → B conflict path](../../../references/conflict-merge.md), keep original
 A as business source and validate the exact C/B MR, reviewed resolution and
 A/C containment in B. The normal executor still rejects a substituted C.
+Resolution/MR authority may also come from the main entry's complete confirmed
+execution checklist under the shared confirmation-reuse rules. A standalone
+going-live or conflict call still needs its own exact plan confirmation.
 An upfront ACB confirmation may include default cleanup of exact local/remote
 C and its temporary worktree after verified merge and fresh safety checks.
 Do not demand another confirmation for that unchanged scope. A later user

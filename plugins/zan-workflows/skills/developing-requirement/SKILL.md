@@ -22,7 +22,7 @@ Bug 使用 `zan-workflows:fixing-bug`。
 
 `delivery_mode=PLAN_ONLY|BRANCH_ONLY|IMPLEMENT|SUBMIT|GO_LIVE` 根据明确请求确定：
 仅计划、仅建分支、仅开发验证、提测或上线。普通“开发”默认 SUBMIT，包含
-合并实际 dev/develop、构建测试环境和提测 Wiki，仍须当前清单及正式提测计划确认。
+合并实际 dev/develop、构建测试环境和提测 Wiki；完整清单一次确认，后续准确计划仍须核对原授权。
 明确“只开发/仅验证、不提测”才到 IMPLEMENT 为止；
 “合并并构建”表示实际 dev/develop 与项目测试环境，不推导 master/生产。
 仅请求分支时不要求将来的实现说明、Task、Plan 或排期就绪。
@@ -99,6 +99,10 @@ Task/Plan 内容合并确认，不另问一轮范围或分支；任务写入须�
 初始开发请求不批准未展示的清单。确认前不创建分支、保存 Plan、写 Task 或源码。
 表格、备注、关联 Plan 和实际写入共同绑定授权；实质变化只重开受影响部分。
 取得对当前完整内容的确认后才称 `执行清单`，名称变化不增加确认或第二份文档。
+下游按共享 [确认复用规则](../../references/execution-checklist.md#执行清单的确认复用)
+消费同一执行清单；已覆盖的 Task/Plan、提交/MR、构建、Wiki/回链和登记不按
+技能重新询问，选定合并的冲突按已确认 A → C → B 自动处理。独立技能仍走
+自身具体计划确认；原清单未涵盖的范围或操作不能据此执行。
 用户调整范围/方案或合并、Wiki、部署选择时，返回确定阶段，复核变化后重新展示完整确定清单：概览、任务表、六列主表、
 写入和三项意图，需要 Wiki 则附模板，再等待确认。未变化内容也保留供对照；
 选项回答不能替代完整执行确认，已有分支/任务/记录等效果只展示、不重复执行。
@@ -156,8 +160,9 @@ IMPLEMENT 到这里结束，不进入提交、推送、提测或上线。
 仅 SUBMIT/GO_LIVE 读取并调用 `zan-workflows:submitting-for-test`。解析实际
 `submission_profile=AUTO|STANDARD|NO_WIKI` 与 `deployment_mode=AUTO|DEPLOY|SKIP`。
 沿用当前清单的明确选择；未关闭时含 AUTO 默认 STANDARD 和 DEPLOY，不能覆盖明确的 NO_WIKI/SKIP。
-先 `submission_phase=PLAN` 汇总各项目准确提测计划并展示；用户确认当前计划后
-才 `submission_phase=EXECUTE`，初始开发清单不能替代其提交/推送/MR/部署授权。
+先 `submission_phase=PLAN` 准备各项目准确提测计划；与完整执行清单逐项核对
+仍在原授权范围内，就直接 `submission_phase=EXECUTE`，不再次询问提交/推送/
+MR/部署确认。首轮未覆盖或实质变化才补充授权；单独执行技能仍先确认其具体计划。
 使用 [共享提测 Wiki](../../references/shared-test-wiki.md)，同一 Story 的所选
 项目/Tasks 共用一页，全部相关交付门禁通过后再统一写回；不按 Task 新建 Wiki。
 准确读回后才关联实际 MR、测试构建和 Wiki，不制造未来链接或扩大登记对象。

@@ -41,9 +41,12 @@ another terminal to deliver a long plan.
    updated plan before execution.
    It validates selections and returns fingerprints. Check Job
    ownership, channel/version semantics and complete source evidence once.
-   Display the complete actual plan and obtain one exact current-conversation
-   release confirmation. An unchanged confirmed submission/delivery plan that already
-   includes all these actions is reusable; do not ask again.
+   Standalone execution displays this complete actual plan and obtains its
+   own exact release confirmation. From a main entry, compare it to the
+   approved complete execution checklist or confirmed submission/delivery
+   plan; when all actions and parameter semantics are covered, reuse that
+   authority without another question. Technical fingerprints and derived
+   build/version receipts still require evidence and validation.
 3. Send `EXECUTE` to the same live session, or invoke the standalone helper
    once with the unchanged plan and `--execute`. It
    triggers through `jenkins-mcp` exactly once and waits in its own process.

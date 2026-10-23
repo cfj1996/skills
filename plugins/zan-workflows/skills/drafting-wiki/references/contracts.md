@@ -52,7 +52,7 @@
   ID/parent/title into the one creation/supplementation/comment execution;
   a changed original body blocks supplementation. A preview is read-only and
   does not authorize writes. New-page execution uses the preview's fixed
-  month/title, not the date when the later confirmation arrives.
+  month/title, not the date when a later execution/standalone confirmation arrives.
   Create modes use `before_content_hash=NEW_PAGE` and a fully specified parent
   plan; the monthly parent never receives the entry body.
 - Every canonical field must be resolved from read-only evidence. A successful
@@ -120,5 +120,9 @@
   the existing body. Final 已合并 still requires verified source containment.
 - The result contains no external-write authority, local path, runtime ID,
   recovery/history state, or private validator response.
+- The consumer may bind the exact validated body/patch to a main entry's
+  confirmed complete execution checklist and its evidence-based template
+  completion rule. Standalone submission still needs its own exact-plan
+  confirmation; an early template or a VALIDATED draft alone is not permission.
 - Capability consumers receive the complete in-memory result. Only a direct
   standalone user response projects `VALIDATED` to raw Markdown alone.

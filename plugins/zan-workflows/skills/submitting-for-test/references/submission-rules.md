@@ -6,12 +6,15 @@ Prepare one consolidated authorization using
 [deployment-and-confirmation.md](deployment-and-confirmation.md). For every
 external write inside that unchanged authorized plan:
 
-1. The consolidated plan has already displayed the exact target, payload,
-   operation and purpose; do not repeat that display or broad discovery for
-   each operation.
+1. The main execution checklist has confirmed the operation/target/purpose
+   and allowed derivations, or the standalone plan has confirmed the exact
+   payload. Calculate and validate the current exact bindings before writing;
+   do not repeat user display/approval or broad discovery for each operation.
 2. Re-read only the mutable facts for this specific write immediately before
    execution. Reuse the consolidated authorization when they still match;
-   obtain a fresh one only when a bound fact or operation changes.
+   stop stale bindings and refresh the accurate plan when needed. Reuse
+   authority for permitted technical derivations; material scope/operation
+   changes need fresh approval.
 3. Ask the private validator to check this operation, execute only after it
    passes, and read the result back before proceeding.
 

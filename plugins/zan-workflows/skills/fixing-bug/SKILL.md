@@ -26,7 +26,7 @@ Preferred lead model profile: `CRITICAL`。可选模型时使用
 - `branch_mode=AUTO|CREATE|USE_EXISTING`：按准确分支和已核实基准判断；
   已有分支不要求已经包含当前 Bug 的提交、测试或文档。
 - `delivery_mode=IMPLEMENT|SUBMIT|GO_LIVE`：普通“修复”默认 `SUBMIT`，包含合并
-  实际 dev/develop、构建测试环境和提测 Wiki；清单确认及正式提测计划门禁仍必需。
+  实际 dev/develop、构建测试环境和提测 Wiki；完整清单一次确认，后续准确计划及验证仍必需。
   明确“只修复验证/只开发、不提测”才选 `IMPLEMENT`；明确上线才选 `GO_LIVE`。
   已有 Wiki、待测试状态、测试反馈不覆盖本轮明确终点。“合并并构建”表示 dev/develop 与项目测试环境。
 
@@ -73,6 +73,9 @@ Wiki 链接不能进入“待决事项”。只修复时不解析、不询问 Wi
 完整 SHA、原始 payload 和校验证据保留内部；实质内容变化只重开受影响部分。
 同一分支创建后的 CREATE → USE_EXISTING、排版变化不增加确认。
 确认当前完整确定清单后，才称 `执行清单` 并按其推进，不为名称变化重复确认。
+按共享 [确认复用规则](../../references/execution-checklist.md#执行清单的确认复用)
+一次确认完整本轮操作。下游核对并消费同一执行清单；选定合并的冲突自动按
+A → C → B 处理，不因换技能或进入提交、构建、Wiki、登记阶段另问一次。
 用户修改范围/方案或合并、Wiki、部署选项时，返回确定阶段，按共享规范重新展示完整确定清单及
 需要的 Wiki 模板，再等待执行确认；选项回答或“其余沿用”不能替代完整清单。
 已完成效果标明不重复，不重建分支或重发原记录。
@@ -116,9 +119,11 @@ Wiki 链接不能进入“待决事项”。只修复时不解析、不询问 Wi
 
 仅 `SUBMIT|GO_LIVE` 进入 `zan-workflows:submitting-for-test`。
 将同一 Bug 的全部 `work_definitions` 与 `reviewed_changes` 按仓库准确配对，
-单仓库仍传原对象。先用 `submission_phase=PLAN` 展示完整 `SubmissionPlan`，在确认前不提交、
-推送、创建 MR、部署或更新 Wiki/TAPD。用户随后确认这份准确计划，才用
-`submission_phase=EXECUTE`。初始修复清单不能替代提测计划确认。
+单仓库仍传原对象。先用 `submission_phase=PLAN` 准备完整 `SubmissionPlan`，在确认前不提交、
+推送、创建 MR、部署或更新 Wiki/TAPD。这里的确认可以来自完整执行清单：
+编排核对准确计划仍在原范围和操作内后，直接用 `submission_phase=EXECUTE`，
+不再询问“是否执行提测计划”。首轮未覆盖或发生实质变化时才补充确认；
+单独调用提测技能仍按其独立计划确认，不凭修复完成推导授权。
 该 Bug 全部必要仓库的 Git/部署门禁通过后，才统一写 Wiki 和 TAPD 提测登记；
 缺少必要项目结果或交付能力无法聚合时保留待交付，不能先把 Bug 改为待测试。
 常规完整修复的状态顺序是“开始修复 → 修复中；提测交付完成 → 待测试”。

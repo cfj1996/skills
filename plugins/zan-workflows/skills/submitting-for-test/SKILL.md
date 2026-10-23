@@ -45,8 +45,14 @@ mutable facts inside its executor. Session reuse caches connections, not
 authorization, item state, refs or deployment evidence.
 
 Accept `submission_phase=PLAN|EXECUTE`. The first invocation is always `PLAN`:
-it is read-only, returns the complete plan and stops. `EXECUTE` requires that
-exact current plan plus a later current-conversation confirmation.
+it is read-only and returns the complete plan. Follow the shared
+[confirmation-reuse contract](../../references/execution-checklist.md#执行清单的确认复用).
+When a Bug/requirement orchestrator supplies its complete execution checklist
+and real human confirmation, compare the exact plan to that authority and
+continue to EXECUTE without another user turn. For a standalone invocation,
+display the plan, ask for its confirmation and stop; only that matching
+confirmation permits EXECUTE. A helper's PLAN state is not a mandatory new
+human approval when the orchestrator already has matching authority.
 
 Carry the `ReviewedChange`, work definition, Git snapshot, TAPD item and Wiki
 target through both phases. `PLAN` does not repeat implementation review or
@@ -77,8 +83,10 @@ Require:
 - `deployment_mode=AUTO|DEPLOY|SKIP`.
 
 For `EXECUTE`, also require one `PlannedTestSubmission` with
-`terminal_state=AWAITING_CONFIRMATION` and confirmation of its exact visible
-operation set. Initial repair/scope authorization is not sufficient.
+`terminal_state=AWAITING_CONFIRMATION` and authorization covering its exact
+operation set: the orchestrator's unchanged complete execution checklist or
+the standalone plan's own human confirmation. Repair-only authorization,
+implementation completion and a true flag alone are insufficient.
 
 Before the first submission write, require one current-conversation
 consolidated authorization binding every displayed submission operation. A
@@ -87,8 +95,10 @@ fresh authorization is required only when a bound fact changes.
 `STANDARD` does not require a user-supplied Wiki URL. Wiki discovery and
 creation planning are producer-owned behavior, not an input gate.
 An unspecified Wiki choice is resolved to the stated default before this gate,
-not returned as a missing user decision. A template preview from the initial
-checklist is not a final draft or authorization to write Wiki content.
+not returned as a missing user decision. A template preview alone is not a
+final draft or write authority. An approved complete checklist can authorize
+evidence-based completion and writing of that template; resolve and validate
+the exact final body/patch before writing without a routine second question.
 
 For a multi-repository Bug, group all `work_definitions` by verified canonical
 repository/root, origin and fixed branch, and match each group to its one
@@ -125,7 +135,7 @@ requires a refreshed confirmation. Never rebuild on the test target or use
    `NO_WIKI`, set Wiki to `SKIPPED_BY_POLICY` without loading Wiki capability.
    Reuse the item's current details/comments and the original source branch;
    do not start an independent Wiki search in this skill.
-4. Build and display one consolidated `SubmissionPlan` containing each
+4. Build one consolidated `SubmissionPlan` containing each
    repository's Git/target/deployment selection, applicable shared Wiki/comment
    actions, and one final TAPD registration for the Bug. Existing per-project
    handoffs retain their original structure; no new workflow ledger is needed.
@@ -141,11 +151,16 @@ requires a refreshed confirmation. Never rebuild on the test target or use
    or pipeline-computed version policy explicitly when used. Under
    `NO_WIKI`, explicitly list that no Wiki discovery/read/write/comment tool
    will be called. Return `PlannedTestSubmission` with
-   `terminal_state=AWAITING_CONFIRMATION` and stop; perform no write.
-5. In a later `EXECUTE` invocation, verify the user's confirmation answers the
-   exact unchanged plan, then re-read each mutable bound fact at its write
-   boundary. If anything changed,
-   return the updated plan and stop for fresh confirmation.
+   `terminal_state=AWAITING_CONFIRMATION`; PLAN itself performs no write.
+   Standalone calls display this complete plan, ask and stop. An orchestrator
+   instead checks it against the confirmed execution checklist and continues
+   when fully covered; keep unchanged technical plans internal and do not turn
+   a preview into another approval or end-of-stage user question.
+5. In `EXECUTE`, verify the matching standalone confirmation or the
+   orchestrator's exact unchanged checklist authority, then re-read each mutable bound fact at its write
+   boundary. A changed technical binding stops the stale write and requires a
+   fresh accurate plan; compare it to the original authority. Only missing or
+   materially changed scope needs user confirmation, not deterministic receipts.
 6. For each repository, before its first Git write, validate one `GIT_DELIVERY_BUNDLE` with the
    private [submission-validator.md](agents/submission-validator.md) using
    `PRE_GIT_WRITE`. Bind the complete reviewed diff/file list, repository,
@@ -159,10 +174,10 @@ requires a refreshed confirmation. Never rebuild on the test target or use
    the source branch SHA is not automatically the target merge commit SHA.
    A genuine metadata update or conflict needs its exact authorized action,
    not a new broad preparation/review run. Conflicts use the shared
-   [A → C → B flow](../../references/conflict-merge.md): include exact local/
-   remote C and temporary-worktree cleanup in the initial ACB confirmation by
-   default. After verified C → develop/dev and safety checks, clean that scope
-   without a second prompt unless the user requested retention. Keep A as the
+   [A → C → B flow](../../references/conflict-merge.md): reuse the main checklist's
+   conditional resolution authority; standalone or missing scope still confirms
+   its exact ACB plan. Cleanup consumes only explicitly covered exact resources,
+   otherwise retain them and give next-step advice without another question. Keep A as the
    business source and retain the complete ConflictMergeHandoff, association
    and cleanup/retention/deferred outcomes in TestSubmissionResult for go-live.
 7. Resolve every repository's deployment gate through `jenkins-mcp`:

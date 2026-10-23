@@ -3,7 +3,7 @@
 `TestSubmissionResult` is an in-memory handoff to optional `going-live`.
 
 `submission_phase=PLAN` returns an in-memory `PlannedTestSubmission` with the
-complete visible `SubmissionPlan`, bound-fact fingerprint, exact
+complete `SubmissionPlan` (visible for standalone confirmation or material changes), bound-fact fingerprint, exact
 `STANDARD|NO_WIKI`, resolved `DEPLOY|SKIP`, and
 `terminal_state=AWAITING_CONFIRMATION`. It has effects `NONE` and is not a
 `TestSubmissionResult`.
@@ -14,7 +14,7 @@ complete visible `SubmissionPlan`, bound-fact fingerprint, exact
 | --- | --- |
 | Inputs | one source definition/reviewed change pair or a Bug's `work_definitions`/`reviewed_changes` collections matched by canonical repository/root, origin and fixed branch; shared Bug identity/repair-record readbacks and all required repository evidence;  `INITIAL|CONTINUE`, exact Wiki profile, and `AUTO|DEPLOY|SKIP` deployment mode |
 | Repository | expected/actual path, Git root, origin, verification result |
-| Authorization | one consolidated plan/confirmation, bound facts, deterministic derived values, and any reauthorization reason |
+| Authorization | complete execution checklist and actual human confirmation from a main entry, or the standalone plan's own confirmation; current scope-coverage comparison, exact technical plan/bound facts, deterministic derivations, and any reauthorization reason |
 | Git delivery | per repository: original source branch/SHA, verified confirmed test target (`dev` or `develop`), current-round commits, commit/push/MR/merge results, actual-target containment |
 | Conflict handoff | when A → C → B was used, exact ConflictMergeHandoff including original A/B, C MR/revisions/containment, temporary resources, upfront cleanup authority, latest retention policy and per-resource cleanup/deferred outcome; retain it even if C is absent |
 | Deployment | `DEPLOYED|SKIPPED_BY_INTENT|FAILED|UNKNOWN|NOT_ATTEMPTED`, Jenkins job/environment/ref/version/channel/purpose and trigger/readback evidence when applicable |
@@ -32,7 +32,9 @@ complete visible `SubmissionPlan`, bound-fact fingerprint, exact
   defaults do not authorize writes or override explicit non-delivery scope.
   No separate preference question is needed. The initial checklist shows all three
   choices, with a canonical template preview when Wiki is requested. That
-  preview is not `ValidatedWikiDraft` or authorization for unknown body fields.
+  preview alone is not `ValidatedWikiDraft` or write authority. A confirmed
+  complete checklist can authorize its evidence-based completion and the
+  scoped Wiki/comment writes; exact body/patch validation remains required.
   The visible pre-approval/revised checklist is 确定清单; only its confirmed
   current content is 执行清单. Per-project merge/deploy choices and one shared
   Story/Bug Wiki choice remain distinct.
@@ -42,10 +44,15 @@ complete visible `SubmissionPlan`, bound-fact fingerprint, exact
   repeated writes. Unchanged approvals and deterministic receipts retain their
   original reuse rules.
 - `PLAN` performs no commit, push, MR, deployment, Wiki, TAPD, status or test
-  version write. It always returns and stops at `AWAITING_CONFIRMATION`.
-- `EXECUTE` requires the exact current `PlannedTestSubmission` plus a later
-  confirmation that answers its visible plan. Initial repair authorization or
-  implementation completion cannot be reused as submission authorization.
+  version write. Its `AWAITING_CONFIRMATION` result is a read-only technical
+  preview. A standalone call displays it and waits for its own human approval.
+  In a main workflow, the orchestrator may immediately consume existing matching
+  complete execution-checklist authority and proceed without another user turn.
+- `EXECUTE` requires the exact current `PlannedTestSubmission` and either that
+  confirmed complete execution checklist or a matching standalone confirmation.
+  Apply [confirmation reuse](../../../references/execution-checklist.md#执行清单的确认复用);
+  repair-only authorization, completion, an old summary or a true flag alone
+  cannot establish submission authority. No new runtime state/model is needed.
 
 - `SUBMITTED` requires every necessary repository's matching upstream inputs,
   exact repository/original source and confirmed test target (`dev` or
@@ -71,11 +78,14 @@ complete visible `SubmissionPlan`, bound-fact fingerprint, exact
 - The Git sequence is commit when needed, push when needed, MR create/update,
   then MR merge. Include every step in the displayed validated bundle, perform
   its fresh bound checks, execute and read back before the next.
-- An explicitly confirmed conflict uses the shared
+- A conflict covered by the confirmed main execution checklist, or its own
+  standalone ACB confirmation, uses the shared
   [A → C → B flow](../../../references/conflict-merge.md). A remains the
   original business branch; C's exact MR and A/C containment in B are distinct
-  evidence, not a substituted business source. The initial ACB confirmation
-  includes default local/remote C and temporary-worktree cleanup; verified
+  evidence, not a substituted business source. Standalone ACB confirmation
+  includes default local/remote C and temporary-worktree cleanup; a main
+  checklist's automatic resolution alone does not grant deletion. When exact
+  conditional cleanup was explicitly covered, verified
   merge and safety checks trigger that unchanged scope without another prompt.
   User retention revokes the affected deletion authority and survives go-live.
   Preserve exact related-branch association and cleanup outcomes in the handoff.

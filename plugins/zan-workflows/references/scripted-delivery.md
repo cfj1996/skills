@@ -9,7 +9,12 @@ releases and all package publications retain the complete flow below.
 Use one confirmed in-memory plan per operation bundle. Scripts receive JSON
 through stdin and return JSON on stdout; do not save workflow plan/result
 files. `--execute` is an execution switch, not evidence of human authorization.
-The caller must bind the current displayed plan and actual confirmation first.
+The caller must first bind the actual human confirmation to the current exact
+plan: reuse a main entry's complete execution checklist after scope comparison,
+or obtain the standalone skill's own plan confirmation. Follow
+[confirmation reuse](execution-checklist.md#执行清单的确认复用); a PLAN result or
+`confirmed=true` alone is not evidence, and internal preview/execution calls do
+not require another human turn when the main authorization already covers them.
 
 ## Reuse one live MCP session
 
@@ -69,8 +74,9 @@ project's actual default branch during preview and again before merging.
 A default-branch change invalidates the plan even when its old ref has not moved.
 Source remains the original
 `feature/*|fixbug/*`; conflict branches use the shared
-[A → C → B flow](conflict-merge.md), with exact temporary cleanup included
-in its confirmation by default and an explicit user retention override.
+[A → C → B flow](conflict-merge.md), reusing the main checklist's conditional
+resolution authority or obtaining standalone confirmation. Temporary cleanup
+requires its own exact covered resources; automatic resolution alone grants none.
 
 ```bash
 node scripts/merge-reviewed-branch.mjs --json <<'PLAN'

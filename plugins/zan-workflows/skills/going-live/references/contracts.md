@@ -21,7 +21,7 @@ that exact name through plan, executor, validation and containment checks.
 | Wiki | `UPDATED_PENDING_MERGE|ALREADY_PENDING_MERGE|UPDATED_MERGED|ALREADY_MERGED|UPDATED_LATEST|ALREADY_LATEST|SKIPPED_TOOL_PROJECT|SKIPPED_NO_WIKI|BLOCKED|NOT_ATTEMPTED`, matching project/branch entry, project type, before/after type-specific status, target/patch authorization, exact-body readback and intermediate body hash when used |
 | Validation | `VALIDATION_PASSED|VALIDATION_FAILED|NOT_RUN` and normalized reason |
 | Local closeout | per completed project `CHECKED|PARTIAL|UNAVAILABLE|NOT_TRIGGERED`; related branch/worktree paths, association and delivery evidence, observed tip/target SHAs, dirty/ignored/occupancy findings, and per-resource `CANDIDATE|RETAIN|VERIFY` with reasons |
-| Cleanup | `NO_CANDIDATE|AWAITING_CONFIRMATION|CLEANED|PARTIAL|BLOCKED|NOT_TRIGGERED`; exact plan and confirmation when applicable, final-response cleanup question or no-candidate/blocker reason, refreshed evidence, worktree-removal and local-branch-deletion readbacks, and completed/retained resources |
+| Cleanup | `NO_CANDIDATE|AWAITING_CONFIRMATION|CLEANED|PARTIAL|BLOCKED|NOT_TRIGGERED`; exact plan and confirmation when applicable, standalone cleanup question or main-workflow next-step advice, refreshed evidence, worktree-removal and local-branch-deletion readbacks, and completed/retained resources |
 | Remote cleanup | `NOT_REQUESTED|AWAITING_CONFIRMATION|NO_CANDIDATE|CLEANED|PARTIAL|BLOCKED`; associated remote merge refs may be attached as `CleanupPlan.remoteTemporary` under one explicit combined confirmation; remote development refs default NOT_REQUESTED and require a separate request; retain repository/remote/push URL/full refs/SHAs, own MR targets, protection/shared-use and containment evidence, conditional deletion and per-ref absence readback |
 | Terminal | `MERGED|AWAITING_MERGE|BLOCKED`; exact pending MR/read-only continuation when waiting, or blocker when applicable |
 | User action | For `AWAITING_MERGE`, `userAction.type=CONTACT_MERGER`, a message naming the exact MR/source/target and asking the user to contact a colleague with merge permission, and `resumePrompt=已合并，继续上线`; surface this in the final response even when the pending Wiki patch blocks |
@@ -111,7 +111,9 @@ that exact name through plan, executor, validation and containment checks.
 - Merge, package release, consumer-upgrade and Wiki-patch authority are distinct
   scopes and may share one
   current-conversation confirmation only when the full targets, operation,
-  purpose and actual minimal Wiki body/patch were displayed together. Omitted
+  purpose and actual minimal Wiki body/patch or its scoped evidence-based
+  derivation were included together in the complete main execution checklist.
+  A standalone call still displays/confirms its own complete exact plan. Omitted
   or changed scopes need fresh confirmation. Validate the unchanged delivery
   bundle once; the MR and update-only Wiki executors enforce fresh checks and
   readbacks without separate Agent validation between steps. Cleanup remains
@@ -149,7 +151,7 @@ that exact name through plan, executor, validation and containment checks.
 - `NO_CANDIDATE` requires a complete check with no safe candidates. A partial
   or unavailable check yields cleanup `BLOCKED`, never a clean/no-candidate
   claim.
-- Every delivery final response includes the cleanup outcome. An
+- Every delivery final response includes the cleanup outcome. For standalone delivery, an
   `AWAITING_CONFIRMATION` result displays the exact plan and ends with
   `是否删除以上本地开发环境？`, offering `确认清理` or `保留开发环境`,
   for local-only scope. A combined plan uses the concise three-row format in
@@ -158,8 +160,9 @@ that exact name through plan, executor, validation and containment checks.
   evidence in memory; show repository, exact local/remote names and paths,
   retained remote development branches and concise exclusion reasons.
   A state code or generic recommendation cannot replace this question.
-  Orchestrators retain the plan and surface one combined question only after
-  all required delivery gates pass. Other states explain why cleanup is
+  Main orchestrators instead retain the plan and show cleanup as next-step
+  advice without another approval question or unapproved deletion. An explicit
+  independent CLEANUP request still obtains this exact confirmation. Other states explain why cleanup is
   unavailable; they do not request deletion of retained or uncertain resources.
 - An immediate cleanup confirmation answers only the unchanged displayed
   plan; `CLEANUP` reuses the prior merge result and rechecks candidates without

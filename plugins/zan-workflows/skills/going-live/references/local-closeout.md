@@ -108,10 +108,13 @@ disposition:
   distinguish proven undelivered commits from inconclusive history.
 
 In the final response, summarize the findings with concrete paths/branches and
-reasons, separately from merge/Wiki status. After all delivery gates pass,
+reasons, separately from merge/Wiki status. For standalone delivery after all gates pass,
 display the concise exact cleanup plan in the final response and ask
 `是否删除以上本地开发环境？` for local-only scope, or
 `是否清理以上资源（含远程临时分支）？` for a combined plan; a status code alone is insufficient.
+For fixing-bug/developing-requirement, retain these unapproved resources and
+provide the exact candidates as next-step advice instead of an approval
+question. An independently requested CLEANUP still needs its exact resource confirmation.
 If none exist after a complete check, say `目前没有可安全清理的本地资源。`
 and explain any retained current/active resources. For incomplete checks, state
 what was checked and what remains unknown. Always make clear no deletion was
@@ -157,9 +160,10 @@ merge confirmation does not authorize cleanup. In a combined plan a generic
 `确认清理` is insufficient and performs no deletion until scope is explicit.
 An immediate `确认清理` or `执行清理` replying to an unchanged local-only plan
 starts the confirmed cleanup below; `保留开发环境` ends the flow without
-deletion or another prompt. An orchestrator must surface the combined plan
-and this question after all required deliveries pass, rather than dropping
-them from its final summary.
+deletion or another prompt. A main orchestrator surfaces the combined plan as
+next-step advice after delivery and keeps unapproved resources; it does not
+append this standalone cleanup question. An explicit CLEANUP request uses the
+confirmation above and cannot inherit deletion from ordinary merge permission.
 An exact upfront ACB confirmation that explicitly included default C cleanup
 already authorizes that conditional temporary scope. Do not repeat the above
 prompt for it; apply the latest retention override and shared conflict flow.

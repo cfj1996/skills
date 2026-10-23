@@ -12,8 +12,11 @@ Before confirmation, label it 确定清单; approved current content is 执行�
 Its overview lists all selected projects. Show merge/deployment per project,
 with one Story/Bug Wiki choice and the applicable multi-project template.
 For `STANDARD`, show the canonical template preview before the implementation
-confirmation, and the complete validated body/patch in the later submission plan.
-The early template has no write authority and cannot contain claims of future success.
+confirmation. A confirmed complete execution checklist may authorize filling
+that template from reviewed implementation/actual delivery facts and writing
+the scoped final body/patch. The template alone grants no authority and cannot
+claim future success. Standalone submission still displays its complete body
+and operation plan for its own confirmation.
 
 ## Deployment mode
 
@@ -35,39 +38,66 @@ question, not a separate deployment preference prompt.
 
 ## Consolidated submission authorization
 
+Follow [execution-checklist confirmation reuse](../../../references/execution-checklist.md#执行清单的确认复用).
 After `ReviewedChange` passes, prepare one complete `SubmissionPlan` before the
-first submission write. `submission_phase=PLAN` displays it and returns
-`AWAITING_CONFIRMATION`; it must stop before all writes. A later
-`submission_phase=EXECUTE` obtains one authorization covering:
+first submission write. `submission_phase=PLAN` is always read-only and returns
+`AWAITING_CONFIRMATION`; this technical state does not itself require another
+human turn. There are two authorization paths:
+
+- From `fixing-bug`/`developing-requirement`: consume the complete execution
+  checklist, actual human confirmation and current handoffs. Compare each
+  selected operation and derived fact to that scope, validate the accurate
+  plan and call `submission_phase=EXECUTE` directly when fully covered. Do not
+  redisplay an unchanged full plan or ask “是否执行正式提测计划”.
+- Standalone skill invocation: display the complete exact plan/body, ask for
+  its confirmation and stop. A later matching human confirmation permits
+  EXECUTE. Merely mentioning a prior repair, supplying a true flag or having
+  implementation results does not establish orchestrated authority.
+
+The applicable confirmed checklist/standalone plan must cover:
 
 - repository, reviewed paths/diff identity, original source branch, verified
   test target (`dev` or `develop`), and commit/push/MR create-or-update/merge intent;
-- `STANDARD|NO_WIKI`, exact Wiki target plan and complete rendered body when
-  applicable;
+- `STANDARD|NO_WIKI`, owner/hierarchy/entry scope, template and evidence-based
+  completion rule, or the exact final body/patch when confirmed standalone;
 - `DEPLOY|SKIP`; for `DEPLOY`, target project, release target, test environment,
   Jenkins Job, exact confirmed test-target ref/SHA identity, version/build parameter,
   test release channel, and purpose;
-- deterministic `Bug|Story|Task` Wiki-link comment and final TAPD status/test-version actions;
+- deterministic `Bug|Story|Task` Wiki-link comment and final TAPD status/owner/
+  test-version actions, including a bounded version-text derivation rule;
 - status behavior from `work_mode`.
+
+Exact post-review diff/SHA, final Wiki body/patch/hashes, release parameters
+and metadata bindings must still be calculated and validated before writing.
+An approved business scope is not a guessed future diff or permission to
+deploy unrelated target commits. Keep the exact reviewed/source containment
+and mutable-fact checks; populate derived technical fields only from evidence.
 
 The plan shows “需要提测 Wiki” or “不需要提测 Wiki”, mapped internally to
 `STANDARD|NO_WIKI`; do not show only “标准流程” or raw profile codes. For `NO_WIKI`, list Wiki discovery,
 read, create, update and comment as omitted operations.
 
-Initial Bug checklist confirmation, implementation authorization, “修复完成就
-提测”, or a generic confirmation that did not answer this displayed plan does
-not authorize submission writes.
+Repair-only/implementation-only confirmation, “修复完成就提测”, defaults, or an
+unconfirmed checklist do not authorize missing delivery operations. If the
+main execution checklist already explicitly covers those operations, reuse
+it; do not reject it merely because its confirmation preceded implementation.
 
-The same authorization remains valid while those bound facts are unchanged.
-Generated commit SHA, MR ID, Wiki/month/child ID, Jenkins queue/build ID, and
-readback values do not require another confirmation when they are deterministic
-results of the authorized plan. Validate each complete operation bundle once;
+The same authorization remains valid while scope and authorized semantics
+remain unchanged. Generated commit SHA, MR ID, Wiki/month/child ID, Jenkins
+queue/build ID, verified implementation/results and template completion do not require another confirmation
+when they follow the authorized derivation. Pure technical binding refreshes
+still stop the stale write and require a fresh accurate validated plan; they
+do not automatically require another human approval. Validate each complete operation bundle once;
 scripts still check and read back every write without another Agent invocation.
 
-Require fresh authorization only when project/repository, reviewed paths or
-diff, source/target branch, operation set, Wiki target/body semantics, Jenkins
-Job/environment/ref/parameters, TAPD payload, or purpose changes; also require
-it for conflict handling or any `master` operation.
+Require fresh authorization when project/repository, business scope or key
+approach, source/target branch, operation set, Wiki owner/body semantics,
+Jenkins Job/environment/channel or parameter semantics, TAPD target/personnel,
+or purpose extends/changes the approved scope. Automatic A → C → B conflict
+handling consumes the conditional scope already included in the main checklist;
+otherwise show and confirm that exact additional scope. A `master` operation
+requires explicit source/target/purpose authority and is never inferred from
+test delivery. Preserve separately required cleanup authority.
 When those facts or the merge/Wiki/deployment choices change, re-display the
 whole current checklist and submission operation set, including applicable Wiki
 body/patch, before asking for confirmation. A changed preference alone does not
@@ -77,7 +107,7 @@ plan without another loop. Follow the shared
 
 ## Execution order
 
-Prepare the Wiki draft before confirmation, but defer Wiki/TAPD writes until
+Prepare and validate the exact Wiki draft before its write, but defer Wiki/TAPD writes until
 every included repository's deployment gate is resolved:
 
 ```text

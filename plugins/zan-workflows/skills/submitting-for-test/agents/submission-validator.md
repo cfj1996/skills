@@ -27,12 +27,18 @@ filesystem, or network write operations.
   binds independent source/target SHAs and deployment choices. Shared Wiki and
   TAPD writes require every required Git/deployment gate; reject partial-Bug
   registration.
-- The current operation's displayed facts, current re-read facts, target,
-  payload, purpose, `tool_route`, and required authorization all match.
+- The current operation's confirmed business facts, evidence-derived exact
+  bindings/payload, current re-read facts, purpose, `tool_route`, and authority
+  all match. Apply the shared [confirmation reuse](../../../references/execution-checklist.md#执行清单的确认复用):
+  from a main entry, accept its complete execution checklist and actual human
+  confirmation after scope comparison; standalone calls require their own
+  exact-plan confirmation. Reject repair-only permission, summaries or true
+  flags alone. A technical PLAN state is not grounds to demand a second user
+  turn. Derived facts/body completion need validation, not routine reapproval.
 - Browser automation is invalid for GitLab MR, Jenkins, TAPD, Wiki, comment,
   status, test-version, or YApi operations unless the authorized plan explicitly
   records an approved browser fallback under the shared tool-routing policy.
-- One consolidated `SubmissionPlan` authorization binds Git, Wiki, deployment,
+- One complete execution-checklist or standalone `SubmissionPlan` authorization binds Git, Wiki, deployment,
   deterministic comment, and final TAPD actions. Generated commit/MR/Wiki/
   Jenkins IDs are valid without another prompt only when they follow the exact
   authorized derivation.
@@ -84,7 +90,9 @@ An actual conflict may instead use the explicitly confirmed shared
 [A → C → B flow](../../../references/conflict-merge.md). Validate the separate
 exact C/B MR scope, resolution review and original A identity; do not require
 the ordinary source-restricted executor to accept C. Default conditional C
-cleanup is authorized only when exact local/remote C, worktree and purpose
+resolution/MR authority may already come from the main execution checklist;
+do not ask again when exact C/path bindings follow that confirmed rule.
+Cleanup is a separate permission, authorized only when exact local/remote C, worktree and purpose
 were included in that ACB confirmation. Respect later retention instructions,
 require exact C → B merged and full-tip containment proof plus fresh resource
 safety checks, and never include original A deletion. This authority can be

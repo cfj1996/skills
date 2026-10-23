@@ -77,6 +77,11 @@ before execution confirmation. Material scope/approach or delivery-choice change
 re-display the complete current checklist, writes and choices before confirming.
 “合并并构建” means verified dev/develop plus
 that project's Jenkins test environment, subject to later delivery write gates.
+The main entry's complete confirmed execution checklist is reusable downstream
+after exact scope comparison; technical PLAN/validation gates do not require a
+new human turn. Standalone skills keep their own concrete-plan confirmation.
+Evidence-based Wiki completion/IDs and approved automatic A → C → B handling
+follow the shared confirmation-reuse contract without routine reapproval.
 For Bugs, append the final TAPD target under 合并与测试环境 according to the shared
 checklist; full test delivery targets 待测试, while implementation-only retains 修复中.
 

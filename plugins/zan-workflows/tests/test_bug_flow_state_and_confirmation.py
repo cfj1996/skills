@@ -46,7 +46,8 @@ class BugFlowStateAndConfirmationTests(unittest.TestCase):
                        "需要提测 Wiki（会创建/更新）", "不需要提测 Wiki",
                        "submission_phase=PLAN", "submission_phase=EXECUTE", "dev/develop"]:
             self.assertIn(marker, FIXING)
-        self.assertIn("初始修复清单不能替代提测计划确认", FIXING)
+        self.assertIn("execution-checklist.md#执行清单的确认复用", FIXING)
+        self.assertIn("单独调用提测技能仍按其独立计划确认", FIXING)
         self.assertIn("Select `DEPLOY`; preserve an explicit `SKIP`", DEPLOYMENT)
         self.assertIn("SKIPPED_BY_INTENT", DEPLOYMENT)
         self.assertIn("one complete `SubmissionPlan`", DEPLOYMENT)

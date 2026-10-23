@@ -45,11 +45,15 @@ never authorizes remote deletion.
 
 Every delivery final response must include the local cleanup outcome. After
 all required delivery gates pass and the completed check yields safe
-candidates, show their exact plan and end
+candidates, standalone delivery shows their exact plan and ends
 with `是否删除以上本地开发环境？` for a local-only plan, or
 `是否清理以上资源（含远程临时分支）？` for a combined plan; a cleanup-state code or a generic cleanup
-recommendation alone is insufficient. When invoked by an orchestrator,
-preserve this next step for its final response after the whole delivery ends.
+recommendation alone is insufficient in that standalone confirmation flow.
+When invoked by fixing-bug/developing-requirement, report the check and cleanup
+candidates as next-step advice; do not append a new approval question or delete
+original development resources. Explicitly requested CLEANUP still requires its
+own exact resource confirmation. Existing exact conditional conflict cleanup
+retains its already-approved scope.
 
 Read [contracts.md](references/contracts.md) and
 [tool-routing policy](../../references/tool-routing.md) before any write.
@@ -216,6 +220,11 @@ user specifies whether to include or exclude the remote temporary rows.
    merge, official package release, scoped consumer upgrades/delivery and exact
    Wiki-patch authority when fully displayed. An omitted scope still
    needs its own confirmation; changed facts require a fresh actual preview.
+   A main entry's complete execution checklist may already supply that explicit
+   go-live authority. Apply [confirmation reuse](../../references/execution-checklist.md#执行清单的确认复用),
+   compare the exact delivery/derived facts and continue without another user
+   turn when covered. Standalone going-live still displays and confirms its
+   own complete plan; test-delivery approval never implies master/production.
 3. For a `STANDARD` submission, read its exact Wiki target and uniquely locate
    the entry by the original source branch. Resolve the project category and
    service type before planning the Wiki operation:
@@ -270,8 +279,10 @@ user specifies whether to include or exclude the remote temporary rows.
    preparation, review, private validation or Agent polling between its steps.
    A real metadata edit or conflict needs its own exact authorized action.
    For a conflict, use the shared [A → C → B flow](../../references/conflict-merge.md)
-   with default temporary cleanup included in its initial exact confirmation
-   and the user's retention override. Keep A as the business source; retain
+   under the main checklist's already-covered conditional scope, or confirm
+   the standalone ACB plan when absent. Do not ask again for covered conflict
+   resolution; temporary cleanup needs explicit exact authority and honors
+   retention overrides. Keep A as the business source; retain
    separate C → B merge/containment evidence rather than passing C to the
    ordinary original-branch executor.
 6. After each successful merge readback and `origin/master` containment, run the

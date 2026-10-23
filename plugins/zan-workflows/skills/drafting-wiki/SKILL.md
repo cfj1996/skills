@@ -29,9 +29,12 @@ body, retaining all included projects and their distinct status fields.
 An entrypoint's pre-execution template preview uses the existing
 [template-preview rules](references/wiki-template.md#确定清单中的模板预览) and
 does not invoke this formal drafting procedure before implementation is reviewed.
-It has no `VALIDATED` state, target/body fingerprint or write authority. When
-submission is actually planned, replace preview placeholders with evidenced facts
-and show the final draft under the existing confirmation/write gates.
+It has no `VALIDATED` state, target/body fingerprint or write authority by itself.
+When submission is planned, replace placeholders with evidenced facts. A main
+entry's confirmed complete execution checklist may authorize that scoped
+completion and write; the consumer compares the exact validated draft to it
+without a routine second confirmation. Standalone submission still obtains
+its own exact-plan approval; this drafting skill remains read-only in either context.
 
 ## Inputs
 
@@ -142,4 +145,5 @@ blocker and no claimed final body.
 
 No input/output JSON, report file, runtime state, or recovery information is
 created. When called by `submitting-for-test`, the draft exists only in memory
-until that skill displays the complete rendered Markdown for authorization.
+and is consumed under the main execution-checklist authority or the standalone
+submission's exact confirmation; drafting itself never authorizes a write.

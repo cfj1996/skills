@@ -88,7 +88,8 @@ class RequirementDevelopmentFlowTests(unittest.TestCase):
         for marker in ["submission_phase=PLAN", "submission_phase=EXECUTE", "shared-test-wiki.md",
                        "AWAITING_MERGE", "userAction.message", "zan-workflows:going-live"]:
             self.assertIn(marker, SKILL)
-        self.assertIn("初始开发清单不能替代", SKILL)
+        self.assertIn("execution-checklist.md#执行清单的确认复用", SKILL)
+        self.assertIn("单独执行技能仍先确认其具体计划", SKILL)
         self.assertIn("不按 Task 新建 Wiki", SKILL)
         self.assertIn("业务应用生产部署不由本入口推导", SKILL)
         self.assertIn("不能提前删除其他项目仍使用的分支/工作树", SKILL)
