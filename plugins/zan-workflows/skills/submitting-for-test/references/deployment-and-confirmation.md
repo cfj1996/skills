@@ -23,12 +23,12 @@ first submission write. `submission_phase=PLAN` displays it and returns
 `AWAITING_CONFIRMATION`; it must stop before all writes. A later
 `submission_phase=EXECUTE` obtains one authorization covering:
 
-- repository, reviewed paths/diff identity, original source branch, target
-  `develop`, and commit/push/MR create-or-update/merge intent;
+- repository, reviewed paths/diff identity, original source branch, verified
+  test target (`dev` or `develop`), and commit/push/MR create-or-update/merge intent;
 - `STANDARD|NO_WIKI`, exact Wiki target plan and complete rendered body when
   applicable;
 - `DEPLOY|SKIP`; for `DEPLOY`, target project, release target, test environment,
-  Jenkins Job, expected `develop` ref/SHA identity, version/build parameter,
+  Jenkins Job, exact confirmed test-target ref/SHA identity, version/build parameter,
   test release channel, and purpose;
 - deterministic `Bug|Story|Task` Wiki-link comment and final TAPD status/test-version actions;
 - status behavior from `work_mode`.
@@ -55,22 +55,26 @@ it for conflict handling or any `master` operation.
 ## Execution order
 
 Prepare the Wiki draft before confirmation, but defer Wiki/TAPD writes until
-the deployment gate is resolved:
+every included repository's deployment gate is resolved:
 
 ```text
-Git commit/push/MR -> develop containment
+Each repository: Git commit/push/MR -> confirmed test-target containment
   -> DEPLOY: Jenkins SUCCESS + expected ref/SHA proof
      SKIP: no Jenkins deployment call + SKIPPED_BY_INTENT
-  -> Wiki create/update/readback when STANDARD
+All required repositories pass:
+  -> one shared Wiki create/update/readback when STANDARD
   -> idempotent Bug/Story/Task Wiki-link comment when applicable
-  -> TAPD waiting-test/test-version writes when status policy requires them
+  -> one Bug registration with waiting-test/test-version writes when required
 ```
 
 For `DEPLOY`, resolve the Jenkins Job through workspace project knowledge and
 the release-safety policy. Jenkins success alone is insufficient: read back the
 build parameters and repository-specific SCM evidence needed to prove it built the expected
-`origin/develop` commit. Use that SHA as the release identity when the job has
-no semantic version parameter.
+delivered commit of that exact confirmed remote test target. For an application
+deployment without a semantic-version parameter, that SHA may identify its
+build. Package publication still requires an explicit package version or the
+supported pipeline-computed version contract and actual version readback;
+a source SHA cannot stand in for a package version.
 
 Use the [scripted delivery executors](../../../references/scripted-delivery.md).
 Preview exact Job/ref/version/channel selections once; pass the unchanged

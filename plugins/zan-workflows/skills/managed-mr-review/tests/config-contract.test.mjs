@@ -164,3 +164,93 @@ test('Zan governance and code findings remain independent merge blockers', () =>
   });
   assert.deepEqual(result, { mergeAllowed: false, blockers: ['zan-governance'] });
 });
+
+const passingReview = {
+  codeReview: 'pass',
+  safety: 'pass',
+  mergeability: 'mergeable',
+};
+
+test('merge readiness accepts evidenced ordinary and adopted success paths', () => {
+  for (const evidence of [
+    {},
+    { pipeline: 'pending', pipelineRequired: false, approval: 'not-required' },
+    { pipeline: 'success', pipelineRequired: true, approval: 'approved' },
+    { zanStatus: 'adopted', zanMust: 'pass', approval: 'approved' },
+  ]) {
+    assert.deepEqual(evaluateMergeReadiness({ ...passingReview, ...evidence }), {
+      mergeAllowed: true,
+      blockers: [],
+    });
+  }
+});
+
+test('required pipelines accept only success and retain existing blocker reasons', () => {
+  for (const [pipeline, reason] of [
+    ['none', 'pipeline-missing'],
+    ['pending', 'pipeline-pending'],
+    ['failed', 'pipeline-failed'],
+    ...['running', 'manual', 'canceled', 'skipped', 'unknown', '', null, true, {}]
+      .map((state) => [state, 'pipeline-not-success']),
+  ]) {
+    assert.deepEqual(evaluateMergeReadiness({
+      ...passingReview, pipeline, pipelineRequired: true,
+    }), { mergeAllowed: false, blockers: [reason] }, JSON.stringify(pipeline));
+  }
+});
+
+test('optional pipelines still reject failures and unrecognized or null states', () => {
+  for (const [pipeline, reason] of [
+    ['failed', 'pipeline-failed'],
+    ...['running', 'manual', 'canceled', 'skipped', 'unknown', '', null, true, {}]
+      .map((state) => [state, 'pipeline-unknown']),
+  ]) {
+    assert.deepEqual(evaluateMergeReadiness({
+      ...passingReview, pipeline, pipelineRequired: false,
+    }), { mergeAllowed: false, blockers: [reason] }, JSON.stringify(pipeline));
+  }
+});
+
+test('review and merge gates reject unsupported and null states', () => {
+  for (const [field, reason] of [
+    ['codeReview', 'code-review-incomplete'],
+    ['safety', 'safety'],
+    ['mergeability', 'mergeability'],
+    ['approval', 'approval'],
+    ['zanStatus', 'zan-governance'],
+  ]) {
+    for (const state of ['unknown', 'unexpected-success', '', null, true, {}]) {
+      assert.deepEqual(evaluateMergeReadiness({ ...passingReview, [field]: state }), {
+        mergeAllowed: false,
+        blockers: [reason],
+      }, `${field}=${JSON.stringify(state)}`);
+    }
+  }
+  assert.deepEqual(evaluateMergeReadiness({
+    ...passingReview,
+    codeReview: 'blocker',
+    approval: 'required-missing',
+    zanStatus: 'misconfigured',
+  }), { mergeAllowed: false, blockers: ['code', 'approval', 'zan-governance'] });
+});
+
+test('adopted projects require explicit Zan MUST success', () => {
+  for (const zanMust of ['fail', 'unknown', 'not-applicable', '', null, true, {}]) {
+    assert.deepEqual(evaluateMergeReadiness({
+      ...passingReview, zanStatus: 'adopted', zanMust,
+    }), { mergeAllowed: false, blockers: ['zan-must'] }, JSON.stringify(zanMust));
+  }
+});
+
+test('unknown gate requirements and discussion states cannot bypass merge checks', () => {
+  for (const state of [null, 'false', '', 0, {}]) {
+    assert.deepEqual(evaluateMergeReadiness({ ...passingReview, pipelineRequired: state }), {
+      mergeAllowed: false,
+      blockers: ['pipeline-requirement-unknown'],
+    }, `pipelineRequired=${JSON.stringify(state)}`);
+    assert.deepEqual(evaluateMergeReadiness({ ...passingReview, unresolvedDiscussions: state }), {
+      mergeAllowed: false,
+      blockers: ['unresolved-discussions'],
+    }, `unresolvedDiscussions=${JSON.stringify(state)}`);
+  }
+});

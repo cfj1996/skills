@@ -4,11 +4,15 @@
 `master` deliveries, including the required latest flow for involved tooling
 packages and affected consumers.
 
+Here `master` means the verified remote default delivery branch, including
+`main` only when remote evidence identifies it as the actual default. Preserve
+that exact name through plan, executor, validation and containment checks.
+
 ## Required content
 
 | Section | Required facts |
 | --- | --- |
-| Submission | upstream `SUBMITTED` result and original repair branch; exact related submitted owner/consumer handoffs when tooling dependencies are involved |
+| Submission | upstream `SUBMITTED` result with every included repository's original repair branch and exact actual test target; single-project input or a same-Bug aggregate matched by repository/origin/fixed branch; exact related submitted owner/consumer handoffs when tooling dependencies are involved |
 | Repository | expected/actual path, Git root, origin, verification result |
 | Merge | source/target branches and SHAs, current-round commits, authorization, MR result, merge readback, master containment |
 | Tooling latest | `VERIFIED|NOT_APPLICABLE|AWAITING_MERGE|BLOCKED`; exact plan/authorization, latest precheck `VERIFIED_EXISTING|NEEDS_RELEASE|BLOCKED`, package owner delivery, `REUSED_LATEST|PUBLISHED_LATEST` and publication/source/registry evidence, Jenkins result only when a release is needed, affected consumer manifests/locks/resolved versions, upgrade review/checks/delivery, and final latest recheck |
@@ -45,20 +49,20 @@ packages and affected consumers.
   block. Reuse unchanged authority only for unfinished dependent actions.
 
 - `MERGED` requires the original submitted `feature/*` or `fixbug/*` source,
-  target exactly `master`, matching expected/actual source and target SHAs at
+  target exactly the verified remote default (`master` or `main`), matching expected/actual source and target SHAs at
   execution, explicit merge authorization, passing pre-write validation,
   successful merge readback, and containment of every current-round commit.
   If tooling packages are involved, it additionally requires
   `ToolingLatestResult=VERIFIED`, all bound consumers delivered at the current
   registry latest, and applicable Wiki `当前版本：latest` readbacks. Merge
   success alone cannot satisfy the overall delivery result.
-- `develop -> master`, `dev -> master`, `merge/*`, release branches, or a
+- `develop`/`dev` to the default delivery branch, `merge/*`, release branches, or a
   substituted source are always blocked.
   Here source means the original business source. An explicitly confirmed
   [A → C → B conflict](../../../references/conflict-merge.md) retains original
   A and distinct C → B MR evidence; it never passes C as A to the ordinary
   merge executor. Require both reviewed A and C containment in B before
-  recording completion. This exception does not permit develop/dev → master.
+  recording completion. This exception does not permit develop/dev → the default delivery branch.
 - A `STANDARD` submission, including `SKIPPED_BY_POLICY`, requires its
   pre-existing exact Wiki target and one uniquely matching source-branch entry.
   An involved tooling package yields `UPDATED_LATEST|ALREADY_LATEST`, with

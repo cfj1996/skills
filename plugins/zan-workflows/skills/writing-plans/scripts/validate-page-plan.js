@@ -307,8 +307,7 @@ function validatePagePlanModel(model) {
     return { valid: false, errors: [{ code: "input-normalized-object", message: "input requires a normalized object" }] };
   }
 
-  addError(errors, [2, 3].includes(model.schemaVersion), "schema-version", "schemaVersion must be 2 or 3");
-  const isModuleModel = model.schemaVersion === 3;
+  addError(errors, model.schemaVersion === 3, "schema-version", "schemaVersion must be 3");
   const implementationStage = IMPLEMENTATION_STAGES.has(model.deliveryUnit?.status);
   addError(errors, isNormalizedObject(model.deliveryUnit), "delivery-unit-object", "deliveryUnit requires a normalized object");
   if (isNormalizedObject(model.deliveryUnit)) {
@@ -331,35 +330,33 @@ function validatePagePlanModel(model) {
     indexes[collectionName] = indexById(itemsByCollection[collectionName], collectionName, errors);
   }
 
-  if (isModuleModel) {
-    addError(errors, itemsByCollection.features.length > 0, "module-features-required", "features requires at least one reviewed module");
-  }
+  addError(errors, itemsByCollection.features.length > 0, "module-features-required", "features requires at least one reviewed module");
   const nestedIds = { scenarios: new Set(), questions: new Set() };
 
   for (const feature of itemsByCollection.features) {
     if (!isNormalizedObject(feature)) continue;
     validateStatus(errors, `features ${feature.id}`, feature.status, STATUS_MODEL.feature);
-    if (isModuleModel) validateModule(feature, indexes, nestedIds, errors);
-    const applicable = isModuleModel ? feature.reviewConclusion !== "不适用" : feature.status !== "不适用";
+    validateModule(feature, indexes, nestedIds, errors);
+    const applicable = feature.reviewConclusion !== "不适用";
     validateFeatureImplementationPlan(feature, indexes.evidence, errors, implementationStage && applicable);
-    if (isModuleModel && implementationStage && applicable) {
+    if (implementationStage && applicable) {
       addError(errors, feature.reviewConclusion === "已确认", "feature-review-not-confirmed", `features ${feature.id} reviewConclusion must be 已确认 for an implementation-stage delivery unit`);
       addError(errors, feature.apiNeed !== "unknown", "feature-api-need-unresolved", `features ${feature.id} apiNeed must be resolved for an implementation-stage delivery unit`);
       addError(errors, Array.isArray(feature.module?.questions) && feature.module.questions.length === 0, "feature-module-questions-unresolved", `features ${feature.id} module.questions must be resolved for an implementation-stage delivery unit`);
     }
     addError(
       errors,
-      API_NEEDS.includes(feature.apiNeed) && (isModuleModel || feature.apiNeed !== "unknown"),
+      API_NEEDS.includes(feature.apiNeed),
       "feature-api-need",
-      `features ${feature.id} apiNeed must be ${isModuleModel ? "required, none, or unknown" : "required or none"}`,
+      `features ${feature.id} apiNeed must be required, none, or unknown`,
     );
     addError(
       errors,
-      Array.isArray(feature.apiDecisionEvidenceRefs) && ((isModuleModel && feature.apiNeed === "unknown") || feature.apiDecisionEvidenceRefs.length > 0),
+      Array.isArray(feature.apiDecisionEvidenceRefs) && (feature.apiNeed === "unknown" || feature.apiDecisionEvidenceRefs.length > 0),
       "feature-api-decision-evidence",
       `features ${feature.id} requires API decision evidence`,
     );
-    if (isModuleModel && feature.apiNeed === "unknown") {
+    if (feature.apiNeed === "unknown") {
       addError(
         errors,
         (Array.isArray(feature.module?.questions) && feature.module.questions.length > 0) || hasText(feature.apiEvidenceGap),
@@ -385,7 +382,7 @@ function validatePagePlanModel(model) {
       );
     }
   }
-  if (isModuleModel) validateModuleTree(indexes.features, errors);
+  validateModuleTree(indexes.features, errors);
   for (const api of itemsByCollection.apis) {
     if (!isNormalizedObject(api)) continue;
     validateStatus(errors, `apis ${api.id}`, api.status, STATUS_MODEL.api);

@@ -20,11 +20,11 @@ function calculateObjectiveMetrics(model = {}) {
   const tasks = (model.tasks || []).filter((item) => item.status !== "不适用");
   const completed = tasks.filter((item) => ["已完成", "已验证"].includes(item.status)).length;
   const verified = tasks.filter((item) => item.status === "已验证").length;
-  const reviewByStatus = countByStatus(model.reviewCards, "conclusion");
+  const reviewByStatus = countByStatus(model.features, "reviewConclusion");
 
   return {
     review: {
-      total: (model.reviewCards || []).length,
+      total: (model.features || []).length,
       byStatus: reviewByStatus,
       pendingRecheck:
         (reviewByStatus["未评审"] || 0) +

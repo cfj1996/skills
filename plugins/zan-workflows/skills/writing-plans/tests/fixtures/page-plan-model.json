@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "deliveryUnit": {
     "id": "UNIT-001",
     "kind": "page",
@@ -31,6 +31,29 @@
         "acceptanceFocus": ["校验、失败反馈、重复提交和成功跳转均可验证"],
         "evidenceIds": ["E-001"],
         "blockers": []
+      },
+      "reviewConclusion": "已确认",
+      "module": {
+        "name": "登录表单",
+        "parentId": null,
+        "purpose": "让用户建立登录会话",
+        "inputs": ["用户输入的账号和密码"],
+        "outputs": ["登录成功建立会话并跳转；失败展示原因"],
+        "rules": ["字段校验通过后才请求登录；提交期间阻止重复提交"],
+        "scenarios": [
+          {
+            "id": "F-001-S-001",
+            "given": "用户填写有效凭证",
+            "when": "点击登录",
+            "then": "建立会话并进入目标页"
+          }
+        ],
+        "questions": [],
+        "change": {
+          "kind": "modified",
+          "summary": "补充失败反馈和重复提交保护"
+        },
+        "revision": 1
       }
     }
   ],

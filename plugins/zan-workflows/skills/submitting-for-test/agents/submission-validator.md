@@ -16,8 +16,17 @@ filesystem, or network write operations.
 
 - Definition is `READY_FOR_HANDOFF`; reviewed change is `REVIEWED` with public
   `REVIEW_PASSED`; repository and original source branch match.
-- Profile is exactly `STANDARD|NO_WIKI`; target is exactly `develop` for Git
-  delivery; current-round diff/commits contain no unrelated work.
+- Profile is exactly `STANDARD|NO_WIKI`; each Git delivery target is the
+  verified and confirmed actual test branch (`dev` or `develop`), unchanged
+  from its upstream selection. Never normalize one alias to the other.
+  Current-round diff/commits contain no unrelated work.
+- For a Bug across repositories, pair all required definitions/reviews by
+  canonical repository/root, origin and fixed branch, not array position.
+  Require matching Bug identity, per-repository passing reviews, cross-repository
+  acceptance and the shared completion-record readback. One consolidated plan
+  binds independent source/target SHAs and deployment choices. Shared Wiki and
+  TAPD writes require every required Git/deployment gate; reject partial-Bug
+  registration.
 - The current operation's displayed facts, current re-read facts, target,
   payload, purpose, `tool_route`, and required authorization all match.
 - Browser automation is invalid for GitLab MR, Jenkins, TAPD, Wiki, comment,
@@ -46,8 +55,10 @@ filesystem, or network write operations.
 - Under `STANDARD`, a drafter result with
   `terminal_state=SKIPPED_BY_POLICY` is valid only when
   `skip_reason=NON_FUNCTIONAL_CONTINUE` is supported by the current reviewed
-  change; it forbids Wiki and Wiki-comment operations and needs no Wiki
-  readback.
+  change and a verified owner page/current repository+branch entry with exact
+  target/body readback retained for go-live. It forbids Wiki and Wiki-comment
+  writes; no post-write readback is needed because no write occurs. Missing
+  page/entry requires a validated creation/append draft instead of a skip.
 
 For `PRE_GIT_WRITE`, accept exactly one operation:
 `GIT_DELIVERY_BUNDLE|COMMIT|PUSH|MR_CREATE_OR_UPDATE|MR_MERGE`. Validate only the current payload
@@ -89,7 +100,7 @@ no Wiki material.
 
 For `JENKINS_TEST_DEPLOY`, require `deployment_mode=DEPLOY`, the release-safety
 fields, exact Jenkins Job/parameters, test environment/channel, and expected
-`origin/develop` SHA, plus `tool_route=jenkins-mcp`. A later `DEPLOYED` result requires terminal `SUCCESS` and
+delivered SHA of the exact confirmed remote test target, plus `tool_route=jenkins-mcp`. A later `DEPLOYED` result requires terminal `SUCCESS` and
 build evidence for that SHA. Validate the full `run-jenkins-release.mjs`
 invocation once with exact instance/Job URL, ref/version/channel/parameters,
 config/definition or explicitly displayed metadata-only binding fingerprints,
@@ -164,11 +175,12 @@ Continue already waiting skips these writes; Story/Task rejects Bug status/owner
 Changed state, version, assignment facts or metadata blocks before update. Partial/unknown
 readback reports actual known effects and never rolls back/retries.
 
-For final `POST_WRITE`, require successful merge/develop containment and deployment
+For final `POST_WRITE`, require every required repository's merge/confirmed-target containment and deployment
 state `DEPLOYED|SKIPPED_BY_INTENT`. Under `DEPLOY`, require Jenkins success/SHA
 proof before Wiki/TAPD writes. Require Wiki readback and work-item link state
 `LINKED|ALREADY_LINKED` under `STANDARD` whenever the Wiki target is validated;
-a policy skip requires no such readbacks.
+a policy skip requires retained existing target/body/entry evidence, but no
+post-write readbacks.
 For `INITIAL`, require applicable waiting-test/owner/version readbacks; for
 `CONTINUE` already in `待测试`, require no status/owner/version write and public
 `SKIPPED_ALREADY_WAITING_TEST`. Verify ordering and truthful completed effects.

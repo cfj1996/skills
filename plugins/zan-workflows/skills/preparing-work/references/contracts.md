@@ -9,11 +9,11 @@
 | --- | --- |
 | Identity | TAPD URL, type, item ID, short ID, title |
 | Context | cited requirement facts, conflicts, missing facts, confidence and reasons |
-| Workflow (optional) | resolved `workflow_profile=QUICK|STANDARD|FULL`, reason, `verification_risk=NORMAL|HIGH` and risk evidence; QUICK may carry the in-memory `implementationBrief` from the same selected item and scope |
+| Execution context | brief or Bug investigation summary for the selected scope; applicable formal Plan/Task result when needed, with current evidence and concrete verification risks |
 | Work mode | `INITIAL|CONTINUE`, trigger evidence, reused confirmation facts, and original-branch recovery evidence when applicable |
 | Scope | in-scope work, excluded work, acceptance criteria, confirmation state |
 | Project | selected project, canonical repository path, Git root, origin remote, verification result |
-| Branch | requested mode, fixed branch, action `CREATE|USE_EXISTING`, selected/planned branch, local/remote ref facts, for `CREATE` exact verified base ref/SHA, and matching current-conversation confirmation source |
+| Branch | requested mode, fixed branch, action `CREATE|USE_EXISTING`, selected/planned branch, local/remote refs and ancestry evidence, exact selected ref/SHA for existing work, for `CREATE` exact verified base ref/SHA, and matching current-conversation confirmation source |
 | TAPD status plan | item type, current status/`current_owner`, `WRITE_ACTIVE|NO_CHANGE|SKIPPED_ALREADY_WAITING_TEST|NOT_APPLICABLE_NON_BUG`; for applicable Bugs verified `repairOwner={account,workspaceId,source,evidence}`; exact status+owner target/payload/purpose and confirmation source only for a Bug `WRITE_ACTIVE` |
 | Validation | public mapped state and normalized failure reason |
 | Terminal | `READY_FOR_HANDOFF|PENDING|BLOCKED` and blocker/next decision when needed |
@@ -25,15 +25,22 @@
   definition names it as the planned branch and carries `create_base_ref` plus
   its current verified `create_base_sha`, but does not create it. The base must
   come from explicit input or a named governing workspace policy.
-- `USE_EXISTING` requires the exact supplied branch to exist. When both local
-  and remote refs exist, their SHAs must match. The definition selects that
-  same branch and does not inspect Bug-specific history as an eligibility gate.
+- `USE_EXISTING` requires the exact supplied branch to exist. Equal refs or
+  verified local-ahead history covered by confirmed scope or an accepted baseline select the original
+  local branch and exact local tip. Remote-ahead or divergent refs block until
+  a separate explicit resolution is completed; no push/reset/rebase is implied.
+  Missing ancestry or unclear local increment is `PENDING`. With only one ref,
+  bind that exact verified tip under the same branch identity and authorization.
+  The definition does not require Bug-specific commits as an eligibility gate.
 - `AUTO` with an exact fixed branch chooses `USE_EXISTING` when the verified
   branch exists, otherwise `CREATE` when absence is verified. An unavailable
-  ref check is `PENDING`; conflicting refs are `BLOCKED`.
+  ref/ancestry check is `PENDING`; remote-ahead or divergent refs are `BLOCKED`.
 - No mode may select or plan a branch different from `fixed_branch`.
 - The confirmation source binds project/repository, scope, fixed branch,
-  source/base ref/SHA, target branch, operation and purpose. A visible-field
+  source/base ref/SHA (including the selected existing tip), target branch,
+  operation and purpose. Existing accepted baseline commits remain separate
+  from this work; verify the unpublished increment without absorbing unrelated
+  changes into the result. A visible-field
   change invalidates it; the expected post-creation `CREATE` to `USE_EXISTING`
   transition for the same branch does not.
 - `CONTINUE` requires `USE_EXISTING` on the recovered original source branch.
@@ -64,12 +71,10 @@ Use `PENDING` only for missing evidence or a named user choice that could make
 the definition valid. Use `BLOCKED` for a proven mismatch or conflict. Neither
 state advertises an eligible handoff or performs a write.
 
-Apply [按工作规模选择流程](../../../references/adaptive-workflow.md) when an
-orchestrator supplies a profile. A QUICK brief supplies execution/verification
-context, not permission or a formal Plan. Do not require TaskBreakdown or Plan
-solely to validate a QUICK definition, and do not drop an existing formal
-Plan's unresolved requirements. Legacy handoffs without a profile retain
-STANDARD semantics. The terminal invariants above apply to every profile.
+A brief supplies execution and verification context, not permission or a
+formal Plan. Small changes need no TaskBreakdown or Plan solely to validate
+this definition. Existing formal Plan/Task requirements remain binding; all
+inputs must satisfy the terminal invariants above.
 
 The definition must not include runtime IDs, persistence paths, prior-run
 history, generated evidence paths, or private validator output.

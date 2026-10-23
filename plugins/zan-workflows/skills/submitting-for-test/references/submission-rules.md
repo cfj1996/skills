@@ -40,9 +40,11 @@ transport for these systems.
 
 ## Git delivery
 
-Use the original fixed business branch as source and exactly `develop` as
-target. Keep commits already inherited by the branch separate from the current
-reviewed change. Never rebuild on `develop`, substitute `merge/*`, or include
+Use the original fixed business branch as source and the verified, confirmed
+`dev` or `develop` branch as target. Preserve the upstream exact selection;
+standalone calls resolve it from project policy and remote evidence before
+confirmation. Both existing names without a selected target are an unresolved gap. Keep commits already inherited by the branch separate from the current
+reviewed change. Never rebuild on the test target, substitute `merge/*`, or include
 unreviewed paths.
 
 When uncommitted, the exact reviewed diff/file list is the commit payload in
@@ -50,7 +52,7 @@ the displayed bundle. Commit/push only that payload with local Git, reuse the
 derived SHA, then invoke `merge-reviewed-branch.mjs` once with the confirmed
 source/target facts. Do not redisplay/revalidate push, MR and merge merely
 because the stage changed. Prove current-round containment in
-`origin/develop` before any TAPD, Wiki or version write. A real MR metadata
+the exact confirmed remote test target before any TAPD, Wiki or version write. A real MR metadata
 change or conflict gets its own exact plan; no history rewrite or duplicate MR.
 
 ## Standard Wiki
@@ -63,8 +65,10 @@ it into Task-titled pages. Preserve separate repository/branch entries.
 Give current work handoffs—not a user-supplied Wiki URL—to
 `zan-workflows:drafting-wiki`. Require `terminal_state=VALIDATED` and one target
 plan, or `terminal_state=SKIPPED_BY_POLICY` with
-`skip_reason=NON_FUNCTIONAL_CONTINUE` and no Wiki operation. Discovery order is
-mandatory for the validated path:
+`skip_reason=NON_FUNCTIONAL_CONTINUE`, a verified existing owner page/current
+repository+branch entry with retained target/body readback, and no Wiki
+operation. Missing history follows normal drafting. Discovery order is
+mandatory for both paths:
 
 1. Resolve the common owner and check its/current-item links; when the Story
    has no link, check its exact child Tasks and their comments as described in
@@ -75,7 +79,8 @@ mandatory for the validated path:
 2. Otherwise query `get_wiki(name=YYYY-MM)` and select the result whose
    returned `parent_wiki_id` is root `1150372234001008260`.
 3. Query the owner-based deterministic child title once and compare returned parent IDs.
-   Reuse the unique matching child or plan `MM-DD: 中文简述` creation. Never pass
+   A same-title child without an owner link blocks; repository/branch matching
+   is not ownership evidence. If absent, plan `MM-DD: 中文简述` creation. Never pass
    unsupported `parent_wiki_id` to `get_wiki`, list all Wiki pages, or repeat
    an unchanged query with a different page size/order.
 
@@ -152,10 +157,9 @@ successful release result's actual channel to match the draft: `canary` maps
 to `canary`, `official` to `latest`. A planned parameter or
 develop/master merge alone is insufficient. Under `SKIP`, apply the existing
 release-evidence/preservation rules in `drafting-wiki`; do not default to canary
-or add deployment queries. A policy skip has no
-child write/readback or Wiki update,
-but retains any existing target readback needed by an explicitly requested
-`going-live` step.
+or add deployment queries. A policy skip has no child write or post-write
+readback, but must retain the verified owner page and matching current entry's
+exact target/body readback for `going-live`.
 
 Use the TAPD workspace from the current work item for every Wiki operation:
 
@@ -199,7 +203,7 @@ or write a Wiki-link comment.
 ## Test deployment and TAPD status
 
 Follow [deployment-and-confirmation.md](deployment-and-confirmation.md).
-Resolve `DEPLOY|SKIP`, finish the deployment gate after develop containment,
+Resolve `DEPLOY|SKIP`, finish the deployment gate after confirmed test-target containment,
 then write Wiki/TAPD data. `DEPLOY` requires Jenkins success and expected SHA
 proof; `SKIP` records `SKIPPED_BY_INTENT` and must not claim a published test
 environment.

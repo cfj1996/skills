@@ -56,4 +56,22 @@ Zan 合规只运行项目声明的命令。命令不存在、无法执行、输�
 
 安全检查单独保持最高优先级：develop 来源或历史、目标分支、HEAD SHA、pipeline、approval、未解决讨论和 mergeability 结论必须继续输出。Zan 合规矩阵不能覆盖安全违规，也不能因合规暂缓而跳过安全检查。
 
-`pipeline = none` 与 `pipeline = failed` 必须区分。只有失败的 pipeline，或项目明确要求但缺失/未完成的 pipeline，才构成合并阻断。
+`pipeline = none` 与 `pipeline = failed` 必须区分。已识别状态中，失败的 pipeline，或项目明确要求但缺失/未完成的 pipeline，构成合并阻断；无法识别或读取失败属于证据不足，不能按无 pipeline 放行。
+
+## 合并判断输入
+
+`scripts/review-policy.mjs evaluate-merge` 接收已核实、归一化的状态，返回
+`mergeAllowed` 和结构化 `blockers`。未知枚举或显式 `null` 不能当作通过：
+
+- `codeReview`：`pass` / `blocker` / `incomplete`；只有 `pass` 通过。
+- `safety` 只有 `pass`、`mergeability` 只有 `mergeable` 通过。
+- `pipeline`：`success` / `failed` / `pending` / `none`。`pipelineRequired`
+  必须为布尔值；为 `true` 时只有 `success` 通过，为 `false` 时允许
+  `success`、`pending`、`none`。原始 GitLab 状态须根据证据归一化，不能把读取失败当成 `none`。
+- `approval`：`approved` / `not-required` / `required-missing`；前两项通过，
+  `not-required` 必须有项目规则依据。
+- `unresolvedDiscussions` 必须明确为 `false` 才通过。
+- `zanStatus` 使用上表四种状态；只有 `adopted` / `not-adopted` 可继续，
+  且 `adopted` 还要求 `zanMust = pass`。
+
+省略字段仍使用脚本的原有默认值；调用方必须先核实项目门禁，不能用默认值替代未知证据。

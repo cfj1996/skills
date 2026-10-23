@@ -1,9 +1,35 @@
 # 页面交付评审规范
 
-本规范约束正式评审模型与 Plan。QUICK 的范围检查复用适用的行为/证据原则，
+本规范约束正式评审模型与 Plan。简短范围检查复用适用的行为/证据原则，
 仅交接内存 `implementationBrief`，不构造 ReviewSession/PagePlan 或调用正式
-Plan 写入。STANDARD/FULL 沿用本规范及原校验器；档位、验证风险不加入模型
-白名单，也不能免除正式 TAPD Plan 的 `TASKS_READY` 和任务关联要求。
+Plan 写入。正式 TAPD Plan 必须满足 `TASKS_READY` 和任务关联要求。
+
+## 执行清单与同一份 Plan
+
+Bug、小需求和大需求的最终执行清单统一遵守
+[六列展示规则](../../../references/execution-checklist.md)：
+`项目 | 分支 | 交付范围 | 实施方案 | 验收标准 | 待决事项`。
+交付范围合并包含与排除；范围、方案、验收、待决内容过长时保留短摘要，追加
+“详见下方 #01”。表下详情标题只用 `### #01`、`### #02`，编号全清单递增、
+跨项目不重置，同一详情可复用，短内容不编号。数字说明内可关联已有 Plan
+的准确章节或行号；不再重复“实施方案/验收标准/验证安排/分支安排”分组。
+待决事项保留阻塞数量、关键问题及决定人，选项/推荐/影响在数字说明展开；
+Agent 能查证的先查证。无业务/实施未决时写“无”，不把执行确认计为待决项。
+待决项按共享定义记录需求不完整、流程不闭环、接口/字段和外部条件缺口，
+说明影响、责任方、补齐条件和阻塞阶段。区分真实缺失与尚未核实，不记录
+授权 Key 值。实际外部责任及解除条件写入既有问题/影响/建议或 blocker 文本，
+`questions.owner` 仍限 `user|agent`，不扩展字段白名单。
+
+首次确认前没有 Plan 时，在表下或已有面板展示拟写正文或 brief，不虚构链接、
+不提前写 Plan、不另建临时清单详情文档。不为提供链接创建正式 Plan 或 Task。
+分支列显示新建/复用、完整目标名及基准 ref。当前分支、完整 SHA、原始
+payload 和人员字段核验留在内部按需披露，精确校验与授权绑定仍完整执行。
+必要 Task/Plan 写入按项目逐项可审阅，不能隐藏人员、工时、范围或其他实质
+变更；不再重复表内分支和验收内容。对外用中文本轮终点和实际风险，不显示内部阶段码。
+首次执行清单另有“合并与测试环境”两项明确状态：合并到 dev（或实际
+develop）：是/否；构建测试环境：是/否。普通开发默认均为否，不查询未选择
+的 Jenkins；“合并并构建”指实际 dev/develop 及该项目 Jenkins 测试环境，
+后续仍走原交付确认，不推为 master/生产。六列不改变任何确认、写入或就绪门禁。
 
 ## 项目规范发现、启动与规则门禁
 
@@ -12,6 +38,11 @@ Plan 写入。STANDARD/FULL 沿用本规范及原校验器；档位、验证风�
 项目级范围必须拒绝：候选范围若包含没有共同独立实施、对接和验收边界的多个页面或模块，要求按该边界拆分为一个或多个页面/内聚模块 Plan。
 
 产物位置按自动识别、推荐目录、手动指定三种入口汇合到同一条流程：
+
+`SCOPE_REVIEW` 只读，不要求已有正式目录规则才能确认范围。面板可使用
+`status=unresolved-candidate, source=candidate`；`artifactRuleFingerprint`
+来自当前候选信息快照，尚无候选则明确记录无候选快照。该状态允许范围评审，
+不允许确认更新 Plan 或保存。目录规则写入只在 `PLAN_WRITE` 进行。
 
 1. 自动识别：先读取当前工具适用的 `AGENTS.md` 和明确委托的规则，再检查目标项目
    中已有 Plan、Draft 与文档目录。已写明且唯一有效的规则直接复用，不重复询问。
@@ -23,10 +54,12 @@ Plan 写入。STANDARD/FULL 沿用本规范及原校验器；档位、验证风�
    明确指定优先于旧规则，不再要求额外确认推荐。相对路径相对消费项目根目录解析；
    根目录下的 Plan/Draft 文件名与编号根据项目惯例补齐并展示。完整文件路径只绑定
    对应产物，不擅自推广为全项目模板；尚无明确位置的其他产物仅在实际需要时补齐。
-4. 用户确认完整候选或手动指定后，直接将已确定的规则固化至最近适用公共作用域的
+4. 进入 `PLAN_WRITE` 且范围、分支已确认后，用户确认完整候选或手动指定即授权
+   本次目录规则写入。将已确定的规则固化至最近适用公共作用域的
    `AGENTS.md`，随后重新读取并验证当前产物位置能够唯一解析，才能继续使用正式规则。
-   指定本身授权这次规则写入，不再询问“是否写入 Agent 文件”。未经用户确认不得固化，
-   明确指定视为确认。只对路径多解、冲突范围或覆盖风险询问缺失信息。
+   使用 `status=resolved, source=agents`；不再询问“是否写入 Agent 文件”。
+   只对路径多解、冲突范围或覆盖风险询问缺失信息。范围评审中指定目录仅保留候选，
+   不提前写规则。
 5. 写入目标限定在消费项目内：项目已有适用 `AGENTS.md` 时维护其中的产物规则段；
    没有时在项目根目录创建 `AGENTS.md`。模块专属规则写入该模块适用文件，不修改
    工作区公共规则或其他工具的配置。保留文件中的其他指令，不整文件覆盖；若已明确
@@ -46,8 +79,8 @@ Plan 写入。STANDARD/FULL 沿用本规范及原校验器；档位、验证风�
 ```
 
 通过一次确认完成目录选择与规则写入；确认位置规则不等于确认更新 Plan。
-不得自动迁移已有文件。启动确认前的只读限制不阻止用户明确指定后写入产物规则，
-但不因此创建 Plan、生成 Draft 或修改业务代码。位置写入失败应报告实际文件和错误，
+不得自动迁移已有文件，也不因目录指定越过 `SCOPE_REVIEW` 的只读边界。
+目录规则写入不创建 Plan、生成 Draft 或修改业务代码。位置写入失败应报告实际文件和错误，
 不能伪装成已解析规则。Draft 暂未涉及时不要求先确定其路径才能评审，生成 Draft 前
 再按同一流程补齐；保存 Plan 时仅校验当前需要的产物位置。
 
@@ -57,9 +90,9 @@ Plan 写入。STANDARD/FULL 沿用本规范及原校验器；档位、验证风�
 
 以功能模块为评审对象，页面也是一个模块。一个内聚模块可包含子模块；只有职责、输入输出与验收能够独立说清时才拆分。列、按钮或接口不因技术上独立就自动成为模块。模块树保留完整范围，后续轮次默认突出本次新增、修改、删除、重开和未决项。
 
-新 ReviewSession 使用 `schemaVersion=2`，仍接受旧 `schemaVersion=1`。新卡片的 `id` 是模块稳定编号；`module.parentId` 引用同一完整清单中的 `card.id`，顶层为 `null`，不得悬空、自引用或形成环。`module.revision` 是正整数；同一编号的业务内容、实现方案或相关证据改变时递增，编号不重排、不复用。`change.kind` 中的 `added/modified/unchanged` 与 `change.summary` 是轮次描述，其单独变化不要求递增 revision 或重开；进入或退出 `removed` 会改变业务范围，须递增并重开。
+ReviewSession 只接受 `schemaVersion=2`。卡片的 `id` 是模块稳定编号；`module.parentId` 引用同一完整清单中的 `card.id`，顶层为 `null`，不得悬空、自引用或形成环。`module.revision` 是正整数；同一编号的业务内容、实现方案或相关证据改变时递增，编号不重排、不复用。`change.kind` 中的 `added/modified/unchanged` 与 `change.summary` 是轮次描述，其单独变化不要求递增 revision 或重开；进入或退出 `removed` 会改变业务范围，须递增并重开。
 
-每张新卡片包含以下 `module` 契约，字段以运行时白名单校验：
+每张卡片包含以下 `module` 契约，字段以运行时白名单校验：
 
 | 字段 | 含义 |
 |---|---|
@@ -115,16 +148,23 @@ acceptanceFocus 同时说明观察行为的入口、预期结果和验证局限�
 `schemaVersion`、`sessionId`、`deliveryUnitKey`、`deliveryUnitKind`、`deliveryUnitName`、
 `artifactRuleFingerprint`、`artifactRuleResolution`、`reviewRound`、`planFingerprint`、
 `submissionVersion`、`mode`、`currentCardIndex`、`viewScope` 和 `cards`。
-卡片沿用 `id`、`dimension`、`links`、`sourceEvidence`、`reviewGoal`、`design`、
+卡片包含 `id`、`module`、`dimension`、`links`、`sourceEvidence`、`reviewGoal`、`design`、
 `regionAndComponents`、`interactionStates`、`relatedApis`、`mockScenarios`、
 `acceptanceCriteria`、`implementationPlan`、`conclusion`、`userNote`、`reviewResult`、
-`reopened`、`evidenceChanged`，新版本增加上述 `module`；普通业务扩展 `telepath` 可选。
-`dimension` 是兼容标记，新模块卡使用“功能模块”，不再决定拆卡。
+`reopened`、`evidenceChanged`；普通业务扩展 `telepath` 可选。
+`dimension` 使用“功能模块”，不决定拆卡。
 `links` 只包含 features/apis/uiStates/dependencies/tasks/evidence 六组编号；
 `sourceEvidence` 只包含有类型的 id/kind/label/selector/frameSelector/path。
 未知字段不得进入 state、草稿或 submission。`deliveryUnitName` 是交付单元的显示名称，不得从接口能力归属推断。
 
-Plan 与面板使用同一模块结构和稳定编号。Agent 语义读取 Markdown 后构造临时规范化模型，禁止脚本解析 Markdown。新模型为 `schemaVersion=3`，`features[].module` 使用相同模块契约，`features[].reviewConclusion` 独立记录需求结论；旧 `schemaVersion=2` 保留原字段结构并允许带明确 blockers 的阶段 blocked 保存，无需迁移到模块模型；非评审阶段仍执行实现准备度门禁，不无声改写历史。
+候选转为正式规则只允许同一交付单元的 `unresolved-candidate/candidate` →
+`resolved/agents`。通过 `updateReviewSession` 使用新 `sessionId`、正式规则指纹
+和 `viewScope=all`；已提交过则进入下一 `reviewRound`。保留未受影响模块的意见，
+清除旧提交、结果、确认和保存状态，用户重新提交与确认完整拟保存内容。不得复用
+旧 `resumeSubmission` 或确认请求。其他规则身份变化须重新读取证据并重新挂载，
+不能借此接口修改已正式规则或回退候选。具体步骤见运行协议。
+
+Plan 与面板使用同一模块结构和稳定编号。Agent 语义读取 Markdown 后构造临时规范化模型，禁止脚本解析 Markdown。PagePlan 只接受 `schemaVersion=3`，`features[].module` 使用相同模块契约，`features[].reviewConclusion` 独立记录需求结论；非评审阶段执行实现准备度门禁。
 
 Agent 在现有内容上检查独立接手能力：没有规划聊天历史的执行者，能否从
 所选任务、Plan 与证据理解要做什么、不能改变什么、为什么作关键选择以及
@@ -132,22 +172,36 @@ Agent 在现有内容上检查独立接手能力：没有规划聊天历史的�
 或强制 reviewer。实施步骤在原 Task 内按可验证行为组织，先验证最有可能
 推翻方案的贯通路径；不能为了每个行为再创建一个 TAPD Task。
 
-阶段 Plan 可以保存已确认需求、待修改需求和未决问题。`implementationPlan.status=blocked` 必须记录 `blockers`，不能据此制造实施承诺或把交付单元设为可实施；`ready` 方案原样保留一句话摘要、四块实施内容和证据引用。`validate-page-plan.js` 校验模块层级、版本、行为例子、需求结论、实现准备度及引用，不再把需求已确认误判为实施已就绪。V3 的 `questions` 均表示尚未解决事项；适用模块的 `questions` 必须为空，且需求确认、实现 ready 及其他证据门禁均通过，才能进入可实施及其后续状态。问题即使有建议也不算解决；阶段 Plan 仍可保存这些问题。
+具体实现写到独立接手所需的深度：关键选择理由、复用和代码落点、适用的联动/
+数据流、步骤依赖及验收证据与局限。无需逐行代码或操作流水账。初次只在
+对话/面板预览；范围、分支、位置和正文门禁通过后保存并读回同一 Plan。
+后续实质变化展示受影响差异并按原门禁维护，完成时记录真实验证结果、
+未验证项和遗留问题；摘要链接随内容位置核对，不另维护清单详情副本。
+
+阶段 Plan 可以保存已确认需求、待修改需求和未决问题。`implementationPlan.status=blocked` 必须记录 `blockers`，不能据此制造实施承诺或把交付单元设为可实施；`ready` 方案原样保留一句话摘要、四块实施内容和证据引用。`validate-page-plan.js` 校验模块层级、版本、行为例子、需求结论、实现准备度及引用，不再把需求已确认误判为实施已就绪。`questions` 均表示尚未解决事项；适用模块的 `questions` 必须为空，且需求确认、实现 ready 及其他证据门禁均通过，才能进入可实施及其后续状态。问题即使有建议也不算解决；阶段 Plan 仍可保存这些问题。
 
 ## 轮次与确认
 
 TAPD Plan 额外遵守 [任务与 Plan 交接契约](../../breaking-down-requirement/references/contracts.md)：
 模型以 `tapdRequirement` 绑定父需求，`taskBreakdown` 保存内存交接的清单指纹与
-准确 Task 读回，实施步骤以 `tapdTaskKey` 归属。已有 schemaVersion 2/3 不变；
+准确 Task 读回，实施步骤以 `tapdTaskKey` 归属。
 阶段 Plan 可保留未确认任务，但实施阶段必须具备对应人员、预估工时、
 真实 ID 和完整功能覆盖。对话和 Plan 仅展示最终预估，内部估算数据不外显。
 任务字段不加入浏览器 ReviewSession 白名单，
 也不嵌入 Markdown JSON；它们由 Agent 从 TAPD 与已确认清单构造并验证。
 
+任务创建前用稳定 `taskKey` 展示完整实质内容、目标 Plan 路径及
+`taskKey → 准确读回的真实 Task ID/链接` 映射规则。已确认该规则和正文后，
+验证通过的系统 ID/链接可以机械回填同一 Plan，无需重复内容确认；proposal、
+范围、人员、工时、路径或关键方案有变化则展示受影响差异并重新确认。
+这不允许绕过 TASKS_READY 或篡改浏览器确认请求。PANEL 如无法在现有运行时
+协议内承载回填，继续其增量确认和保存回执，不能假称支持免确认回填。
+
 首次全量生成模块与子模块；后续复评默认仅处理新增、修改、未评审、待修改、阻塞、重开项和证据变化项，已确认或不适用项保留结论。统一提交评审后，冻结本轮输入、核对证据并展示冲突、拟处理方式和 Plan 变更摘要；用户逐卡核对后，仍须单独点击确认更新 Plan 才能一次性回写同一 Plan。
 
 这是两阶段确认：产物位置规则确认与确认更新 Plan 相互独立。确认更新 Plan
-必须先由用户在最终结果卡上进行浏览器可信点击，生成绑定 session、submission
+要求当前规则为经 Agent 文件读回的 `resolved/agents`，再由用户在最终结果卡上
+进行浏览器可信点击，生成绑定 session、submission
 版本、独立 submissionId 和双指纹的一次性内部请求；脚本触发的 click/dispatchEvent、缺失请求、
 过期请求、跨 session/version/fingerprint 请求和重复消费都必须拒绝。
 pending 请求不得通过 state 或 submission 暴露；Agent 通过 `getPlanConfirmationRequest()` 只读获取身份元数据，该读取不能创建或消费许可。请求在新结果、重新挂载、销毁

@@ -470,6 +470,13 @@ export async function ensureTestWiki(call, input, now = new Date()) {
     if (input.expectedMonthId && String(child.parent_wiki_id) !== String(input.expectedMonthId)) {
       throw new Error('月份 Wiki ID 与确认计划不一致');
     }
+    // Titles and repository/branch entries identify a delivery entry, not its
+    // TAPD owner. Different Bugs may deliberately use the same repair branch.
+    // An explicit link/update operation has its own exact-target authority;
+    // automatic ensure discovery must establish ownership from the work links.
+    if (mode === 'ensure' && !linkedIds.includes(String(child.id))) {
+      throw new Error(`已有 Wiki ${child.id} 缺少当前需求或 Bug 的归属链接证据，不能仅凭标题、仓库或分支复用`);
+    }
     if (branchEntryCount(child.markdown_description, sourceBranch, input) > 1) {
       throw new Error('已有 Wiki 存在重复的原分支条目，停止自动补充');
     }

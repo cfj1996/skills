@@ -12,10 +12,10 @@ complete visible `SubmissionPlan`, bound-fact fingerprint, exact
 
 | Section | Required facts |
 | --- | --- |
-| Inputs | source definition, reviewed change, `INITIAL|CONTINUE`, exact Wiki profile, and `AUTO|DEPLOY|SKIP` deployment mode |
+| Inputs | one source definition/reviewed change pair or a Bug's `work_definitions`/`reviewed_changes` collections matched by canonical repository/root, origin and fixed branch; shared Bug identity/repair-record readbacks and all required repository evidence;  `INITIAL|CONTINUE`, exact Wiki profile, and `AUTO|DEPLOY|SKIP` deployment mode |
 | Repository | expected/actual path, Git root, origin, verification result |
 | Authorization | one consolidated plan/confirmation, bound facts, deterministic derived values, and any reauthorization reason |
-| Git delivery | original source branch, target `develop`, current-round commits, commit/push/MR/merge results, develop containment |
+| Git delivery | per repository: original source branch/SHA, verified confirmed test target (`dev` or `develop`), current-round commits, commit/push/MR/merge results, actual-target containment |
 | Conflict handoff | when A → C → B was used, exact ConflictMergeHandoff including original A/B, C MR/revisions/containment, temporary resources, upfront cleanup authority, latest retention policy and per-resource cleanup/deferred outcome; retain it even if C is absent |
 | Deployment | `DEPLOYED|SKIPPED_BY_INTENT|FAILED|UNKNOWN|NOT_ATTEMPTED`, Jenkins job/environment/ref/version/channel/purpose and trigger/readback evidence when applicable |
 | Shared Wiki | `sharedWikiPlan`, `wikiOwner` (workspace/type/ID), owner/Task relationship readback, one target per Story/Bug, repository+branch entry identities, complete combined body/hash, all comment targets and included project gates; same final page ID in every participating result |
@@ -33,10 +33,24 @@ complete visible `SubmissionPlan`, bound-fact fingerprint, exact
   confirmation that answers its visible plan. Initial repair authorization or
   implementation completion cannot be reused as submission authorization.
 
-- `SUBMITTED` requires matching upstream inputs, exact repository and original
-  source branch, target exactly `develop`, passing authorization and private
-  pre-write validation for every executed write, immediate readback, and
-  containment of all current-round commits in `origin/develop`.
+- `SUBMITTED` requires every necessary repository's matching upstream inputs,
+  exact repository/original source and confirmed test target (`dev` or
+  `develop`), passing authorization and private pre-write validation for every
+  executed write, immediate readback, and containment of all current-round
+  commits in that repository's exact remote target. Never replace an upstream
+  confirmed `dev` with `develop`, or the reverse.
+- For one Bug across repositories, normalize the existing singular inputs or
+  `work_definitions`/`reviewed_changes` collections into delivery rows; match
+  canonical repository/root, origin and fixed branch, never array order.
+  Several subproject definitions may share that key; retain every definition's
+  scope/acceptance while using one reviewed result and one Git operation per key.
+  Missing required repositories, mismatched Bug identity or missing review/
+  cross-repository acceptance/shared completion-record readback block the plan.
+  One `SubmissionPlan` binds each row's independent source SHA, actual target
+  and deployment choice. Execute existing helpers per repository; only after
+  every selected Git/deployment gate passes write the shared Wiki/comments and
+  register the Bug once. A first successful repository cannot mark it waiting
+  for test while another required repository is incomplete.
 - One consolidated submission authorization covers the unchanged Git, Wiki,
   deployment, comment, and final TAPD plan. Deterministically generated commit,
   MR, Wiki, queue, and build identifiers do not create new confirmation points.
@@ -66,8 +80,9 @@ complete visible `SubmissionPlan`, bound-fact fingerprint, exact
   authorization and readback for each Wiki write, and for the originating
   `Bug|Story|Task` the exact final-child Wiki-link `LINKED|ALREADY_LINKED`
   result before TAPD status and version publication; or a `SKIPPED_BY_POLICY` draft with
-  `skip_reason=NON_FUNCTIONAL_CONTINUE`, no rendered body, and no Wiki/comment
-  operation. A newly created entry reads back the exact status derived from
+  `skip_reason=NON_FUNCTIONAL_CONTINUE`, a verified owner page and each included
+  repository/branch entry with exact target/body readback, no rendered body,
+  and no Wiki/comment operation. A newly created entry reads back the exact status derived from
   project type: `是否上线：未合并` for a business project, or
   `当前版本：canary|latest` for a tooling/library project.
   Tooling `DEPLOY` requires the successful actual release channel to match
@@ -83,6 +98,8 @@ complete visible `SubmissionPlan`, bound-fact fingerprint, exact
 - `STANDARD` never requires a Wiki URL from the user. Existing links in
   TAPD details/comments are reused; absent links trigger related-child lookup
   and then month/child creation under root `1150372234001008260` when needed.
+  An existing same-title page without owner-link evidence blocks; a matching
+  repository/branch alone never authorizes automatic reuse.
 - A month page is structural only. The canonical `# 前端` entry body is written
   to the child Wiki, never directly to the `YYYY-MM` page.
 - A successful `STANDARD` result retains the exact Wiki target and original
@@ -91,10 +108,12 @@ complete visible `SubmissionPlan`, bound-fact fingerprint, exact
   is omitted. It still requires Git delivery, deployment resolution, and
   applicable TAPD registration/readbacks.
 - A `STANDARD` `SKIPPED_BY_POLICY` result is allowed only for a proven
-  non-functional `CONTINUE`; it omits Wiki and Wiki-comment writes while still
-  completing the remaining authorized submission steps.
+  non-functional `CONTINUE` with a verified existing owner page/current entries
+  and exact retained readback; it omits Wiki and Wiki-comment writes while still
+  completing the remaining authorized submission steps. Missing history uses
+  the normal draft path; unresolved evidence blocks before delivery writes.
 - `DEPLOY` requires Jenkins terminal `SUCCESS` plus evidence that the expected
-  `origin/develop` SHA was built. `SKIP` performs no Jenkins build/deploy or
+  delivered SHA of the exact confirmed test target was built. `SKIP` performs no Jenkins build/deploy or
   parameter/poll call; exact metadata-only canonical Wiki Job lookup is the
   sole read-only exception. It records
   `SKIPPED_BY_INTENT`. `FAILED|UNKNOWN` forbids later Wiki/status/version writes.

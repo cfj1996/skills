@@ -1,6 +1,6 @@
 ---
 name: submitting-for-test
-description: Use when one reviewed TAPD change must be delivered to develop, optionally deployed to the test environment, documented when required, and then marked for test.
+description: Use when a reviewed TAPD change must be delivered to its verified test branch (dev or develop), optionally deployed to the test environment, documented when required, and then marked for test.
 ---
 
 # Submit for Test
@@ -9,8 +9,10 @@ Preferred lead model profile: `CRITICAL`. Read the shared
 [model-routing policy](../../references/model-routing.md) when model selection
 or delegation is available; model availability never weakens write gates.
 
-Consume one `TapdWorkDefinition` and one matching `ReviewedChange`, then return
-one in-memory `TestSubmissionResult`. Execute exactly one profile:
+Consume one `TapdWorkDefinition` and matching `ReviewedChange`, or one Bug's
+`work_definitions` and `reviewed_changes` collections. Normalize either input
+into per-repository delivery rows and one in-memory `TestSubmissionResult`.
+Execute exactly one profile:
 
 - `STANDARD`: Git delivery, optional Jenkins test deployment, Wiki
   draft/write/readback, idempotent Wiki-link comment for the originating
@@ -42,7 +44,7 @@ exact current plan plus a later current-conversation confirmation.
 Carry the `ReviewedChange`, work definition, Git snapshot, TAPD item and Wiki
 target through both phases. `PLAN` does not repeat implementation review or
 project routing. `EXECUTE` refreshes only mutable facts that bind an authorized
-write (source/develop refs, current diff, TAPD state, Wiki body/comment and
+write (source/confirmed-target refs, current diff, TAPD state, Wiki body/comment and
 deployment target); unchanged skill text, knowledge files and unrelated
 history do not need another read. Batch independent read-only checks, then
 stop on the first actual mismatch. Never rerun the full Wiki discovery after
@@ -61,8 +63,8 @@ all owner/Task comment targets in the consolidated plan.
 
 Require:
 
-- definition `READY_FOR_HANDOFF`;
-- matching reviewed change `REVIEWED` with `REVIEW_PASSED`;
+- each definition `READY_FOR_HANDOFF`;
+- each matching reviewed change `REVIEWED` with `REVIEW_PASSED`;
 - exact repository fingerprint and original fixed repair branch;
 - one explicit profile `STANDARD|NO_WIKI`; and
 - `deployment_mode=AUTO|DEPLOY|SKIP`.
@@ -78,27 +80,45 @@ fresh authorization is required only when a bound fact changes.
 `STANDARD` does not require a user-supplied Wiki URL. Wiki discovery and
 creation planning are producer-owned behavior, not an input gate.
 
-The source is the original `feature/*` or `fixbug/*` branch. Target is exactly
-`develop`. Never rebuild the change on `develop` or use `merge/*` as the
-business source.
+For a multi-repository Bug, group all `work_definitions` by verified canonical
+repository/root, origin and fixed branch, and match each group to its one
+`reviewed_changes` entry, never by array position. Retain coverage of every
+original subproject definition; grouping must not overwrite scope or acceptance.
+Require the same Bug identity, every
+necessary repository, per-repository review evidence, cross-repository
+acceptance and the shared completion-record readback. Missing or mismatched
+required rows return `BLOCKED`; do not silently submit a partial Bug.
+
+Each source is the original `feature/*` or `fixbug/*` branch. Reuse its
+upstream verified and confirmed test target (`dev` or `develop`). For a
+standalone invocation, resolve the actual test branch from project policy and
+remote refs before displaying the plan. If both names exist without an
+authoritative selection, report that gap; never choose by alias. Carry that
+exact target through Git, deployment, validation and result; changing it
+requires a refreshed confirmation. Never rebuild on the test target or use
+`merge/*` as the business source.
 
 ## Procedure
 
-1. Re-read repository, source branch/SHA, `develop` SHA, current diff and
-   commits. Verify they match the reviewed change and contain no unrelated
-   paths.
-2. Resolve `deployment_mode` and, for `DEPLOY`, resolve the exact Jenkins Job,
+1. For each repository row, re-read repository, original source branch/SHA,
+   confirmed test-target ref/SHA, current diff and commits. Verify they match
+   that row's reviewed change and contain no unrelated paths.
+2. Resolve `deployment_mode` per repository and, for `DEPLOY`, resolve its exact Jenkins Job,
    test environment, release channel, parameters/version identity, and purpose
    through workspace project knowledge and release-safety rules.
 3. Under `STANDARD`, pass the resolved `DEPLOY|SKIP` and available parameter
    evidence to `zan-workflows:drafting-wiki`, invoke it read-only, and require
    either one validated target/body plan or a
-   `SKIPPED_BY_POLICY` result proven to be `NON_FUNCTIONAL_CONTINUE`. Under
+   `SKIPPED_BY_POLICY` result proven to be `NON_FUNCTIONAL_CONTINUE` with a
+   verified owner page/current repository+branch entry and retained exact
+   target/body readback. No historical page/entry uses the normal draft path. Under
    `NO_WIKI`, set Wiki to `SKIPPED_BY_POLICY` without loading Wiki capability.
    Reuse the item's current details/comments and the original source branch;
    do not start an independent Wiki search in this skill.
-4. Build and display one consolidated `SubmissionPlan` containing Git,
-   applicable Wiki/comment actions, deployment, and final TAPD actions.
+4. Build and display one consolidated `SubmissionPlan` containing each
+   repository's Git/target/deployment selection, applicable shared Wiki/comment
+   actions, and one final TAPD registration for the Bug. Existing per-project
+   handoffs retain their original structure; no new workflow ledger is needed.
    Preview registration to automatically resolve actual state labels,
    transitions, required-field values and native/custom test-version mapping.
    For a Bug transition, read `te`, `reporter` and `current_owner`; assign the
@@ -114,7 +134,7 @@ business source.
    exact unchanged plan, then re-read each mutable bound fact at its write
    boundary. If anything changed,
    return the updated plan and stop for fresh confirmation.
-6. Before the first Git write, validate one `GIT_DELIVERY_BUNDLE` with the
+6. For each repository, before its first Git write, validate one `GIT_DELIVERY_BUNDLE` with the
    private [submission-validator.md](agents/submission-validator.md) using
    `PRE_GIT_WRITE`. Bind the complete reviewed diff/file list, repository,
    original branch, target refs, commit/push/MR actions and purpose once.
@@ -133,7 +153,7 @@ business source.
    without a second prompt unless the user requested retention. Keep A as the
    business source and retain the complete ConflictMergeHandoff, association
    and cleanup/retention/deferred outcomes in TestSubmissionResult for go-live.
-7. Resolve the deployment gate through `jenkins-mcp`:
+7. Resolve every repository's deployment gate through `jenkins-mcp`:
    - `DEPLOY`: validate `JENKINS_TEST_DEPLOY` once, then run
      [run-jenkins-release.mjs](../../scripts/run-jenkins-release.mjs) once with
      the exact confirmed release plan and Job/config fingerprints. It triggers
@@ -149,7 +169,8 @@ business source.
      permits the earlier exact read-only metadata lookup. NO_WIKI+SKIP has no
      reason to load or call Jenkins.
    `FAILED|UNKNOWN` blocks every later Wiki/TAPD write.
-8. After `DEPLOYED|SKIPPED_BY_INTENT`, execute the authorized Wiki plan under
+8. Only after every required repository passes Git containment and
+   `DEPLOYED|SKIPPED_BY_INTENT`, execute the authorized Wiki plan under
    `STANDARD` only when the drafter returned `VALIDATED`. For creation,
    functional `CONTINUE` supplementation, or unchanged reuse, run
    [ensure-test-wiki.mjs](scripts/ensure-test-wiki.mjs) once with the exact
@@ -175,7 +196,8 @@ business source.
    For `SKIPPED_BY_POLICY`, perform no Wiki or Wiki-comment operation. A
    conflict or failed readback blocks later TAPD actions. Retain the exact
    final Wiki target for `going-live`.
-9. Apply the status policy from the work mode through one validated
+9. After all required repository gates and the shared Wiki/comment gate pass,
+   apply the status policy from the work mode through one validated
    `TAPD_REGISTRATION_BUNDLE`, then invoke
    [register-test-submission.mjs](../../scripts/register-test-submission.mjs)
    once with the exact item, work mode, approved status/version policy,

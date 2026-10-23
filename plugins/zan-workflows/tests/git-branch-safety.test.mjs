@@ -14,6 +14,34 @@ function evaluate(command, options = {}) {
 }
 const denied = command => evaluate(command)?.hookSpecificOutput?.permissionDecision === 'deny';
 
+test('branch listing patterns and read-only filters are not branch creation', () => {
+  for (const command of [
+    'git branch --list feature/existing',
+    'git branch --list fixbug/existing',
+    'git branch -lv feature/*',
+    'git branch --list -- feature/* fixbug/*',
+    'git branch --contains feature/existing',
+    'git branch --no-contains=feature/existing',
+    'git branch --merged feature/existing',
+    'git branch --no-merged=feature/existing',
+    'git branch --points-at feature/existing',
+    'git branch --show-current',
+    'git branch --format="%(refname:short)" --list feature/*',
+    'git branch --list --sort -committerdate',
+    'git branch --list --format -D',
+    'git branch --list --sort=-committerdate',
+    "git branch --format 'feature/%(refname:short)'",
+    'git branch --format="fixbug/%(refname:short)"',
+    'git branch --sort -committerdate',
+  ]) assert.equal(denied(command), false, command);
+
+  assert.equal(denied('git branch --list --no-list feature/new'), true);
+  assert.equal(denied('git branch --format="%(refname:short)" feature/new'), true);
+  assert.equal(denied('git branch --format "--list" feature/new'), true);
+  assert.equal(denied('git branch --list feature/existing && git rebase origin/develop'), true);
+  assert.equal(denied('git branch --list -D feature/existing'), true);
+});
+
 test('ordinary local deletion is classified separately from branch creation', () => {
   for (const command of [
     'git branch -d feature/issue-13-ui-exports',
@@ -57,6 +85,9 @@ test('existing creation and cross-base rebase restrictions remain effective', ()
   for (const command of [
     'git branch feature/new',
     'git branch --no-track feature/new origin/develop',
+    'git branch -f feature/new origin/develop',
+    'git branch --force fixbug/new origin/dev',
+    'git branch --format "feature/%(refname:short)" feature/new origin/develop',
     'git switch --no-track -c feature/new origin/develop',
     'git switch -c feature/new origin/master',
     'git checkout -b fixbug/new origin/master',
@@ -65,6 +96,7 @@ test('existing creation and cross-base rebase restrictions remain effective', ()
   ]) assert.equal(denied(command), true, command);
   for (const command of [
     'git branch --no-track feature/new origin/master',
+    'git branch -f --no-track feature/new origin/master',
     'git switch --no-track -c feature/new origin/master',
     'git checkout --no-track -b fixbug/new origin/master',
   ]) assert.equal(denied(command), false, command);
@@ -80,6 +112,27 @@ test('current-branch checks follow git -C rather than the tool working directory
     const result = evaluateHookInput(input(`git -C '${repository}' branch -d fixbug/other-current`), options);
     assert.equal(result?.hookSpecificOutput?.permissionDecision, 'deny');
     assert.equal(evaluateHookInput(input(`git -C '${repository}' branch -d feature/completed`), options), undefined);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('rebase checks use the actual repository selected by absolute or repeated relative -C', () => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'zan-hook-rebase-'));
+  try {
+    const host = path.join(directory, 'host');
+    const target = path.join(directory, 'target with spaces');
+    execFileSync('git', ['init', '-b', 'main', host], { stdio: 'ignore' });
+    execFileSync('git', ['init', '-b', 'feature/other-current', target], { stdio: 'ignore' });
+    const input = (cwd, command) => ({ tool_name: 'Bash', cwd, tool_input: { command } });
+    const options = { workspaceRoot: directory };
+    for (const command of [
+      `git -C '${target}' rebase origin/develop`,
+      "git -C .. -C 'target with spaces' rebase origin/dev",
+    ]) {
+      const result = evaluateHookInput(input(host, command), options);
+      assert.equal(result?.hookSpecificOutput?.permissionDecision, 'deny', command);
+    }
+    assert.equal(evaluateHookInput(input(target, `git -C '${host}' rebase origin/develop`), options), undefined);
+    assert.equal(evaluateHookInput(input(host, `git -C '${target}' rebase origin/master`), options), undefined);
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 

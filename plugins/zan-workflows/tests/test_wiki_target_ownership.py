@@ -41,13 +41,10 @@ PROJECT_RELATIONS = (
 class WikiTargetOwnershipTests(unittest.TestCase):
     def test_fixing_bug_never_requires_user_wiki_target(self):
         self.assertNotIn("target_wiki_url", FIXING + FIXING_CONTRACT)
-        self.assertRegex(FIXING, r"Never ask the user for (?:a\s+)?Wiki URL")
-        self.assertIn(
-            "absence of a user-supplied Wiki URL never blocks preflight",
-            FIXING_CONTRACT,
-        )
-        self.assertIn("Infer `STANDARD` from an explicit request", FIXING)
-        self.assertIn("must never appear in `待确认`", FIXING)
+        self.assertIn("不向用户索要 Wiki URL", FIXING)
+        self.assertIn("缺少用户提供的 Wiki URL 不阻塞预检", FIXING_CONTRACT)
+        self.assertIn("明确需要 Wiki 选 `STANDARD`", FIXING)
+        self.assertIn("Wiki 链接不能进入“待决事项”", FIXING)
 
     def test_drafter_resolves_existing_before_planning_creation(self):
         linked = DRAFTING.index("comments once")

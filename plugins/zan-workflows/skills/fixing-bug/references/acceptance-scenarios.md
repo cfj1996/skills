@@ -1,50 +1,39 @@
-# Acceptance scenarios
+# 验收场景
 
-| Scenario | Expected behavior |
+仅在修改或核查流程规则、处理具体边界时加载。实际展示由共享清单规范负责。
+
+| 场景 | 必须保留的行为 |
 | --- | --- |
-| One Bug URL before confirmation | Prepare read-only, show one checklist row, and stop with no writes. |
-| Three Bug URLs before confirmation | Prepare all three read-only, show three ordered checklist rows, and stop with no writes. |
-| Initial “修复这些 Bug” request | Treat it as item selection, not checklist confirmation. |
-| Repair request without a submission request | Select `delivery_mode=IMPLEMENT`; show the five common checklist columns and stop each successful Bug at `REVIEWED`. |
-| `IMPLEMENT` without a Wiki policy | Do not ask for submission profile/deployment or call submission PLAN; absence of the policy does not block repair. |
-| Later explicit submission request after `IMPLEMENT` | Reuse a still-current `ReviewedChange` through submission PLAN and its state checks; require the exact submission confirmation, without repeating Bug activation. |
-| Preflight item is `PENDING` or `BLOCKED` | Show its reason in `待确认`; perform no writes for the request. |
-| Confirmed checklist with a new fixed branch | Re-prepare the first Bug with `CREATE`; after branch readback re-prepare later Bugs with `USE_EXISTING`. |
-| Effective action changes from `CREATE` to `USE_EXISTING` | Keep the confirmation valid because the exact visible branch identity is unchanged. |
-| Confirmed checklist with an existing fixed branch | Re-prepare every Bug with `USE_EXISTING` before implementation. Do not require prior Bug-specific evidence. |
-| Same Bug still fails after deployment | Use `CONTINUE` on the original branch; preserve the previously explicit delivery endpoint when applicable, otherwise infer current intent. Reuse the Wiki only when submission is selected. |
-| Continue Bug is already `待测试` | Keep status and handler unchanged; do not write `修复中`, `待测试`, repair owner or the same test-version field again. |
-| Initial Bug enters `修复中` | Original start authorization includes old handler → verified repair TAPD account; write status and handler together and read back both. |
-| Already repairing Bug still belongs to a tester | Plan an authorized owner correction, not `NO_CHANGE`. |
-| Continue request explicitly supplies incremental scope and bound facts are unchanged | Skip a repeated full checklist confirmation and proceed to implementation. |
-| Confirmed checklist field changes during re-prepare | Show the changed checklist and wait for confirmation again. |
-| Execution-time preparation becomes `PENDING` or `BLOCKED` | Pause the entire queue, show the updated checklist, and perform no later writes until reconfirmed. |
-| Second Bug fails repair | Report the second Bug failure, skip its submit/go-live, then begin the third Bug. |
-| Exact duplicate URL | Keep the first occurrence and do not execute the duplicate again. |
-| User says `需要提测 Wiki` | Select `STANDARD` without asking for a profile or Wiki URL. |
-| `STANDARD` without a user-supplied Wiki URL | Continue normally; submission locates/reuses or creates the Wiki from TAPD and hierarchy rules. |
-| `NO_WIKI` | Submission never loads or invokes Wiki capability. |
-| User says “直接提测” | Select `SKIP`; do not ask a separate Jenkins question. |
-| User says “发布测试环境后提测” | Select `DEPLOY` and include Jenkins in the consolidated submission plan. |
-| Explicit submission without go-live | Select `SUBMIT` and stop each successful Bug after submission. |
-| Existing Wiki or `待测试` status without delivery intent | Do not infer submission from these facts. |
-| Known narrow fix with high-risk behavior | `QUICK` preparation may apply, but high-risk verification, independent review and exact Bug status/owner authorization remain required. |
-| Broad investigation with `FULL` and `IMPLEMENT` | Complete preparation and implementation without acquiring submission or go-live authority. |
-| Interrupted conversation | Create no recovery record; the user supplies remaining Bugs again. |
-| Shared repository or branch mismatch | Perform no writes for affected items and report the shared blocker concisely. |
-| Initial one-Bug flow with submission selected | Require at most one start confirmation and one consolidated submission confirmation before optional go-live. |
+| 一个或多个 Bug，尚未确认 | 全部只读预检，按原顺序合并六列清单；原始请求不授权尚未展示内容 |
+| 只有最后执行批准未回复 | 待决事项写“无”，单独请求执行确认，不写“执行确认 1 项” |
+| 需求、闭环、接口/字段或必需外部条件缺口 | 明确影响、责任方、补齐条件和受阻步骤；未核实不当成已确认不存在 |
+| 局部修复没有 Plan | 使用同一范围说明和必要 #01 备注，不为超链接生成文档/Task |
+| 有关联 Plan 或详细备注 | 内容与摘要共同绑定确认；实质变化不能藏在旧摘要下 |
+| 普通“修复” | 到 REVIEWED 结束，合并/测试构建显示否，不查询 Wiki/Jenkins 或调用提测 PLAN |
+| “合并并构建” | 核实实际 dev/develop 与项目测试环境，后续准确提测计划确认才写入 |
+| 开始记录已预览并获准 | 同一授权覆盖评审后的完整完成记录，不再增加常规评论确认 |
+| 旧授权未覆盖评论 | 只展示并补充缺少的评论写入授权 |
+| 记录事实仍未知 | 如实注明引入人/时间未知，不猜测归因；没有关联需求省略整行 |
+| 代码评审通过但评论读回失败 | 不能 REVIEWED/提测；保留代码结果，核查原评论后仅补缺失记录 |
+| 当前状态已修复中，但处理人错误 | 按已核实修复账号确认联合状态/处理人写入，并读回两者 |
+| 人员仅分号/空白不同 | 显示保持不变，内部准确 payload 与读回检查仍保留 |
+| 共享新分支的多个 Bug | 首次成功创建读回后，后续使用 USE_EXISTING，不重复创建 |
+| 使用现有分支开始新 Bug | 不要求该分支已有此 Bug 的历史提交、文档或测试 |
+| 测试反馈继续原 Bug | 复用原分支和明确增量范围；有效授权不重复确认 |
+| CONTINUE 已待测试 | 保留状态、处理人及既有测试版本，不重写成修复中 |
+| 写前准确事实变化或准备 PENDING/BLOCKED | 暂停整个队列，先查明变化并更新受影响确认 |
+| 单项失败且其他项独立 | 确认共享约束仍有效才继续，不能把失败项夹带到下一项交付 |
+| 小修复涉及金额/权限 | 准备可简短，相关高风险场景和独立最终评审不能省略 |
+| 未提供 Wiki URL | 不阻塞；STANDARD 由提测能力定位/创建；NO_WIKI 不加载 Wiki 能力 |
+| 后续才请求提测 | 复用当前 ReviewedChange，由接收能力验证版本/范围，不重复激活或修复 |
+| 等待人工 MR 合并 | 暂停依赖队列，提供准确 MR 与联系有权限人员的动作；续接核实同一 MR |
+| 多 Bug 共享分支清理 | 全部相关项结束才汇总候选，遵守 going-live 的准确资源清单与独立确认 |
+| 单个 Bug 跨多个仓库 | 各仓库分别准备定义、清单各一行；统一开始记录，全部验证/独立评审及跨仓库验收通过后统一完成记录，才交接完整 reviewed_changes |
+| 同 Bug 一仓库通过、另一仓库失败 | 保留已完成效果，整 Bug BLOCKED；不发表完成评论、不把部分项目单独提测，恢复只补缺失或失效步骤 |
+| 同仓库多个子项目 | 合并为一个固定分支操作和准确仓库结果，保留各子项目范围；不因重复行重复建分支或写评论 |
+| 多仓库完成评论写入后读回失败 | 保留各仓库代码和评审；先查询确认原评论，再仅补缺少读回/评论，不重跑修复 |
+| 同 Bug 多仓库交付 | 全部必要项目 Git/部署门禁通过才统一 Wiki/TAPD 登记；不能按首个仓库提前改待测试 |
+| 中断后继续 | 核查真实已完成效果和剩余范围，不重放未知写入，不创建恢复文件 |
 
-When initial confirmation is needed, the preflight response contains the
-concise checklist and one confirmation question. A valid `CONTINUE` request with
-explicit incremental scope and unchanged bound facts proceeds without repeating
-that question. The final response contains the ordered result list and, when go-live
-was attempted, its cleanup outcome. Verified candidates require the exact
-combined plan and `是否删除以上本地开发环境？` with choices
-`确认清理` / `保留开发环境` for local-only scope. A plan including verified
-remote temporary merge refs instead asks `是否清理以上资源（含远程临时分支）？`
-and offers `确认清理（含远程临时分支）` / `保留开发环境` once for both scopes;
-remote development branches remain retained. Use the concise three-row format;
-no candidates or blocked cleanup require a reason.
-Neither
-response exposes handoff objects, runtime metadata, generated files, or
-validator protocol.
+提测、上线、清理的具体写入/readback 与失败处理，分别由对应能力的验收场景
+覆盖；本入口只检查交接顺序、准确结果和授权边界。

@@ -148,14 +148,16 @@ const semanticGenericResourcePolicy = {
   ],
 };
 
-test("Zan plugin manifest includes the page-delivery skill", async () => {
+test("Zan plugin manifest exposes its skills through the two main workflows", async () => {
   const manifest = JSON.parse(await read(".codex-plugin/plugin.json"));
   assert.equal(manifest.name, "zan-workflows");
-  assert.match(manifest.version, /^0\.1\.0\+codex\.[a-z0-9-]+$/);
+  assert.match(manifest.version, /^\d+\.\d+\.\d+\+codex\.[a-z0-9-]+$/);
   assert.equal(manifest.skills, "./skills/");
   assert.equal(manifest.interface.displayName, "Zan Workflows");
-  assert.match(manifest.description, /page review/i);
-  assert.ok(manifest.interface.defaultPrompt.some((prompt) => prompt.includes("$writing-plans")));
+  assert.match(manifest.description, /Bug repair and requirement development/i);
+  for (const entry of ["$fixing-bug", "$developing-requirement"]) {
+    assert.ok(manifest.interface.defaultPrompt.some((prompt) => prompt.includes(entry)));
+  }
 });
 
 test("repository exposes the plugin through the canonical marketplace layout", async () => {
@@ -364,9 +366,10 @@ test("module review schema and normalized Plan preserve hierarchy, revisions, an
     read("skills/reviewing-page-delivery/assets/page-delivery-plan-template.md"),
     read("skills/reviewing-page-delivery/references/status-model.md"),
   ]);
-  assert.match(standard, /ReviewSession.*schemaVersion=2.*schemaVersion=1/s);
+  assert.match(standard, /ReviewSession.*schemaVersion=2/s);
+  assert.doesNotMatch(standard, /仍接受旧|兼容旧版|schemaVersion=1/);
   assert.match(standard, /schemaVersion=3.*features\[\]\.module.*features\[\]\.reviewConclusion/s);
-  assert.match(standard, /schemaVersion=2.*允许.*阶段 blocked 保存/s);
+  assert.match(standard, /阶段.*blocked.*保存|阶段 Plan 仍可保存/s);
   assert.match(standard, /questions.*必须为空.*才能进入可实施/s);
   assert.match(standard, /阶段 Plan 仍可保存这些问题/);
   for (const field of ["parentId", "inputs", "outputs", "rules", "scenarios", "given", "when", "then", "questions", "impact", "owner", "recommendation", "change", "revision"]) {
@@ -435,22 +438,18 @@ test("automatic notifications bind a temporary local bridge and never replace su
   assert.match(wait, /普通交回用户等待操作时保留进程/);
 });
 
-test("artifact-location candidates must be confirmed, solidified, reread, and uniquely resolved before review continues", async () => {
+test("artifact-location candidates allow scope review while formal writes require confirmed rules", async () => {
   const skill = visibleMarkdown(await read("skills/reviewing-page-delivery/SKILL.md"));
   const standard = await read("skills/reviewing-page-delivery/references/page-review-standard.md");
-
+  const runtime = await read("skills/reviewing-page-delivery/references/feature-review-runtime.md");
   for (const document of [skill, standard]) {
-    const confirm = document.indexOf("用户确认完整候选");
-    const solidify = document.indexOf("固化至最近适用公共作用域");
-    const reread = document.indexOf("重新读取");
-    const resolve = document.indexOf("唯一解析");
-    const continueReview = document.indexOf("才能继续");
-    assert.ok(
-      confirm < solidify && solidify < reread && reread < resolve && resolve < continueReview,
-      "确认 → 固化 → 重新读取 → 唯一解析 → 才能继续 必须按顺序出现",
-    );
-    assert.match(document, /未经用户确认不得固化/);
+    assert.match(document, /SCOPE_REVIEW[\s\S]*unresolved-candidate[\s\S]*source=candidate/);
+    assert.match(document, /PLAN_WRITE[\s\S]*(?:已授权目录规则写入|用户确认完整候选)[\s\S]*固化至最近适用公共作用域[\s\S]*重新读取[\s\S]*唯一解析/);
+    assert.match(document, /(?:不提前写规则|不得提前固化)/);
   }
+  assert.match(runtime, /已有提交[\s\S]*reviewing[\s\S]*result[\s\S]*reviewRound \+ 1/);
+  assert.match(runtime, /旧提交、结果、确认请求及保存状态全部失效/);
+  assert.match(runtime, /不得用旧 `resumeSubmission`/);
 });
 
 test("a complete artifact candidate is evidence-filled before confirmation but remains unofficial", async () => {
@@ -459,8 +458,8 @@ test("a complete artifact candidate is evidence-filled before confirmation but r
   assert.match(locationSection, /只读证据/);
   assert.match(locationSection, /填充.*候选值/);
   assert.match(locationSection, /展示.*完整候选/);
-  assert.match(locationSection, /确认前.*不得固化/);
-  assert.match(locationSection, /确认前.*不得.*正式规则/);
+  assert.match(locationSection, /范围评审中指定目录不得提前固化/);
+  assert.match(locationSection, /候选状态只能评审范围，不能确认更新 Plan 或保存/);
   assert.doesNotMatch(locationSection, /Do not fill in any field value until the project confirms it/);
 });
 
@@ -677,7 +676,7 @@ test("pressure scenario preserves required facts and excludes answer oracles", a
 test("feature review is explicit-only and the Zan plugin has one cachebuster", async () => {
   const manifest = JSON.parse(await read(".codex-plugin/plugin.json"));
   const yaml = await read("skills/reviewing-page-delivery/agents/openai.yaml");
-  assert.match(manifest.version, /^0\.1\.0\+codex\.[a-z0-9-]+$/);
+  assert.match(manifest.version, /^\d+\.\d+\.\d+\+codex\.[a-z0-9-]+$/);
   assert.equal((manifest.version.match(/\+codex\./g) ?? []).length, 1);
   assert.match(yaml, /^policy:\n\s+allow_implicit_invocation:\s+false$/m);
 });

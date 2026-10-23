@@ -7,7 +7,7 @@
 | Section | Required facts |
 | --- | --- |
 | Terminal | `VALIDATED|SKIPPED_BY_POLICY|BLOCKED` |
-| Target plan | For `VALIDATED`, `REUSE_EXISTING|CREATE_CHILD|CREATE_MONTH_AND_CHILD`, workspace, root/month/child identity, title, creator, and evidence; exact URL/ID/body/hash when reusing. A policy skip retains an existing target only when available for `going-live`. |
+| Target plan | For `VALIDATED`, `REUSE_EXISTING|CREATE_CHILD|CREATE_MONTH_AND_CHILD`, workspace, root/month/child identity, title, creator, and evidence; exact URL/ID/body/hash when reusing. A policy skip requires the verified owner page, matching repository/branch entry and exact target/body readback for `going-live`. |
 | Claims | resolved value and read-only source for each material field |
 | Conflicts | competing values, sources, criticality |
 | Deployment context | Resolved `DEPLOY|SKIP`; a standalone Wiki-only request uses `SKIP` for parameter requirements. |
@@ -23,8 +23,10 @@
 ## Rules
 
 - A user-supplied Wiki URL is never required. For `VALIDATED`, resolve one
-  target plan in this order: a Wiki link in TAPD details/comments; one related
-  exact-title child in the current month; otherwise a new child under the fixed hierarchy.
+  target plan in this order: a Wiki link in the owner's TAPD details/comments
+  or its verified related Tasks; exact-title lookup in the current month;
+  otherwise a new child under the fixed hierarchy. A title/repository/branch
+  match without an owner link is insufficient to reuse an existing page.
   A policy skip never plans a new child.
 - Discovery uses an exact linked Wiki ID, then at most a month-name query and
   an exact child-title query when needed. Compare returned `parent_wiki_id`
@@ -35,13 +37,14 @@
   `MM-DD: {归属需求或Bug标题}`. A missing
   month yields `CREATE_MONTH_AND_CHILD`; an existing month without a related
   child yields `CREATE_CHILD`.
-- Any linked or exact-title existing child must be read and reused. An inaccessible
+- Any owner-linked child must be read and reused. An unlinked exact-title child,
+  an inaccessible
   linked page, multiple plausible targets returned by those precise queries, or
   conflicting hierarchy evidence blocks creation rather than producing a
   duplicate Wiki.
 - `CONTINUE` reuses the prior matching child/branch entry. A functional
   continuation appends only the affected scope; a proven non-functional
-  continuation returns `SKIPPED_BY_POLICY`. It never
+  continuation with a verified owner page/current entry returns `SKIPPED_BY_POLICY`. It never
   creates a duplicate entry solely because the prior MR was merged.
 - `REUSE_EXISTING` requires the exact current target body and content hash.
   The helper preview's `beforeBodySha256` is SHA-256 over the exact UTF-8
@@ -69,14 +72,19 @@
 - For `CONTINUE`, classify the current-round change from reviewed diff and
   implementation/verification evidence as `FUNCTIONAL_IMPACT` or
   `NON_FUNCTIONAL`. Ambiguous classification blocks.
-- `NON_FUNCTIONAL` continuation returns `SKIPPED_BY_POLICY` with
+- `NON_FUNCTIONAL` continuation returns `SKIPPED_BY_POLICY` only after discovery
+  proves `REUSE_EXISTING` and `REUSE_ENTRY` for the exact owner/repository/branch,
+  retaining ID/URL/parent/title/body/hash and ownership/entry evidence. It has
   `skip_reason=NON_FUNCTIONAL_CONTINUE`, no rendered body, and no Wiki update.
+  A missing page or current entry takes the normal validated creation/append
+  path; uncertain or conflicting evidence blocks. Never skip discovery because
+  the diff is non-functional or defer the missing target to going-live.
   This policy covers changes that do not alter functional behavior, such as
   refactoring, logging, test-only, or build-only changes.
 - `FUNCTIONAL_IMPACT` continuation reuses the matching existing entry and
   appends the new affected module/page to that entry's `影响范围` list. A
   business entry changes `已合并` back to `未合并` when the new current-round
-  commits are not in `origin/master`; a tooling entry preserves `当前版本`
+  commits are not in the verified remote default ref (`origin/master` or `origin/main`); a tooling entry preserves `当前版本`
   unless a newer release changes the channel under the verified-readback or
   conditional `DEPLOY` rule in `wiki-template.md`. Do
   not create a duplicate entry or duplicate an identical scope already listed.
@@ -94,7 +102,7 @@
   `当前版本：latest` for `official`, following the release-evidence rules
   in `wiki-template.md`; no tooling `是否上线` field is rendered. A business
   entry changes to `已合并` only after the original branch is verified in
-  `origin/master`; it is not a production-publication claim.
+  the verified remote default ref (`origin/master` or `origin/main`); it is not a production-publication claim.
 - Reused valid content is immutable outside the declared minimal patch. A
   matching entry must already use the current status contract: business
   `未合并|待合并|已合并`, or tooling `当前版本：canary|latest`.

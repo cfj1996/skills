@@ -1,7 +1,7 @@
 {
   "name": "zan-workflows",
-  "version": "0.1.0+codex.20261021-adaptive-workflow",
-  "description": "Company requirement development, TAPD and Wiki-link workflows, page review, MR review, debug token, identity, memory, and unified Hub-first project knowledge for Codex.",
+  "version": "0.3.0+codex.20261023-parallel-implementation",
+  "description": "TAPD Bug repair and requirement development with scoped plans, task links, verified implementation and explicit delivery.",
   "author": {
     "name": "Local developer"
   },
@@ -11,8 +11,8 @@
     "displayName": "Zan Workflows",
     "composerIcon": "./assets/logo.png",
     "logo": "./assets/logo.png",
-    "shortDescription": "按复杂度分流的 TAPD 需求、Bug 开发与交付。",
-    "longDescription": "Routes requirements and Bugs through QUICK, STANDARD or FULL preparation, with independent risk-based verification and explicit delivery endpoints. QUICK uses a scoped execution brief; formal task and Plan workflows retain verified owners, estimates and readbacks. Includes test submission, master delivery, Wiki, MR review, debug tokens, identity and Hub-first project knowledge.",
+    "shortDescription": "TAPD Bug 修复与需求开发，按实际需要准备和交付。",
+    "longDescription": "Two main workflows for TAPD Bug repair and requirement development. Reuse a concise execution brief or an actual Task-linked Plan, confirm the six-column checklist, implement and independently review, then deliver to testing or the main branch only when requested.",
     "developerName": "Local developer",
     "category": "Productivity",
     "capabilities": [
@@ -20,17 +20,12 @@
       "Write"
     ],
     "defaultPrompt": [
-      "Use the appropriate Zan workflow skill for this task.",
-      "Use the shared adaptive-workflow policy: choose workflow_profile by complexity and uncertainty, verification_risk by impact, and delivery_mode only from user intent. QUICK never bypasses existing formal Plan, branch, status, review or delivery gates.",
-      "Apply the bundled model-routing policy to lead decisions and explicitly bound validators; let the runtime choose models for managed MR reviewer agents.",
-      "Before initial Bug work, show a concise project/repository, branch, and scope checklist and wait for confirmation; for CONTINUE work, reuse unchanged bound facts and confirm only unclear incremental scope.",
-      "Reuse original branch and TAPD status for CONTINUE work. Ordinary Bug repair stops after implementation and review; only requested submission resolves Wiki/deployment policy and uses the consolidated submission confirmation.",
-      "Resolve and scope each TAPD work item before changing code.",
-      "Repair, automatically locate or create the required TAPD Wiki, submit for test, or merge to master and maintain its merge-status field with the matching functional skill.",
-      "Use $writing-plans for scoped requirement review; QUICK returns an in-memory execution brief. Write a formal branch-bound Plan only for STANDARD/FULL or an explicit Plan request, preserving its Task/readback requirements.",
-      "Use $breaking-down-requirement to split a TAPD Story into Tasks with verified developers and final estimated hours; display only final estimated hours in the complete task list and wait for human confirmation before creating or updating Tasks, then link exact Task readbacks to Plan steps.",
-      "Use $developing-requirement to choose QUICK, STANDARD or FULL, bind the exact branch, implement and review, then enter test submission or master delivery only when requested.",
-      "Use $linking-tapd-wiki to safely backfill or verify an existing 提测 Wiki link in a TAPD Bug, Story, or Task comment without rerunning submission."
+      "Use $fixing-bug for TAPD Bugs and $developing-requirement for Story/Task development. Load each capability only at its stage.",
+      "Prepare a concise scope, implementation and verification brief. Use formal Task/Plan capabilities only when actually needed or explicitly requested, preserving existing task readbacks and confirmed scope.",
+      "Before initial writes, show the six-column Chinese execution checklist with indexed notes and concrete TAPD/delivery operations. Reuse unchanged authorization; keep real requirement, interface and environment gaps visible.",
+      "Use the original fixed branch for continued work. Bug implementation includes verified repair ownership and start/completion records. Requirement implementation covers only selected Tasks and their acceptance.",
+      "Complete relevant verification and independent final review. Ordinary repair/development stops there; merge/build means the verified dev/develop target and project test environment, subject to the delivery plan.",
+      "Use submitting-for-test and going-live only for the requested delivery stage. Their exact write plans, readbacks, manual-merge handoff and separately confirmed cleanup remain authoritative."
     ]
   }
 }

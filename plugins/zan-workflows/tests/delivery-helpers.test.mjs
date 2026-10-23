@@ -256,6 +256,55 @@ test('package canary cannot silently use a stable channel', async () => {
   assert.equal(fake.calls.some(call => call.name === 'jenkins_trigger_build'), false);
 });
 
+test('SHA-only deployment identity cannot authorize an ordinary package release', async () => {
+  const params = { REF: sourceSha, CHANNEL: 'canary' };
+  const fake = releaseFake({ onCall(name) {
+    if (name === 'jenkins_get_job_parameters') return reply({ jobName: 'demo-test', parameters: [
+      { name: 'REF', type: 'string' }, { name: 'CHANNEL', type: 'choice', choices: ['canary', 'latest'] },
+    ] });
+  }, onBuild(build) {
+    build.actions[0].parameters = Object.entries(params).map(([name, value]) => ({ name, value }));
+    return build;
+  } });
+  const plan = await runJenkinsRelease(fake.call, fake.reader, { ...releaseInput(),
+    versionParameter: undefined, version: sourceSha, channelParameter: 'CHANNEL', params }, fake.io);
+  for (const versionStrategy of [undefined, 'PIPELINE_COMPUTED']) {
+    for (const execute of [false, true]) {
+      await assert.rejects(runJenkinsRelease(fake.call, fake.reader, { ...plan,
+        releaseKind: 'package', releaseTarget: '@example/demo', versionStrategy, adapterHash: undefined,
+        execute, confirmed: execute }, fake.io), /包发布必须绑定实际版本参数/);
+    }
+  }
+  assert.equal(fake.calls.some(call => call.name === 'jenkins_trigger_build'), false);
+  const result = await runJenkinsRelease(fake.call, fake.reader, { ...plan,
+    execute: true, confirmed: true }, fake.io);
+  assert.equal(result.state, 'DEPLOYED');
+  assert.equal(result.version, sourceSha);
+  assert.equal(fake.calls.filter(call => call.name === 'jenkins_trigger_build').length, 1);
+});
+
+test('ordinary package versions cannot be SHA values or claim a computed contract', async () => {
+  const fake = releaseFake({ onCall(name) {
+    if (name === 'jenkins_get_job_parameters') return reply({ jobName: 'demo-test', parameters: [
+      { name: 'REF', type: 'string' }, { name: 'VERSION', type: 'string' },
+      { name: 'CHANNEL', type: 'choice', choices: ['canary', 'latest'] },
+    ] });
+  } });
+  const plan = await runJenkinsRelease(fake.call, fake.reader, { ...releaseInput(),
+    releaseKind: 'package', releaseTarget: '@example/demo', channelParameter: 'CHANNEL',
+    params: { ...releaseInput().params, CHANNEL: 'canary' } }, fake.io);
+  for (const change of [
+    { version: sourceSha, params: { ...plan.params, VERSION: sourceSha } },
+    { versionStrategy: 'PIPELINE_COMPUTED' },
+  ]) {
+    for (const execute of [false, true]) {
+      await assert.rejects(runJenkinsRelease(fake.call, fake.reader, { ...plan, ...change,
+        adapterHash: undefined, execute, confirmed: execute }, fake.io), /包发布必须绑定实际版本参数/);
+    }
+  }
+  assert.equal(fake.calls.some(call => call.name === 'jenkins_trigger_build'), false);
+});
+
 test('polling backs off, reports changes only and never exceeds a bounded sleep', async () => {
   const io = clock();
   let reads = 0;
@@ -387,6 +436,8 @@ test('an actual canary package release reports its kind and cannot switch to lat
   const result = await runJenkinsRelease(fake.call, fake.reader, { ...plan, execute: true, confirmed: true }, fake.io);
   assert.equal(result.state, 'RELEASED');
   assert.equal(result.releaseKind, 'package');
+  assert.equal(result.version, '1.0.0-canary.1');
+  assert.equal(result.versionStrategy, 'EXPLICIT');
   await assert.rejects(runJenkinsRelease(fake.call, fake.reader, { ...input, params: { ...input.params, CHANNEL: 'latest' } }, fake.io), /不能使用 latest/);
   assert.equal(fake.calls.filter(call => call.name === 'jenkins_trigger_build').length, 1);
 });

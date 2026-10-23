@@ -8,6 +8,7 @@ const WORKING_BRANCH_PATTERN = /^(?:feature|fixbug)\//;
 const MERGE_BRANCH_PATTERN = /^merge\//;
 const DEVELOP_REFS = new Set(['develop', 'dev', 'origin/develop', 'origin/dev']);
 const MASTER_REF = 'origin/master';
+const BRANCH_OPTIONS_WITH_VALUES = ['--format', '--sort', '--set-upstream-to', '-u'];
 
 function isPathInside(candidate, root) {
   const relative = path.relative(root, candidate);
@@ -146,6 +147,34 @@ function positionalArgs(args, optionsWithValues = []) {
   return positional;
 }
 
+function branchOptions(args) {
+  const options = [];
+  for (let index = 0; index < args.length && args[index] !== '--'; index += 1) {
+    const option = args[index];
+    options.push(option);
+    if (BRANCH_OPTIONS_WITH_VALUES.includes(option)) index += 1;
+  }
+  return options;
+}
+
+function isBranchQuery(args) {
+  const options = branchOptions(args);
+  // Explicit mutation modes must still reach their own checks, even if mixed
+  // with display options. Formatting alone does not imply a list operation.
+  if (options.some(option => /^--(?:delete|move|copy|set-upstream-to|unset-upstream|edit-description)(?:=|$)/.test(option)
+    || (/^-[A-Za-z]+$/.test(option) && /[dDmMcCu]/.test(option)))) return false;
+  let list = false;
+  let showCurrent = false;
+  for (const option of options) {
+    if (option === '--list' || (/^-[A-Za-z]+$/.test(option) && option.includes('l'))) list = true;
+    if (option === '--no-list') list = false;
+    if (option === '--show-current') showCurrent = true;
+    if (option === '--no-show-current') showCurrent = false;
+  }
+  return list || showCurrent || options.some(option =>
+    /^--(?:contains|no-contains|merged|no-merged|points-at)(?:=|$)/.test(option));
+}
+
 function branchCreation(invocation) {
   const { subcommand, args } = invocation;
 
@@ -164,7 +193,8 @@ function branchCreation(invocation) {
   }
 
   if (subcommand === 'branch') {
-    const positional = positionalArgs(args, ['-f', '-m', '-M', '-c', '-C']);
+    if (isBranchQuery(args)) return undefined;
+    const positional = positionalArgs(args, [...BRANCH_OPTIONS_WITH_VALUES, '-m', '-M', '-c', '-C']);
     if (positional.length === 0) return undefined;
     return { branch: positional[0], startRef: positional[1], hasNoTrack: args.includes('--no-track') };
   }
@@ -182,12 +212,11 @@ function branchCreation(invocation) {
 
 function branchDeletion(invocation) {
   if (invocation.subcommand !== 'branch') return undefined;
-  const end = invocation.args.indexOf('--');
-  const options = end === -1 ? invocation.args : invocation.args.slice(0, end);
+  const options = branchOptions(invocation.args);
   const shortFlags = options.filter(arg => /^-[A-Za-z]+$/.test(arg)).join('');
   if (!options.includes('--delete') && !/[dD]/.test(shortFlags)) return undefined;
   return {
-    branches: positionalArgs(invocation.args),
+    branches: positionalArgs(invocation.args, BRANCH_OPTIONS_WITH_VALUES),
     forced: /[Df]/.test(shortFlags) || options.includes('--force'),
     remote: /[ra]/.test(shortFlags) || options.includes('--remotes') || options.includes('--all'),
   };
@@ -277,7 +306,7 @@ export function evaluateHookInput(input, { workspaceRoot, currentBranch } = {}) 
 
     if (invocation.subcommand === 'rebase') {
       const refs = new Set(invocation.args);
-      const branch = currentBranch ?? inferCurrentBranch(cwd);
+      const branch = currentBranch ?? inferCurrentBranch(cwd, invocation.globalArgs);
       const targetsDevelop = invocation.args.some(argument => DEVELOP_REFS.has(argument));
       const crossesProtectedBases = targetsDevelop
         && (refs.has('master') || refs.has('origin/master') || WORKING_BRANCH_PATTERN.test(branch));

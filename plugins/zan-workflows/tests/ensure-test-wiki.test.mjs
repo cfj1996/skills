@@ -184,12 +184,12 @@ test('creates month, child and comment once, then reads back each write', async 
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
-test('reuses an existing matching child and blocks a conflicting linked Wiki', async () => {
+test('reuses an owner-linked existing child and blocks a conflicting linked Wiki', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'zan-wiki-'));
   try {
     const bodyFile = join(dir, 'wiki.md');
     await writeFile(bodyFile, `# 前端\n- 代码分支名：${branch}`);
-    const fake = makeFake({ childExists: true });
+    const fake = makeFake({ childExists: true, description: `提测wiki：${url}` });
     const result = await ensureTestWiki(fake.call, {
       ...existingInput(bodyFile),
     });
@@ -243,7 +243,7 @@ test('parses fixed Wiki identity, body hash and comment-only mode', () => {
 });
 
 test('discovers an existing Wiki without creation inputs', async () => {
-  const fake = makeFake({ childExists: true });
+  const fake = makeFake({ childExists: true, description: `提测wiki：${url}` });
   const plan = await ensureTestWiki(fake.call, {
     ...input(undefined), creator: undefined, commentAuthor: undefined,
   });
@@ -276,7 +276,7 @@ test('blocks conflicting targets between item details and comments', async () =>
 });
 
 test('does not switch the approved Wiki ID to a same-title replacement', async () => {
-  const fake = makeFake({ childExists: true });
+  const fake = makeFake({ childExists: true, description: `提测wiki：${url}` });
   const plan = await ensureTestWiki(fake.call, input(undefined));
   const old = fake.wikis.get(childId);
   fake.wikis.delete(childId);
@@ -296,7 +296,7 @@ test('blocks a changed linked Wiki ID even when branch and body still match', as
 });
 
 test('requires the exact existing target and before-body hash before writes', async () => {
-  const fake = makeFake({ childExists: true });
+  const fake = makeFake({ childExists: true, description: `提测wiki：${url}` });
   await assert.rejects(ensureTestWiki(fake.call, {
     ...input(undefined, true), expectTarget: 'REUSE_EXISTING',
   }), /expected-wiki-id.*expected-body-sha256/);
@@ -326,7 +326,7 @@ test('supplements the approved body, preserves other sections and links in one i
   const before = `# 后端\n保留历史说明\n\n${originalBody}\n- 影响范围：\n  1. 门店发货\n\n# 备注\n保留备注\n`;
   const after = before.replace('  1. 门店发货', '  1. 门店发货\n  2. 订单校验');
   await withBody(after, async bodyFile => {
-    const fake = makeFake({ childExists: true });
+    const fake = makeFake({ childExists: true, description: `提测wiki：${url}` });
     fake.wikis.get(childId).markdown_description = before;
     const runInput = { ...existingInput(bodyFile), expectedBodySha256: contentHash(before) };
     const result = await ensureTestWiki(fake.call, runInput);
@@ -475,7 +475,7 @@ test('stops before creation when the approved month parent changed', async () =>
 test('reports a completed update and stops if a conflicting comment appears', async () => {
   await withBody(`${originalBody}\n补充范围`, async bodyFile => {
     let reads = 0;
-    const fake = makeFake({ childExists: true, onCall(name, args, { comments }) {
+    const fake = makeFake({ childExists: true, description: `提测wiki：${url}`, onCall(name, args, { comments }) {
       if (name === 'get_comments' && ++reads === 2) comments.push({ id: 'other', description:
         `提测wiki：https://www.tapd.cn/${workspaceId}/markdown_wikis/show/#2002` });
     } });
@@ -492,7 +492,7 @@ test('reports a completed update and stops if a conflicting comment appears', as
 
 test('does not link after an update readback mismatch', async () => {
   await withBody(`${originalBody}\n补充范围`, async bodyFile => {
-    const fake = makeFake({ childExists: true, onCall(name, args, { wikis, calls }) {
+    const fake = makeFake({ childExists: true, description: `提测wiki：${url}`, onCall(name, args, { wikis, calls }) {
       if (name === 'get_wiki' && calls.some(call => call.name === 'update_wiki')) {
         return response('Wiki', [{ ...wikis.get(childId), markdown_description: originalBody }]);
       }
@@ -519,7 +519,7 @@ test('never retries an unknown comment write', async () => {
 });
 
 test('requires a conflict-free comment readback before reporting success', async () => {
-  const fake = makeFake({ childExists: true, onCall(name, args, { comments, calls }) {
+  const fake = makeFake({ childExists: true, description: `提测wiki：${url}`, onCall(name, args, { comments, calls }) {
     if (name === 'get_comments' && calls.some(call => call.name === 'create_comments')) {
       return plainResponse('Comment', [...comments, { id: 'other', description:
         `提测wiki：https://www.tapd.cn/${workspaceId}/markdown_wikis/show/#2002` }]);
@@ -545,7 +545,7 @@ test('does not interpret malformed Wiki responses as proof of absence', async ()
 test('rechecks the Wiki before update if another editor changes it during the parallel reads', async () => {
   await withBody(`${originalBody}\n批准的补充`, async bodyFile => {
     let wikiReads = 0;
-    const fake = makeFake({ childExists: true, onCall(name, args, { wikis }) {
+    const fake = makeFake({ childExists: true, description: `提测wiki：${url}`, onCall(name, args, { wikis }) {
       if (name === 'get_wiki' && ++wikiReads === 2) {
         wikis.get(childId).markdown_description += '\n其他人刚写入的内容';
       }

@@ -90,15 +90,20 @@ export function evaluateMergeReadiness({
   const blockers = [];
 
   if (codeReview === 'blocker') blockers.push('code');
-  if (codeReview === 'incomplete') blockers.push('code-review-incomplete');
+  else if (codeReview !== 'pass') blockers.push('code-review-incomplete');
   if (safety !== 'pass') blockers.push('safety');
   if (mergeability !== 'mergeable') blockers.push('mergeability');
   if (pipeline === 'failed') blockers.push('pipeline-failed');
-  if (pipelineRequired && pipeline === 'none') blockers.push('pipeline-missing');
-  if (pipelineRequired && pipeline === 'pending') blockers.push('pipeline-pending');
-  if (unresolvedDiscussions) blockers.push('unresolved-discussions');
-  if (approval === 'required-missing') blockers.push('approval');
-  if (['misconfigured', 'unknown'].includes(zanStatus)) blockers.push('zan-governance');
+  else if (pipelineRequired === true && pipeline !== 'success') {
+    if (pipeline === 'none') blockers.push('pipeline-missing');
+    else if (pipeline === 'pending') blockers.push('pipeline-pending');
+    else blockers.push('pipeline-not-success');
+  }
+  else if (!['success', 'none', 'pending'].includes(pipeline)) blockers.push('pipeline-unknown');
+  if (typeof pipelineRequired !== 'boolean') blockers.push('pipeline-requirement-unknown');
+  if (unresolvedDiscussions !== false) blockers.push('unresolved-discussions');
+  if (!['approved', 'not-required'].includes(approval)) blockers.push('approval');
+  if (!['adopted', 'not-adopted'].includes(zanStatus)) blockers.push('zan-governance');
   if (zanStatus === 'adopted' && zanMust !== 'pass') blockers.push('zan-must');
 
   return {

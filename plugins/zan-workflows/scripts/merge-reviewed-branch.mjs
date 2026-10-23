@@ -82,6 +82,12 @@ function mergeMode(input) {
   return mode;
 }
 
+function checkDefaultTarget(project, input) {
+  if (['master', 'main'].includes(input.targetBranch) && project.default_branch !== input.targetBranch) {
+    throw new Error(`${input.targetBranch} 未验证为实际默认分支，需要更新清单`);
+  }
+}
+
 export function mergeRequiredTools(input) {
   const mode = mergeMode(input);
   return ['get_branch', 'get_project', 'get_merge_request', 'list_merge_requests',
@@ -151,7 +157,7 @@ export async function mergeReviewedBranch(call, input, io = {}) {
   if (![project?.ssh_url_to_repo, project?.http_url_to_repo].filter(Boolean).some(url => repositoryKey(url) === repositoryKey(input.originUrl))) {
     throw new Error('GitLab 项目与确认的源码仓库不一致');
   }
-  if (input.targetBranch === 'main' && project.default_branch !== 'main') throw new Error('main 未验证为实际默认分支');
+  checkDefaultTarget(project, input);
   if (candidates.length > 1) throw new Error('同一源/目标有多个打开 MR，停止自动选择');
   let mr = candidates[0];
   if (mr) {
@@ -203,11 +209,13 @@ export async function mergeReviewedBranch(call, input, io = {}) {
       }
       phase = 'CHECK_MERGE';
       const approvals = await verifyMergeApprovals(call, mrArgs, plan, project, io);
-      const [freshSource, freshTarget, freshMr] = await Promise.all([
+      const [freshSource, freshTarget, freshMr, freshProject] = await Promise.all([
         readTool(call, 'get_branch', { ...projectArgs, branch_name: input.sourceBranch }),
         readTool(call, 'get_branch', { ...projectArgs, branch_name: input.targetBranch }),
         readTool(call, 'get_merge_request', mrArgs),
+        ['master', 'main'].includes(input.targetBranch) ? readTool(call, 'get_project', projectArgs) : project,
       ]);
+      checkDefaultTarget(freshProject, input);
       if (freshSource?.commit?.id !== plan.sourceSha || freshTarget?.commit?.id !== plan.targetSha) {
         throw new Error('合并前 source/target SHA 已变化，需要更新清单');
       }

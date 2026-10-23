@@ -63,8 +63,11 @@ Required plan facts: `projectId`, `repositoryPath`, exact `originUrl`, original
 `sourceBranch`, `targetBranch`, `purpose`, current `reviewPassed=true`, explicit
 `pipelineRequired` and new-MR title/description when applicable. Preview binds
 `sourceSha`, `targetSha` and any exact `mrIid`. Execute also needs the matching
-confirmation (`confirmed=true`). Targets are `develop|dev|master` or `main`
-only after it is verified as the actual default. Source remains the original
+confirmation (`confirmed=true`). Test-delivery targets are the verified
+`develop|dev`; default-delivery targets `master|main` must both match the
+project's actual default branch during preview and again before merging.
+A default-branch change invalidates the plan even when its old ref has not moved.
+Source remains the original
 `feature/*|fixbug/*`; conflict branches use the shared
 [A → C → B flow](conflict-merge.md), with exact temporary cleanup included
 in its confirmation by default and an explicit user retention override.
@@ -222,7 +225,10 @@ Required facts: `targetProject`, `releaseTarget` (package name for a package),
 `releaseKind=deployment|package`, `purpose`, exact `params`, `refParameter` and
 any `versionParameter`/`channelParameter`. An adapter may resolve these during
 preview. No version parameter means a deployment source identity equal to
-the confirmed SHA. Package canary binds a non-official channel; official
+the confirmed SHA. Package releases require a real version bound to a live Job
+parameter or the verified `npm-tools-v1` computed-version contract; a source SHA
+or a caller-provided `PIPELINE_COMPUTED` label cannot substitute for either.
+Package canary binds a non-official channel; official
 versions are stable, explicitly bound or read back through the computed
 adapter below. Review the actual Job/channel semantics before confirmation.
 

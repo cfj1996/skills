@@ -3,7 +3,7 @@
 | Scenario | Expected result |
 | --- | --- |
 | TAPD details/comments contain one matching 提测 Wiki link | Read and reuse that child; never create a duplicate or ask the user for its URL. |
-| No link, but one related current-month child matches the TAPD/branch | Reuse that child and calculate the minimal patch. |
+| No owner link, but one current-month child matches title/repository/branch | Block ownership resolution; these shared fields cannot distinguish two different Bugs or Stories. |
 | No link, month exists, no related child | Plan `CREATE_CHILD` named `MM-DD: 中文简述` under that month with `# 前端`, sequence `1`, and the resolved type-specific status. |
 | No link and current month is absent | Plan `CREATE_MONTH_AND_CHILD` below root `1150372234001008260`; never put the entry body in the month page. |
 | Multiple linked or related Wiki candidates | Block rather than ask for an arbitrary URL or create another page. |
@@ -11,7 +11,9 @@
 | Existing `# 前端` sequences `1` and `3` | Append the new entry as sequence `4`; do not count sub-list numbers. |
 | Existing unique entry with the same source branch and a functional change | Keep its sequence, append the affected scope, and apply only the allowed type-specific status patch; a missing status blocks. |
 | Continue work after a prior MR/deployment with a functional change | Reuse the same Wiki/branch entry and append only the new affected scope to `影响范围`. |
-| Continue work is proven non-functional by the reviewed diff | Return `SKIPPED_BY_POLICY` with `NON_FUNCTIONAL_CONTINUE`; do not update the Wiki. |
+| Continue work is proven non-functional and has a verified owner page/current repository+branch entry | Return `SKIPPED_BY_POLICY` with `NON_FUNCTIONAL_CONTINUE`; retain the exact target/body readback for go-live and do not update the Wiki. |
+| Non-functional continuation has no historical page or no current repository+branch entry | Follow normal validated creation/append drafting; do not return a successful skip without a usable go-live target. |
+| Same-title page has the same repository and branch but no owner link | Block ownership resolution without writes or wider scans; do not combine different Bugs or create a second page by changing its title. |
 | Continue work changes functional behavior | Reuse the matching entry and append only the affected module/page to its `影响范围` list without creating a duplicate entry. |
 | A new functional round reuses a business entry currently marked `已合并` | Append the new affected scope and reset only that entry to `是否上线：未合并`. |
 | A reused entry has a missing or non-current status | Block except for the evidenced minimal replacement of a tooling legacy `是否上线：无需上线` line. |

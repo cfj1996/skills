@@ -121,8 +121,8 @@
     if (!isNormalizedObject(session) || !Array.isArray(session.cards) || !isNonEmptyString(session.sessionId)) {
       throw createCodedError(TypeError, "invalid-review-session", "ReviewSession must include a sessionId and cards array");
     }
-    if (![1, 2].includes(session.schemaVersion)) {
-      throw createCodedError(TypeError, "invalid-review-schema-version", "ReviewSession schemaVersion must be 1 or 2");
+    if (session.schemaVersion !== 2) {
+      throw createCodedError(TypeError, "invalid-review-schema-version", "ReviewSession schemaVersion must be 2");
     }
     if (!isDeliveryUnitKey(session.deliveryUnitKey)) {
       throw createCodedError(TypeError, "invalid-delivery-unit-key", "ReviewSession deliveryUnitKey must be a safe relative key");
@@ -151,14 +151,7 @@
     if (!artifactRuleResolution) {
       throw createCodedError(TypeError, "invalid-artifact-rule-resolution", "Artifact rule resolution is invalid");
     }
-    if (!isReviewableArtifactRuleResolution(artifactRuleResolution, session.artifactRuleFingerprint)) {
-      throw createCodedError(
-        TypeError,
-        "artifact-rule-confirmation-required",
-        "Artifact rule candidate must be explicitly confirmed for the current fingerprint before review",
-      );
-    }
-    let cards = session.cards.map(card => normalizeReviewCard(card, session.schemaVersion));
+    let cards = session.cards.map(normalizeReviewCard);
     const ids = new Set();
     for (const card of cards) {
       if (ids.has(card.id)) {
@@ -166,15 +159,13 @@
       }
       ids.add(card.id);
     }
-    if (session.schemaVersion === 2) {
-      validateModuleTree(cards);
-      const ordered = [];
-      const visit = parentId => cards.filter(card => card.module.parentId === parentId).forEach(card => {
-        ordered.push(card); visit(card.id);
-      });
-      visit(null);
-      cards = ordered;
-    }
+    validateModuleTree(cards);
+    const ordered = [];
+    const visit = parentId => cards.filter(card => card.module.parentId === parentId).forEach(card => {
+      ordered.push(card); visit(card.id);
+    });
+    visit(null);
+    cards = ordered;
     return {
       schemaVersion: session.schemaVersion,
       sessionId: session.sessionId,
@@ -193,28 +184,28 @@
     };
   }
 
-  function normalizeReviewCard(card, schemaVersion = 1) {
-    let module;
-    if (schemaVersion === 2) {
-      module = normalizeModule(card?.module);
-      card = {
-        ...card,
-        dimension: "功能模块",
-        reviewGoal: module.name,
-        design: module.purpose,
-        regionAndComponents: module.name,
-        interactionStates: card.interactionStates ?? [],
-        relatedApis: card.relatedApis ?? [],
-        mockScenarios: card.mockScenarios ?? [],
-        acceptanceCriteria: module.scenarios.map(item => `${item.given}；${item.when}；${item.then}`),
-        reopened: card.reopened ?? false,
-        evidenceChanged: card.evidenceChanged ?? false,
-        reviewResult: card.reviewResult ?? null,
-        userNote: card.userNote ?? "",
-        conclusion: card.conclusion ?? "未评审",
-        links: card.links ?? Object.fromEntries(LINK_FIELDS.map(field => [field, []])),
-      };
+  function normalizeReviewCard(card) {
+    if (!isNormalizedObject(card)) {
+      throw createCodedError(TypeError, "invalid-review-card", "Review cards must follow the approved canonical schema");
     }
+    const module = normalizeModule(card.module);
+    card = {
+      ...card,
+      dimension: "功能模块",
+      reviewGoal: module.name,
+      design: module.purpose,
+      regionAndComponents: module.name,
+      interactionStates: card.interactionStates ?? [],
+      relatedApis: card.relatedApis ?? [],
+      mockScenarios: card.mockScenarios ?? [],
+      acceptanceCriteria: module.scenarios.map(item => `${item.given}；${item.when}；${item.then}`),
+      reopened: card.reopened ?? false,
+      evidenceChanged: card.evidenceChanged ?? false,
+      reviewResult: card.reviewResult ?? null,
+      userNote: card.userNote ?? "",
+      conclusion: card.conclusion ?? "未评审",
+      links: card.links ?? Object.fromEntries(LINK_FIELDS.map(field => [field, []])),
+    };
     const valid = (
       isNormalizedObject(card) &&
       isNonEmptyString(card.id) &&
@@ -247,7 +238,7 @@
     );
     return {
       id: card.id,
-      ...(module ? { module } : {}),
+      module,
       dimension: card.dimension,
       links: Object.fromEntries(LINK_FIELDS.map((field) => [field, [...card.links[field]]])),
       sourceEvidence: card.sourceEvidence.map(normalizeSourceEvidence),
@@ -390,10 +381,19 @@
   }
 
   function mergeReviewSession(state, nextSession) {
+    if (!isReviewState(state)) {
+      throw createCodedError(TypeError, "invalid-session-update", "Only the current review state can be updated");
+    }
     const next = normalizeReviewSession(nextSession);
+    const ruleChanged = next.artifactRuleFingerprint !== state.artifactRuleFingerprint ||
+      JSON.stringify(next.artifactRuleResolution) !== JSON.stringify(state.artifactRuleResolution);
+    const resolvesCandidate = state.artifactRuleResolution?.status === "unresolved-candidate" &&
+      next.artifactRuleResolution.status === "resolved" &&
+      next.artifactRuleFingerprint !== state.artifactRuleFingerprint &&
+      ["reviewing", "result"].includes(state.mode) && state.lastSubmission && next.viewScope === "all";
     if (next.schemaVersion !== 2 || state.schemaVersion !== 2 || next.sessionId === state.sessionId ||
       next.deliveryUnitKey !== state.deliveryUnitKey || next.planFingerprint !== (state.savedPlanFingerprint || state.planFingerprint) ||
-      next.artifactRuleFingerprint !== state.artifactRuleFingerprint ||
+      (ruleChanged && !resolvesCandidate) ||
       next.reviewRound !== state.reviewRound + (state.mode === "input" ? 0 : 1)) {
       throw createCodedError(TypeError, "invalid-session-update", "Update requires a new session for this module, current fingerprints and the correct round");
     }
@@ -433,6 +433,7 @@
 
     if (state.mode === "confirmed" && action.type === "MARK_PLAN_SAVED") {
       if (
+        assertArtifactLocationRule({ ...state.artifactRuleResolution, ruleFingerprint: state.artifactRuleFingerprint }, action.artifactRuleFingerprint) ||
         action.sessionId !== state.sessionId ||
         action.submissionId !== state.lastSubmission?.submissionId ||
         assertCurrentFingerprints(state, action) ||
@@ -573,9 +574,10 @@
   function restoreSubmittedReview(state, snapshot) {
     if (!isNormalizedObject(snapshot) || snapshot.sessionId !== state.sessionId ||
       snapshot.planFingerprint !== state.planFingerprint || snapshot.artifactRuleFingerprint !== state.artifactRuleFingerprint ||
+      JSON.stringify(canonicalizeArtifactRuleResolution(snapshot.artifactRuleResolution)) !== JSON.stringify(state.artifactRuleResolution) ||
       !isNonEmptyString(snapshot.submissionId) || !Number.isSafeInteger(snapshot.submissionVersion) || snapshot.submissionVersion < 1 ||
       !Array.isArray(snapshot.cards)) throw createCodedError(TypeError, "invalid-submission-restore", "Only the matching exported submission can be restored");
-    const cards = snapshot.cards.map(card => normalizeReviewCard(card, state.schemaVersion));
+    const cards = snapshot.cards.map(normalizeReviewCard);
     if (JSON.stringify(cards) !== JSON.stringify(state.cards)) {
       throw createCodedError(TypeError, "invalid-submission-restore", "Restored submission must match the current review content and opinions");
     }
@@ -650,7 +652,7 @@
         height: rect.height || FALLBACK_PANEL_SIZE.height,
       };
     };
-    const persistDraft = () => saveDraft(storageKey, {
+    const persistDraft = () => !destroyed && saveDraft(storageKey, {
       deliveryUnitKey: state.deliveryUnitKey,
       sessionId: state.sessionId,
       reviewRound: state.reviewRound,
@@ -714,6 +716,7 @@
       if (evidenceStatus) render();
     };
     const dispatch = (action) => {
+      if (destroyed) return state;
       const nextState = reduceReviewState(state, action);
       if (nextState === state) return state;
       state = nextState;
@@ -725,22 +728,30 @@
       return state;
     };
     const setRuntimeError = (error) => {
+      if (destroyed) return state;
       state = { ...state, lastError: error };
       persistDraft();
       render();
       return state;
     };
+    const assertActiveRuntime = () => {
+      if (destroyed) throw createCodedError(Error, "review-runtime-destroyed", "This review runtime has been destroyed");
+    };
     const applyResultFromPage = (result) => {
-      confirmationGate.invalidate();
-      return dispatch({ type: "APPLY_RESULT", ...result });
+      assertActiveRuntime();
+      if (state.mode === "reviewing") confirmationGate.invalidate();
+      dispatch({ ...result, type: "APPLY_RESULT" });
+      return runtimeState();
     };
     const confirmPlan = (fingerprints) => {
+      assertActiveRuntime();
       const confirmationError = confirmationGate.consume(state, fingerprints || {});
-      if (confirmationError) return setRuntimeError(confirmationError);
-      return dispatch({ type: "CONFIRM_PLAN", ...fingerprints });
+      if (confirmationError) setRuntimeError(confirmationError);
+      else dispatch({ ...fingerprints, type: "CONFIRM_PLAN" });
+      return runtimeState();
     };
     const notifyAgent = async (event) => {
-      if (!state.lastSubmission) return;
+      if (destroyed || !state.lastSubmission) return;
       if (!wakeNotifier) {
         if (notification.status === "connecting") pendingWake = { event, sessionId: state.sessionId, submissionId: state.lastSubmission.submissionId };
         return;
@@ -764,6 +775,7 @@
       }
     };
     const connectWakeBridge = async (config, { notifyExistingSubmission = false } = {}) => {
+      assertActiveRuntime();
       const generation = ++wakeGeneration;
       wakeNotifier = null;
       pendingWake = null;
@@ -796,6 +808,7 @@
       }
     };
     const requestPlanConfirmation = (event) => {
+      if (destroyed) return;
       const requestError = confirmationGate.request(state, event);
       if (requestError) {
         if (requestError.code !== "untrusted-confirmation-request") setRuntimeError(requestError);
@@ -827,8 +840,13 @@
     const pageApi = {
       getState: runtimeState,
       connectWakeBridge,
-      markPlanSaved: (receipt) => dispatch({ ...receipt, type: "MARK_PLAN_SAVED" }),
+      markPlanSaved: (receipt) => {
+        assertActiveRuntime();
+        dispatch({ ...receipt, type: "MARK_PLAN_SAVED" });
+        return runtimeState();
+      },
       updateReviewSession: (nextSession) => {
+        assertActiveRuntime();
         const merged = mergeReviewSession(state, nextSession);
         confirmationGate.invalidate();
         state = merged;
@@ -846,6 +864,7 @@
       destroy,
     };
     const render = () => {
+      if (destroyed) return;
       removeRenderListeners();
       shadowRoot.replaceChildren();
       const style = document.createElement("style");
@@ -1124,9 +1143,7 @@
       draft.planFingerprint === state.planFingerprint &&
       draft.artifactRuleFingerprint === state.artifactRuleFingerprint &&
       draftArtifactRuleResolution?.status === state.artifactRuleResolution.status &&
-      draftArtifactRuleResolution?.source === state.artifactRuleResolution.source &&
-      draftArtifactRuleResolution?.confirmedRuleFingerprint ===
-        state.artifactRuleResolution.confirmedRuleFingerprint
+      draftArtifactRuleResolution?.source === state.artifactRuleResolution.source
     );
   }
 
@@ -1516,12 +1533,8 @@
   function panelMarkup(state, collapsed, evidenceStatus, options = {}) {
     const currentCard = state.cards[state.currentCardIndex];
     const isResultMode = state.mode === "result" || state.mode === "confirmed";
-    const currentResult = isResultMode ? state.results[state.currentResultIndex] : null;
     const disabled = state.mode !== "input" ? " disabled" : "";
     const escape = escapeHtml;
-    const reviewDomain = (isResultMode ? currentResult?.dimension : currentCard?.dimension) || "未分类";
-    const sessionCount = state.cards.length;
-    const objectiveCount = state.cards.length;
     const contextIndex = isResultMode ? state.currentResultIndex + 1 : state.currentCardIndex + 1;
     const contextLength = isResultMode ? state.results.length : state.cards.length;
     const displayIndex = contextLength === 0 ? 0 : contextIndex;
@@ -1529,9 +1542,7 @@
     const statusSummary = `<div data-review-status-summary aria-label="评审状态统计">${REVIEW_CONCLUSIONS
       .map((status) => statusBadgeMarkup(status, counts[status]))
       .join("")}</div>`;
-    const contextLabel = state.schemaVersion === 2
-      ? `第 ${state.reviewRound} 轮 · ${displayIndex}/${contextLength} 个模块`
-      : `${escape(reviewDomain)} · ${displayIndex}/${contextLength} · 会话 ${sessionCount} · 目标 ${objectiveCount}`;
+    const contextLabel = `第 ${state.reviewRound} 轮 · ${displayIndex}/${contextLength} 个模块`;
     const header = `<header data-review-panel-titlebar><div data-review-heading><strong data-review-title>${escape(state.deliveryUnitName)} 功能评审</strong><span data-review-context>${contextLabel}</span></div>${statusSummary}<button type="button" data-action="toggle-collapse">${collapsed ? "展开" : "收起"}</button></header>`;
     const handles = resizeHandlesMarkup(options.dockSide);
     if (collapsed) return `${handles}${header}`;
@@ -1556,7 +1567,7 @@
       return `${handles}${header}<div data-review-body>${alerts}<p data-review-empty>本轮没有需要评审的卡片</p></div>`;
     }
     if (state.mode === "result" || state.mode === "confirmed") {
-      const result = currentResult;
+      const result = state.results[state.currentResultIndex];
       const lastResult = state.currentResultIndex >= state.results.length - 1;
       const confirmationError = assertArtifactLocationRule(
         {
@@ -1582,7 +1593,7 @@
         return `<button type="button" data-action="select-conclusion" data-value="${value}" role="radio" aria-checked="${value === card.conclusion}" aria-pressed="${value === card.conclusion}"${disabled}>${value}</button>`;
       })
       .join("")}</div></div>`;
-    const moduleBody = card.module ? moduleMarkup(card) : `${implementationPlanMarkup(card)}<details data-review-implementation-evidence><summary>实现依据</summary><div data-card-fields>${cardFieldsMarkup(card)}</div></details>`;
+    const moduleBody = moduleMarkup(card);
     const cardMarkup = `<article data-review-card data-card-id="${escape(card.id)}"><div data-review-card-header><h2 data-review-card-title>${escape(card.module?.name || card.id)}</h2>${readinessMarkup(card)}${statusBadgeMarkup(card.conclusion)}</div>${moduleBody}${conclusionGroup}<label>评审备注<textarea data-field="userNote"${disabled}>${escape(card.userNote || "")}</textarea></label></article>`;
     const cardList = reviewListMarkup(state.cards, state.currentCardIndex, "card", state.allCards);
     const footer = `<footer data-review-footer><div data-review-navigation><button type="button" data-action="previous"${disabled || state.currentCardIndex === 0 ? " disabled" : ""}>上一个</button><button type="button" data-action="next"${disabled || lastCard ? " disabled" : ""}>下一个</button></div><div data-review-actions><button type="button" data-action="highlight-evidence"${disabled}>查看证据</button>${lastCard ? `<button type="button" data-action="submit"${disabled}>统一提交评审</button>` : ""}</div></footer>`;
@@ -2043,10 +2054,10 @@
     return (
       state &&
       typeof state === "object" &&
+      state.schemaVersion === 2 &&
       ["input", "reviewing", "result", "confirmed"].includes(state.mode) &&
       isReviewableArtifactRuleResolution(
         canonicalizeArtifactRuleResolution(state.artifactRuleResolution),
-        state.artifactRuleFingerprint,
       ) &&
       Array.isArray(state.cards) &&
       Number.isInteger(state.currentCardIndex) &&
@@ -2066,29 +2077,12 @@
     if (value.status === "unresolved-candidate" && value.source === "candidate") {
       return { status: "unresolved-candidate", source: "candidate" };
     }
-    if (
-      value.status === "temporarily-confirmed-candidate" &&
-      value.source === "candidate" &&
-      isNonEmptyString(value.confirmedRuleFingerprint)
-    ) {
-      return {
-        status: "temporarily-confirmed-candidate",
-        source: "candidate",
-        confirmedRuleFingerprint: value.confirmedRuleFingerprint,
-      };
-    }
     return null;
   }
 
-  function isReviewableArtifactRuleResolution(value, artifactRuleFingerprint) {
-    if (!value) return false;
-    if (value.status === "resolved" && value.source === "agents") return true;
-    return (
-      value.status === "temporarily-confirmed-candidate" &&
-      value.source === "candidate" &&
-      isNonEmptyString(artifactRuleFingerprint) &&
-      value.confirmedRuleFingerprint === artifactRuleFingerprint
-    );
+  function isReviewableArtifactRuleResolution(value) {
+    return (value?.status === "resolved" && value.source === "agents") ||
+      (value?.status === "unresolved-candidate" && value.source === "candidate");
   }
 
   function isDeliveryUnitKey(value) {

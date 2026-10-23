@@ -18,7 +18,10 @@
 | Repair account is missing, ambiguous or not verified in this workspace | `PENDING`; no status-only payload or inferred account from USER_NAME/Git/tester. |
 | Continue Bug is already `待测试` | Plan `SKIPPED_ALREADY_WAITING_TEST`; no status or owner write and no new repair-account requirement. |
 | Story or Task in any current status | Plan `NOT_APPLICABLE_NON_BUG`; never construct or write a Bug `修复中` payload. |
-| Local and remote branch SHAs differ | `BLOCKED` with both observed SHAs. |
+| Local branch is ahead of origin on the original branch and increment has confirmed scope or an accepted baseline | `USE_EXISTING` on the exact verified local tip; preserve unpublished commits without demanding push or attributing earlier work to this item. |
+| Local-ahead increment is outside or unclear against the confirmed scope | Retain changes; return the concrete scope gap before handoff. |
+| Origin is ahead of local, or both have independent commits | `BLOCKED` with tips and relationship; no automatic synchronization or branch substitution. |
+| Ref lookup or ancestry evidence is unavailable/incomplete | `PENDING`; do not claim divergence or infer absence. |
 | Fixed project or repository mismatches actual fingerprint | `BLOCKED`; never route to a similarly named project. |
 | Several projects remain plausible | `PENDING` with the exact user choice required. |
 | Scope lacks a material requirement | `PENDING`; do not invent scope. |

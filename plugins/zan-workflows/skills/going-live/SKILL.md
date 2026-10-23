@@ -146,6 +146,13 @@ For `operation=DELIVER`, require:
 - resolved project category/service type; and
 - an explicit current-conversation request to go live.
 
+A multi-repository Bug submission retains the same per-project delivery rows.
+Match each by verified repository/origin and original fixed branch, and include
+every required repository in the go-live plan; never interpret the first row
+as completion of the Bug. Preserve each row's exact submitted test target
+(`dev` or `develop`) as delivery evidence; it is neither the go-live source nor
+the default delivery target. Single-project handoffs remain valid unchanged.
+
 Identify involved tooling packages from the submitted diff/dependency evidence,
 not only the primary project's category. Accept related `SUBMITTED` handoffs for
 package owners and affected consuming projects in the same delivery. Each

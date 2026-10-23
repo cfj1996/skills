@@ -64,10 +64,10 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
     check(panel()?.querySelector("[data-review-card]")?.getAttribute("data-card-id") === "REV-002", "round should begin with the first active card");
     check(!JSON.stringify(state()).includes("/private/evidence-source"), "initial state must recursively sanitize nested artifact locations");
     check(getComputedStyle(panel()?.querySelector("[data-review-panel]")).color !== "rgb(0, 255, 0)", "host-page important styles must not pollute panel body color");
-    check(panel()?.querySelector("[data-review-context]")?.textContent.includes("交互验收"), "header should render the review domain");
+    check(panel()?.querySelector("[data-review-context]")?.textContent.includes("第 2 轮"), "header should render the review round");
     check(panel()?.querySelector("[data-review-title]")?.textContent.includes("登录模块 功能评审"), "header should render the delivery unit review title");
     check(panel()?.querySelector("[data-review-context]")?.textContent.includes("1/3"), "header should render the card sequence");
-    check(panel()?.querySelector("[data-review-context]")?.textContent.includes("会话 3") && panel()?.querySelector("[data-review-context]")?.textContent.includes("目标 3"), "header should derive canonical session and objective counts from active cards");
+    check(panel()?.querySelector("[data-review-context]")?.textContent.includes("1/3 个模块"), "header should count current module cards");
     check(panel()?.querySelectorAll("[data-review-list-item]").length === 3, "left navigation should list every active review card");
     check(panel()?.querySelector("[data-review-list-item][aria-current='true']")?.getAttribute("data-card-index") === "0", "left navigation should mark the current card");
     check(panel()?.querySelectorAll("[data-review-status-summary] [data-review-status]").length === 5, "header should summarize all fixed review statuses");
@@ -209,9 +209,17 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
       ],
     });
     check(state()?.mode === "result", "matching result should enter result mode");
+    const resultSnapshot = globalThis.__PAGE_DELIVERY_REVIEW__.applyResult({
+      type: "CONFIRM_PLAN", planFingerprint: submission.planFingerprint,
+      artifactRuleFingerprint: submission.artifactRuleFingerprint,
+    });
+    check(resultSnapshot.mode === "result" && state()?.saveState === "unsaved", "result payloads must not select the confirmation action");
+    resultSnapshot.mode = "confirmed";
+    resultSnapshot.results[0].summary = "Changed outside runtime";
+    check(state()?.mode === "result" && state()?.results[0].summary !== "Changed outside runtime", "public result returns must be detached snapshots");
     check(panel()?.querySelectorAll("[data-review-result]").length === 1, "result mode should render exactly one result card");
     check(panel()?.querySelector("[data-review-result]")?.getAttribute("data-result-id") === "blocking", "results should begin with blocking items");
-    check(panel()?.querySelector("[data-review-context]")?.textContent.includes("结果域") && panel()?.querySelector("[data-review-context]")?.textContent.includes("1/4"), "result header should use the result domain and result sequence");
+    check(panel()?.querySelector("[data-review-context]")?.textContent.includes("第 2 轮") && panel()?.querySelector("[data-review-context]")?.textContent.includes("1/4"), "result header should use the review round and result sequence");
     check(!JSON.stringify(state()).includes("/private/result") && !panel()?.textContent.includes("/private/result"), "result state and DOM must not leak nested artifact locations");
     check(!panel()?.querySelector('[data-action="confirm-plan"]'), "only the last result card should offer plan confirmation");
     click(panel()?.querySelector('[data-action="next"]'));
@@ -240,7 +248,8 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
 
     const destroyedStorage = localStorage.getItem(storageKey);
     const destroyedState = state();
-    globalThis.__PAGE_DELIVERY_REVIEW__.destroy();
+    const oldApi = globalThis.__PAGE_DELIVERY_REVIEW__;
+    oldApi.destroy();
     pointer(document, "pointermove", 1, 1);
     pointer(document, "pointerup", 1, 1);
     window.dispatchEvent(new Event("resize"));
@@ -248,6 +257,21 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
     check(!document.querySelector("[data-review-evidence-overlay]"), "destroy should remove evidence overlays");
     check(!globalThis.__PAGE_DELIVERY_REVIEW__, "destroy should remove the temporary global API");
     check(localStorage.getItem(storageKey) === destroyedStorage && destroyedState?.mode === "result", "destroy should remove listeners so pointer and resize events cannot mutate state or storage");
+    const replacementApi = globalThis.PageDeliveryReviewPanel.mountReviewPanel({
+      ...globalThis.reviewSession, sessionId: "replacement-browser-session", deliveryUnitName: "Replacement browser session",
+    });
+    const replacementHtml = panel()?.innerHTML;
+    const replacementDraft = localStorage.getItem(storageKey);
+    for (const call of [
+      () => oldApi.applyResult({ ...submission, results: [{ id: "late-result", cardIds: submission.cards.map(card => card.id), conclusion: "已确认", summary: "Late old result", planChangeSummary: "Late old change" }] }),
+      () => oldApi.updateReviewSession({ ...globalThis.reviewSession, sessionId: "late-old-update", reviewRound: globalThis.reviewSession.reviewRound + 1 }),
+    ]) {
+      let error;
+      try { call(); } catch (caught) { error = caught; }
+      check(error?.code === "review-runtime-destroyed", "old mutation APIs must reject after replacement");
+    }
+    check(panel()?.innerHTML === replacementHtml && localStorage.getItem(storageKey) === replacementDraft && state()?.sessionId === "replacement-browser-session", "old callbacks must preserve the new visible session and draft");
+    replacementApi.destroy();
     check(trackedListeners.length > 0 && trackedListeners.every((entry) => entry.removed), "destroy should pair every runtime pointermove/pointerup/resize listener with the same removeEventListener identity");
 
     localStorage.removeItem(storageKey);
@@ -272,9 +296,8 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
       sessionId: "tainted-resolution-session",
       deliveryUnitKey: "sample/tainted-resolution",
       artifactRuleResolution: {
-        status: "temporarily-confirmed-candidate",
-        source: "candidate",
-        confirmedRuleFingerprint: globalThis.reviewSession.artifactRuleFingerprint,
+        status: "resolved",
+        source: "agents",
         absolutePath: "/secret/AGENTS.md",
         artifactPath: "/private/rule",
         unknown: "drop-me",
@@ -282,22 +305,21 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
       cards: [canonicalCard({ id: "tainted-resolution-card" })],
     };
     const taintedStorageKey = `page-delivery-review:v1:${taintedResolutionSession.deliveryUnitKey}`;
-    const canonicalTemporaryResolution = {
-      status: "temporarily-confirmed-candidate",
-      source: "candidate",
-      confirmedRuleFingerprint: globalThis.reviewSession.artifactRuleFingerprint,
+    const canonicalResolution = {
+      status: "resolved",
+      source: "agents",
     };
     globalThis.PageDeliveryReviewPanel.mountReviewPanel(taintedResolutionSession);
-    check(JSON.stringify(state()?.artifactRuleResolution) === JSON.stringify(canonicalTemporaryResolution), "state must retain only the canonical temporary confirmation fields");
+    check(JSON.stringify(state()?.artifactRuleResolution) === JSON.stringify(canonicalResolution), "state must retain only the canonical resolved rule fields");
     check(!JSON.stringify(state()).includes("/secret/AGENTS.md") && !JSON.stringify(state()).includes("/private/rule") && !JSON.stringify(state()).includes("drop-me"), "state must canonicalize artifact-rule resolution metadata");
     const taintedNote = panel()?.querySelector('[data-field="userNote"]');
     taintedNote.value = "触发安全草稿";
     taintedNote.dispatchEvent(new Event("input", { bubbles: true }));
-    check(JSON.stringify(JSON.parse(localStorage.getItem(taintedStorageKey)).artifactRuleResolution) === JSON.stringify(canonicalTemporaryResolution), "localStorage draft must retain only the canonical temporary confirmation fields");
+    check(JSON.stringify(JSON.parse(localStorage.getItem(taintedStorageKey)).artifactRuleResolution) === JSON.stringify(canonicalResolution), "localStorage draft must retain only the canonical resolved rule fields");
     check(!localStorage.getItem(taintedStorageKey).includes("/secret/AGENTS.md") && !localStorage.getItem(taintedStorageKey).includes("/private/rule") && !localStorage.getItem(taintedStorageKey).includes("drop-me"), "localStorage draft must canonicalize artifact-rule resolution metadata");
     click(panel()?.querySelector('[data-action="submit"]'));
     const taintedSubmission = globalThis.__PAGE_DELIVERY_REVIEW__.exportSubmission();
-    check(JSON.stringify(taintedSubmission.artifactRuleResolution) === JSON.stringify(canonicalTemporaryResolution), "exportSubmission must retain only the canonical temporary confirmation fields");
+    check(JSON.stringify(taintedSubmission.artifactRuleResolution) === JSON.stringify(canonicalResolution), "exportSubmission must retain only the canonical resolved rule fields");
     check(!JSON.stringify(taintedSubmission).includes("/secret/AGENTS.md") && !JSON.stringify(taintedSubmission).includes("/private/rule") && !JSON.stringify(taintedSubmission).includes("drop-me"), "exportSubmission must canonicalize artifact-rule resolution metadata");
     globalThis.__PAGE_DELIVERY_REVIEW__.destroy();
     localStorage.removeItem(taintedStorageKey);
@@ -336,72 +358,66 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
       },
       cards: [canonicalCard({ id: "unresolved-rule-card", conclusion: "阻塞" })],
     };
-    let unresolvedError = null;
-    try {
-      globalThis.PageDeliveryReviewPanel.mountReviewPanel(unresolvedSession);
-    } catch (error) {
-      unresolvedError = error;
-    }
-    check(unresolvedError?.code === "artifact-rule-confirmation-required", "unresolved artifact rules must fail before mounting review cards");
-    check(!document.querySelector("[data-page-delivery-review-host]"), "unresolved artifact rules must not mount a panel host");
+    globalThis.PageDeliveryReviewPanel.mountReviewPanel(unresolvedSession);
+    const unresolvedApi = globalThis.__PAGE_DELIVERY_REVIEW__;
+    const scopeHost = document.querySelector("[data-page-delivery-review-host]");
+    const scopeNote = panel()?.querySelector('[data-field="userNote"]');
+    scopeNote.value = "保留首次范围评审意见";
+    scopeNote.dispatchEvent(new Event("input", { bubbles: true }));
+    click(panel()?.querySelector('[data-action="submit"]'));
+    const scopeSubmission = unresolvedApi.exportSubmission();
+    check(scopeSubmission?.artifactRuleResolution.status === "unresolved-candidate", "first scope review should submit without writing an artifact rule");
+    unresolvedApi.applyResult({ ...scopeSubmission, results: [{ id: "scope", ...resultDetails(), conclusion: "已确认" }] });
+    check(state()?.mode === "result", "candidate rule should allow read-only review results");
+    check(panel()?.querySelector('[data-action="confirm-plan"]')?.disabled === true, "candidate rule must disable Plan confirmation");
+    check(panel()?.querySelector('[data-review-confirm-blocked]')?.textContent.includes("AGENTS.md"), "candidate rule should explain the remaining formal rule requirement");
+    unresolvedApi.confirmPlan({ planFingerprint: scopeSubmission.planFingerprint, artifactRuleFingerprint: scopeSubmission.artifactRuleFingerprint });
+    check(state()?.mode === "result" && state()?.saveState === "unsaved", "candidate rule cannot confirm or save a Plan");
 
-    for (const [artifactRuleResolution, expectedCode] of [
-      [{
-        status: "temporarily-confirmed-candidate",
-        source: "candidate",
-      }, "invalid-artifact-rule-resolution"],
-      [{
-        status: "temporarily-confirmed-candidate",
-        source: "candidate",
-        confirmedRuleFingerprint: "sha256:different-rule",
-      }, "artifact-rule-confirmation-required"],
-    ]) {
+    const resolvedSession = {
+      ...unresolvedSession, sessionId: "resolved-scope-session", reviewRound: 2, viewScope: "all",
+      artifactRuleResolution: { status: "resolved", source: "agents" },
+      artifactRuleFingerprint: "sha256:readback-agents-rule",
+    };
+    unresolvedApi.updateReviewSession(resolvedSession);
+    check(document.querySelector("[data-page-delivery-review-host]") === scopeHost, "resolving a rule should keep the live panel host");
+    check(state()?.cards[0].userNote === "保留首次范围评审意见", "rule resolution should preserve reviewed opinions");
+    check(state()?.mode === "input" && state()?.submissionVersion === 0 && state()?.lastSubmission === null && state()?.results.length === 0, "rule resolution must reset submission and result authority");
+    check(unresolvedApi.getPlanConfirmationRequest() === null, "rule resolution must invalidate previous confirmation requests");
+    let restoreError = null;
+    try { globalThis.PageDeliveryReviewPanel.mountReviewPanel(resolvedSession, { resumeSubmission: { ...scopeSubmission, sessionId: resolvedSession.sessionId, artifactRuleFingerprint: resolvedSession.artifactRuleFingerprint } }); }
+    catch (error) { restoreError = error; }
+    check(restoreError?.code === "invalid-submission-restore", "candidate submission cannot be restored as a formal rule submission");
+    check(state()?.sessionId === resolvedSession.sessionId, "rejected restore must preserve the current panel");
+    click(panel()?.querySelector('[data-action="submit"]'));
+    const resolvedSubmission = unresolvedApi.exportSubmission();
+    unresolvedApi.applyResult({ ...resolvedSubmission, results: [{ id: "formal", ...resultDetails(), conclusion: "已确认" }] });
+    check(panel()?.querySelector('[data-action="confirm-plan"]')?.disabled === false, "a new formal submission can offer Plan confirmation");
+    unresolvedApi.markPlanSaved({ ...scopeSubmission, savedPlanFingerprint: "sha256:old-must-not-save" });
+    check(state()?.saveState === "unsaved", "scope submission cannot become a save receipt");
+    unresolvedApi.confirmPlan({ planFingerprint: resolvedSubmission.planFingerprint, artifactRuleFingerprint: resolvedSubmission.artifactRuleFingerprint });
+    check(state()?.mode === "result" && state()?.lastError?.code === "confirmation-request-required", "formalized review still requires a fresh trusted confirmation");
+    unresolvedApi.destroy();
+
+    for (const confirmedRuleFingerprint of [undefined, "sha256:different-rule", unresolvedSession.artifactRuleFingerprint]) {
       let temporaryError = null;
       try {
         globalThis.PageDeliveryReviewPanel.mountReviewPanel({
           ...unresolvedSession,
-          artifactRuleResolution,
+          artifactRuleResolution: { status: "temporarily-confirmed-candidate", source: "candidate", confirmedRuleFingerprint },
         });
       } catch (error) {
         temporaryError = error;
       }
-      check(
-        temporaryError?.code === expectedCode,
-        "temporary candidate confirmation must reject a missing or mismatched fingerprint",
-      );
+      check(temporaryError?.code === "invalid-artifact-rule-resolution", "retired temporary rules must be rejected even with a matching fingerprint");
+      check(!document.querySelector("[data-page-delivery-review-host]"), "retired temporary rules must not mount a panel host");
     }
-
-    const temporarilyConfirmedSession = {
-      ...unresolvedSession,
-      artifactRuleResolution: {
-        status: "temporarily-confirmed-candidate",
-        source: "candidate",
-        confirmedRuleFingerprint: unresolvedSession.artifactRuleFingerprint,
-      },
-    };
-    globalThis.PageDeliveryReviewPanel.mountReviewPanel(temporarilyConfirmedSession);
-    click(panel()?.querySelector('[data-action="submit"]'));
-    const unresolvedSubmission = globalThis.__PAGE_DELIVERY_REVIEW__.exportSubmission();
-    globalThis.__PAGE_DELIVERY_REVIEW__.applyResult({
-      sessionId: unresolvedSubmission.sessionId,
-      submissionVersion: unresolvedSubmission.submissionVersion,
-      submissionId: unresolvedSubmission.submissionId,
-      planFingerprint: unresolvedSubmission.planFingerprint,
-      artifactRuleFingerprint: unresolvedSubmission.artifactRuleFingerprint,
-      results: [{ id: "unresolved-rule-result", ...resultDetails(), conclusion: "阻塞" }],
-    });
-    const unresolvedConfirm = panel()?.querySelector('[data-action="confirm-plan"]');
-    check(unresolvedConfirm?.disabled === true, "unresolved artifact rules should disable Plan confirmation");
-    check(panel()?.querySelector("[data-review-confirm-blocked]")?.textContent.includes("AGENTS.md"), "unresolved artifact rules should show a visible AGENTS gate");
-    const eventsBeforeUnresolvedClick = submittedEvents().length;
-    click(unresolvedConfirm);
-    check(submittedEvents().length === eventsBeforeUnresolvedClick, "unresolved artifact rules must not emit a Plan confirmation request");
-    globalThis.__PAGE_DELIVERY_REVIEW__.confirmPlan({
-      planFingerprint: unresolvedSubmission.planFingerprint,
-      artifactRuleFingerprint: unresolvedSubmission.artifactRuleFingerprint,
-    });
-    check(state()?.mode === "result" && state()?.lastError?.code === "confirmation-request-required", "the public API must reject confirmation without a trusted request");
-    globalThis.__PAGE_DELIVERY_REVIEW__.destroy();
+    let retiredSchemaError = null;
+    try {
+      globalThis.PageDeliveryReviewPanel.mountReviewPanel({ ...globalThis.reviewSession, schemaVersion: 1 });
+    } catch (error) { retiredSchemaError = error; }
+    check(retiredSchemaError?.code === "invalid-review-schema-version", "retired ReviewSession v1 must be rejected");
+    check(!document.querySelector("[data-page-delivery-review-host]"), "retired sessions must not mount a panel host");
 
     const frame = document.createElement("iframe");
     frame.setAttribute("data-review-evidence-frame", "");

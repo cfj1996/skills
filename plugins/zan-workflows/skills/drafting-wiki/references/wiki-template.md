@@ -74,7 +74,7 @@ target-location, Wiki-ID, TAPD-comment, writeback, merge, or release narration.
   field. Never use `reporter` as an implicit substitute; missing tester blocks.
 - `项目状态行` contains exactly one type-specific field:
   - Business: `- 是否上线：未合并` for test submission; use `已合并` only
-    after the original branch is verified in `origin/master`.
+    after the original branch is verified in the verified remote default ref (`origin/master` or `origin/main`).
     `待合并` is a valid intermediate value maintained by going-live only after
     exact original-source/default-target MR creation/reuse and open-state
     readback; it does not mean production delivery or completed merge.
@@ -94,11 +94,13 @@ target-location, Wiki-ID, TAPD-comment, writeback, merge, or release narration.
     If the channel cannot be resolved, block the final body.
   An unresolved project type blocks; never guess.
 - For `CONTINUE`, classify the current-round change before patching. If it is
-  `NON_FUNCTIONAL`, do not update the Wiki. If it is `FUNCTIONAL_IMPACT`, the
+  `NON_FUNCTIONAL` and the verified owner page already contains this repository/
+  branch entry, skip the body write and retain its exact readback. With no page
+  or current entry, prepare the normal creation/append body. If it is `FUNCTIONAL_IMPACT`, the
   new affected module/page must be appended to the matching entry's
   `影响范围` list; do not duplicate an identical existing item. A business
   entry already marked `已合并` must also return to `未合并` when this new
-  current round is not contained in `origin/master`. A tooling entry preserves
+  current round is not contained in the verified remote default ref (`origin/master` or `origin/main`). A tooling entry preserves
   its valid `当前版本` unless a newer release changes the channel under the
   verified-readback or conditional `DEPLOY` rule above.
   An existing `待合并` likewise returns to `未合并` when a new functional
@@ -135,8 +137,9 @@ Do not request a Wiki URL from the user. Resolve the target in this order:
    results under other parents are not a reason to scan the whole workspace.
 3. When the month exists, query the deterministic child title once with
    `get_wiki(name=MM-DD: 中文简述)` and locally match its returned
-   `parent_wiki_id` to the month ID. Reuse only a unique matching child whose
-   body evidences the original branch. `get_wiki` accepts `name` and `id`, but
+   `parent_wiki_id` to the month ID. A same-title child without an owner link
+   blocks: matching repository and branch do not establish TAPD ownership.
+   `get_wiki` accepts `name` and `id`, but
    not `parent_wiki_id` as a query option; never send that unsupported filter,
    paginate the unfiltered Wiki list, or repeat identical requests.
 4. If no related child exists, use title `MM-DD: {归属需求或Bug标题}`;
@@ -169,12 +172,13 @@ For `REUSE_EXISTING`, operate only on the current child body read from TAPD:
   affected module/page as the next numbered item under that entry's existing
   `影响范围` field. For a business project, the same minimal patch also changes
   `是否上线：已合并` to `是否上线：未合并` when the new current-round commits
-  are not contained in `origin/master`; an existing `未合并` is preserved. A
+  are not contained in the verified remote default ref (`origin/master` or `origin/main`); an existing `未合并` is preserved. A
   tooling project follows the `当前版本` rule above: preserve a valid value,
   update it only under the release-evidence rule above, or replace exactly one legacy
   `是否上线：无需上线` line when the release channel is evidenced. A missing
   status or any other non-current value blocks. For a `NON_FUNCTIONAL`
-  continuation, produce a policy skip and no patch.
+  continuation with this verified existing entry, produce a policy skip and no
+  patch while retaining the exact target/body readback for go-live.
 - Multiple matching entries, duplicate existing sequences,
   duplicate/conflicting status fields (including both tooling field names),
   malformed section boundaries, or an unreadable child block instead of guessing.

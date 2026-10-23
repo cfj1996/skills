@@ -52,6 +52,13 @@ function checkParameters(definitions, input) {
   if (input.jobAdapter !== 'npm-tools-v1' && (!input.refParameter || String(input.params[input.refParameter]) !== input.releaseRef)) {
     throw new Error('发布 ref 必须绑定实际 Job 参数');
   }
+  const computedPackageVersion = input.releaseKind === 'package' && input.jobAdapter === 'npm-tools-v1' &&
+    input.versionStrategy === 'PIPELINE_COMPUTED';
+  if (input.releaseKind === 'package' && !computedPackageVersion &&
+      (!input.versionParameter || input.versionStrategy === 'PIPELINE_COMPUTED' ||
+        !/^\d+\.\d+\.\d+(?:-[a-z\d.-]+)?(?:\+[a-z\d.-]+)?$/i.test(input.version))) {
+    throw new Error('包发布必须绑定实际版本参数，或使用已核实的 npm-tools 计算版本契约；源码 SHA 不能代替包版本');
+  }
   if (input.versionParameter ? String(input.params[input.versionParameter]) !== input.version : input.version !== input.expectedSha) {
     throw new Error('版本必须绑定实际 Job 参数；无版本参数时使用已确认 SHA 作为发布身份');
   }
@@ -60,7 +67,7 @@ function checkParameters(definitions, input) {
       (!input.channelParameter || !CANARY.test(channelValue) || OFFICIAL.test(channelValue))) {
     throw new Error('金丝雀包发布必须绑定明确的非正式通道参数，不能使用 latest/stable');
   }
-  if (input.releaseKind === 'package' && input.releaseChannel === 'official' && input.versionStrategy !== 'PIPELINE_COMPUTED' &&
+  if (input.releaseKind === 'package' && input.releaseChannel === 'official' && !computedPackageVersion &&
       !/^\d+\.\d+\.\d+(?:\+[a-z\d.-]+)?$/i.test(input.version)) throw new Error('正式包必须绑定稳定版本');
   if (input.releaseChannel === 'official' && input.channelParameter && CANARY.test(channelValue)) {
     throw new Error('正式发布与实际通道参数不一致');
