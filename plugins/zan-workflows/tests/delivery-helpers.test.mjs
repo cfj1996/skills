@@ -44,6 +44,7 @@ function mergeFake({ existing = false, pipeline = ['success'], approvals = [], o
     throw new Error(name);
   };
   return { call, calls, io: { ...clock(), checkRepository: async () => {},
+    inspectContainment: async () => ({ contained: false, targetSha }),
     containsSource: async () => ({ contained, targetSha: otherSha }) } };
 }
 

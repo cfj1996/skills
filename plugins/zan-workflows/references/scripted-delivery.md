@@ -72,6 +72,22 @@ confirmation (`confirmed=true`). Test-delivery targets are the verified
 `develop|dev`; default-delivery targets `master|main` must both match the
 project's actual default branch during preview and again before merging.
 A default-branch change invalidates the plan even when its old ref has not moved.
+For test targets only, an AUTO/MANUAL call with no open MR first checks whether
+the reviewed source is already contained in the current target. Equal live
+tips or fetched ancestry return `state=VERIFIED`,
+`operation=VERIFY_CONTAINMENT_ONLY`, `containment=true` and writes=0, without
+creating an MR, waiting for CI or claiming an MR merge. `deliveredSha` and
+`observedTargetSha` are the verified test-target tip. An unavailable check or
+changed target blocks before writing; an evidenced non-containing target may
+continue the already-authorized ordinary MR path.
+
+When the checklist disables merging or the developer already delivered the
+change, call `mergeMode=CONTAINMENT_ONLY` with `execute=false`, the exact reviewed
+source SHA and dev/develop target. It needs only project/target read tools and
+never falls through to an MR write if containment is absent. It can verify
+the immutable source even if its remote branch is gone. It is a Git delivery
+receipt for test submission, not default-branch MR/cleanup evidence, and does
+not clear an outstanding exact-MR manual handoff in a workflow session.
 Source remains the original
 `feature/*|fixbug/*`; conflict branches use the shared
 [A → C → B flow](conflict-merge.md), reusing the main checklist's conditional

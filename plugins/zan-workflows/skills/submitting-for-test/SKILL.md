@@ -1,6 +1,6 @@
 ---
 name: submitting-for-test
-description: Use when a reviewed TAPD change must be delivered to its verified test branch (dev or develop), optionally deployed to the test environment, documented when required, and then marked for test.
+description: Use for 直接提测 after implementation or developer inspection; verify the existing change, deliver it to the verified dev/develop branch, run selected test builds and Wiki updates, and register TAPD without repeating implementation.
 ---
 
 # Submit for Test
@@ -63,6 +63,36 @@ history do not need another read. Batch independent read-only checks, then
 stop on the first actual mismatch. Never rerun the full Wiki discovery after
 the exact target was identified in `PLAN`.
 
+## Direct submission after developer inspection
+
+Use [直接提测](references/direct-submission.md) when the user asks “直接提测”,
+“代码确认了，提测” or returns after IMPLEMENT to request delivery. It is also the
+standalone entry for existing reviewed work. “直接提测” selects delivery, not SKIP;
+only an explicit “不构建/跳过发布/不发测试环境” disables the build. Re-resolve this
+new delivery request instead of inheriting a previous IMPLEMENT endpoint.
+
+Reuse the original definition(s), branches and still-current `ReviewedChange`.
+Refresh refs, current diff and pending commits before PLAN. If the developer
+changed content after review, verify the affected delta and refresh independent
+`POST_CHANGE_REVIEW` evidence before treating it as REVIEWED. Never manufacture
+review evidence from human inspection or rerun implementation/Task/Plan/branch
+creation solely to deliver. Missing trustworthy handoffs need scoped read-only
+reconstruction; unresolved evidence blocks, not invented READY/REVIEWED flags.
+Direct submission does not authorize business-source edits or Bug reactivation.
+For a Bug whose completion record became stale, follow the record-only refresh
+in [direct-submission.md](references/direct-submission.md#人工改动后的-bug-完成记录):
+review the corrected proposed body with the current diff. PLAN may preview the
+record correction and delivery after current code checks/review pass; do not
+claim a complete REVIEWED handoff yet. Confirm that exact comment action/body
+with the same delivery checklist, then append/reuse and read it back before
+any delivery write. Refresh the existing ReviewedChange only after the record
+gate passes; failed/unknown comments block all later writes without replay.
+
+For standalone use, show the direct-submission 确定清单 with actual change/review
+facts, 合并与测试环境 and the requested complete Wiki body/patch, then obtain its
+one matching confirmation before EXECUTE. Implementation-only approval never
+authorizes delivery. Main-entry matching complete authority is reused unchanged.
+
 ## Shared Wiki ownership
 
 Follow [shared-test-wiki.md](../../references/shared-test-wiki.md). One Story
@@ -81,6 +111,15 @@ Require:
 - exact repository fingerprint and original fixed repair branch;
 - one explicit profile `STANDARD|NO_WIKI`; and
 - `deployment_mode=AUTO|DEPLOY|SKIP`.
+
+The sole PLAN-only exception is the direct Bug record-only correction above:
+current code verification/independent review and the proposed corrected record
+must already pass, with exact repository/branch/scope and historical evidence.
+Its missing completion readback remains explicit. At EXECUTE, perform only the
+confirmed record action first, obtain its readback, and then require all normal
+READY_FOR_HANDOFF/REVIEWED gates before any commit/push/MR, build, Wiki or final
+registration. Missing code review, required repositories, history or acceptance
+is not this exception and still blocks PLAN.
 
 For `EXECUTE`, also require one `PlannedTestSubmission` with
 `terminal_state=AWAITING_CONFIRMATION` and authorization covering its exact
@@ -108,6 +147,9 @@ Require the same Bug identity, every
 necessary repository, per-repository review evidence, cross-repository
 acceptance and the shared completion-record readback. Missing or mismatched
 required rows return `BLOCKED`; do not silently submit a partial Bug.
+Only the explicitly scoped record-only PLAN exception may defer the corrected
+completion readback; it never defers repository coverage, code review or
+cross-repository acceptance, and EXECUTE must restore the record gate first.
 
 Each source is the original `feature/*` or `fixbug/*` branch. Reuse its
 upstream verified and confirmed test target (`dev` or `develop`). For a
@@ -161,7 +203,15 @@ requires a refreshed confirmation. Never rebuild on the test target or use
    boundary. A changed technical binding stops the stale write and requires a
    fresh accurate plan; compare it to the original authority. Only missing or
    materially changed scope needs user confirmation, not deterministic receipts.
-6. For each repository, before its first Git write, validate one `GIT_DELIVERY_BUNDLE` with the
+6. For each repository, if already delivered or merge is explicitly disabled,
+   first ensure every reviewed change is committed in the bound source SHA,
+   with no uncommitted delivery delta. Run merge read-only in `CONTAINMENT_ONLY`
+   with that SHA and exact dev/develop target; require `VERIFIED`,
+   `operation=VERIFY_CONTAINMENT_ONLY`, containment and zero writes. Use its
+   delivered target revision without requiring an MR or claiming a merge.
+   Uncommitted, missing or unknown containment blocks before any commit/push;
+   never fall through to an unapproved write. Otherwise, before its first Git
+   write, validate one `GIT_DELIVERY_BUNDLE` with the
    private [submission-validator.md](agents/submission-validator.md) using
    `PRE_GIT_WRITE`. Bind the complete reviewed diff/file list, repository,
    original branch, target refs, commit/push/MR actions and purpose once.

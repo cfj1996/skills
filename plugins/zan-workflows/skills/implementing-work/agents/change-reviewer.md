@@ -76,9 +76,22 @@ contract and its blockers remain binding. Check in order:
    the last modifier or current repairer. Unknown history stays explicit;
    an absent related requirement is omitted, and there are no project sections.
    Actual repair/verification statements must match the reviewed change.
+   Check that the proposed comment uses HTML paragraphs with bold title/field
+   labels and lists for long repair/verification details; plain newlines inside
+   one paragraph or unrendered Markdown do not provide TAPD comment formatting.
    The completion comment is written/read back after this review passes;
    do not require that future readback as a prerequisite for the review itself.
    Story/Task has no repair-record obligation.
+
+For direct-submission record-only correction after developer edits, inspect the
+current full diff/verification and proposed corrected completion body under
+[direct submission](../../submitting-for-test/references/direct-submission.md#人工改动后的-bug-完成记录).
+Verified original records establish historical facts; a valid prior completion
+may support comment-only recovery without a retroactive start comment or Bug
+reactivation. Do not demand the future corrected-comment readback before this
+review. A pass covers code and proposed record only: it cannot establish a full
+Bug REVIEWED handoff until the authorized comment is written/reused and read
+back. Reject stale claims, missing historical evidence or incomplete repositories.
 
 When implementation used subagents, require a stable reviewed diff with related
 writers stopped. Verify actual task/path ownership and that local checks cover

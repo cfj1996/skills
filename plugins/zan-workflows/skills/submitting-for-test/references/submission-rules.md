@@ -50,7 +50,15 @@ confirmation. Both existing names without a selected target are an unresolved ga
 reviewed change. Never rebuild on the test target, substitute `merge/*`, or include
 unreviewed paths.
 
-When uncommitted, the exact reviewed diff/file list is the commit payload in
+When delivery is already present, or merging is explicitly disabled, run the
+merge helper read-only with `mergeMode=CONTAINMENT_ONLY`, exact reviewed source
+SHA and actual dev/develop target. Require its `VERIFIED`/
+`VERIFY_CONTAINMENT_ONLY` receipt, containment and zero writes; no MR is needed
+and no new merge may be claimed. Use its verified target `deliveredSha` for
+testing. All reviewed delivery changes must already be committed in the bound
+source SHA; pending uncommitted delivery changes or missing/unknown containment
+block before any commit/push, without silently enabling merge.
+For an ordinary authorized merge, when uncommitted, the exact reviewed diff/file list is the commit payload in
 the displayed bundle. Commit/push only that payload with local Git, reuse the
 derived SHA, then invoke `merge-reviewed-branch.mjs` once with the confirmed
 source/target facts. Do not redisplay/revalidate push, MR and merge merely

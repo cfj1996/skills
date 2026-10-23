@@ -25,7 +25,27 @@ complete `SubmissionPlan` (visible for standalone confirmation or material chang
 | Validation | mapped results for each pre-write operation and final post-write validation |
 | Terminal | `SUBMITTED|BLOCKED` and blocker when applicable |
 
+## Direct-submission continuation
+
+Apply [direct-submission.md](direct-submission.md) for independently requested
+existing-change delivery. Reuse original scope/branches and still-current
+verification/review; refresh invalidated checks and independent review after
+human edits. A previous IMPLEMENT endpoint is not this new request's deployment
+choice or delivery authority. “直接提测” does not imply SKIP. Show the actual
+standalone delivery checklist and obtain its matching confirmation before writes;
+never rerun business implementation or invent a missing READY/REVIEWED handoff.
+
 ## Invariants
+
+- Direct Bug record-only refresh follows `direct-submission.md`: when manual
+  edits invalidate the old completion record, PLAN may carry a reviewed
+  corrected body after all current code/repository/acceptance checks pass.
+  This is a read-only preview, not a complete REVIEWED handoff. The same exact
+  checklist confirms the Bug/account/body and append/reuse action; at EXECUTE
+  write/reuse and read back that one record first, then refresh every matching
+  ReviewedChange before any delivery write. Other missing evidence still blocks.
+  A valid current record is reused. Failure blocks delivery without repeating
+  code work, status activation, start comments or unknown comment writes.
 
 - Explicit checklist choices are preserved. Without overrides, selected test
   delivery defaults to merge plus `STANDARD` and `DEPLOY`, including `AUTO`;
@@ -78,6 +98,12 @@ complete `SubmissionPlan` (visible for standalone confirmation or material chang
 - The Git sequence is commit when needed, push when needed, MR create/update,
   then MR merge. Include every step in the displayed validated bundle, perform
   its fresh bound checks, execute and read back before the next.
+  For a test target already containing the reviewed source, a merge helper
+  `VERIFIED`/`VERIFY_CONTAINMENT_ONLY` receipt with exact refs/SHA, containment
+  and writes=0 satisfies Git delivery without an MR or merge readback. A
+  disabled merge uses read-only `CONTAINMENT_ONLY`; missing/unknown containment
+  blocks, never authorizes a merge. Bind its actual target `deliveredSha` for
+  testing and do not use this receipt as a master MR/cleanup proof.
 - A conflict covered by the confirmed main execution checklist, or its own
   standalone ACB confirmation, uses the shared
   [A → C → B flow](../../../references/conflict-merge.md). A remains the

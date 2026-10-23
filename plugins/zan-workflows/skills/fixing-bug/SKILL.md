@@ -33,7 +33,13 @@ Preferred lead model profile: `CRITICAL`。可选模型时使用
 只在选择提测或上线时解析 `submission_profile=AUTO|STANDARD|NO_WIKI` 和
 `deployment_mode=AUTO|DEPLOY|SKIP`。明确需要提测 Wiki（会创建/更新）或未关闭时选 `STANDARD`；
 明确不需要提测 Wiki 选 `NO_WIKI`。`AUTO` 默认 Wiki 需要、测试构建/部署 `DEPLOY`，
-仍有效的明确选择优先；明确直接提测/跳过发布选 `SKIP`，不另弹 Wiki 选择题。
+仍有效的明确选择优先；明确不构建/跳过发布选 `SKIP`，不另弹 Wiki 选择题。
+“直接提测”是交付入口，不隐含 SKIP。默认清单显示“直接提测：是”；
+“先完成代码，我检查后再提测”“先不要提交/推送”“暂不直接提测”选 IMPLEMENT，
+显示“直接提测：否”，本轮不提交/推送/合并、不写提测 Wiki、不构建、不登记待测试。
+实施必需的修复状态及开始/完成记录仍按原授权执行。人工检查后用
+`$submitting-for-test` 按 [直接提测流程](../submitting-for-test/references/direct-submission.md)
+核实原成果与人工改动、补受影响验证/独立评审，确认交付清单后再交付，不重新修复。
 其余默认和实际交付门禁由 `submitting-for-test` 负责。
 不向用户索要 Wiki URL：该能力负责定位或创建 Wiki；缺少用户提供的
 Wiki 链接不能进入“待决事项”。只修复时不解析、不询问 Wiki/Jenkins 设置。

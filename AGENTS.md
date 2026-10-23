@@ -27,6 +27,18 @@ The `npx` command fetches TAPD data for workflow execution. Run Git commands fro
 The registration checks also cover waiting-test owner selection (`te` before
 `reporter`), assignment drift and partial owner readback, without real TAPD writes.
 
+For default direct submission, the implementation-only developer-inspection stop,
+manual-edit review refresh and standalone delivery confirmation, run
+`python3 -m unittest discover -s plugins/zan-workflows/tests -p 'test_direct_submission_flow.py'`.
+These checks inspect workflow contracts without external writes.
+
+For already-delivered test-target containment, disabled-merge read-only delivery,
+stale/missing evidence and workflow-session continuation, run
+`node --test plugins/zan-workflows/tests/test-merge-containment.test.mjs`.
+It uses simulated APIs and disposable local Git repositories/bare remotes,
+without company remote calls or MR writes. The direct-submission Python checks
+also cover Bug completion-record refresh before delivery.
+
 For the mounted review panel's public API authorization and destroyed-session
 isolation, run `node --test plugins/zan-workflows/skills/writing-plans/tests/review-panel-public-api.test.mjs`.
 The full Writing Plans suite includes these tests. For the trusted-click browser

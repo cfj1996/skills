@@ -41,7 +41,9 @@ function fixture({ existing = true, canMerge, denied, override, targetBranch = '
     }
     throw new Error('Unexpected tool ' + name);
   };
-  const io = { checkRepository: async () => {}, containsSource: async plan => {
+  const io = { checkRepository: async () => {},
+    inspectContainment: async () => ({ contained: false, targetSha: state.targetSha }),
+    containsSource: async plan => {
     assert.equal(plan.sourceSha, sourceSha);
     state.proofCalls++;
     return { contained: state.contained, targetSha: advancedSha };

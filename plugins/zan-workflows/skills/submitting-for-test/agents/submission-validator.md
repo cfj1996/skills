@@ -82,6 +82,13 @@ MR writes use `gitlab-mcp`. Derived commit/MR/merge IDs do not require another
 Agent validation or confirmation. Require deterministic bound checks and
 readbacks at each write, fresh source/target SHA and actual approval checks
 before merge, no auto-delete/squash/rebase, and final source containment.
+For an already-delivered test target or explicitly disabled merge, accept
+`CONTAINMENT_ONLY` with the reviewed source SHA and actual dev/develop target.
+Require `VERIFIED`, `operation=VERIFY_CONTAINMENT_ONLY`, exact ref/target revision,
+`containment=true` and writes=0; it needs no MR IID or merge readback and must
+not claim a new merge. Missing containment blocks later delivery without
+falling back to MR creation. It cannot replace an outstanding exact-MR manual
+handoff, default-branch merge evidence or cleanup permission.
 Do not require future readbacks before execution. Individual-operation modes
 remain for a genuine standalone action; do not expand a bundle back into four
 private reviewer calls or review every CI poll.

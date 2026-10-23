@@ -26,8 +26,13 @@ clear:
 | Mode | Trigger | Result requirement |
 | --- | --- | --- |
 | `DEPLOY` | “发布测试环境”“发布版本”“部署并提测” or a named project policy requiring deployment | Jenkins must accept the exact confirmed test build; continue on `BUILD_SUBMITTED` without waiting |
-| `SKIP` | “直接提测”“跳过发布”“不发测试环境” | No build/deploy/parameter/poll calls; allow only missing canonical Wiki Job metadata lookup; record `SKIPPED_BY_INTENT` |
+| `SKIP` | “不构建”“跳过发布”“不发测试环境” | No build/deploy/parameter/poll calls; allow only missing canonical Wiki Job metadata lookup; record `SKIPPED_BY_INTENT` |
 | `AUTO` | No explicit override within selected test delivery | Select `DEPLOY`; preserve an explicit `SKIP` or overall non-delivery scope |
+
+“直接提测” follows [direct-submission.md](direct-submission.md): it starts
+existing-change delivery with the normal DEPLOY default, and never implies SKIP.
+Explicit “直接提测，不构建” preserves SKIP. A prior IMPLEMENT endpoint does not
+silently disable this newly requested delivery.
 
 Never silently downgrade an explicit `DEPLOY` request. If the user changes from
 `DEPLOY` to `SKIP` before Jenkins is triggered, update the choice and show the
