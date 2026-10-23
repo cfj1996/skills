@@ -44,6 +44,11 @@ is called 执行清单. The overview lists all actual execution projects, item,
 links and goal. Merge/deployment choices are per project; the Story/Bug has
 one Wiki choice and a shared multi-project template. Material changes return
 to a complete 确定清单, preserving already-completed effects.
+For selected TAPD Tasks, place a three-column `序号 | 标题 | 工时` table before
+执行内容. Link real Tasks from their titles; subsequent checklist references
+use stable `#F01`/`#F02` display indexes, distinct from detail `#01` and model
+feature IDs. Preserve actual Task key/ID and Plan-step bindings internally;
+the display indexes neither alter the model nor require new Tasks/estimates.
 The checklist summarizes the same Plan content; it does not create a second
 detail artifact. Long scope/approach/acceptance/decision cells use “详见下方 #01”
 with a useful summary. Below the table, use only `### #01`, `### #02` headings,

@@ -1,7 +1,7 @@
 interface:
   display_name: "zan:需求开发"
   short_description: "从 TAPD 需求定位项目、绑定分支并可选实施、提测和上线"
-  default_prompt: "使用 $developing-requirement 开发这个 TAPD Story 或选定 Task，按实际需要准备任务和 Plan；先展示支持多项目的六列确定清单，确认后按执行清单开发、验证及独立评审，合并测试分支、构建和 Wiki 默认都需要，确认前先预览模板。"
+  default_prompt: "使用 $developing-requirement 开发这个 TAPD Story 或选定 Task；先在执行内容前用序号、标题、工时列出本轮任务，后文用 #F01 关联，再展示支持多项目的六列确定清单。确认后按执行清单实施；合并测试分支、构建和 Wiki 默认都需要，确认前先预览模板。"
 
 policy:
   allow_implicit_invocation: true
