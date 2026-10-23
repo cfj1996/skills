@@ -1,6 +1,6 @@
 {
   "name": "zan-workflows",
-  "version": "0.4.2+codex.20261023-tapd003",
+  "version": "0.4.3+codex.20261023-task-mcp",
   "description": "TAPD Bug repair and requirement development with scoped plans, task links, verified implementation and explicit delivery.",
   "author": {
     "name": "Local developer"
@@ -21,7 +21,7 @@
     ],
     "defaultPrompt": [
       "Use $fixing-bug for TAPD Bugs and $developing-requirement for Story/Task development. Load each capability only at its stage.",
-      "Prepare a concise scope, implementation and verification brief. Use formal Task/Plan capabilities only when actually needed or explicitly requested, preserving existing task readbacks and confirmed scope.",
+      "Prepare a concise scope, implementation and verification brief. Use formal Task/Plan capabilities only when actually needed or explicitly requested, preserving existing task readbacks and confirmed scope. Route approved Task creation through breaking-down-requirement to TAPD MCP create_task/create_tasks; checklists and Plans consume the same verified result.",
       "Before initial writes, show 确定清单 with multi-project overview, a selected TAPD Task table (序号/标题/工时) before 执行内容, six columns, indexed notes and concrete writes. Link real Tasks in titles and use stable #F01 task references later; detail #01 and real Task/Plan identities stay separate. Ordinary repair/development defaults to test-branch merge, test build/deploy and shared Wiki, subject to explicit overrides and confirmation. Preview Wiki before confirmation. Approved content becomes 执行清单; material changes re-display the complete 确定清单. Preserve completed effects.",
       "Use the original fixed branch for continued work. Bug implementation includes verified repair ownership and start/completion records. Requirement implementation covers only selected Tasks and their acceptance.",
       "Complete relevant verification and independent final review before default test delivery. Explicit implementation-only requests stop at REVIEWED. Merge/build means the verified dev/develop target and project test environment, subject to the exact delivery plan; go-live requires an explicit request.",

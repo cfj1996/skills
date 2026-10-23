@@ -91,11 +91,11 @@ node <skill-dir>/scripts/validate-task-breakdown.js
    单位、精度及其它必填字段；先查自定义字段配置再用字段名。预计工时与实际
    工时是不同字段，不能把工时仅写进描述或伪造字段配置。日单位只有实际
    工作日小时数已核实并展示换算时才可适配；规范化清单仍以小时计。
-3. 按清单实际动作核实任务创建/更新、精确读取和成员校验能力；仅 REUSE
-   不要求创建/更新能力，只读草稿也不以写能力为前提。MCP 缺少创建工具时
-   按共享路由检查已批准的官方 API/受控 CLI 及真实参数；不能拿更新工具冒充
-   创建、猜测工具名/参数，或静默浏览器写入。能力不足返回
-   `BLOCKED_TASK_WRITE_CAPABILITY`，仍可保留只读草稿。
+3. 按共享 [TAPD 任务创建路由](../../references/tool-routing.md#tapd-任务创建)
+   核实 `create_task`/`create_tasks`、准确更新/读取及成员校验能力。仅 REUSE
+   不要求创建/更新能力，只读草稿也不以写能力为前提。新增方法缺失时先核对
+   版本与连接；仍不可用或不支持必填字段时返回 `BLOCKED_TASK_WRITE_CAPABILITY`，
+   保留只读草稿，不在本流程改走其它创建路径。
 4. 根据范围与工作量形成 `CREATE|REUSE|UPDATE` 清单。已有任务符合已确认
    范围、人员、工时和关联时 REUSE；需修改时展示旧/新值；歧义需先解决。
    移除范围只列“取消建议”，本技能不删除、关闭或覆盖已有任务。
@@ -124,26 +124,23 @@ CREATE/UPDATE 的确认必须绑定未变化的清单指纹。范围、人员、
 拟写入内容变化时，展示差异并重新确认。只读刷新 Story、字段、成员和已有
 Task；被他人改动或出现相同关联标记时停止，先核对，不直接覆盖/重复创建。
 
-TAPD MCP 0.0.3 的创建优先使用实际暴露的 `create_task(workspace_id, name, options)`
-或 `create_tasks(workspace_id, tasks, story_id, options)`。单项用前者并在 options
-中传准确 story_id；同空间、同父需求且依赖顺序连续的 CREATE 可用后者，每批
-最多 50 项，公共 story_id 绑定准确父需求。仅发送已确认的任务字段；人员、
-工时、父需求按核实的字段映射传输（标准字段为 owner、effort、story_id），
-不把内部 proposal/estimate、阅读序号或 entity_type 塞入任务参数。不支持的
-必填字段沿用已验证的创建能力，不丢字段或以 UPDATE 冒充 CREATE。
-REUSE 不调用创建，UPDATE 仍更新准确现有 ID，不混进创建批次。不为快速创建
-额外设置未获准的状态、进度或日期。
+CREATE 按上述共享路由调用 `create_task` 或 `create_tasks`，参数绑定已确认
+payload；UPDATE 使用准确现有 ID 的 `update_story_or_task`，REUSE 只读。
+读回使用 `get_stories_or_tasks`。创建结果仍进入原 `TaskBreakdownResult`，
+不新增另一份任务结果或台账。
 
-批量调用不是事务。按返回的 index 与原清单顺序绑定稳定 key 和实际 ID；
+批量调用不是事务。按返回的 index 在本批发送列表中绑定稳定 key 和实际 ID；
 逐项检查 state、id、task 与全部获准字段，尤其 description 中的范围和完整
 关联标记，工具自带成功标记不能替代这些比对。遇到 partial、failed、unknown
 或 skipped 时保留已有 ID、已成功及未执行项，停止后续批次和其它写入，按下述
 恢复流程核对，不能重放整批或把已有 ID 的任务再次创建。
 
-按依赖顺序逐项执行，只写该项获准的字段；每次立即通过准确 ID 读取并核对
-父 Story、人员、预计工时、标题、描述/稳定标记及其它获准字段。REUSE 同样
-需要准确读回。各项实际 ID 与结果绑定在内存 `TaskBreakdownResult`。
-任一失败、读回不符或结果不明即停止后续写入，返回已成功项、失败/未知项
+按依赖顺序执行，只写各项获准字段；单项或每批返回后立即核对准确 ID 的
+实际读回，包括父 Story、人员、预计工时、标题、描述/稳定标记及其它获准字段。
+工具读回未包含所需字段时按准确 ID 补读，REUSE 同样需要准确读回。
+各项实际 ID 与结果绑定在内存 `TaskBreakdownResult`。批量返回后发现额外
+字段不符时，按真实结果核对整批，不能假定其它项尚未创建。
+任一失败、读回不符或结果不明即停止后续调用，返回已成功项、失败/未知项
 与 `PARTIAL|BLOCKED`；不自动重试创建、不撤销成功项。恢复时完整查询关联
 标记并核实唯一匹配；未能证明失败写入未生效前不得再创建。确需重试时
 展示剩余清单和恢复证据并确认，不重放已成功项。

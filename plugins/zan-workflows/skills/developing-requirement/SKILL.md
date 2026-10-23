@@ -54,6 +54,8 @@ Bug 使用 `zan-workflows:fixing-bug`。
 需要任务准备时，调用 `zan-workflows:breaking-down-requirement phase=PLAN`，
 并传 `confirmation_mode=DEFER_TO_ORCHESTRATOR`。核实新建/复用/更新、负责人、
 最终预估工时、范围、依赖和验收。Task 输入只检查或调整所选 Task。
+任务创建路线固定指向共享 [TAPD MCP 方法](../../references/tool-routing.md#tapd-任务创建)：
+单个 `create_task`、同需求批量 `create_tasks`，统一交任务模块执行，本入口不另建创建路径。
 保留完整写入内容、旧/新差异和 proposal fingerprint；不展示内部工时算法。
 需要正式 Plan 时先准备拟写正文/差异与准确目标，保留稳定任务 key。
 任务未创建只显示提案，不伪造 ID 或 TASKS_READY。
@@ -105,7 +107,7 @@ Task/Plan 内容合并确认，不另问一轮范围或分支；任务写入须�
 人员或实际写入改变时先展示差异，不能继续沿用过期授权。
 
 需要正式任务/Plan 的实施，先调用 `breaking-down-requirement phase=EXECUTE`
-执行已确认任务操作；REUSE 只准确读回，不重写描述。要求所选任务全部
+通过上述 MCP 方法执行已确认任务操作；REUSE 只准确读回，不重写描述。要求所选任务全部
 `TaskBreakdownResult.terminal_state=TASKS_READY`。失败/不明或部分写入保留
 已成功 ID，核查原记录后补缺，禁止直接重试创建。任务创建不改变原分支身份。
 PLAN_ONLY 只有 Task 写入也已明确获准时才执行，未授权则保留任务提案。

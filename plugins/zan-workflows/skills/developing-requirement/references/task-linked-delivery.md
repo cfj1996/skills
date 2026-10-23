@@ -19,6 +19,9 @@
 稳定任务 key 与真实 Task ID 通过现有 `TaskBreakdownResult.records` 对应；
 正式 Plan 继续使用 `taskBreakdown` 和每步 `tapdTaskKey`。不新增
 `taskBindings`、状态 schema、JSON 台账或 Task 专属文件。
+新建任务统一消费 `breaking-down-requirement` 通过
+[TAPD MCP 创建方法](../../../references/tool-routing.md#tapd-任务创建) 返回的结果；
+上方任务表、后续清单和 Plan 都引用同一批事实，不各自生成或创建任务。
 
 ## 任务表与清单中的呈现
 

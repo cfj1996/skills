@@ -18,6 +18,9 @@
 
 - 小改动使用简短执行说明；确需正式 Plan、任务创建/更新、多人协作或已有
   正式计划时，才进入对应 Task/Plan 能力。见[准备与验证规则](references/adaptive-workflow.md)。
+- 任务创建统一交 `breaking-down-requirement`，确认后调用 TAPD MCP 的
+  `create_task`（单个）或 `create_tasks`（同需求批量）；开发清单与 Plan 复用
+  同一任务结果。参数与能力检查见[任务创建路由](references/tool-routing.md#tapd-任务创建)。
 - 先查证、后提问，复用同一份事实；进入写阶段只刷新会变化的事实。
 - 确认后由 `implementing-work` 统一开发：小任务直接执行，独立步骤按
   [多任务实施](skills/implementing-work/references/parallel-execution.md) 分批并行，

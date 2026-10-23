@@ -258,6 +258,9 @@ in-app Browser 打开；本地文件才启动临时 loopback 服务。使用运�
 TAPD 需求交接复用 `breaking-down-requirement` 的
 [任务与 Plan 契约](../breaking-down-requirement/references/contracts.md)。
 `SCOPE_REVIEW` 只输出稳定模块/功能编号和拆分依据，不创建任务。
+需要新建任务时交给该模块确认并执行，工具统一指向共享
+[TAPD 任务创建路由](../../references/tool-routing.md#tapd-任务创建) 的
+`create_task`/`create_tasks`；本技能只消费其结果，不直接创建或补建任务。
 `PLAN_WRITE` 内部接收 `TaskBreakdownResult`：每个 Task 有真实 ID、经核实人员、
 内部估算数据、最终预计工时、依赖及验收，并经过准确读回。对话、确认和
 Plan 正文只展示最终预估工时，不展示计算系数、原始值、公式或折算前后对比。
