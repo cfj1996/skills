@@ -14,7 +14,7 @@
 
 | 系统 | 首选能力 | 典型操作 |
 | --- | --- | --- |
-| TAPD / TAPD Wiki | `tapd-mcp` | Bug/Story/Task 读取、评论、状态、测试版本、Wiki 查询与写入 |
+| TAPD / TAPD Wiki | `tapd-mcp` | Bug/Story/Task 读取、任务创建/更新、评论、状态、测试版本、Wiki 查询与写入 |
 | GitLab | `gitlab-mcp` | 项目、MR、diff、冲突、pipeline、审批、创建/更新/合并 MR |
 | Jenkins | `jenkins-mcp` | Job 查询、参数读取、触发构建、队列/构建跟踪、结果与日志读取 |
 | YApi | `yapi-mcp` | 项目、分类、接口、请求/响应字段及契约事实查询 |

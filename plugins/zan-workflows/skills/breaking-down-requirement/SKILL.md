@@ -124,6 +124,22 @@ CREATE/UPDATE 的确认必须绑定未变化的清单指纹。范围、人员、
 拟写入内容变化时，展示差异并重新确认。只读刷新 Story、字段、成员和已有
 Task；被他人改动或出现相同关联标记时停止，先核对，不直接覆盖/重复创建。
 
+TAPD MCP 0.0.3 的创建优先使用实际暴露的 `create_task(workspace_id, name, options)`
+或 `create_tasks(workspace_id, tasks, story_id, options)`。单项用前者并在 options
+中传准确 story_id；同空间、同父需求且依赖顺序连续的 CREATE 可用后者，每批
+最多 50 项，公共 story_id 绑定准确父需求。仅发送已确认的任务字段；人员、
+工时、父需求按核实的字段映射传输（标准字段为 owner、effort、story_id），
+不把内部 proposal/estimate、阅读序号或 entity_type 塞入任务参数。不支持的
+必填字段沿用已验证的创建能力，不丢字段或以 UPDATE 冒充 CREATE。
+REUSE 不调用创建，UPDATE 仍更新准确现有 ID，不混进创建批次。不为快速创建
+额外设置未获准的状态、进度或日期。
+
+批量调用不是事务。按返回的 index 与原清单顺序绑定稳定 key 和实际 ID；
+逐项检查 state、id、task 与全部获准字段，尤其 description 中的范围和完整
+关联标记，工具自带成功标记不能替代这些比对。遇到 partial、failed、unknown
+或 skipped 时保留已有 ID、已成功及未执行项，停止后续批次和其它写入，按下述
+恢复流程核对，不能重放整批或把已有 ID 的任务再次创建。
+
 按依赖顺序逐项执行，只写该项获准的字段；每次立即通过准确 ID 读取并核对
 父 Story、人员、预计工时、标题、描述/稳定标记及其它获准字段。REUSE 同样
 需要准确读回。各项实际 ID 与结果绑定在内存 `TaskBreakdownResult`。
