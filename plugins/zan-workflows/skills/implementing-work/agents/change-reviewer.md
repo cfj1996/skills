@@ -14,9 +14,15 @@ authorization.
 
 For `PRE_STATUS_WRITE`, inspect only the approved definition, verified
 repository/branch facts, exact TAPD target/current state/planned active state,
-displayed payload/purpose, and current explicit authorization. Require all to
+displayed concrete changes/purpose, internal payload, and current explicit authorization. Require all to
 match and require no future write/readback evidence. Reject a missing or
 different target, payload, purpose, or authorization.
+
+The user-facing preview may express the exact state/account changes in Chinese
+without printing raw payload keys, status codes or full SHA. Require that preview
+to map unambiguously to the internal verified payload/base. A verified identical
+account differing only in separators/whitespace may be shown as “保持不变”;
+do not reject correct authorization solely for omitting internal wire format.
 
 For Bug `WRITE_ACTIVE`, reject a status-only payload. Require the exact
 `status`+`current_owner` payload, old status/owner, one repair account with
@@ -35,12 +41,9 @@ For `POST_CHANGE_REVIEW`, inspect the supplied approved scope, current
 requirement/acceptance references and confirmed amendments, repository/branch
 facts, starting baseline, exact final diff, TAPD status readback, and
 verification results and gaps, plus the applicable Plan, implementation brief
-or Bug investigation summary, resolved workflow profile and independent
-verification risk. Missing
-profile uses legacy `STANDARD`. A valid `QUICK` brief is sufficient planning
-input without manufactured Task/Plan/estimate/schedule artifacts; an existing
-formal contract and its blockers remain binding. Every profile requires this
-independent review. Check in order:
+or Bug investigation summary and concrete verification risks. A brief is sufficient
+without manufactured Task/Plan/estimate/schedule artifacts; an existing formal
+contract and its blockers remain binding. Check in order:
 
 1. Actual repository path, Git root, origin, and current branch match the
    prepared fixed target.
@@ -64,9 +67,46 @@ independent review. Check in order:
    reused where appropriate, and tests observe behavior rather than copying
    implementation details. Keep this check distinct from requirement coverage;
    one reviewer may cover both. Avoid unrelated redesign suggestions.
-9. Verification depth matches risk independently of preparation profile.
-   `HIGH` requires evidence for relevant failure paths, compatibility and
-   preserved behavior at the affected boundaries, including `QUICK` changes.
+9. Verification covers the actual risks: relevant failure paths, compatibility
+   and preserved behavior at affected boundaries. Small scope alone does not
+   excuse missing evidence for a material risk.
+10. For a Bug, inspect the authorized start-record readback and the proposed
+   final content under [Bug 溯源与修复记录](../references/bug-repair-record.md).
+   Attribution must follow original-change/causality evidence, never merely
+   the last modifier or current repairer. Unknown history stays explicit;
+   an absent related requirement is omitted, and there are no project sections.
+   Actual repair/verification statements must match the reviewed change.
+   Check that the proposed comment uses HTML paragraphs with bold title/field
+   labels and lists for long repair/verification details; plain newlines inside
+   one paragraph or unrendered Markdown do not provide TAPD comment formatting.
+   The completion comment is written/read back after this review passes;
+   do not require that future readback as a prerequisite for the review itself.
+   Story/Task has no repair-record obligation.
+
+For direct-submission record-only correction after developer edits, inspect the
+current full diff/verification and proposed corrected completion body under
+[direct submission](../../submitting-for-test/references/direct-submission.md#人工改动后的-bug-完成记录).
+Verified original records establish historical facts; a valid prior completion
+may support comment-only recovery without a retroactive start comment or Bug
+reactivation. Do not demand the future corrected-comment readback before this
+review. A pass covers code and proposed record only: it cannot establish a full
+Bug REVIEWED handoff until the authorized comment is written/reused and read
+back. Reject stale claims, missing historical evidence or incomplete repositories.
+
+When implementation used subagents, require a stable reviewed diff with related
+writers stopped. Verify actual task/path ownership and that local checks cover
+their claimed changes; inspect integration/shared interfaces across the combined
+diff. Worker success or self-review is not independent approval. A grouped
+requirement covers only the selected Story/Task scope and has no Bug record gate.
+
+For a multi-repository Bug, receive the complete confirmed repository set and
+scope plus this repository's exact diff and applicable integration evidence.
+Review only claims supported by those facts; a pass covers this repository,
+not unseen sibling diffs. The caller must collect a passing independent review
+for every required repository and verify agreed cross-repository acceptance
+before publishing one complete Bug record and eligible `reviewed_changes`.
+Shared start/status readbacks are valid for this same Bug and repair round;
+do not demand a separate comment or repeated state write per repository.
 
 Loss of a still-required behavior without an equivalent reachable replacement
 fails review. Equivalent refactoring and explicitly authorized changes/removals

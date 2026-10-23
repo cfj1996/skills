@@ -4,9 +4,9 @@
 
 ## 选择评审页面
 
-启动确认通过后，只读发现 PRD、既有 Plan、项目 `AGENTS.md` 指定的唯一产物位置
-规则，以及浏览器可访问的原型来源。选择与当前页面或内聚模块对应的原型页面；
-原型源码不得修改。
+启动确认通过后，只读发现 PRD、既有 Plan、项目 `AGENTS.md` 中现有的产物位置
+规则，以及浏览器可访问的原型来源。没有正式位置规则时保留候选或明确无候选，
+不阻塞只读范围评审。选择与当前页面或内聚模块对应的原型页面；原型源码不得修改。
 
 原型来源按 `scripts/resolve-prototype-source.js` 的固定规则分类：
 
@@ -84,10 +84,15 @@ HTTPS iframe 地址直接作为顶层原型打开。无法顶层打开时，仅�
 Badge 区分状态，右侧展示当前详情。列表点击与上一个/下一个共用唯一当前索引；
 结论使用互斥按钮组，不使用下拉选择。
 
-新会话使用 `schemaVersion=2` 的模块卡，旧 `schemaVersion=1` 仍可读取。左侧按
+会话只接受 `schemaVersion=2` 的模块卡。左侧按
 模块与子模块展示，父模块由 `module.parentId` 关联；同一模块的技术维度不重复成卡。
 右侧第一屏展示职责与范围、输入输出、行为规则、验收例子、待确认问题和本次变更。
 每个问题显示影响、责任方及建议，需求结论独立操作。
+
+`SCOPE_REVIEW` 无正式目录规则时，以
+`artifactRuleResolution.status=unresolved-candidate, source=candidate` 挂载。
+`artifactRuleFingerprint` 来自当前候选信息快照；尚无候选时明确记录无候选快照，
+不得伪造 `source=agents`。可提交范围意见并回填结果，但确认更新 Plan 与保存保持阻塞。
 
 `implementationPlan` 及项目规范、依赖、具体组件、代码落点、API 消费事实与来源证据
 收纳在默认折叠的“内部实现 / 实现依据”中；展开后一并显示一句话方案及四块
@@ -99,8 +104,10 @@ Badge 区分状态，右侧展示当前详情。列表点击与上一个/下一�
 浮动时两侧均可调整；标题栏继续负责移动和左右吸附。宽度、位置和吸附侧写入
 同一临时草稿并在重挂载后恢复。
 
-插件开发可运行 `node tests/preview-review-panel.mjs` 打开自带的实时预览页，
-验证面板脚本、样式和交互。该页面仅是插件开发 fixture，不是消费项目原型，
+插件开发可运行 `node tests/preview-review-panel.mjs` 打开自带的模块实时预览页，
+用 `?assert` 验证面板脚本、样式和交互，用 `?wake&assert` 验证通知竞态。
+`?confirm&assert` 先验证脚本动作被拒绝，再通过真实浏览器点击验证确认和模拟保存回执；不写 Plan 文件。
+该页面仅是插件开发 fixture，不是消费项目原型，
 不得在真实功能评审中替代同一 in-app Browser 页面上的动态注入。
 
 ## 挂载验证
@@ -237,7 +244,34 @@ const next = window.__PAGE_DELIVERY_REVIEW__.applyResult({
 
 若 Browser、host、Shadow Root、临时 API 或当前提交任一证据缺失，明确报告“评审阻塞”、说明缺失谓词和可执行的恢复动作；不得把阻塞说明写成最终评审结论。
 
+## 从范围评审进入正式保存
+
+目录规则写入限定 `PLAN_WRITE`：范围、分支已确认且目录写入已获授权后，
+Agent 才能写入适用 Agent 文件，读回验证并计算正式规则指纹。目录指定不等于
+评审内容写入许可，也不允许在 `SCOPE_REVIEW` 提前写规则。读回失败保留候选
+状态并报告错误，不能伪造 `status=resolved, source=agents`。
+
+首次将同一交付单元从 `unresolved-candidate/candidate` 转为 `resolved/agents`：
+
+1. 读取最新 `getState()` 和 `exportSubmission()`，保留完整模块清单及最新意见。
+2. 构造 `nextSession`：新 `sessionId`、正式 `artifactRuleFingerprint` 和
+   `artifactRuleResolution`、输入态、归零的提交版本及 `viewScope=all`。转换要求当前
+   已有提交，状态为 `reviewing` 或 `result`，使用 `reviewRound + 1`；输入态先完成
+   只读范围提交。候选规则不能进入 `confirmed` 或已保存状态。
+   Plan 指纹来自当前实际内容，首次尚无文件时明确保持未创建事实。
+3. 调用 `updateReviewSession(nextSession)` 并核对新身份、正式规则及完整模块。
+   保留未受影响模块的意见；旧提交、结果、确认请求及保存状态全部失效。
+   不得用旧 `resumeSubmission` 或旧确认请求恢复本轮授权。
+4. 用户重新提交全部拟保存内容，Agent 重新回填，再按下节取得本轮确认并保存。
+
+该转换只允许候选首次解析为正式规则。已有正式规则变化或回退候选时，必须
+另行读取证据、展示影响并重新挂载，不能用 `updateReviewSession` 改写规则身份。
+失败时保留旧面板现场，规则文件的实际写入结果与面板状态分别报告。
+
 ## 确认与回写
+
+进入本节前必须完成范围/分支确认、正式目录规则写入和读回；当前会话使用
+`status=resolved, source=agents` 及其精确指纹。候选规则只能用于只读范围评审。
 
 1. 回填结果后，让用户核对面板内容并在最后一张结果卡点击“确认更新 Plan”。
    Agent 不得代点。通过 `getPlanConfirmationRequest()` 轮询只读请求元数据；
@@ -252,7 +286,7 @@ const next = window.__PAGE_DELIVERY_REVIEW__.applyResult({
    传入刚重新读取后计算的指纹。只有返回 `mode === "confirmed"` 且无 `lastError`
    才能按用户确认的范围写入 Plan。该调用只消费一次内部许可，不会自行写文件。
 4. “已确认，待保存”与“已保存”分开显示。运行 `validate-page-plan.js` 对拟写内容
-   的规范化模型（新模型 `schemaVersion=3`，兼容旧版 `2`）进行校验；阶段 Plan
+   的规范化模型（只接受 `schemaVersion=3`）进行校验；阶段 Plan
    允许包含未决问题和 blocked 实现，不能将其标成可实施。通过后用 Agent 文件工具
    写入同一 Plan，再读回核对实际内容并计算保存后的指纹。
 5. 读回一致后在同一页面调用下列 API 并核对保存状态。调用只记录本轮保存凭据，
@@ -270,14 +304,6 @@ window.__PAGE_DELIVERY_REVIEW__.markPlanSaved({
 // 核对返回状态无 lastError，面板显示“已保存”，才向用户报告保存完成。
 ```
 
-不再把用户已指定的目录保留为临时规则。收到目录指定后，Agent 按产物规则流程
-立即写入适用 Agent 文件，读回并计算新指纹后使用 `status=resolved, source=agents`。
-`temporarily-confirmed-candidate` 仅兼容旧会话：若用户此前只授权临时使用，先展示
-拟固化的位置和 Agent 文件；用户选定后直接固化，不再追加写入确认。不能伪造
-`source=agents`；文件写入失败必须报告实际错误。
-从旧临时会话转为正式规则会改变规则指纹：先保留用户全部意见与提交记录，用新
-指纹重新挂载并回填已核对结果所需的新一轮提交，保留已有结论，不让用户逐项重选。
-仍需用户统一提交并确认最终拟保存内容，不将目录指定当成评审内容写入许可。
 若要修改已回填的结果、处理写入失败或开启复评，保留旧输入，由 Agent 构造新的
 `sessionId` 和所需轮次后重新挂载，并要求用户重新提交及确认。不要在原结果已确认后
 静默更换拟写内容。

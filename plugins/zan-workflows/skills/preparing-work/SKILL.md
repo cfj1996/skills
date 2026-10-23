@@ -44,14 +44,11 @@ Accept exactly one TAPD URL plus optional hard constraints:
   confirmation binds the exact project/repository, scope, fixed branch,
   source/base, target branch, operation and purpose.
 
-An orchestrator may also supply `workflow_profile`, `verification_risk` and
-an in-memory `implementationBrief` under
-[按工作规模选择流程](../../references/adaptive-workflow.md). Preserve these
-with their evidence; QUICK does not require a formal Plan or TaskBreakdown.
-Validate the brief against the same selected item, scope and branch. Never
-reclassify an existing formal Plan as a brief to bypass its unresolved gates.
-Absent profile on a legacy handoff means STANDARD; none of these fields
-changes the branch, scope, Bug status/owner or authorization requirements.
+Reuse an in-memory `implementationBrief`, Bug investigation summary, or an
+applicable formal Plan/Task result from the orchestrator. Validate its scope,
+evidence and acceptance against the same selected item and fixed branch.
+Small changes need no formal Plan or Task breakdown. Existing formal Plan/Task
+requirements and blockers remain binding; a shorter summary cannot bypass them.
 
 Constraints are requirements, not hints. Never replace a supplied project,
 repository, or branch with a more plausible candidate.
@@ -84,7 +81,11 @@ repository, or branch with a more plausible candidate.
 6. Validate the confirmation source against every visible project, scope and
    branch fact. Missing or changed confirmation keeps the definition `PENDING`;
    never ask again when the current-conversation confirmation still matches.
-7. Derive and display the status plan with the scope and branch facts. For a
+7. Derive the status plan with scope and branch facts. Display the concrete
+   changes in Chinese under the shared 确定清单 before approval; its confirmed
+   current content becomes 执行清单. Keep raw status
+   codes/payload, identity-source details and full SHA in the verified internal
+   definition. The readable preview must still map exactly to those facts. For a
    Bug, apply [修复中状态与处理人](../implementing-work/references/bug-repair-owner.md)
    and its read-only helper. Resolve one verified TAPD repair account and bind
    its source/member evidence plus the old `status,current_owner` to the plan.
@@ -111,8 +112,9 @@ repository, or branch with a more plausible candidate.
 - `CONTINUE` always reuses the original source branch and existing Wiki when
   available. If the original branch cannot be proved, return `PENDING`; do not
   propose a new branch from `develop`, `master`, or another base.
-- If local and remote refs both exist, their SHAs must match. A mismatch is
-  `BLOCKED`; never choose one silently.
+- If both refs exist, verify ancestry. Equal refs or a verified local-ahead tip
+  with confirmed scope/baseline can use the existing local branch. Bind its exact
+  tip; remote-ahead/diverged refs block automatic selection or synchronization.
 - Repository fingerprint, scope confirmation, exact branch decision, and a
   matching current-conversation branch/implementation confirmation must
   pass before `READY_FOR_HANDOFF`.

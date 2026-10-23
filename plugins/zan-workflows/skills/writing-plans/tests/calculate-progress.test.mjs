@@ -4,18 +4,15 @@ import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 const { calculateObjectiveMetrics, countByStatus } = require("../scripts/calculate-progress.js");
+const { validatePagePlanModel } = require("../scripts/validate-page-plan.js");
+const pagePlan = require("./fixtures/page-plan-model.json");
 
 test("counts statuses without inventing an aggregate page percentage", () => {
   const metrics = calculateObjectiveMetrics({
-    reviewCards: [
-      { conclusion: "已确认" },
-      { conclusion: "待修改" },
-      { conclusion: "阻塞" },
-    ],
     features: [
-      { status: "已完成" },
-      { status: "已验证" },
-      { status: "不适用" },
+      { status: "已完成", reviewConclusion: "已确认" },
+      { status: "已验证", reviewConclusion: "待修改" },
+      { status: "不适用", reviewConclusion: "阻塞" },
     ],
     tasks: [
       { status: "已完成" },
@@ -40,6 +37,19 @@ test("counts statuses without inventing an aggregate page percentage", () => {
   assert.equal(metrics.review.pendingRecheck, 2);
   assert.equal(metrics.draftOperationCount, 1);
   assert.equal("pageCompletionRate" in metrics, false);
+});
+
+test("counts review conclusions from the current validated PagePlan model", () => {
+  const model = structuredClone(pagePlan);
+  model.features[0].reviewConclusion = "阻塞";
+  assert.deepEqual(validatePagePlanModel(model), { valid: true, errors: [] });
+  const before = structuredClone(model);
+  assert.deepEqual(calculateObjectiveMetrics(model).review, {
+    total: 1,
+    byStatus: { 阻塞: 1 },
+    pendingRecheck: 1,
+  });
+  assert.deepEqual(model, before);
 });
 
 test("returns zero rates for no applicable tasks", () => {

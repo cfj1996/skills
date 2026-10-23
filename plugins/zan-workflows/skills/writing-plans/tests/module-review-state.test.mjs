@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 const require = createRequire(import.meta.url);
-const { createReviewState, reduceReviewState, mergeReviewSession, panelMarkup } = require('../scripts/inject-review-panel.js');
+const { createReviewState, reduceReviewState, mergeReviewSession, panelMarkup, restoreDraft, restoreSubmittedReview } = require('../scripts/inject-review-panel.js');
 const fixture = JSON.parse(readFileSync(new URL('./fixtures/module-review-session.json', import.meta.url), 'utf8'));
 const session = () => structuredClone(fixture);
 const submit = state => reduceReviewState(state, { type: 'SUBMIT' });
@@ -177,4 +177,67 @@ test('module navigation follows parents and shows ancestry in a filtered round',
   const filtered = createReviewState(initial);
   assert.deepEqual(filtered.cards.map(card => card.id), ['M-003']);
   assert.match(panelMarkup(filtered, false, null), /属于凭据输入/);
+});
+
+
+test('scope review can resolve its artifact rule without carrying submission or save authority', () => {
+  const initial = session();
+  initial.artifactRuleResolution = { status: 'unresolved-candidate', source: 'candidate' };
+  initial.artifactRuleFingerprint = 'sha256:candidate-rule';
+  const input = edit(select(createReviewState(initial), 1), { conclusion: '已确认', userNote: '保留已核对的范围' });
+  const reviewed = result(submit(input));
+  const oldSubmission = reviewed.lastSubmission;
+  const next = session(); next.sessionId = 'resolved-rule'; next.reviewRound = 2;
+  next.artifactRuleFingerprint = 'sha256:actual-agents-rule';
+  const updated = mergeReviewSession(reviewed, next);
+  assert.equal(updated.cards[1].conclusion, '已确认');
+  assert.equal(updated.cards[1].userNote, '保留已核对的范围');
+  assert.equal(updated.cards[2].implementationPlan.status, 'blocked');
+  assert.equal(updated.mode, 'input');
+  assert.equal(updated.lastSubmission, null);
+  assert.equal(updated.submissionVersion, 0);
+  assert.equal(updated.results.length, 0);
+  assert.equal(updated.saveState, 'unsaved');
+  assert.equal(updated.savedPlanFingerprint, null);
+  assert.equal(updated.previousSubmissions[0], oldSubmission);
+  assert.equal(reduceReviewState(updated, { type: 'CONFIRM_PLAN', ...oldSubmission }), updated);
+  assert.throws(() => restoreSubmittedReview(updated, oldSubmission), error => error.code === 'invalid-submission-restore');
+  // Even matching text and copied identity cannot turn an unresolved submission into a resolved one.
+  assert.throws(() => restoreSubmittedReview(updated, {
+    ...oldSubmission, sessionId: updated.sessionId, artifactRuleFingerprint: updated.artifactRuleFingerprint,
+  }), error => error.code === 'invalid-submission-restore');
+  const rejectedDraft = restoreDraft(updated, {
+    ...oldSubmission, sessionId: updated.sessionId, reviewRound: updated.reviewRound,
+    artifactRuleFingerprint: updated.artifactRuleFingerprint, savedAt: Date.now(),
+    cards: [{ id: 'M-002', userNote: '覆盖意见' }],
+  });
+  assert.equal(rejectedDraft, updated);
+  let current = result(submit(updated));
+  while (current.currentResultIndex < current.results.length - 1) current = reduceReviewState(current, { type: 'NEXT' });
+  assert.equal(reduceReviewState(current, { type: 'CONFIRM_PLAN', ...oldSubmission }).mode, 'result');
+  current = reduceReviewState(current, { type: 'CONFIRM_PLAN', ...current.lastSubmission });
+  assert.equal(current.mode, 'confirmed');
+  assert.equal(current.saveState, 'pending');
+  const oldReceipt = reduceReviewState(current, { type: 'MARK_PLAN_SAVED', ...oldSubmission, savedPlanFingerprint: 'sha256:stale-saved' });
+  assert.equal(oldReceipt.saveState, 'pending');
+  assert.equal(oldReceipt.lastError.code, 'invalid-save-receipt');
+});
+
+test('artifact rule transitions require submitted scope, fresh identity and a full recheck', () => {
+  const initial = session();
+  initial.artifactRuleResolution = { status: 'unresolved-candidate', source: 'candidate' };
+  initial.artifactRuleFingerprint = 'sha256:candidate-rule';
+  const input = createReviewState(initial);
+  const reviewed = result(submit(input));
+  const next = session(); next.sessionId = 'resolved'; next.reviewRound = 2;
+  assert.throws(() => mergeReviewSession(input, { ...next, reviewRound: 1 }), error => error.code === 'invalid-session-update');
+  for (const patch of [
+    { sessionId: initial.sessionId }, { artifactRuleFingerprint: initial.artifactRuleFingerprint },
+    { reviewRound: 1 }, { viewScope: 'round' },
+    { artifactRuleResolution: initial.artifactRuleResolution },
+  ]) assert.throws(() => mergeReviewSession(reviewed, { ...next, ...patch }), error => error.code === 'invalid-session-update');
+  const resolved = mergeReviewSession(reviewed, next);
+  const nextInput = { ...next, sessionId: 'another' };
+  assert.throws(() => mergeReviewSession(resolved, { ...nextInput, artifactRuleResolution: initial.artifactRuleResolution }), error => error.code === 'invalid-session-update');
+  assert.throws(() => mergeReviewSession(resolved, { ...nextInput, artifactRuleFingerprint: 'sha256:changed-agents-rule' }), error => error.code === 'invalid-session-update');
 });

@@ -83,8 +83,36 @@ evidence is `PENDING`; never guess the base.
 
 ### `USE_EXISTING`
 
-Verify the exact `fixed_branch` exists in the selected repository. If both
-local and remote refs exist, require equal SHAs. Select the exact branch.
+Verify the exact `fixed_branch` exists in the selected repository. After the
+required remote refresh, inspect exact local/origin refs and commit ancestry:
+
+```bash
+# stdin: {"cwd":"<verified-repository>","branch":"<fixed_branch>"}
+node <preparing-work-dir>/scripts/inspect-branch-refs.mjs
+```
+
+This [read-only helper](../scripts/inspect-branch-refs.mjs) reports refs, tips and
+their relationship; it does not fetch, select a branch, authorize work or prove
+remote absence. The caller must verify current remote evidence separately.
+
+- Equal refs: select the existing local branch and bind its exact tip.
+- Local ahead: prove the remote tip is an ancestor of the local tip, verify
+  the unpublished increment belongs to the confirmed scope or accepted baseline, and continue the
+  same local branch/tip. Preserve existing commits; do not demand a push.
+  Accepted earlier work stays outside this work's attribution. Unclear increment
+  scope/baseline is `PENDING`, not implicit authorization to absorb it.
+- Remote ahead or diverged: report both tips and the difference; return
+  `BLOCKED` pending an explicit resolution. Do not silently select the remote
+  tip or run push, reset, merge, rebase, or another synchronization operation.
+- Only one ref exists: bind that verified ref/tip under the exact branch name;
+  still prove remote existence/absence and honor the continuation recovery gate.
+- An unavailable ref/ancestry check, including incomplete shallow history,
+  is `PENDING`; never treat failed evidence collection as proven divergence.
+
+The confirmation source must cover the selected original branch and scope.
+Record its exact tip internally and recheck it before branch selection/editing.
+Changed facts return for review; an unchanged, already authorized local-ahead
+continuation does not require a repeated confirmation or publication.
 
 This mode is independent of the current TAPD item. The branch may be empty,
 may contain earlier Bugs, or may have been created for a larger feature. Do not
@@ -103,6 +131,6 @@ into `CREATE` merely because a newly derived branch name is absent.
 ## Result classification
 
 - Missing/unavailable data that can still be supplied: `PENDING`.
-- Proven repository mismatch, ref mismatch, or invalid mode combination:
+- Proven repository mismatch, remote-ahead/divergent refs, or invalid mode combination:
   `BLOCKED`.
 - Fully verified and confirmed facts: `READY_FOR_HANDOFF`.

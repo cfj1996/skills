@@ -1,136 +1,73 @@
-# Orchestration contract
+# 编排交接约定
 
-`fixing-bug` is a stateless sequential composition. It owns preflight ordering,
-checklist formatting, execution ordering, and the final summary; producer
-skills own all business validation and external writes.
+`fixing-bug` 只负责有序预检、确定清单、确认后的执行清单、能力交接与结果汇总。
+实际分支/状态/源码/评论/交付写入由对应能力负责，精确事实和授权不能省略。
 
-## Request
+## 输入
 
-| Field | Required | Rule |
-| --- | --- | --- |
-| `tapd_urls` | yes | One Bug URL or an ordered list; exact duplicates are removed. |
-| `fixed_project` | yes | Hard constraint shared by every Bug. |
-| `fixed_repo_path` | yes | Canonical repository path shared by every Bug. |
-| `fixed_branch` | yes | Exact repair branch shared by every Bug. |
-| `work_mode` | yes | `INITIAL|CONTINUE`; infer from current and prior work evidence. |
-| `branch_mode` | yes | `AUTO`, `CREATE`, or `USE_EXISTING`. |
-| `delivery_mode` | yes | `IMPLEMENT|SUBMIT|GO_LIVE`; “修复” defaults to `IMPLEMENT`; submission/go-live require the corresponding user intent. |
-| `workflow_profile` / `verification_risk` | derived per Bug | Shared adaptive-workflow rules select preparation depth and independent verification risk from that Bug's scope/evidence; the same branch may hold different profiles. Neither expands delivery authority. |
-| `implementationBrief` | eligible QUICK Bug | Reuse the existing scope summary with `behaviors`, `exclusions`, `evidence`, `steps`, `verification`; carry it through preparation into implementation without new persistence or confirmation. |
-| `create_base_ref` | conditional | Exact base when creation may occur, unless verified workspace policy supplies it. |
-| `submission_profile` | for `SUBMIT|GO_LIVE` | `AUTO|STANDARD|NO_WIKI`; resolve AUTO only from named policy, otherwise show `PENDING_SUBMISSION_PROFILE` and both exact choices. Not required or resolved for `IMPLEMENT`. |
-| `deployment_mode` | for `SUBMIT|GO_LIVE` | `AUTO|DEPLOY|SKIP`; infer explicit publish/direct-submit wording. Not required or resolved for `IMPLEMENT`. |
-
-`USE_EXISTING` means begin this Bug on the supplied existing branch. It is not
-a resume request and carries no requirement for prior Bug-specific evidence.
-
-`CONTINUE` reuses context, the original branch and only the incremental scope;
-it never creates a follow-up branch. Reuse the previously explicit delivery
-endpoint when still applicable and not changed by the current request; the
-current explicit endpoint takes precedence.
-Status, existing Wiki or test feedback alone never selects submission. Reuse
-the original Wiki only when entering the selected submission flow.
-
-A Wiki URL is not a request field. Under `STANDARD`, the submission capability
-derives the target by checking TAPD details/comments and the fixed Wiki
-hierarchy; absence of a user-supplied Wiki URL never blocks preflight.
-
-For a multi-Bug request that starts with `CREATE`, the effective mode changes
-to `USE_EXISTING` immediately after the exact branch is created and its ref is
-read back. Later items must not repeat `CREATE`. If an item fails before branch
-creation, the next item may still use `CREATE`; if creation occurred before a
-later failure, the next item uses `USE_EXISTING`.
-
-## Preflight checklist
-
-Before any write, the orchestrator derives one user-visible row from each
-producer-owned preflight snapshot. Display the delivery endpoint above the
-table and bind it to confirmation. `IMPLEMENT` uses the five common columns;
-only `SUBMIT|GO_LIVE` adds the two submission columns:
-
-| Column | Source |
+| 字段 | 约束 |
 | --- | --- |
-| Bug | TAPD identity or short ID |
-| 项目/仓库 | verified selected project and canonical repository |
-| 分支 | exact fixed branch identity; exclude `CREATE` or `USE_EXISTING` |
-| 修复范围 | concise producer-derived in-scope work |
-| 提测策略 (submission only) | exact `STANDARD（Wiki）` or `NO_WIKI（无 Wiki 调用）` |
-| 部署 (submission only) | exact resolved `DEPLOY` or `SKIP` |
-| 待确认 | normalized missing decision/blocker, or `无` |
+| `tapd_urls` | 一个 Bug 或有序列表；准确去重、保留顺序 |
+| 项目/仓库/分支绑定 | 每个 Bug 列全必要仓库；每个仓库分别有准确项目、路径和固定分支。同一仓库的多个子项目合并一次分支操作。单仓库沿用 `fixed_project` / `fixed_repo_path` / `fixed_branch`；用户约束必须核实，不可替换 |
+| `work_mode` | `INITIAL|CONTINUE`；续修复用原分支与明确增量范围 |
+| `branch_mode` | `CREATE|USE_EXISTING`，AUTO 由现有分支事实解析；创建需准确 base ref/SHA |
+| `delivery_mode` | `IMPLEMENT|SUBMIT|GO_LIVE`，仅来自当前或仍有效的明确交付意图 |
+| 实施依据 | 同一范围的 `implementationBrief`、调查说明或已有 Plan；小修复不强制文件 |
+| 提测设置 | 普通修复默认测试交付，解析 `submission_profile=AUTO|STANDARD|NO_WIKI` 和 `deployment_mode=AUTO|DEPLOY|SKIP`，未关闭时为 STANDARD/DEPLOY；明确仅实施则不加载交付能力 |
 
-The initial repair request is item selection, not checklist confirmation. An
-unconfirmed checklist permits no write capability. A `PENDING` or `BLOCKED`
-snapshot remains producer-owned, appears in `待确认`, and keeps the whole
-request read-only.
+Wiki URL 不是必要输入。缺少用户提供的 Wiki URL 不阻塞预检。
+Wiki 目标由提测能力查证，入口不派生、不写 Wiki。
 
-After explicit confirmation or valid `CONTINUE` incremental-scope authorization,
-each Bug is prepared again immediately before
-implementation. Only a `READY_FOR_HANDOFF` whose visible project/repository,
-branch, and scope match the confirmed row may become a handoff. Any changed
-visible field invalidates confirmation and returns the updated checklist.
-The normal effective-action transition from `CREATE` to `USE_EXISTING` is not
-a visible field change and does not invalidate confirmation.
+## 确认与执行
 
-The checklist and confirmation live only in the current conversation. They do
-not add request fields, persistence, runtime IDs, or recovery state.
+展示遵循 [确定与执行清单规范](../../../references/execution-checklist.md)，不另维护模板。
+确认前含调整后的待确认内容均叫确定清单；当前内容获确认后才叫执行清单。
+概览列全部实际项目，主表保留各仓库/固定分支的范围及验收映射。
+确认覆盖六列与编号详情、当前 Plan 内容、分支操作/基准、Bug 状态/准确人员、
+开始评论和评审后完整完成评论。旧授权没有包含评论时，只补所缺写入授权。
+未知引入人/时间不自动成为修复阻塞；记录按事实完善，不虚构归因。
 
-For `INITIAL`, checklist confirmation also authorizes the displayed exact
-branch action/base, active-state transition, and implementation. Its authorization
-summary also binds each Bug's old status/`current_owner`, verified repair account
-and evidence, and the combined status+owner payload. The person summary is a
-visible bound fact outside the checklist columns.
-An already-active Bug with a different handler still requires this authorized
-correction; only matching status and repair owner allow `NO_CHANGE`. Missing or
-ambiguous repair identity is `PENDING`. For
-`CONTINUE`, an already-`待测试` Bug has
-`status_action=SKIPPED_ALREADY_WAITING_TEST`; no active/final status rewrite or
-repair-owner rewrite or duplicate test-version write is allowed.
+- 只读预检快照不是可执行交接；准确事实和必要授权通过才可 READY_FOR_HANDOFF。
+- 实质范围、分支/基准、人员、状态或拟写入变化，重开受影响确认。
+  重新展示完整六列清单、实际写入和合并/Wiki/构建三项；普通修复默认三项需要，
+  明确需要时先展示本次模板预览。选项回答不授权尚未重印的完整调整清单。
+- CREATE 后同一分支变为 USE_EXISTING 是预期执行变化，不重复确认。
+- CONTINUE 已待测试时保留 status/current_owner，不重复状态或测试版本写入。
+- 常规完整修复先进入修复中，全部提测交付条件通过后再进入待测试；确定清单
+  在“合并与测试环境”末尾展示最终 TAPD 目标，执行结果只报告准确读回的实际状态。
+- 写前可变事实核验与写后读回始终保留；“无待决事项”不表示已授权执行。
+- 完整执行清单覆盖提交/合并/部署/Wiki/登记时，SubmissionPlan 核对后复用
+  原人类确认；独立技能仍确认自己的具体计划。未涵盖的上线/清理不自动执行，
+  关联/已存在 Wiki 或状态不扩大交付授权。
 
-`IMPLEMENT` stops at `REVIEWED` after the necessary initial authorization and
-independent review. It neither asks for submission settings nor calls submission
-PLAN. Repair with submission has at most two confirmation points: initial
-scope/implementation authorization when needed, then one consolidated
-submission authorization. `going-live` remains a separate master/Wiki
-confirmation, and local cleanup is another separate exact confirmation only
-when verified candidates exist.
-The second authorization must answer the complete current `SubmissionPlan`;
-the first confirmation never authorizes submission writes.
+## 能力交接
 
-## In-memory handoffs
-
-| Producer | Successful output | Next consumer |
+| 生产者 | 可交接结果 | 消费者 |
 | --- | --- | --- |
-| `preparing-work` | `TapdWorkDefinition` with `READY_FOR_HANDOFF` | `implementing-work` |
-| `implementing-work` | `ReviewedChange` with `REVIEWED` | final per-Bug result for `IMPLEMENT`; `submitting-for-test` only for `SUBMIT|GO_LIVE` |
-| `submitting-for-test` | `TestSubmissionResult` with `SUBMITTED` | optional `going-live`, as the complete input |
-| `going-live` `DELIVER` | `MasterMergeResult` with `MERGED`, involved tooling latest release/consumer verification/Wiki readbacks, and cleanup state/plan | final summary or deferred cleanup confirmation |
-| `going-live` `CLEANUP` | updated cleanup result with `CLEANED|PARTIAL|BLOCKED` | final summary |
-| `going-live` waiting | `AWAITING_MERGE`, exact MR/read-only continuation and completed effects | pause the shared-branch queue; `已合并，继续上线` requests verification before remaining delivery |
+| `preparing-work` | `TapdWorkDefinition`：READY_FOR_HANDOFF | `implementing-work` |
+| `implementing-work` | 单仓库 `ReviewedChange` 或同 Bug 的 `reviewed_changes`：全部 REVIEWED，含通过的独立评审与共享修复记录读回 | IMPLEMENT 返回；按请求进入提测 |
+| `submitting-for-test` | `TestSubmissionResult`：SUBMITTED | SUBMIT 返回；按请求进入上线 |
+| `going-live` | 实际合并/发布/Wiki 结果、人工等待或清理计划 | 汇总、准确续接或另行清理 |
 
-Preflight snapshots are not handoffs. Handoffs live only for the current
-execution, begin only after checklist confirmation or valid `CONTINUE`
-incremental-scope authorization plus execution-time re-preparation, and are not
-serialized or written to the repository.
+接收方核对同一 Bug、仓库、分支、范围、准确源码版本与已有验证。
+多仓库用 `work_definitions` 传入同一 Bug 的单项目定义集合，按 canonical
+repo/origin/fixed_branch 分组配对，不能仅按数组下标匹配。同键的子项目定义
+全部保留范围/验收覆盖关系，合并分支操作并输出一个仓库结果，不能相互覆盖。
+同一 Bug 的状态、修复
+账号与完整修复记录只有一套；任何必要仓库未通过验证/评审、跨仓库验收未通过
+或完成记录未核实，都不能交出可提测的 REVIEWED 集合。失败保留各仓库实际
+代码/评审事实，恢复时只重查失效证据、补缺失阶段，不重做已完成项目或重发评论。
+提测复用该集合汇总计划；所有必要仓库交付门禁通过才统一登记该 Bug。
+后续请求交付复用仍有效结果，不能为改变终点重复修复或制造替代分支。
+交接留在当前对话，不序列化为运行记录。
 
-A later explicit submission request may reuse a still-current `ReviewedChange`
-after the receiver verifies repository, branch, exact diff and verification.
-Refresh invalidated evidence, not the whole repair flow. Initial repair
-authorization never authorizes the later submission writes.
+## 列表执行与失败
 
-## Per-Bug result
+全部 Bug 先预检；写前准备失败、共享仓库/分支失效或事实变化暂停整个队列。
+单项实施/交付失败只在确认不影响共享约束和其余改动时允许继续；失败项不得
+混入下一项交付。逐项保留真实结果与已完成效果，不自动回滚或重放不明写入。
+首次分支创建成功后其余 Bug 使用 USE_EXISTING；失败发生在创建前则仍需 CREATE。
+人工合并等待暂停依赖队列；所有相关项结束后才考虑清理共享分支。
 
-The orchestrator retains only enough in the current conversation to report:
-
-| Field | Values |
-| --- | --- |
-| Bug | supplied URL or derived short ID |
-| Status | `成功`, `失败`, `待确认` |
-| Last capability | capability name or `未开始` |
-| Deployment | `DEPLOYED|SKIPPED_BY_INTENT|FAILED|UNKNOWN|未执行` |
-| Cleanup | `NO_CANDIDATE|AWAITING_CONFIRMATION|CLEANED|PARTIAL|BLOCKED|未执行` |
-| Reason | first blocker or required confirmation; empty on success |
-
-Execution-time `preparing-work` returning `PENDING` or `BLOCKED` pauses the entire queue.
-A downstream failure from `implementing-work`, `submitting-for-test`, or `going-live`
-does not cancel later Bugs unless it invalidates a shared constraint. The final list
-preserves input order.
+最终只需报告 Bug、实际结果、验证/评审/记录、交付结果、缺口和下一步。
+没有发生的阶段不伪造完成状态。

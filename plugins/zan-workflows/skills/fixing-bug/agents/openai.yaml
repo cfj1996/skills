@@ -1,7 +1,7 @@
 interface:
   display_name: "zan:修复 TAPD 缺陷"
-  short_description: "按固定项目分支修复 TAPD 缺陷"
-  default_prompt: "使用 $fixing-bug 按确认后的项目、仓库、分支和范围修复 TAPD Bug，并按我的明确要求继续提测、上线以及在单独确认后清理本地开发环境。"
+  short_description: "按各仓库固定分支修复 TAPD 缺陷，统一记录并验证完整范围"
+  default_prompt: "使用 $fixing-bug 先展示支持多项目的六列确定清单，确认后按执行清单修复并验证 TAPD Bug，全部必要仓库通过后统一完成记录；合并测试分支、构建和 Wiki 默认都需要，确认前先预览模板。"
 
 policy:
   allow_implicit_invocation: true

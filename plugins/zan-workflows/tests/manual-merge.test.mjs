@@ -11,12 +11,12 @@ const input = () => ({ projectId: '1', repositoryPath: '/fixture/demo', originUr
   title: 'feat: delivery', purpose: '上线已评审变更', reviewPassed: true, pipelineRequired: true,
   execute: true, confirmed: true });
 
-function fixture({ existing = true, canMerge, denied, override } = {}) {
+function fixture({ existing = true, canMerge, denied, override, targetBranch = 'master', defaultBranch = 'master' } = {}) {
   const calls = [];
-  const state = { existing, merged: false, sourceDeleted: false, sourceSha, targetSha,
+  const state = { existing, merged: false, sourceDeleted: false, sourceSha, targetSha, defaultBranch,
     pipeline: 'success', contained: true, proofCalls: 0 };
   const mr = () => ({ iid: 7, web_url: 'https://git.example.test/team/demo/-/merge_requests/7',
-    source_branch: input().sourceBranch, target_branch: 'master', sha: state.sourceSha,
+    source_branch: input().sourceBranch, target_branch: targetBranch, sha: state.sourceSha,
     source_project_id: 1, target_project_id: 1, state: state.merged ? 'merged' : 'opened',
     detailed_merge_status: 'mergeable', head_pipeline: { status: state.pipeline },
     merge_commit_sha: state.merged ? advancedSha : null,
@@ -25,7 +25,7 @@ function fixture({ existing = true, canMerge, denied, override } = {}) {
     calls.push({ name, args });
     const custom = await override?.(name, args);
     if (custom !== undefined) return custom;
-    if (name === 'get_project') return reply({ id: 1, default_branch: 'master', ssh_url_to_repo: originUrl });
+    if (name === 'get_project') return reply({ id: 1, default_branch: state.defaultBranch, ssh_url_to_repo: originUrl });
     if (name === 'get_branch') {
       if (args.branch_name === input().sourceBranch && state.sourceDeleted) throw new Error('HTTP 404 source branch deleted');
       return reply({ commit: { id: args.branch_name === input().sourceBranch ? state.sourceSha : state.targetSha } });
@@ -41,7 +41,9 @@ function fixture({ existing = true, canMerge, denied, override } = {}) {
     }
     throw new Error('Unexpected tool ' + name);
   };
-  const io = { checkRepository: async () => {}, containsSource: async plan => {
+  const io = { checkRepository: async () => {},
+    inspectContainment: async () => ({ contained: false, targetSha: state.targetSha }),
+    containsSource: async plan => {
     assert.equal(plan.sourceSha, sourceSha);
     state.proofCalls++;
     return { contained: state.contained, targetSha: advancedSha };
@@ -49,6 +51,56 @@ function fixture({ existing = true, canMerge, denied, override } = {}) {
   return { call, calls, io, state, mr };
 }
 const mutations = fake => fake.calls.filter(row => /^(create|merge)_/.test(row.name));
+
+test('default target changes after preview stop both MR creation and merge before any write', async () => {
+  for (const targetBranch of ['master', 'main']) {
+    for (const existing of [false, true]) {
+      const fake = fixture({ existing, targetBranch, defaultBranch: targetBranch });
+      const plan = await mergeReviewedBranch(fake.call, {
+        ...input(), targetBranch, execute: false, confirmed: false,
+      }, fake.io);
+      fake.state.defaultBranch = targetBranch === 'master' ? 'main' : 'master';
+      await assert.rejects(mergeReviewedBranch(fake.call, {
+        ...plan, execute: true, confirmed: true,
+      }, fake.io), /未验证为实际默认分支/);
+      assert.deepEqual(mutations(fake), []);
+    }
+  }
+});
+
+test('default target is refreshed after waiting and approval checks before the merge write', async () => {
+  for (const targetBranch of ['master', 'main']) {
+    for (const existing of [false, true]) {
+      const fake = fixture({ existing, targetBranch, defaultBranch: targetBranch, override(name) {
+        if (name === 'get_merge_request_approval_state') {
+          fake.state.defaultBranch = targetBranch === 'master' ? 'main' : 'master';
+        }
+      } });
+      await assert.rejects(mergeReviewedBranch(fake.call, {
+        ...input(), targetBranch, ...(existing ? { mrIid: '7' } : {}),
+      }, fake.io), error => {
+        assert.match(error.message, /未验证为实际默认分支/);
+        assert.equal(error.result.phase, 'CHECK_MERGE');
+        assert.equal(error.result.writes, existing ? 0 : 1);
+        return true;
+      });
+      assert.deepEqual(mutations(fake).map(row => row.name), existing ? [] : ['create_merge_request']);
+      assert.equal(fake.calls.filter(row => row.name === 'get_project').length, 2);
+    }
+  }
+});
+
+test('unchanged actual master and main targets still merge and verify containment', async () => {
+  for (const targetBranch of ['master', 'main']) {
+    const fake = fixture({ targetBranch, defaultBranch: targetBranch });
+    const result = await mergeReviewedBranch(fake.call, { ...input(), targetBranch, mrIid: '7' }, fake.io);
+    assert.equal(result.state, 'MERGED');
+    assert.equal(result.defaultTargetVerified, true);
+    assert.equal(result.defaultBranch, targetBranch);
+    assert.equal(result.containment, true);
+    assert.deepEqual(mutations(fake).map(row => row.name), ['merge_merge_request']);
+  }
+});
 
 function assertContactAction(result, targetBranch = 'master') {
   assert.equal(result.userAction.type, 'CONTACT_MERGER');

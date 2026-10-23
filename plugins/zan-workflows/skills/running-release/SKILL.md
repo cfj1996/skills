@@ -24,6 +24,13 @@ only when model selection is available. No TAPD item is required for a standalon
   needs one focused clarification; a Job name containing `test` alone does not
   prove that it cannot publish packages or affect production.
 
+Choosing the full flow selects its exact plan and authorization checks, not
+necessarily a terminal-build wait. Every test-submission build, including a
+canary package build, uses `completionMode=TRIGGER_ACCEPTED` and returns the
+accepted `BUILD_SUBMITTED` queue receipt to `submitting-for-test` without
+queue/build/log polling. Standalone daily builds, standalone releases and
+go-live retain their terminal-result/source verification.
+
 ## Daily project build
 
 Use the connected Jenkins MCP directly. Do not start `workflow-session.mjs`,

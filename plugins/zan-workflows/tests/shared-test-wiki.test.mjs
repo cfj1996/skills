@@ -137,6 +137,38 @@ test('one Bug across projects and branches appends to one Wiki, without grouping
   assert.ok(!f.calls.some(c => c.name === 'get_stories_or_tasks'));
 });
 
+test('different Bugs cannot reuse a same-day same-title Wiki by repository and shared repair branch', async () => {
+  const otherBug = '201', sharedBranch = 'fixbug/alice.shared';
+  for (const execute of [false, true]) {
+    const f = fixture();
+    f.items.set(`bug:${otherBug}`, { ...f.items.get(`bug:${bug}`), id: otherBug });
+    f.putWiki(`# 前端\n\n${entry(1, repoA, sharedBranch)}`);
+    f.link('bug', bug);
+    const runInput = { ...input(otherBug, sharedBranch, repoA), entryType: 'bug', wikiTitle: title,
+      ...(execute ? { execute: true, expectTarget: 'REUSE_EXISTING', expectedWikiId: wikiId,
+        expectedOwnerType: 'bug', expectedOwnerId: otherBug, expectedMonthId: monthId,
+        expectedBodySha256: contentHash(f.wikis.get(wikiId).markdown_description),
+        commentAuthor: 'Alice' } : {}) };
+    await assert.rejects(ensureTestWiki(f.call, runInput), /归属链接证据/);
+    assert.equal(f.writes().length, 0);
+    assert.equal(f.comments.has(`bug:${otherBug}`), false);
+    assert.ok(!f.calls.some(c => c.name === 'get_stories_or_tasks'));
+  }
+});
+
+test('unlinked title collision blocks Story discovery but its own detail link permits reuse', async () => {
+  const f = fixture(); f.putWiki();
+  const runInput = { ...input(story), entryType: 'stories', wikiTitle: title };
+  await assert.rejects(ensureTestWiki(f.call, runInput), /归属链接证据/);
+  assert.equal(f.writes().length, 0);
+  f.items.get(`stories:${story}`).description = `提测wiki：${url(wikiId)}`;
+  const plan = await ensureTestWiki(f.call, runInput);
+  assert.equal(plan.wikiId, wikiId);
+  assert.equal(plan.entryOperation, 'REUSE_ENTRY');
+  assert.equal(plan.commentOperation, 'CREATE');
+  assert.equal(f.writes().length, 0);
+});
+
 test('parent/current and historical sibling Wiki conflicts block without creating a third page', async () => {
   for (const parentLinked of [false, true]) {
     const f = fixture(); f.putWiki(); f.link('tasks', taskA); f.link('tasks', taskB, '999');

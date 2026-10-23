@@ -26,7 +26,9 @@ Validate these invariants in order:
    were checked first. A complete helper preview is valid read-only discovery
    evidence. Any linked Wiki in details or comments is reused, including prior
    months. Without a link, only the exact month-name and child-title queries
-   are needed; returned parent IDs are checked locally. Never require an
+   are needed; returned parent IDs are checked locally. An existing same-title
+   child without an exact owner link is blocked, even when its repository and
+   branch match. Never require an
    unfiltered Wiki-list scan. Creation uses root
    `1150372234001008260`, `YYYY-MM`, and
    `MM-DD: 中文简述`. Ambiguous/inaccessible existing evidence is blocked rather
@@ -66,22 +68,28 @@ Validate these invariants in order:
    `# 前端` and sequence `1`. The monthly parent never receives the entry body.
    Under `CONTINUE`, one matching source-branch entry receives the current
    affected-scope append; a business entry also resets `已合并` to `未合并`
-   when the new current-round commits are not in `origin/master`, while a
+   when the new current-round commits are not in the verified remote default ref (`origin/master` or `origin/main`), while a
    tooling entry preserves `当前版本` or applies only the evidenced channel
    update/legacy-line replacement allowed by `wiki-template.md`.
    A business 待合并 field is valid on reuse but resets to 未合并 for a new
    functional submission round; this drafting stage never creates a waiting
    MR claim without going-live's exact MR evidence. Missing or
    conflicting statuses are invalid,
-   and a new duplicate entry is invalid. A proven non-functional continuation
-   is skipped before this validator is called.
+   and a new duplicate entry is invalid. A non-functional continuation is
+   skipped before this validator only with a verified owner page/current entry
+   and retained target/body readback; otherwise validate its normal creation
+   or append plan.
 5. A successful new entry contains every canonical field from
    `references/wiki-template.md`, including `项目名称`, the exact Jenkins Job
    link, and exactly one valid type-specific status: `是否上线：未合并` for a
    business project at test submission; `当前版本：canary` for
    tooling `canary` or `当前版本：latest` for tooling `official`. Tooling
-   has no `是否上线` line. Check release evidence, or the exact planned channel
-   with a conditional successful-release gate under `DEPLOY`; under `SKIP`,
+   has no `是否上线` line. Under `TRIGGER_ACCEPTED`, preserve an evidenced prior
+   channel or use `当前版本：待发布` when no publication is evidenced; this pending
+   value is valid for new pages, appended entries and reuse. Queue acceptance is not publication evidence, and
+   submission does not wait for publication before writing. For a release that
+   waits to completion, check release evidence or an exact planned channel with
+   a conditional successful-release gate. Under `SKIP`,
    preserve valid existing evidence without querying builds or defaulting to
    canary. A master merge alone cannot prove the latest publication. It contains no
    process narration, validation verdict, write instruction, or unsupported

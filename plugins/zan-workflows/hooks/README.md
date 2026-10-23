@@ -15,6 +15,10 @@ continues checking later commands in the same shell request. Passing this
 syntax check does not authorize deletion: `going-live` still requires the
 exact user-confirmed cleanup plan and a fresh delivery/data/occupancy check.
 
+Branch listing patterns and filters are read-only queries, so they do not
+require branch-creation flags. Deletion and rebase checks use the repository
+selected by Git's global options, including repeated `git -C` paths.
+
 The hooks are portable across machines:
 
 - Plugin scripts are resolved from `${PLUGIN_ROOT}`.

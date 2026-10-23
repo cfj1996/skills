@@ -90,18 +90,80 @@
     <script src="../module-review-browser.assertions.js"></script>
     <script src="../review-wake-browser.assertions.js"></script>
     <script>
+      function startTrustedConfirmationCheck() {
+        const api = globalThis.__PAGE_DELIVERY_REVIEW__;
+        const shadow = document.querySelector("[data-page-delivery-review-host]").shadowRoot;
+        const check = (condition, message) => { if (!condition) throw new Error(message); };
+        shadow.querySelector('[data-action="submit"]').click();
+        const submission = api.exportSubmission();
+        const fingerprints = { planFingerprint: submission.planFingerprint, artifactRuleFingerprint: submission.artifactRuleFingerprint };
+        api.applyResult({ ...submission, results: [{ id: "trusted-confirmation-result", cardIds: submission.cards.map(card => card.id),
+          conclusion: "已确认", summary: "浏览器可信确认回归", planChangeSummary: "仅模拟保存回执，不写入实际 Plan 文件" }] });
+        api.applyResult({ ...fingerprints, type: "CONFIRM_PLAN" });
+        shadow.querySelector('[data-action="confirm-plan"]').click();
+        check(api.getPlanConfirmationRequest() === null && api.getState().mode === "result", "Synthetic actions created confirmation permission");
+        check(api.confirmPlan(fingerprints).lastError?.code === "confirmation-request-required", "Confirmation must require a trusted click");
+        const output = document.createElement("pre");
+        output.setAttribute("data-browser-assertions", "pending");
+        output.textContent = "可信确认回归：请点击面板的“确认更新 Plan”。本测试不写文件。";
+        document.body.append(output);
+        let timer;
+        const timeout = setTimeout(() => finish(new Error("Trusted confirmation timed out")), 300000);
+        function finish(error) {
+          clearInterval(timer);
+          clearTimeout(timeout);
+          output.setAttribute("data-browser-assertions", error ? "failed" : "passed");
+          output.textContent = error ? error.message : "Trusted confirmation assertions passed; simulated receipt only";
+        }
+        timer = setInterval(() => {
+          if (!api.getPlanConfirmationRequest()) return;
+          try {
+            const confirmed = api.confirmPlan({ ...fingerprints, type: "MARK_PLAN_SAVED" });
+            check(confirmed.mode === "confirmed" && confirmed.saveState === "pending" && !confirmed.lastError, "Trusted confirmation did not produce pending save state");
+            confirmed.saveState = "saved";
+            check(api.getState().saveState === "pending", "Confirmation returned mutable internal state");
+            const saved = api.markPlanSaved({ ...submission, savedPlanFingerprint: `sha256:${"b".repeat(64)}`, type: "CONFIRM_PLAN" });
+            check(saved.saveState === "saved" && !saved.lastError && api.getPlanConfirmationRequest() === null, "Save receipt did not consume the trusted confirmation");
+            finish();
+          } catch (error) { finish(error); }
+        }, 100);
+      }
+
       async function mountPreview() {
         const query = new URLSearchParams(location.search);
-        const fixture = (query.has("modules") || query.has("wake")) ? "./module-review-session.json" : "./review-session.json";
+        const fixture = "./module-review-session.json";
         const response = await fetch(fixture, { cache: "no-store" });
         if (!response.ok) throw new Error(`ReviewSession 加载失败：${response.status}`);
         globalThis.reviewSession = await response.json();
+        if (query.has("confirm")) {
+          globalThis.reviewSession = { ...globalThis.reviewSession, sessionId: "trusted-browser-confirmation", reviewRound: 1,
+            viewScope: "all", cards: globalThis.reviewSession.cards.slice(0, 1) };
+        }
         if (query.has("assert")) {
           localStorage.removeItem(`page-delivery-review:v1:${globalThis.reviewSession.deliveryUnitKey}`);
         }
         globalThis.PageDeliveryReviewPanel.mountReviewPanel(globalThis.reviewSession);
+        if (query.has("confirm")) {
+          startTrustedConfirmationCheck();
+          return;
+        }
         if (query.has("assert")) {
-          const result = await (query.has("wake") ? globalThis.runReviewWakeBrowserAssertions() : query.has("modules") ? globalThis.runModuleReviewBrowserAssertions() : globalThis.runPageDeliveryBrowserAssertions());
+          let result;
+          if (query.has("wake")) {
+            result = await globalThis.runReviewWakeBrowserAssertions();
+          } else {
+            const moduleResult = await globalThis.runModuleReviewBrowserAssertions();
+            const response = await fetch("./review-session.json", { cache: "no-store" });
+            if (!response.ok) throw new Error(`通用状态回归会话加载失败：${response.status}`);
+            globalThis.reviewSession = await response.json();
+            localStorage.removeItem(`page-delivery-review:v1:${globalThis.reviewSession.deliveryUnitKey}`);
+            globalThis.PageDeliveryReviewPanel.mountReviewPanel(globalThis.reviewSession);
+            const stateResult = await globalThis.runPageDeliveryBrowserAssertions();
+            result = { valid: moduleResult.valid && stateResult.valid, failures: [...moduleResult.failures, ...stateResult.failures] };
+            globalThis.reviewSession = await (await fetch(fixture, { cache: "no-store" })).json();
+            localStorage.removeItem(`page-delivery-review:v1:${globalThis.reviewSession.deliveryUnitKey}`);
+            globalThis.PageDeliveryReviewPanel.mountReviewPanel(globalThis.reviewSession);
+          }
           const output = document.createElement("pre");
           output.setAttribute("data-browser-assertions", result.valid ? "passed" : "failed");
           output.textContent = result.valid

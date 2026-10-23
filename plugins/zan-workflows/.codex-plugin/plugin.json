@@ -1,7 +1,7 @@
 {
   "name": "zan-workflows",
-  "version": "0.1.0+codex.20261021-adaptive-workflow",
-  "description": "Company requirement development, TAPD and Wiki-link workflows, page review, MR review, debug token, identity, memory, and unified Hub-first project knowledge for Codex.",
+  "version": "0.4.7+codex.20261023-direct-submission",
+  "description": "TAPD Bug repair and requirement development with scoped plans, task links, verified implementation and explicit delivery.",
   "author": {
     "name": "Local developer"
   },
@@ -11,8 +11,8 @@
     "displayName": "Zan Workflows",
     "composerIcon": "./assets/logo.png",
     "logo": "./assets/logo.png",
-    "shortDescription": "按复杂度分流的 TAPD 需求、Bug 开发与交付。",
-    "longDescription": "Routes requirements and Bugs through QUICK, STANDARD or FULL preparation, with independent risk-based verification and explicit delivery endpoints. QUICK uses a scoped execution brief; formal task and Plan workflows retain verified owners, estimates and readbacks. Includes test submission, master delivery, Wiki, MR review, debug tokens, identity and Hub-first project knowledge.",
+    "shortDescription": "TAPD Bug 修复与需求开发，按实际需要准备和交付。",
+    "longDescription": "Two implementation workflows for TAPD Bug repair and requirement development, plus direct test submission for existing work after developer inspection. Confirm one complete multi-project checklist, then reuse its authority across verified implementation, delivery and scoped automatic conflict handling. Standalone skills retain their own concrete-plan confirmations. Default delivery includes test-branch merge, accepted test-build submission without waiting for completion, and shared Wiki; narrower requests override defaults and go-live requires explicit scope.",
     "developerName": "Local developer",
     "category": "Productivity",
     "capabilities": [
@@ -20,17 +20,13 @@
       "Write"
     ],
     "defaultPrompt": [
-      "Use the appropriate Zan workflow skill for this task.",
-      "Use the shared adaptive-workflow policy: choose workflow_profile by complexity and uncertainty, verification_risk by impact, and delivery_mode only from user intent. QUICK never bypasses existing formal Plan, branch, status, review or delivery gates.",
-      "Apply the bundled model-routing policy to lead decisions and explicitly bound validators; let the runtime choose models for managed MR reviewer agents.",
-      "Before initial Bug work, show a concise project/repository, branch, and scope checklist and wait for confirmation; for CONTINUE work, reuse unchanged bound facts and confirm only unclear incremental scope.",
-      "Reuse original branch and TAPD status for CONTINUE work. Ordinary Bug repair stops after implementation and review; only requested submission resolves Wiki/deployment policy and uses the consolidated submission confirmation.",
-      "Resolve and scope each TAPD work item before changing code.",
-      "Repair, automatically locate or create the required TAPD Wiki, submit for test, or merge to master and maintain its merge-status field with the matching functional skill.",
-      "Use $writing-plans for scoped requirement review; QUICK returns an in-memory execution brief. Write a formal branch-bound Plan only for STANDARD/FULL or an explicit Plan request, preserving its Task/readback requirements.",
-      "Use $breaking-down-requirement to split a TAPD Story into Tasks with verified developers and final estimated hours; display only final estimated hours in the complete task list and wait for human confirmation before creating or updating Tasks, then link exact Task readbacks to Plan steps.",
-      "Use $developing-requirement to choose QUICK, STANDARD or FULL, bind the exact branch, implement and review, then enter test submission or master delivery only when requested.",
-      "Use $linking-tapd-wiki to safely backfill or verify an existing 提测 Wiki link in a TAPD Bug, Story, or Task comment without rerunning submission."
+      "Use $fixing-bug for TAPD Bugs and $developing-requirement for Story/Task development. Use $submitting-for-test for 直接提测 of existing implementation after developer inspection; do not rerun implementation. Load each capability only at its stage.",
+      "Prepare a concise scope, implementation and verification brief. Use formal Task/Plan capabilities only when actually needed or explicitly requested, preserving existing task readbacks and confirmed scope. Route approved Task creation through breaking-down-requirement to TAPD MCP create_task/create_tasks; checklists and Plans consume the same verified result.",
+      "Before initial writes, finish read-only preparation of all selected delivery targets and the Wiki preview, then render references/execution-checklist.md#完整展示模板 in full. Scope review and branch preflight are not execution-confirmation points. Show 确定清单 with multi-project overview, a selected TAPD Task table (序号/标题/工时) before 执行内容, six columns, indexed notes and concrete writes. Prefix Task titles with the current operation 【新建】/【复用】/【调整】 and retain real links. Distinguish original/proposed Task estimates from evidence-based remaining work in the same hours cell; show only the Task list without totals, subtotals or missing-value counts. Keep unknowns explicit in their rows and list each Task once across projects. Display labels and remaining-work predictions never overwrite Task names or estimates or trigger scheduling. Use stable #F01 task references later; detail #01 and real Task/Plan identities stay separate. Ordinary repair/development defaults to test-branch merge, test build/deploy and shared Wiki, subject to explicit overrides and confirmation. Preview Wiki before confirmation. Approved content becomes 执行清单; material changes re-display the complete 确定清单. Preserve completed effects.",
+      "For fixing-bug/developing-requirement, reuse human approval of the complete execution checklist across downstream skills after exact scope/derivation checks. Do not request a second submission/build/Wiki approval for covered operations or technical PLAN states. Standalone skill calls still display and confirm their own concrete plans. Include scoped automatic A-to-C-to-B conflict resolution in the first checklist; validate and review it before continuing, with no unapproved cleanup. Only material scope/operation changes or genuinely missing user decisions need further input. End the main workflow with actual execution results and next-step advice, not routine continue/cleanup questions.",
+      "Use the original fixed branch for continued work. Bug implementation includes verified repair ownership and start/completion records. Ordinary full Bug repair first enters 修复中, then reaches 待测试 only after test-delivery gates pass. Show the final TAPD target under 合并与测试环境, distinguish planned targets from actual readbacks, and preserve existing implementation-only and idempotent continuation policies. Requirement implementation covers only selected Tasks and their acceptance.",
+      "Complete relevant verification and independent final review before default test delivery. Requirement checklists default to 直接提测：是. Explicit implementation-only requests, 先完成代码，我检查后再提测, 先不要提交/推送 or 暂不直接提测 show 直接提测：否 and stop at REVIEWED without delivery writes. Later direct submission refreshes existing diff/refs and invalidated verification/independent review, shows its exact delivery checklist and obtains matching authorization. 直接提测 does not imply SKIP; only an explicit no-build choice disables Jenkins. Business scope restrictions such as 只开发 B 端相关功能, 仅改前端 or 只做所选 Task retain default test delivery; only a delivery endpoint restriction such as 仅开发验证 or 不提测 disables it. Merge/build means the verified dev/develop target and project test environment, subject to the exact delivery plan. Test submission uses completionMode=TRIGGER_ACCEPTED and proceeds on the exact BUILD_SUBMITTED queue receipt without waiting; report build submitted, never deployment or publication success; go-live requires an explicit request.",
+      "Use submitting-for-test and going-live only for the requested delivery stage. Their exact write plans, readbacks, manual-merge handoff and separately confirmed cleanup remain authoritative."
     ]
   }
 }

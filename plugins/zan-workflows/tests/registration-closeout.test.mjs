@@ -36,6 +36,30 @@ async function register(fake, changes = {}) {
   return registerTestSubmission(fake.call, { ...plan, execute: true, confirmed: true });
 }
 
+const submittedBuild = () => ({ state: 'BUILD_SUBMITTED', completionMode: 'TRIGGER_ACCEPTED', writes: 1,
+  queueId: 8, queueUrl: 'https://ci.example.test/queue/item/8/', jobName: 'demo-test',
+  jobUrl: 'https://ci.example.test/job/demo-test/', sourceRepository: 'https://git.example.test/team/demo.git',
+  expectedSha: 'a'.repeat(40), submittedParams: { branch: 'develop' }, sourceVerified: false, buildNumber: null });
+
+test('an accepted build receipt permits waiting-test registration before Jenkins completes', async () => {
+  const fake = tapdFake();
+  const result = await register(fake, { prerequisites: { ...input().prerequisites,
+    deployment: 'BUILD_SUBMITTED', deploymentReceipt: submittedBuild() } });
+  assert.equal(result.state, 'REGISTERED');
+  assert.equal(fake.item.status, 'testing');
+  assert.equal(fake.calls.filter(call => call.name === 'update_bug').length, 1);
+});
+
+test('missing, unknown or incomplete submission receipts block TAPD writes', async () => {
+  for (const receipt of [undefined, { ...submittedBuild(), state: 'UNKNOWN' },
+    { ...submittedBuild(), queueUrl: null }, { ...submittedBuild(), submittedParams: {} }]) {
+    const fake = tapdFake();
+    await assert.rejects(register(fake, { prerequisites: { ...input().prerequisites,
+      deployment: 'BUILD_SUBMITTED', deploymentReceipt: receipt } }), /确切队列和参数回执/);
+    assert.equal(fake.calls.some(call => call.name.startsWith('update_')), false);
+  }
+});
+
 test('registration updates status, owner and version in one exact write and reads them back', async () => {
   const fake = tapdFake();
   const result = await register(fake);

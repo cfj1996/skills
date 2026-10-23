@@ -52,6 +52,13 @@ function checkParameters(definitions, input) {
   if (input.jobAdapter !== 'npm-tools-v1' && (!input.refParameter || String(input.params[input.refParameter]) !== input.releaseRef)) {
     throw new Error('发布 ref 必须绑定实际 Job 参数');
   }
+  const computedPackageVersion = input.releaseKind === 'package' && input.jobAdapter === 'npm-tools-v1' &&
+    input.versionStrategy === 'PIPELINE_COMPUTED';
+  if (input.releaseKind === 'package' && !computedPackageVersion &&
+      (!input.versionParameter || input.versionStrategy === 'PIPELINE_COMPUTED' ||
+        !/^\d+\.\d+\.\d+(?:-[a-z\d.-]+)?(?:\+[a-z\d.-]+)?$/i.test(input.version))) {
+    throw new Error('包发布必须绑定实际版本参数，或使用已核实的 npm-tools 计算版本契约；源码 SHA 不能代替包版本');
+  }
   if (input.versionParameter ? String(input.params[input.versionParameter]) !== input.version : input.version !== input.expectedSha) {
     throw new Error('版本必须绑定实际 Job 参数；无版本参数时使用已确认 SHA 作为发布身份');
   }
@@ -60,7 +67,7 @@ function checkParameters(definitions, input) {
       (!input.channelParameter || !CANARY.test(channelValue) || OFFICIAL.test(channelValue))) {
     throw new Error('金丝雀包发布必须绑定明确的非正式通道参数，不能使用 latest/stable');
   }
-  if (input.releaseKind === 'package' && input.releaseChannel === 'official' && input.versionStrategy !== 'PIPELINE_COMPUTED' &&
+  if (input.releaseKind === 'package' && input.releaseChannel === 'official' && !computedPackageVersion &&
       !/^\d+\.\d+\.\d+(?:\+[a-z\d.-]+)?$/i.test(input.version)) throw new Error('正式包必须绑定稳定版本');
   if (input.releaseChannel === 'official' && input.channelParameter && CANARY.test(channelValue)) {
     throw new Error('正式发布与实际通道参数不一致');
@@ -115,6 +122,13 @@ export function releaseRequiredTools(input) {
 
 export async function runJenkinsRelease(call, reader, input, io = {}) {
   validateWait(io);
+  const completionMode = input.completionMode ?? 'BUILD_TERMINAL';
+  if (!['BUILD_TERMINAL', 'TRIGGER_ACCEPTED'].includes(completionMode) ||
+      (completionMode === 'TRIGGER_ACCEPTED' && (input.releaseChannel !== 'canary' ||
+        (input.releaseKind === 'deployment' && input.targetEnvironment !== 'test')))) {
+    throw new Error('提交即返回仅用于测试提测构建；正式发布必须等待构建完成');
+  }
+  input = { ...input, completionMode };
   const requestedBindingMode = bindingMode(input);
   for (const key of ['targetProject', 'releaseTarget', 'targetEnvironment', 'jobName', 'jobUrl',
     'releaseRef', 'releaseChannel', 'purpose', 'sourceRepository', 'expectedSha']) requireText(input[key], key);
@@ -187,6 +201,7 @@ export async function runJenkinsRelease(call, reader, input, io = {}) {
   result.jobBindingMode = jobBindingMode;
   result.jobAdapter = input.jobAdapter;
   result.versionStrategy = input.versionStrategy || 'EXPLICIT';
+  result.completionMode = completionMode;
   let phase = 'TRIGGER';
   const waitOptions = { ...io, deadline: (io.now || Date.now)() + (io.maxWaitMs ?? 1800000) };
   try {
@@ -195,9 +210,15 @@ export async function runJenkinsRelease(call, reader, input, io = {}) {
     result.writes++;
     if (triggered?.jobName !== input.jobName || !triggered.queueUrl) throw new Error('触发结果缺少确切队列；不要重试发布');
     const queue = reader.queueIdentity(triggered.queueUrl);
+    if (!Number.isSafeInteger(queue.id) || queue.id < 1) throw new Error('触发结果缺少确切队列 ID；不要重试发布');
     result.queueUrl = queue.url || triggered.queueUrl;
     result.queueId = queue.id;
     io.onProgress?.({ state: 'TRIGGERED', queueId: result.queueId, queueUrl: result.queueUrl });
+    if (completionMode === 'TRIGGER_ACCEPTED') {
+      // The accepted queue is the submission receipt, not evidence of a completed build.
+      return { ...result, state: 'BUILD_SUBMITTED', submittedParams: { ...input.params },
+        ...(input.releaseKind === 'package' ? { version: null, versionIdentity: input.expectedSha } : {}) };
+    }
     phase = 'WAIT_QUEUE';
     const queued = await pollState(() => reader.queue(triggered.queueUrl), item => {
       if (item.cancelled) {

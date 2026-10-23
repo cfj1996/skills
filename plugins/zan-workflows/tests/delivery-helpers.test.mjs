@@ -44,6 +44,7 @@ function mergeFake({ existing = false, pipeline = ['success'], approvals = [], o
     throw new Error(name);
   };
   return { call, calls, io: { ...clock(), checkRepository: async () => {},
+    inspectContainment: async () => ({ contained: false, targetSha }),
     containsSource: async () => ({ contained, targetSha: otherSha }) } };
 }
 
@@ -206,6 +207,68 @@ test('release triggers once, follows its exact queue/build and verifies target r
   assert.ok(fake.reads.every(value => value === 'queue' || value === 12));
 });
 
+test('test submission returns the accepted queue without reading or waiting for the build', async () => {
+  const fake = releaseFake({ queuePending: 100, status: 'FAILURE' });
+  const input = { ...releaseInput(), completionMode: 'TRIGGER_ACCEPTED' };
+  const plan = await runJenkinsRelease(fake.call, fake.reader, input, fake.io);
+  assert.equal(plan.completionMode, 'TRIGGER_ACCEPTED');
+  assert.equal(fake.calls.some(call => call.name === 'jenkins_trigger_build'), false);
+  const result = await runJenkinsRelease(fake.call, fake.reader, { ...plan, execute: true, confirmed: true }, fake.io);
+  assert.equal(result.state, 'BUILD_SUBMITTED');
+  assert.equal(result.queueId, 8);
+  assert.equal(result.queueUrl, 'https://ci.example.test/jenkins/queue/item/8/');
+  assert.equal(result.buildNumber, null);
+  assert.equal(result.sourceVerified, false);
+  assert.deepEqual(result.submittedParams, input.params);
+  assert.deepEqual(fake.reads, []);
+  assert.equal(fake.calls.filter(call => call.name === 'jenkins_trigger_build').length, 1);
+});
+
+test('submission mode rejects unknown receipts without retrying and still checks source before triggering', async () => {
+  for (const onCall of [
+    name => name === 'jenkins_trigger_build' ? reply({ jobName: 'demo-test' }) : undefined,
+    name => { if (name === 'jenkins_trigger_build') throw new Error('timeout'); },
+  ]) {
+    const fake = releaseFake({ onCall });
+    await assert.rejects(executeRelease(fake, { completionMode: 'TRIGGER_ACCEPTED' }), error => {
+      assert.equal(error.result.state, 'UNKNOWN');
+      return true;
+    });
+    assert.deepEqual(fake.reads, []);
+    assert.equal(fake.calls.filter(call => call.name === 'jenkins_trigger_build').length, 1);
+  }
+  const fake = releaseFake();
+  const plan = await runJenkinsRelease(fake.call, fake.reader,
+    { ...releaseInput(), completionMode: 'TRIGGER_ACCEPTED' }, fake.io);
+  await assert.rejects(runJenkinsRelease(fake.call, fake.reader, { ...plan, execute: true, confirmed: true },
+    { ...fake.io, checkSource: async () => { throw new Error('source drift'); } }), /source drift/);
+  assert.equal(fake.calls.some(call => call.name === 'jenkins_trigger_build'), false);
+});
+
+test('official and production releases cannot use submission completion mode', async () => {
+  for (const changes of [{ releaseChannel: 'official' }, { targetEnvironment: 'production' }, { completionMode: 'unknown' }]) {
+    const fake = releaseFake();
+    await assert.rejects(executeRelease(fake, { completionMode: 'TRIGGER_ACCEPTED', ...changes }), /正式发布必须等待/);
+    assert.equal(fake.calls.some(call => call.name === 'jenkins_trigger_build'), false);
+  }
+});
+
+test('submission mode rejects foreign or malformed queue URLs without making any read request', async () => {
+  for (const queueUrl of ['https://other.example.test/jenkins/queue/item/8/',
+    'https://ci.example.test/jenkins/queue/item/0/',
+    'https://ci.example.test/jenkins/job/demo-test/12/']) {
+    const fake = releaseFake({ onCall: name => name === 'jenkins_trigger_build'
+      ? reply({ jobName: 'demo-test', queueUrl }) : undefined });
+    const reader = createJenkinsReader({ MCP_JENKINS_URL: 'https://ci.example.test/jenkins',
+      MCP_JENKINS_USER: 'fixture', MCP_JENKINS_API_TOKEN: 'fake-token' }, 'demo-test', jobUrl,
+      async () => assert.fail('queue receipt validation must not make HTTP requests'));
+    fake.reader.queueIdentity = reader.queueIdentity;
+    await assert.rejects(executeRelease(fake, { completionMode: 'TRIGGER_ACCEPTED' }));
+    assert.equal(fake.calls.filter(call => call.name === 'jenkins_trigger_build').length, 1);
+    assert.deepEqual(fake.reads, []);
+  }
+});
+
 test('changed Job config and invalid parameters stop before trigger', async () => {
   const fake = releaseFake();
   const plan = await runJenkinsRelease(fake.call, fake.reader, releaseInput(), fake.io);
@@ -253,6 +316,55 @@ test('package canary cannot silently use a stable channel', async () => {
   await assert.rejects(runJenkinsRelease(fake.call, fake.reader, {
     ...releaseInput(), releaseKind: 'package', version: '1.0.0', params: { REF: sourceSha, VERSION: '1.0.0' },
   }, fake.io), /金丝雀包发布/);
+  assert.equal(fake.calls.some(call => call.name === 'jenkins_trigger_build'), false);
+});
+
+test('SHA-only deployment identity cannot authorize an ordinary package release', async () => {
+  const params = { REF: sourceSha, CHANNEL: 'canary' };
+  const fake = releaseFake({ onCall(name) {
+    if (name === 'jenkins_get_job_parameters') return reply({ jobName: 'demo-test', parameters: [
+      { name: 'REF', type: 'string' }, { name: 'CHANNEL', type: 'choice', choices: ['canary', 'latest'] },
+    ] });
+  }, onBuild(build) {
+    build.actions[0].parameters = Object.entries(params).map(([name, value]) => ({ name, value }));
+    return build;
+  } });
+  const plan = await runJenkinsRelease(fake.call, fake.reader, { ...releaseInput(),
+    versionParameter: undefined, version: sourceSha, channelParameter: 'CHANNEL', params }, fake.io);
+  for (const versionStrategy of [undefined, 'PIPELINE_COMPUTED']) {
+    for (const execute of [false, true]) {
+      await assert.rejects(runJenkinsRelease(fake.call, fake.reader, { ...plan,
+        releaseKind: 'package', releaseTarget: '@example/demo', versionStrategy, adapterHash: undefined,
+        execute, confirmed: execute }, fake.io), /包发布必须绑定实际版本参数/);
+    }
+  }
+  assert.equal(fake.calls.some(call => call.name === 'jenkins_trigger_build'), false);
+  const result = await runJenkinsRelease(fake.call, fake.reader, { ...plan,
+    execute: true, confirmed: true }, fake.io);
+  assert.equal(result.state, 'DEPLOYED');
+  assert.equal(result.version, sourceSha);
+  assert.equal(fake.calls.filter(call => call.name === 'jenkins_trigger_build').length, 1);
+});
+
+test('ordinary package versions cannot be SHA values or claim a computed contract', async () => {
+  const fake = releaseFake({ onCall(name) {
+    if (name === 'jenkins_get_job_parameters') return reply({ jobName: 'demo-test', parameters: [
+      { name: 'REF', type: 'string' }, { name: 'VERSION', type: 'string' },
+      { name: 'CHANNEL', type: 'choice', choices: ['canary', 'latest'] },
+    ] });
+  } });
+  const plan = await runJenkinsRelease(fake.call, fake.reader, { ...releaseInput(),
+    releaseKind: 'package', releaseTarget: '@example/demo', channelParameter: 'CHANNEL',
+    params: { ...releaseInput().params, CHANNEL: 'canary' } }, fake.io);
+  for (const change of [
+    { version: sourceSha, params: { ...plan.params, VERSION: sourceSha } },
+    { versionStrategy: 'PIPELINE_COMPUTED' },
+  ]) {
+    for (const execute of [false, true]) {
+      await assert.rejects(runJenkinsRelease(fake.call, fake.reader, { ...plan, ...change,
+        adapterHash: undefined, execute, confirmed: execute }, fake.io), /包发布必须绑定实际版本参数/);
+    }
+  }
   assert.equal(fake.calls.some(call => call.name === 'jenkins_trigger_build'), false);
 });
 
@@ -387,6 +499,8 @@ test('an actual canary package release reports its kind and cannot switch to lat
   const result = await runJenkinsRelease(fake.call, fake.reader, { ...plan, execute: true, confirmed: true }, fake.io);
   assert.equal(result.state, 'RELEASED');
   assert.equal(result.releaseKind, 'package');
+  assert.equal(result.version, '1.0.0-canary.1');
+  assert.equal(result.versionStrategy, 'EXPLICIT');
   await assert.rejects(runJenkinsRelease(fake.call, fake.reader, { ...input, params: { ...input.params, CHANNEL: 'latest' } }, fake.io), /不能使用 latest/);
   assert.equal(fake.calls.filter(call => call.name === 'jenkins_trigger_build').length, 1);
 });

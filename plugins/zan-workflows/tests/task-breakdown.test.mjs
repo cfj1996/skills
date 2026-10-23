@@ -175,7 +175,7 @@ test('partial, duplicated, mismatched or ambiguous readbacks cannot become TASKS
   ]) { const value = records(input); change(value); assert.equal(validateTaskReadbacks(input, value).valid, false); }
 });
 
-test('Plan validator consumes the same proposal/readbacks and preserves legacy non-TAPD Plans', () => {
+test('Plan validator consumes the same proposal/readbacks and supports direct non-TAPD Plans', () => {
   const value = model();
   assert.deepEqual(validatePagePlanModel(value), { valid: true, errors: [] });
   delete value.taskBreakdown; delete value.tapdRequirement; delete value.tasks[0].tapdTaskKey;
@@ -224,26 +224,22 @@ test('staged TAPD Plans can retain proposals, while implementation requires read
   assert.match(messages(validatePagePlanModel(value)), /TASKS_READY/);
 });
 
-test('a QUICK label or execution brief cannot bypass formal TAPD Plan readiness', () => {
-  for (const profile of ['QUICK', 'STANDARD', 'FULL']) {
-    const value = model();
-    value.workflow_profile = profile;
-    value.verification_risk = 'NORMAL';
-    value.implementationBrief = { behaviors: ['失败时反馈并允许重试'], steps: ['修复并验证'] };
-    value.deliveryUnit.status = '可实施';
-    delete value.taskBreakdown;
-    assert.match(messages(validatePagePlanModel(value)), /TASKS_READY/);
-  }
+test('an execution brief cannot bypass formal TAPD Plan readiness', () => {
+  const value = model();
+  value.implementationBrief = { behaviors: ['失败时反馈并允许重试'], steps: ['修复并验证'] };
+  value.deliveryUnit.status = '可实施';
+  delete value.taskBreakdown;
+  assert.match(messages(validatePagePlanModel(value)), /TASKS_READY/);
 });
 
-test('QUICK cannot hide stale ownership or missing step bindings in an existing formal Plan', () => {
+test('an execution brief cannot hide stale ownership or missing step bindings in an existing formal Plan', () => {
   for (const invalidate of [
     value => { value.taskBreakdown.records[0].readback.ownerAccount = 'different-owner'; },
     value => { delete value.tasks[0].tapdTaskKey; },
     value => { value.taskBreakdown.records = []; },
   ]) {
     const value = model();
-    value.workflow_profile = 'QUICK';
+    value.implementationBrief = { steps: ['继续既有实施'] };
     invalidate(value);
     assert.equal(validatePagePlanModel(value).valid, false);
   }
@@ -256,6 +252,51 @@ test('an existing exact Task can be reused without rewriting its historical desc
   assert.equal(validateTaskBreakdown(input).valid, false);
   task.linkEvidence = 'exact Task ID and parent Story readback, verified scope and estimate';
   assert.equal(validateTaskReadbacks(input, records(input)).valid, true);
+});
+
+test('evidenced REUSE preserves an empty historical description and still requires exact readback', () => {
+  for (const description of ['', '   ', null]) {
+    const input = proposal(), task = input.tasks[0];
+    task.action = 'REUSE'; task.id = 'existing-task'; task.beforeFingerprint = 'snapshot';
+    task.linkEvidence = 'exact Task ID and parent Story, verified scope and estimate';
+    task.payload.description = description;
+    assert.equal(validateTaskReadbacks(input, records(input)).valid, true);
+    const changed = records(input); changed[0].readback.payload.description = 'new description';
+    assert.equal(validateTaskReadbacks(input, changed).valid, false);
+    delete task.linkEvidence;
+    assert.equal(validateTaskBreakdown(input).valid, false);
+  }
+  for (const description of [undefined, {}, 123]) {
+    const input = proposal(), task = input.tasks[0];
+    task.action = 'REUSE'; task.id = 'existing-task'; task.beforeFingerprint = 'snapshot';
+    task.linkEvidence = 'verified existing Task'; task.payload.description = description;
+    assert.equal(validateTaskBreakdown(input).valid, false);
+  }
+  for (const action of ['CREATE', 'UPDATE']) {
+    const input = proposal(), task = input.tasks[0];
+    task.action = action; task.payload.description = ''; task.linkEvidence = 'not REUSE';
+    if (action === 'UPDATE') { task.id = 'existing-task'; task.beforeFingerprint = 'snapshot'; }
+    assert.equal(validateTaskBreakdown(input).valid, false);
+  }
+});
+
+test('stable Task markers compare the entire Story and key token across supported description formatting', () => {
+  const input = proposal(), task = input.tasks[0];
+  const marker = `zan-task:${input.requirement.id}:${task.key}`;
+  for (const description of [marker, `scope\n${marker}\nacceptance`, `<p>${marker}</p>`, `\`${marker}\``,
+    `**${marker}**`, `*${marker}*`, `_${marker}_`, `__${marker}__`, `~~${marker}~~`,
+    `***${marker}***`, `**_~~${marker}~~_**`, `<p>__*${marker}*__</p>`]) {
+    task.payload.description = description;
+    assert.equal(validateTaskReadbacks(input, records(input)).valid, true, description);
+  }
+  for (const description of [`${marker}0`, `${marker}-other`, `${marker}:child`, `prefix-${marker}`,
+    `${marker}_suffix`, `${marker}*suffix`, `**${marker}_suffix**`, `_${marker}0_`,
+    `**${marker}**_suffix`, `*${marker}**`, `~~${marker}~`,
+    `zan-task:${input.requirement.id}0:${task.key}`, marker.replace('DT-001', 'DT-00')]) {
+    task.payload.description = description;
+    assert.equal(validateTaskBreakdown(input).valid, false, description);
+    assert.equal(validateTaskReadbacks(input, records(input)).valid, false, description);
+  }
 });
 
 test('malformed proposal or dependency shapes return validation errors rather than crashing', () => {

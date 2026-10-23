@@ -4,11 +4,15 @@
 `master` deliveries, including the required latest flow for involved tooling
 packages and affected consumers.
 
+Here `master` means the verified remote default delivery branch, including
+`main` only when remote evidence identifies it as the actual default. Preserve
+that exact name through plan, executor, validation and containment checks.
+
 ## Required content
 
 | Section | Required facts |
 | --- | --- |
-| Submission | upstream `SUBMITTED` result and original repair branch; exact related submitted owner/consumer handoffs when tooling dependencies are involved |
+| Submission | upstream `SUBMITTED` result with every included repository's original repair branch and exact actual test target; single-project input or a same-Bug aggregate matched by repository/origin/fixed branch; exact related submitted owner/consumer handoffs when tooling dependencies are involved |
 | Repository | expected/actual path, Git root, origin, verification result |
 | Merge | source/target branches and SHAs, current-round commits, authorization, MR result, merge readback, master containment |
 | Tooling latest | `VERIFIED|NOT_APPLICABLE|AWAITING_MERGE|BLOCKED`; exact plan/authorization, latest precheck `VERIFIED_EXISTING|NEEDS_RELEASE|BLOCKED`, package owner delivery, `REUSED_LATEST|PUBLISHED_LATEST` and publication/source/registry evidence, Jenkins result only when a release is needed, affected consumer manifests/locks/resolved versions, upgrade review/checks/delivery, and final latest recheck |
@@ -17,7 +21,7 @@ packages and affected consumers.
 | Wiki | `UPDATED_PENDING_MERGE|ALREADY_PENDING_MERGE|UPDATED_MERGED|ALREADY_MERGED|UPDATED_LATEST|ALREADY_LATEST|SKIPPED_TOOL_PROJECT|SKIPPED_NO_WIKI|BLOCKED|NOT_ATTEMPTED`, matching project/branch entry, project type, before/after type-specific status, target/patch authorization, exact-body readback and intermediate body hash when used |
 | Validation | `VALIDATION_PASSED|VALIDATION_FAILED|NOT_RUN` and normalized reason |
 | Local closeout | per completed project `CHECKED|PARTIAL|UNAVAILABLE|NOT_TRIGGERED`; related branch/worktree paths, association and delivery evidence, observed tip/target SHAs, dirty/ignored/occupancy findings, and per-resource `CANDIDATE|RETAIN|VERIFY` with reasons |
-| Cleanup | `NO_CANDIDATE|AWAITING_CONFIRMATION|CLEANED|PARTIAL|BLOCKED|NOT_TRIGGERED`; exact plan and confirmation when applicable, final-response cleanup question or no-candidate/blocker reason, refreshed evidence, worktree-removal and local-branch-deletion readbacks, and completed/retained resources |
+| Cleanup | `NO_CANDIDATE|AWAITING_CONFIRMATION|CLEANED|PARTIAL|BLOCKED|NOT_TRIGGERED`; exact plan and confirmation when applicable, standalone cleanup question or main-workflow next-step advice, refreshed evidence, worktree-removal and local-branch-deletion readbacks, and completed/retained resources |
 | Remote cleanup | `NOT_REQUESTED|AWAITING_CONFIRMATION|NO_CANDIDATE|CLEANED|PARTIAL|BLOCKED`; associated remote merge refs may be attached as `CleanupPlan.remoteTemporary` under one explicit combined confirmation; remote development refs default NOT_REQUESTED and require a separate request; retain repository/remote/push URL/full refs/SHAs, own MR targets, protection/shared-use and containment evidence, conditional deletion and per-ref absence readback |
 | Terminal | `MERGED|AWAITING_MERGE|BLOCKED`; exact pending MR/read-only continuation when waiting, or blocker when applicable |
 | User action | For `AWAITING_MERGE`, `userAction.type=CONTACT_MERGER`, a message naming the exact MR/source/target and asking the user to contact a colleague with merge permission, and `resumePrompt=已合并，继续上线`; surface this in the final response even when the pending Wiki patch blocks |
@@ -45,20 +49,20 @@ packages and affected consumers.
   block. Reuse unchanged authority only for unfinished dependent actions.
 
 - `MERGED` requires the original submitted `feature/*` or `fixbug/*` source,
-  target exactly `master`, matching expected/actual source and target SHAs at
+  target exactly the verified remote default (`master` or `main`), matching expected/actual source and target SHAs at
   execution, explicit merge authorization, passing pre-write validation,
   successful merge readback, and containment of every current-round commit.
   If tooling packages are involved, it additionally requires
   `ToolingLatestResult=VERIFIED`, all bound consumers delivered at the current
   registry latest, and applicable Wiki `当前版本：latest` readbacks. Merge
   success alone cannot satisfy the overall delivery result.
-- `develop -> master`, `dev -> master`, `merge/*`, release branches, or a
+- `develop`/`dev` to the default delivery branch, `merge/*`, release branches, or a
   substituted source are always blocked.
   Here source means the original business source. An explicitly confirmed
   [A → C → B conflict](../../../references/conflict-merge.md) retains original
   A and distinct C → B MR evidence; it never passes C as A to the ordinary
   merge executor. Require both reviewed A and C containment in B before
-  recording completion. This exception does not permit develop/dev → master.
+  recording completion. This exception does not permit develop/dev → the default delivery branch.
 - A `STANDARD` submission, including `SKIPPED_BY_POLICY`, requires its
   pre-existing exact Wiki target and one uniquely matching source-branch entry.
   An involved tooling package yields `UPDATED_LATEST|ALREADY_LATEST`, with
@@ -85,7 +89,7 @@ packages and affected consumers.
 - `UPDATED_LATEST` requires verified official publication and same-registry latest
   readback for every required package, verified current consuming projects,
   their reviewed upgrade revisions delivered to the default target, exact Wiki
-  authorization, and a minimal `当前版本：canary` to `当前版本：latest`
+  authorization, and a minimal `当前版本：canary` or submission's `当前版本：待发布` to `当前版本：latest`
   patch plus exact-body readback. `ALREADY_LATEST` performs no Wiki write but
   requires the same package/consumer gates; the label itself is insufficient.
 - Read-only package latest and subsequent consumer-version checks both precede
@@ -107,7 +111,9 @@ packages and affected consumers.
 - Merge, package release, consumer-upgrade and Wiki-patch authority are distinct
   scopes and may share one
   current-conversation confirmation only when the full targets, operation,
-  purpose and actual minimal Wiki body/patch were displayed together. Omitted
+  purpose and actual minimal Wiki body/patch or its scoped evidence-based
+  derivation were included together in the complete main execution checklist.
+  A standalone call still displays/confirms its own complete exact plan. Omitted
   or changed scopes need fresh confirmation. Validate the unchanged delivery
   bundle once; the MR and update-only Wiki executors enforce fresh checks and
   readbacks without separate Agent validation between steps. Cleanup remains
@@ -118,8 +124,11 @@ packages and affected consumers.
   `是否上线：已合并` field and performs no Wiki write.
 - The merge-status field denotes current-round commit containment in
   `origin/master`; it does not claim that a production version was published.
-  Tooling `当前版本` denotes a verified `canary|official` publication channel;
-  master containment cannot change it or prove an official release.
+  Tooling `当前版本` denotes a verified `canary|official` publication channel,
+  or submission's `待发布` when publication is not yet evidenced. 待发布 does
+  not satisfy latest verification; only the full verified release/reuse and
+  consumer gates permit replacing it with latest. Master containment cannot
+  change the field or prove an official release.
 - `SKIPPED_TOOL_PROJECT` has no Wiki patch and requires no Wiki-write
   authorization; it never substitutes for an involved package's latest flow.
   `NO_WIKI` omits only Wiki operations, not release/consumer verification.
@@ -145,7 +154,7 @@ packages and affected consumers.
 - `NO_CANDIDATE` requires a complete check with no safe candidates. A partial
   or unavailable check yields cleanup `BLOCKED`, never a clean/no-candidate
   claim.
-- Every delivery final response includes the cleanup outcome. An
+- Every delivery final response includes the cleanup outcome. For standalone delivery, an
   `AWAITING_CONFIRMATION` result displays the exact plan and ends with
   `是否删除以上本地开发环境？`, offering `确认清理` or `保留开发环境`,
   for local-only scope. A combined plan uses the concise three-row format in
@@ -154,8 +163,9 @@ packages and affected consumers.
   evidence in memory; show repository, exact local/remote names and paths,
   retained remote development branches and concise exclusion reasons.
   A state code or generic recommendation cannot replace this question.
-  Orchestrators retain the plan and surface one combined question only after
-  all required delivery gates pass. Other states explain why cleanup is
+  Main orchestrators instead retain the plan and show cleanup as next-step
+  advice without another approval question or unapproved deletion. An explicit
+  independent CLEANUP request still obtains this exact confirmation. Other states explain why cleanup is
   unavailable; they do not request deletion of retained or uncertain resources.
 - An immediate cleanup confirmation answers only the unchanged displayed
   plan; `CLEANUP` reuses the prior merge result and rechecks candidates without

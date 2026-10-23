@@ -1,63 +1,55 @@
 from pathlib import Path
+import re
 import unittest
 
 
 PLUGIN_ROOT = Path(__file__).resolve().parents[1]
-SKILL = (PLUGIN_ROOT / "skills/fixing-bug/SKILL.md").read_text()
-CONTRACTS = (PLUGIN_ROOT / "skills/fixing-bug/references/contracts.md").read_text()
-WORKFLOW = (PLUGIN_ROOT / "skills/fixing-bug/references/workflow.md").read_text()
-SCENARIOS = (
-    PLUGIN_ROOT / "skills/fixing-bug/references/acceptance-scenarios.md"
-).read_text()
+SKILL_PATH = PLUGIN_ROOT / "skills/fixing-bug/SKILL.md"
+SKILL = SKILL_PATH.read_text()
+CONTRACTS = (SKILL_PATH.parent / "references/contracts.md").read_text()
+CHECKLIST = (PLUGIN_ROOT / "references/execution-checklist.md").read_text()
 
 
 class FixingBugScopeGateTests(unittest.TestCase):
-    def test_preflight_has_exact_visible_contract(self):
-        self.assertIn("| Bug | 项目/仓库 | 分支 | 修复范围 | 待确认 |", SKILL)
-        self.assertIn("| Bug | 项目/仓库 | 分支 | 修复范围 | 提测策略 | 部署 | 待确认 |", SKILL)
-        self.assertIn("For `IMPLEMENT`, use only these columns", SKILL)
-        self.assertIn("For `SUBMIT|GO_LIVE`, use these columns", SKILL)
-        self.assertIn("`是否按此清单执行？`", SKILL)
-        self.assertIn("Before confirmation", SKILL)
-        self.assertIn("do not create a branch", SKILL)
-        self.assertRegex(SKILL, r"every visible checklist field and\s+the delivery endpoint are unchanged")
+    def test_shared_checklist_is_the_only_presentation_contract(self):
+        self.assertIn("../../references/execution-checklist.md", SKILL)
+        self.assertIn("| 项目 | 分支 | 交付范围 | 实施方案 | 验收标准 | 待决事项 |", SKILL)
+        for required in ["#01", "TAPD 更新与修复记录", "是否按以上确定清单执行？"]:
+            self.assertIn(required, SKILL)
+        self.assertIn("等待授权不是缺口", SKILL)
+        self.assertIn("确认前只读", SKILL)
+        self.assertIn("表格、编号详情、所引 Plan", SKILL)
+        self.assertFalse((SKILL_PATH.parent / "references/workflow.md").exists())
 
-    def test_branch_confirmation_binds_identity_not_action(self):
-        self.assertIn(
-            "exact fixed branch identity; exclude `CREATE` or `USE_EXISTING`",
-            CONTRACTS,
-        )
-        self.assertRegex(
-            SKILL,
-            r"The expected `CREATE` to\s+`USE_EXISTING` transition does not invalidate confirmation",
-        )
-        self.assertIn(
-            "Branch action is execution control flow, not a visible checklist field",
-            WORKFLOW,
-        )
+    def test_prepare_is_read_only_until_all_items_and_confirmation_are_bound(self):
+        self.assertIn("全部条目预检完成", SKILL)
+        self.assertIn("`PENDING` 预检快照不是可执行交接", SKILL)
+        self.assertIn("`READY_FOR_HANDOFF`", SKILL)
+        self.assertIn("准确分支/基准", SKILL)
+        self.assertIn("状态/处理人及确认绑定", SKILL)
+        self.assertIn("暂停整个队列", SKILL)
+        self.assertIn("失败项不得", CONTRACTS)
 
-    def test_execution_time_preparation_failure_pauses_entire_queue(self):
-        self.assertRegex(
-            SKILL,
-            r"If execution-time `preparing-work`\s+returns `PENDING` or `BLOCKED`, pause the entire queue",
-        )
-        self.assertRegex(
-            SKILL,
-            r"Only\s+`implementing-work`, `submitting-for-test`, or `going-live`",
-        )
-        self.assertIn(
-            "Execution-time preparation becomes `PENDING` or `BLOCKED`",
-            SCENARIOS,
-        )
-        self.assertIn(
-            "Execution-time `preparing-work` returning `PENDING` or `BLOCKED` pauses the entire queue",
-            CONTRACTS,
-        )
-        self.assertIn(
-            "A downstream failure from `implementing-work`, `submitting-for-test`, or `going-live`",
-            CONTRACTS,
-        )
-        self.assertNotIn("A failed Bug does not cancel later Bugs.", CONTRACTS)
+    def test_shared_branch_creation_and_revalidation_are_preserved(self):
+        self.assertIn("CREATE → USE_EXISTING", SKILL)
+        self.assertIn("不增加确认", SKILL)
+        self.assertIn("第一次成功创建并读回固定分支后", SKILL)
+        self.assertIn("后续 Bug 使用 `USE_EXISTING`", SKILL)
+        self.assertIn("已有分支不要求已经包含当前 Bug", SKILL)
+        self.assertIn("失败发生在创建前则仍需 CREATE", CONTRACTS)
+
+    def test_owned_local_references_resolve(self):
+        for target in re.findall(r"\[[^\]]+\]\(([^)]+)\)", SKILL):
+            if "://" not in target and not target.startswith("#"):
+                with self.subTest(target=target):
+                    self.assertTrue((SKILL_PATH.parent / target.split("#", 1)[0]).is_file())
+
+    def test_scope_inputs_do_not_restore_removed_workflow_routing(self):
+        for removed in ["workflow_profile", "verification_risk", "QUICK", "FULL"]:
+            self.assertNotIn(removed, SKILL + CONTRACTS)
+        self.assertIn("implementationBrief", SKILL)
+        self.assertIn("STANDARD|NO_WIKI", SKILL)
+        self.assertIn("修复记录", SKILL)
 
 
 if __name__ == "__main__":

@@ -18,6 +18,40 @@ target-location, Wiki-ID, TAPD-comment, writeback, merge, or release narration.
 {项目状态行}
 ```
 
+## Preview boundary
+
+The rules below govern the final validated body. For an earlier execution
+checklist, use the distinct template-preview boundary below; never submit that
+preview as a validated body.
+
+## 确定清单中的模板预览
+
+用户明确需要 Wiki 时，入口在初次或调整后的完整确定清单中、执行确认问题前
+展示 `### 提测 Wiki 模板预览`。复用上面的 canonical 结构及最终页面的 `# 前端`
+标题；多项目按本次选定范围展示各项目/原分支条目，不增加另一套 Wiki 模板。
+
+- 明确标注“执行前模板预览，尚未写入 Wiki”。已核实的项目、仓库、负责人、
+  计划分支、影响范围和 Job 信息填实际值；分支未创建时在正文外说明计划动作。
+  不把已有 Wiki/已完成登记当成尚未执行的新写入，也不改变其历史条目。
+- 最终序号、页面地址或字段尚未核实，写 `〈定位后确定〉` 或 `〈待核实：字段〉`；
+  不猜 URL、人员、参数、状态或版本。模板预览不要求先有 `ReviewedChange`，
+  不为填完模板提前调用正式提测流程或定位/创建月份页。
+- 功能内容先展示已确认的拟修复/开发行为。尚未发生的实际修复、验证、构建
+  和发布结果写 `〈执行后按实际结果补充〉`，明确它们不是已通过事实。
+  这些计划待填项不是“待决事项”；必要的身份、接口或目标缺口仍按影响阶段
+  列入原清单，不能靠模板占位符清除真实阻塞。
+- 此预览不返回 `VALIDATED`，不产生目标/body hash，模板本身不授予写权限；
+  含未核实字段的结构不能传给写入脚本、评论或当成可提测结果。
+- 正式提测前，`drafting-wiki` 仍依据当前已审查改动、真实字段/目标和交付事实
+  生成无占位符的完整正文或最小补丁。主流程完整执行清单已确认模板、按实际
+  结果补全和本轮页面/回链操作时，准确计划核对通过后复用原授权，不另问
+  最终正文确认；单独执行提测仍展示准确正文/计划并取得其自身确认。原 Git/
+  部署门禁、正文验证及写后读回不变，新增业务字段/项目/目标不得视为模板补全。
+
+普通修复/开发的“是否需要提测 Wiki”默认“需要”，因此确定清单先展示模板。
+明确关闭 Wiki 或本轮仅开发/计划/分支时不展示空模板、不查询 Wiki；已有明确
+选择继续保留。默认意图或单个选项回答不授权合并、部署或提前写入。
+
 ## Field rules
 
 - `序号` is calculated from the resolved child Wiki under `# 前端`; a new child
@@ -74,7 +108,7 @@ target-location, Wiki-ID, TAPD-comment, writeback, merge, or release narration.
   field. Never use `reporter` as an implicit substitute; missing tester blocks.
 - `项目状态行` contains exactly one type-specific field:
   - Business: `- 是否上线：未合并` for test submission; use `已合并` only
-    after the original branch is verified in `origin/master`.
+    after the original branch is verified in the verified remote default ref (`origin/master` or `origin/main`).
     `待合并` is a valid intermediate value maintained by going-live only after
     exact original-source/default-target MR creation/reuse and open-state
     readback; it does not mean production delivery or completed merge.
@@ -87,18 +121,26 @@ target-location, Wiki-ID, TAPD-comment, writeback, merge, or release narration.
     source SHA and build evidence in claims. A newer verified publication may
     change the value in either direction. Do not infer a publication from the
     project category, Job name, selected parameter, or a master merge.
-    A `DEPLOY` draft may bind the exact planned channel, but its Wiki write is
-    conditional on the matching successful release readback. Under `SKIP`, use
+    For test submission with `completionMode=TRIGGER_ACCEPTED`, an accepted
+    `BUILD_SUBMITTED` receipt permits writing without publication readback:
+    preserve a valid evidenced current channel, or use `- 当前版本：待发布`
+    when no prior publication is evidenced. Queue acceptance does not establish
+    a new canary channel or an actual package version. This pending value is
+    valid on reuse and changes only after verified publication. For a release
+    that waits to completion, a draft may bind the planned channel conditional
+    on its matching successful release readback. Under `SKIP`, use
     existing release evidence or preserve a valid existing `当前版本` field;
     do not query builds, require deployment selections, or default to canary.
-    If the channel cannot be resolved, block the final body.
+    Outside the accepted/pending submission path, unresolved channel evidence blocks the final body.
   An unresolved project type blocks; never guess.
 - For `CONTINUE`, classify the current-round change before patching. If it is
-  `NON_FUNCTIONAL`, do not update the Wiki. If it is `FUNCTIONAL_IMPACT`, the
+  `NON_FUNCTIONAL` and the verified owner page already contains this repository/
+  branch entry, skip the body write and retain its exact readback. With no page
+  or current entry, prepare the normal creation/append body. If it is `FUNCTIONAL_IMPACT`, the
   new affected module/page must be appended to the matching entry's
   `影响范围` list; do not duplicate an identical existing item. A business
   entry already marked `已合并` must also return to `未合并` when this new
-  current round is not contained in `origin/master`. A tooling entry preserves
+  current round is not contained in the verified remote default ref (`origin/master` or `origin/main`). A tooling entry preserves
   its valid `当前版本` unless a newer release changes the channel under the
   verified-readback or conditional `DEPLOY` rule above.
   An existing `待合并` likewise returns to `未合并` when a new functional
@@ -135,8 +177,9 @@ Do not request a Wiki URL from the user. Resolve the target in this order:
    results under other parents are not a reason to scan the whole workspace.
 3. When the month exists, query the deterministic child title once with
    `get_wiki(name=MM-DD: 中文简述)` and locally match its returned
-   `parent_wiki_id` to the month ID. Reuse only a unique matching child whose
-   body evidences the original branch. `get_wiki` accepts `name` and `id`, but
+   `parent_wiki_id` to the month ID. A same-title child without an owner link
+   blocks: matching repository and branch do not establish TAPD ownership.
+   `get_wiki` accepts `name` and `id`, but
    not `parent_wiki_id` as a query option; never send that unsupported filter,
    paginate the unfiltered Wiki list, or repeat identical requests.
 4. If no related child exists, use title `MM-DD: {归属需求或Bug标题}`;
@@ -169,12 +212,13 @@ For `REUSE_EXISTING`, operate only on the current child body read from TAPD:
   affected module/page as the next numbered item under that entry's existing
   `影响范围` field. For a business project, the same minimal patch also changes
   `是否上线：已合并` to `是否上线：未合并` when the new current-round commits
-  are not contained in `origin/master`; an existing `未合并` is preserved. A
+  are not contained in the verified remote default ref (`origin/master` or `origin/main`); an existing `未合并` is preserved. A
   tooling project follows the `当前版本` rule above: preserve a valid value,
   update it only under the release-evidence rule above, or replace exactly one legacy
   `是否上线：无需上线` line when the release channel is evidenced. A missing
   status or any other non-current value blocks. For a `NON_FUNCTIONAL`
-  continuation, produce a policy skip and no patch.
+  continuation with this verified existing entry, produce a policy skip and no
+  patch while retaining the exact target/body readback for go-live.
 - Multiple matching entries, duplicate existing sequences,
   duplicate/conflicting status fields (including both tooling field names),
   malformed section boundaries, or an unreadable child block instead of guessing.

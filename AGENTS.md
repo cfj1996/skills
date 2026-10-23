@@ -15,16 +15,35 @@ git status --short
 node --test plugins/zan-workflows/tests/*.test.mjs
 python3 -m unittest discover -s plugins/zan-workflows/tests -p 'test_*.py'
 node --test plugins/zan-workflows/skills/writing-plans/tests/*.test.mjs
+node --test plugins/zan-workflows/skills/managed-mr-review/tests/*.test.mjs
 python3 /Users/cfj/.codex/skills/.system/skill-creator/scripts/quick_validate.py \
   plugins/zan-workflows/skills/writing-plans
 python3 /Users/cfj/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py \
   plugins/zan-workflows
 ```
 
-The `npx` command fetches TAPD data for workflow execution. Run Git commands from this repository root; use a pathspec such as `-- skills/tapd-workflow` when history should be limited to one standalone skill. The remaining commands run the Zan plugin's complete Node test suite and official Skill/Plugin validators. For a focused Wiki creation/supplementation/comment helper check, run `node --test plugins/zan-workflows/tests/ensure-test-wiki.test.mjs`; the complete Node suite already includes it. This test uses simulated TAPD responses and performs no external writes. For merge/Jenkins executor checks, run `node --test plugins/zan-workflows/tests/delivery-helpers.test.mjs`; these tests also use simulated remote responses. For TAPD registration and read-only closeout checks, run `node --test plugins/zan-workflows/tests/registration-closeout.test.mjs`; these tests simulate both TAPD and Git, without updating real items or deleting resources. For MCP session reuse, Jenkins adapters, automatic TAPD mappings and occupancy collectors, run `node --test plugins/zan-workflows/tests/adaptive-delivery.test.mjs`; remote responses are simulated and SQLite tests use disposable fixture databases. For long session input and GitLab approval compatibility, run `node --test plugins/zan-workflows/tests/session-approval-compat.test.mjs` and `python3 -m unittest discover -s plugins/zan-workflows/tests -p 'test_session_input_pty.py'`; the latter checks a real local PTY without remote writes. For TAPD list decoding, read-only preview recovery and exact Jenkins Job URL lookup, run `node --test plugins/zan-workflows/tests/submission-preflight.test.mjs`; these tests simulate responses without external writes. For browser checks, run `node plugins/zan-workflows/skills/writing-plans/tests/preview-review-panel.mjs`, then open the printed preview URL with `?assert` for legacy sessions or `?modules&assert` for module sessions and `?wake&assert` for notification races; `?modules` shows the interactive module preview.
+The `npx` command fetches TAPD data for workflow execution. Run Git commands from this repository root; use a pathspec such as `-- skills/tapd-workflow` when history should be limited to one standalone skill. The remaining commands run the Zan plugin's complete Node test suite and official Skill/Plugin validators. For a focused Wiki creation/supplementation/comment helper check, run `node --test plugins/zan-workflows/tests/ensure-test-wiki.test.mjs`; the complete Node suite already includes it. This test uses simulated TAPD responses and performs no external writes. For merge/Jenkins executor checks, run `node --test plugins/zan-workflows/tests/delivery-helpers.test.mjs`; these tests also use simulated remote responses. For TAPD registration and read-only closeout checks, run `node --test plugins/zan-workflows/tests/registration-closeout.test.mjs`; these tests simulate both TAPD and Git, without updating real items or deleting resources. For MCP session reuse, Jenkins adapters, automatic TAPD mappings and occupancy collectors, run `node --test plugins/zan-workflows/tests/adaptive-delivery.test.mjs`; remote responses are simulated and SQLite tests use disposable fixture databases. For long session input and GitLab approval compatibility, run `node --test plugins/zan-workflows/tests/session-approval-compat.test.mjs` and `python3 -m unittest discover -s plugins/zan-workflows/tests -p 'test_session_input_pty.py'`; the latter checks a real local PTY without remote writes. For TAPD list decoding, read-only preview recovery and exact Jenkins Job URL lookup, run `node --test plugins/zan-workflows/tests/submission-preflight.test.mjs`; these tests simulate responses without external writes. For browser checks, run `node plugins/zan-workflows/skills/writing-plans/tests/preview-review-panel.mjs`, then open the printed URL for the interactive module preview, add `?assert` for browser regression checks or `?wake&assert` for notification races.
 
 The registration checks also cover waiting-test owner selection (`te` before
 `reporter`), assignment drift and partial owner readback, without real TAPD writes.
+
+For default direct submission, the implementation-only developer-inspection stop,
+manual-edit review refresh and standalone delivery confirmation, run
+`python3 -m unittest discover -s plugins/zan-workflows/tests -p 'test_direct_submission_flow.py'`.
+These checks inspect workflow contracts without external writes.
+
+For already-delivered test-target containment, disabled-merge read-only delivery,
+stale/missing evidence and workflow-session continuation, run
+`node --test plugins/zan-workflows/tests/test-merge-containment.test.mjs`.
+It uses simulated APIs and disposable local Git repositories/bare remotes,
+without company remote calls or MR writes. The direct-submission Python checks
+also cover Bug completion-record refresh before delivery.
+
+For the mounted review panel's public API authorization and destroyed-session
+isolation, run `node --test plugins/zan-workflows/skills/writing-plans/tests/review-panel-public-api.test.mjs`.
+The full Writing Plans suite includes these tests. For the trusted-click browser
+path, open the preview with `?confirm&assert` and click its confirmation button;
+it uses a simulated save receipt and does not write a Plan.
 
 For shared Story/Bug Wiki ownership, sibling Task discovery, cross-repository
 same-name branches, body-less append previews and idempotent links, run
@@ -46,7 +65,7 @@ For requirement task estimates, confirmation fingerprints, exact Task readbacks,
 and Plan-to-Task ownership/coverage checks, run
 `node --test plugins/zan-workflows/tests/task-breakdown.test.mjs`. These tests
 use in-memory task/field/member fixtures and perform no external writes.
-They also verify that QUICK labels or execution briefs cannot bypass formal
+They also verify that execution briefs cannot bypass formal
 Plan Task readiness, owner readbacks or step bindings. The Python suite covers
 implementation-only Bug routing and conditional submission preparation.
 
@@ -70,6 +89,18 @@ For Bug repair-state and repair-owner planning/readback checks, run
 use in-memory Bug/member fixtures and the read-only helper CLI; they perform no
 TAPD writes.
 
+For existing-branch ancestry and continuation checks, run
+`node --test plugins/zan-workflows/tests/branch-ref-relationship.test.mjs`.
+These tests use disposable local Git fixtures to cover equal, local-ahead,
+remote-ahead, diverged and incomplete-history refs, with no external calls.
+
+For submission completion policy across legacy rules, release guidance,
+validators and new/reused tooling Wiki entries, run
+`python3 -m unittest discover -s plugins/zan-workflows/tests -p 'test_submission_completion_policy.py'`.
+These checks read local instructions only; build-receipt and no-poll behavior
+is covered by `delivery-helpers.test.mjs`, `adaptive-delivery.test.mjs` and
+`registration-closeout.test.mjs`, using simulated Jenkins/TAPD responses.
+
 ## Coding Style & Naming Conventions
 
 Write skill docs in concise Markdown with clear `#`/`##` headings, short rule lists, and fenced command examples. Preserve the existing mix of English headings and Chinese workflow detail where the skill already uses it. Name new skill folders with lowercase kebab-case, keep the entry file exactly `SKILL.md`, and use descriptive agent filenames such as `collector.md` or `reviewer.md`.
@@ -77,6 +108,10 @@ Write skill docs in concise Markdown with clear `#`/`##` headings, short rule li
 ## Testing Guidelines
 
 The `zan-workflows` plugin includes the Writing Plans skill's Node tests under `plugins/zan-workflows/skills/writing-plans/tests/`; run the complete suite and both official validators for every plugin change. For a standalone skill, run its owning workflow's targeted command, validate `skills/<skill-name>` with `skill-creator/scripts/quick_validate.py`, inspect generated artifacts when applicable, and confirm documented paths and commands still match the repository layout. Keep new scripts and tests inside their owning skill or plugin directory and document the exact command here.
+
+Also run `skills/managed-mr-review/tests/*.test.mjs` within the plugin. Set
+`PROJECT_KNOWLEDGE_ROOT` to the verified local knowledge repository when available
+to include its integration checks; otherwise report their skipped status.
 
 ## Commit & Pull Request Guidelines
 

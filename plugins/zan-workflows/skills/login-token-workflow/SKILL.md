@@ -17,15 +17,15 @@ Use this skill to fetch the two token types used by the project and wire them in
 - 商家 id: `fx_admin_siteId`
 - C 端用户 token: 通过商家后台 token 交换得到
 
-Obtain reusable login credentials only at runtime from an already authenticated browser session,
-direct user input, or an approved secret store. Never write passwords to skill documentation,
+Use an already authenticated browser session or an approved secret store. When login is
+needed, let the user enter their password directly on the login page, not in chat. Never write passwords to skill documentation,
 prompts, command output, logs, or generated artifacts. Do not persist cookies or raw tokens.
 
 ## Workflow
 
-1. Fetch the merchant admin token.
-2. Use the merchant admin token plus merchant site id to fetch a C-end user token.
-3. Build the local debug URL with `siteId` and the token that matches the current page type.
+1. Determine whether the target is a merchant page or a C-end page from the request and project context; resolve this before requesting a C-end identity.
+2. Fetch the merchant admin token and merchant site id. For a merchant page, build its local URL directly with these values; no C-end user ID or token exchange is needed.
+3. Only for a C-end page, verify the intended test user ID, exchange the merchant token for that user's token, then build the C-end URL. Do not substitute a merchant token if the exchange fails.
 
 ## Token Types
 

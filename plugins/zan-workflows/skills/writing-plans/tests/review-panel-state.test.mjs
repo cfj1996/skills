@@ -50,6 +50,10 @@ const resultDetails = state => ({
 
 const approvedCard = (overrides = {}) => ({
   id: "REV-CANONICAL",
+  module: {
+    ...structuredClone(session.cards[0].module),
+    scenarios: session.cards[0].module.scenarios.map((item, index) => ({ ...item, id: `${overrides.id || "REV-CANONICAL"}-S-${index + 1}` })),
+  },
   dimension: "页面定义",
   links: {
     features: ["F-001"],
@@ -93,7 +97,7 @@ const approvedCard = (overrides = {}) => ({
 });
 
 const approvedSession = (overrides = {}) => ({
-  schemaVersion: 1,
+  schemaVersion: 2,
   sessionId: "session-canonical",
   deliveryUnitKey: "sample/login",
   deliveryUnitKind: "page",
@@ -127,7 +131,7 @@ test("approved ReviewSession schema drives canonical state without path-bearing 
 
   assert.deepEqual(Object.keys(state.cards[0]).sort(), [
     "acceptanceCriteria", "conclusion", "design", "dimension", "evidenceChanged",
-    "id", "implementationPlan", "interactionStates", "links", "mockScenarios", "regionAndComponents",
+    "id", "implementationPlan", "interactionStates", "links", "mockScenarios", "module", "regionAndComponents",
     "relatedApis", "reopened", "reviewGoal", "reviewResult", "sourceEvidence",
     "telepath", "userNote",
   ]);
@@ -141,6 +145,7 @@ test("approved ReviewSession schema drives canonical state without path-bearing 
 
 test("approved ReviewSession rejects invalid top-level contracts and duplicate cards", () => {
   for (const [patch, code] of [
+    [{ schemaVersion: 1 }, "invalid-review-schema-version"],
     [{ schemaVersion: 99 }, "invalid-review-schema-version"],
     [{ deliveryUnitKey: "/absolute/login" }, "invalid-delivery-unit-key"],
     [{ deliveryUnitName: "" }, "invalid-delivery-unit-name"],
@@ -173,6 +178,12 @@ test("approved ReviewSession rejects invalid top-level contracts and duplicate c
       (error) => error?.code === code,
     );
   }
+});
+
+test("retired ReviewSession state cannot resume through reducer actions", () => {
+  const state = { ...createReviewState(session), schemaVersion: 1 };
+  assert.equal(reduceReviewState(state, { type: "SUBMIT" }), state);
+  assert.equal(reduceReviewState(state, { type: "REQUEST_PLAN_CONFIRMATION" }), state);
 });
 
 test("Plan confirmation gate requires one trusted, current, single-use request", () => {
@@ -284,136 +295,55 @@ test("artifact rule resolution is canonical across state, persisted drafts, and 
   assert.doesNotMatch(JSON.stringify(state.lastSubmission), /secret|private/);
 });
 
-test("temporary candidate confirmation is canonical across state, persisted drafts, and submissions", () => {
-  const taintedResolution = {
-    status: "temporarily-confirmed-candidate",
-    source: "candidate",
-    confirmedRuleFingerprint: session.artifactRuleFingerprint,
-    absolutePath: "/secret/AGENTS.md",
-    artifactPath: "/private/rule",
-    unknown: "drop-me",
-  };
-  const canonicalResolution = {
-    status: "temporarily-confirmed-candidate",
-    source: "candidate",
-    confirmedRuleFingerprint: session.artifactRuleFingerprint,
-  };
-  let state = createReviewState({
-    ...session,
-    artifactRuleResolution: taintedResolution,
-  });
-  assert.deepEqual(state.artifactRuleResolution, canonicalResolution);
-  assert.doesNotMatch(JSON.stringify(state), /secret|private|drop-me/);
-
-  const values = new Map();
-  const storage = {
-    getItem(key) { return values.get(key) || null; },
-    setItem(key, value) { values.set(key, value); },
-    removeItem(key) { values.delete(key); },
-  };
-  const storageKey = buildStorageKey("sample/temporary-resolution");
-  saveDraft(storageKey, {
-    deliveryUnitKey: "sample/temporary-resolution",
-    sessionId: state.sessionId,
-    reviewRound: state.reviewRound,
-    planFingerprint: state.planFingerprint,
-    artifactRuleFingerprint: state.artifactRuleFingerprint,
-    artifactRuleResolution: taintedResolution,
-    savedAt: Date.now(),
-    cards: [],
-  }, storage);
-  const persistedDraft = JSON.parse(values.get(storageKey));
-  assert.deepEqual(persistedDraft.artifactRuleResolution, canonicalResolution);
-  assert.doesNotMatch(JSON.stringify(persistedDraft), /secret|private|drop-me/);
-
-  state = reduceReviewState(state, { type: "SUBMIT" });
-  assert.deepEqual(state.lastSubmission.artifactRuleResolution, canonicalResolution);
-  assert.doesNotMatch(JSON.stringify(state.lastSubmission), /secret|private|drop-me/);
-});
-
-test("unresolved artifact rule candidates fail before review state creation or mount", () => {
-  const unresolvedSession = {
-    ...session,
-    artifactRuleResolution: {
-      status: "unresolved-candidate",
-      source: "candidate",
-    },
-    cards: [null],
-  };
-  for (const start of [
-    () => createReviewState(unresolvedSession),
-    () => mountReviewPanel(unresolvedSession),
-  ]) {
-    assert.throws(
-      start,
-      (error) => error?.code === "artifact-rule-confirmation-required",
-    );
+test("retired temporary artifact rules are rejected before review and excluded from drafts", () => {
+  for (const confirmedRuleFingerprint of [undefined, session.artifactRuleFingerprint, "sha256:different-rule"]) {
+    const artifactRuleResolution = {
+      status: "temporarily-confirmed-candidate", source: "candidate", confirmedRuleFingerprint,
+    };
+    for (const start of [createReviewState, mountReviewPanel]) {
+      assert.throws(
+        () => start({ ...session, artifactRuleResolution }),
+        error => error?.code === "invalid-artifact-rule-resolution",
+      );
+    }
+    const draft = sanitizeDraft({ artifactRuleResolution, cards: [] });
+    assert.equal(Object.hasOwn(draft, "artifactRuleResolution"), false);
   }
 });
 
-test("a matching temporary candidate confirmation permits read-only review but never Plan confirmation", () => {
-  const temporaryResolution = {
-    status: "temporarily-confirmed-candidate",
-    source: "candidate",
-    confirmedRuleFingerprint: session.artifactRuleFingerprint,
-  };
-  let state = createReviewState({
-    ...session,
-    artifactRuleResolution: temporaryResolution,
-  });
-  assert.deepEqual(state.artifactRuleResolution, temporaryResolution);
-
+test("unresolved artifact rules allow read-only scope review but cannot confirm or save a Plan", () => {
+  let state = createReviewState({ ...session, artifactRuleResolution: { status: "unresolved-candidate", source: "candidate" } });
+  state = reduceReviewState(state, { type: "EDIT_CARD", patch: { conclusion: "已确认", userNote: "范围明确" } });
   state = reduceReviewState(state, { type: "SUBMIT" });
-  assert.deepEqual(state.lastSubmission.artifactRuleResolution, temporaryResolution);
+  assert.equal(state.mode, "reviewing");
+  assert.equal(state.lastSubmission.artifactRuleResolution.status, "unresolved-candidate");
   state = reduceReviewState(state, {
-    type: "APPLY_RESULT",
-    submissionId: state.lastSubmission?.submissionId,
-    sessionId: session.sessionId,
-    submissionVersion: 1,
-    ...matchedFingerprints,
-    results: [{ id: "result", ...resultDetails(state), conclusion: "阻塞" }],
+    type: "APPLY_RESULT", sessionId: state.sessionId, submissionId: state.lastSubmission.submissionId,
+    submissionVersion: state.submissionVersion, ...matchedFingerprints,
+    results: [{ id: "scope", ...resultDetails(state), conclusion: "已确认" }],
   });
   assert.equal(state.mode, "result");
-
-  state = reduceReviewState(state, { type: "REQUEST_PLAN_CONFIRMATION" });
-  assert.equal(state.mode, "result");
-  assert.deepEqual(state.lastError, {
-    code: "artifact-rule-unresolved",
-    message: "产物位置规则尚未由适用的 AGENTS.md 确认并固化，无法确认更新 Plan。",
-  });
-
-  state = reduceReviewState(state, { type: "CONFIRM_PLAN", ...matchedFingerprints });
-  assert.equal(state.mode, "result");
-  assert.deepEqual(state.lastError, {
-    code: "artifact-rule-unresolved",
-    message: "产物位置规则尚未由适用的 AGENTS.md 确认并固化，无法确认更新 Plan。",
-  });
-});
-
-test("temporary candidate confirmation rejects a missing or mismatched fingerprint", () => {
-  for (const [artifactRuleResolution, expectedCode] of [
-    [{
-      status: "temporarily-confirmed-candidate",
-      source: "candidate",
-    }, "invalid-artifact-rule-resolution"],
-    [{
-      status: "temporarily-confirmed-candidate",
-      source: "candidate",
-      confirmedRuleFingerprint: "sha256:different-rule",
-    }, "artifact-rule-confirmation-required"],
-  ]) {
-    assert.throws(
-      () => createReviewState({ ...session, artifactRuleResolution }),
-      (error) => error?.code === expectedCode,
-    );
+  assert.match(panelMarkup(state, false), /data-action="confirm-plan" disabled/);
+  for (const type of ["REQUEST_PLAN_CONFIRMATION", "CONFIRM_PLAN"]) {
+    const blocked = reduceReviewState(state, { type, ...matchedFingerprints });
+    assert.equal(blocked.mode, "result");
+    assert.equal(blocked.lastError.code, "artifact-rule-unresolved");
+    assert.equal(blocked.saveState, "unsaved");
   }
+  const forged = { ...state, mode: "confirmed" };
+  const blockedSave = reduceReviewState(forged, {
+    type: "MARK_PLAN_SAVED", sessionId: state.sessionId, submissionId: state.lastSubmission.submissionId,
+    ...matchedFingerprints, savedPlanFingerprint: "sha256:must-not-save",
+  });
+  assert.equal(blockedSave.saveState, "unsaved");
+  assert.equal(blockedSave.lastError.code, "invalid-save-receipt");
 });
 
-test("forged unresolved review states cannot submit or apply results", () => {
+test("invalid artifact rule identities cannot submit or apply results", () => {
   const inputState = {
     ...createReviewState(session),
     artifactRuleResolution: {
-      status: "unresolved-candidate",
+      status: "resolved",
       source: "candidate",
     },
   };
@@ -745,29 +675,6 @@ test("draft restore requires matching fresh metadata and clamps only valid edita
   assert.equal(resolvedStateFromTemporaryDraft.cards[0].conclusion, state.cards[0].conclusion);
   assert.equal(resolvedStateFromTemporaryDraft.cards[0].userNote, state.cards[0].userNote);
 
-  const temporaryState = createReviewState({
-    ...session,
-    artifactRuleResolution: temporaryResolution,
-  });
-  const matchingTemporaryDraft = restoreDraft(temporaryState, temporaryDraft, savedAt + 1);
-  assert.equal(matchingTemporaryDraft.currentCardIndex, temporaryState.cards.length - 1);
-  assert.equal(matchingTemporaryDraft.cards[0].conclusion, "阻塞");
-
-  const temporaryStateFromResolvedDraft = restoreDraft(temporaryState, validDraft, savedAt + 1);
-  assert.equal(temporaryStateFromResolvedDraft.currentCardIndex, temporaryState.currentCardIndex);
-  assert.equal(temporaryStateFromResolvedDraft.cards[0].conclusion, temporaryState.cards[0].conclusion);
-  assert.equal(temporaryStateFromResolvedDraft.cards[0].userNote, temporaryState.cards[0].userNote);
-
-  const temporaryStateFromMismatchedConfirmation = restoreDraft(temporaryState, {
-    ...temporaryDraft,
-    artifactRuleResolution: {
-      ...temporaryResolution,
-      confirmedRuleFingerprint: "sha256:different-rule",
-    },
-  }, savedAt + 1);
-  assert.equal(temporaryStateFromMismatchedConfirmation.currentCardIndex, temporaryState.currentCardIndex);
-  assert.equal(temporaryStateFromMismatchedConfirmation.cards[0].conclusion, temporaryState.cards[0].conclusion);
-
   for (const [draft, now] of [
     [{ ...validDraft, sessionId: "other" }, savedAt + DRAFT_TTL_MS],
     [{ ...validDraft, reviewRound: state.reviewRound + 1 }, savedAt + DRAFT_TTL_MS],
@@ -1011,7 +918,7 @@ test("invalid sessions and reducer inputs are safe", () => {
   ]) {
     assert.throws(
       () => createReviewState({ ...session, cards }),
-      (error) => error instanceof TypeError && error.code === "invalid-review-card" && /review card/i.test(error.message),
+      (error) => error instanceof TypeError && error.code === (cards[0] && typeof cards[0] === "object" ? "invalid-module" : "invalid-review-card"),
     );
   }
 

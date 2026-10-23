@@ -2,7 +2,7 @@
 
 ## 总则
 
-访问公司外部系统时，默认按以下优先级选择工具；项目知识遵循下方统一入口的专用回退策略：
+访问公司外部系统时，默认按以下优先级选择工具；任务创建与项目知识遵循下方各自的专用路由：
 
 ```text
 专用 MCP → 官方 API/受控 CLI → 浏览器降级
@@ -14,7 +14,7 @@
 
 | 系统 | 首选能力 | 典型操作 |
 | --- | --- | --- |
-| TAPD / TAPD Wiki | `tapd-mcp` | Bug/Story/Task 读取、评论、状态、测试版本、Wiki 查询与写入 |
+| TAPD / TAPD Wiki | `tapd-mcp` | Bug/Story/Task 读取、任务创建/更新、评论、状态、测试版本、Wiki 查询与写入 |
 | GitLab | `gitlab-mcp` | 项目、MR、diff、冲突、pipeline、审批、创建/更新/合并 MR |
 | Jenkins | `jenkins-mcp` | Job 查询、参数读取、触发构建、队列/构建跟踪、结果与日志读取 |
 | YApi | `yapi-mcp` | 项目、分类、接口、请求/响应字段及契约事实查询 |
@@ -22,6 +22,36 @@
 | 本地 Git | `git` CLI | status、diff、fetch、branch、commit、push、包含性校验 |
 
 本地 Git CLI 不替代 GitLab MCP 的 MR/审批/合并能力；GitLab MCP 也不替代本地源码 diff 和 commit。
+
+## TAPD 任务创建
+
+独立拆分任务、需求开发和正式 Plan 所需的任务创建，统一由
+[breaking-down-requirement](../skills/breaking-down-requirement/SKILL.md)
+在完整清单获确认后执行。使用 TAPD MCP 0.0.3 的以下方法：
+
+| 操作 | MCP 方法 | 参数绑定 |
+| --- | --- | --- |
+| 创建一个任务 | `create_task(workspace_id, name, options)` | 准确空间、标题；`options.story_id` 绑定父需求，其余为该项获准字段 |
+| 在同一需求下创建多个任务 | `create_tasks(workspace_id, tasks, story_id, options)` | 准确空间与公共父需求；`tasks` 按依赖顺序包含 1～50 项，每项含 name，字段绑定已确认内容 |
+| 更新现有任务 | `update_story_or_task(workspace_id, options)` | `options.entity_type=tasks` 和准确现有 `id`，仅传获准变更 |
+| 复用或准确读回任务 | `get_stories_or_tasks(workspace_id, options)` | `options.entity_type=tasks`、准确 id、limit=1；fields 包含本轮需比对的内容及 description |
+
+实际调用使用当前会话暴露的 `tapd-mcp` 工具和 schema。新建不传旧 id 或
+entity_type；人员、预估工时按已核实字段映射传输，标准字段为 owner、effort，
+不把内部估算对象或清单阅读序号当成工具参数。仅同空间、同父需求且依赖顺序
+连续的 CREATE 合批，不夹带 REUSE/UPDATE，也不增加未获准的状态、进度或日期。
+【新建】【复用】【调整】仅是清单标题的展示前缀，不写入 name；本轮剩余
+工时也不替代 effort，仍传已确认的任务最终预估。
+
+批量结果的 index 是本批发送列表内的零起始序号，必须经本批列表对应回稳定
+任务 key；不是原清单全局序号或 `#F01`，新批次重新计 index。逐项绑定真实 ID
+和读回，完整校验及 partial/unknown 等停止与恢复规则由任务模块维护。
+开发入口和 Plan 消费同一 `TaskBreakdownResult`，不自行另建任务或重复写入。
+
+方法缺失时先核对 0.0.3 的启动版本与 MCP 连接；仍未恢复，或必填字段不受
+支持时，保留草稿并返回 `BLOCKED_TASK_WRITE_CAPABILITY`。任务创建以本节
+方法为准，不因旧连接缺工具就转用通用创建、API/CLI 或浏览器，也不拿更新
+方法冒充创建。这里只确定工具路线，不替代拟写入内容的确认和准确读回。
 
 ## 项目知识入口
 
@@ -39,7 +69,7 @@ Hub 映射、范围过滤、工具选择、失败复用和本地回退统一遵�
 
 1. 在首次访问某系统前，检查对应 MCP 工具是否可用；必要时执行工具发现或插件 MCP 配置诊断。
 2. MCP 可用时，所有支持的读写均走 MCP，并读回结果。
-3. MCP 缺少特定能力时，优先使用已批准的官方 API 或受控 CLI；记录缺失的具体能力。
+3. MCP 缺少特定能力且无上述专用路由约束时，优先使用已批准的官方 API 或受控 CLI；记录缺失的具体能力。
 4. MCP 连接、认证或权限失败时，报告原始系统、失败阶段和恢复方式。不得静默打开浏览器登录页替代。
 5. 浏览器只允许用于：
    - 原型、页面布局、DOM、登录态或真实交互评审；

@@ -13,6 +13,13 @@ or any write operation.
 
 Validate in order:
 
+The human-readable checklist may show exact branches/base refs and Chinese
+state/account changes without raw enum codes, payload fields or full SHA.
+Check their unambiguous mapping to the verified internal definition and its
+confirmation source; omitted technical formatting alone is not missing authority.
+A confirmed same account with delimiter/whitespace-only differences can be
+shown as “保持不变”; actual account changes must remain explicit.
+
 1. URL-derived identity matches the supplied TAPD facts.
 2. Material context and scope claims have cited evidence; conflicts and missing
    facts are retained, not guessed away.
@@ -23,6 +30,11 @@ Validate in order:
    `references/collection-and-branch.md` pass.
    A `CREATE` result includes an exact verified base ref and SHA from explicit
    input or a named workspace policy.
+   Existing local/origin refs need exact tips and ancestry evidence. Equal or
+   local-ahead refs are eligible when the unpublished increment has confirmed
+   scope or an accepted baseline and the original local tip is selected. Remote-ahead or
+   diverged refs are blocked; unavailable ancestry or unclear increment scope
+   is pending. Never infer permission to push or synchronize from this result.
    For `CONTINUE`, require one original branch recovered from the declared
    evidence order and action exactly `USE_EXISTING`; reject `CREATE`, a newly
    derived slug, or any proposed branch based on `develop`.

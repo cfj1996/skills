@@ -22,21 +22,7 @@ function deepFreeze(value) {
 
 function moduleModel() {
   const model = structuredClone(validModel);
-  model.schemaVersion = 3;
   model.deliveryUnit.kind = "module";
-  model.features[0].reviewConclusion = "已确认";
-  model.features[0].module = {
-    name: "登录表单",
-    parentId: null,
-    purpose: "让用户建立登录会话",
-    inputs: ["用户输入的账号和密码"],
-    outputs: ["登录成功建立会话并跳转；失败展示原因"],
-    rules: ["字段校验通过后才请求登录；提交期间阻止重复提交"],
-    scenarios: [{ id: "F-001-S-001", given: "用户填写有效凭证", when: "点击登录", then: "建立会话并进入目标页" }],
-    questions: [],
-    change: { kind: "modified", summary: "补充失败反馈和重复提交保护" },
-    revision: 1,
-  };
   return model;
 }
 
@@ -64,6 +50,12 @@ function markImplementationBlocked(feature) {
 
 test("accepts a normalized model with reciprocal links", () => {
   assert.deepEqual(validatePagePlanModel(validModel), { valid: true, errors: [] });
+});
+
+test("rejects retired and unsupported Plan schema versions", () => {
+  for (const schemaVersion of [1, 2, 4, undefined]) {
+    assert.match(errorMessages(validatePagePlanModel({ ...validModel, schemaVersion })), /schemaVersion must be 3/);
+  }
 });
 
 test("rejects an unsupported status", () => {
@@ -542,7 +534,7 @@ test("unresolved API needs cannot be marked ready for development even when the 
   model.deliveryUnit.status = "评审中";
   assert.equal(validatePagePlanModel(model).valid, true);
   model.schemaVersion = 2;
-  assert.match(errorMessages(validatePagePlanModel(model)), /apiNeed must be required or none/);
+  assert.match(errorMessages(validatePagePlanModel(model)), /schemaVersion must be 3/);
 });
 
 test("one module may combine API consumption and inherited dependencies without weakening traceability", () => {

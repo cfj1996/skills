@@ -20,7 +20,7 @@ export const servers = {
     required: ['MCP_JENKINS_URL', 'MCP_JENKINS_USER', 'MCP_JENKINS_API_TOKEN'],
   },
   'tapd-mcp': {
-    command: 'uvx', args: ['--from', 'zan-tapd-mcp==0.0.2', 'mcp-server-tapd'],
+    command: 'uvx', args: ['--from', 'zan-tapd-mcp==0.0.3', 'mcp-server-tapd'],
     required: ['TAPD_ACCESS_TOKEN', 'TAPD_API_BASE_URL', 'TAPD_BASE_URL'],
   },
   'yapi-mcp': {

@@ -16,14 +16,29 @@ filesystem, or network write operations.
 
 - Definition is `READY_FOR_HANDOFF`; reviewed change is `REVIEWED` with public
   `REVIEW_PASSED`; repository and original source branch match.
-- Profile is exactly `STANDARD|NO_WIKI`; target is exactly `develop` for Git
-  delivery; current-round diff/commits contain no unrelated work.
-- The current operation's displayed facts, current re-read facts, target,
-  payload, purpose, `tool_route`, and required authorization all match.
+- Profile is exactly `STANDARD|NO_WIKI`; each Git delivery target is the
+  verified and confirmed actual test branch (`dev` or `develop`), unchanged
+  from its upstream selection. Never normalize one alias to the other.
+  Current-round diff/commits contain no unrelated work.
+- For a Bug across repositories, pair all required definitions/reviews by
+  canonical repository/root, origin and fixed branch, not array position.
+  Require matching Bug identity, per-repository passing reviews, cross-repository
+  acceptance and the shared completion-record readback. One consolidated plan
+  binds independent source/target SHAs and deployment choices. Shared Wiki and
+  TAPD writes require every required Git/deployment gate; reject partial-Bug
+  registration.
+- The current operation's confirmed business facts, evidence-derived exact
+  bindings/payload, current re-read facts, purpose, `tool_route`, and authority
+  all match. Apply the shared [confirmation reuse](../../../references/execution-checklist.md#执行清单的确认复用):
+  from a main entry, accept its complete execution checklist and actual human
+  confirmation after scope comparison; standalone calls require their own
+  exact-plan confirmation. Reject repair-only permission, summaries or true
+  flags alone. A technical PLAN state is not grounds to demand a second user
+  turn. Derived facts/body completion need validation, not routine reapproval.
 - Browser automation is invalid for GitLab MR, Jenkins, TAPD, Wiki, comment,
   status, test-version, or YApi operations unless the authorized plan explicitly
   records an approved browser fallback under the shared tool-routing policy.
-- One consolidated `SubmissionPlan` authorization binds Git, Wiki, deployment,
+- One complete execution-checklist or standalone `SubmissionPlan` authorization binds Git, Wiki, deployment,
   deterministic comment, and final TAPD actions. Generated commit/MR/Wiki/
   Jenkins IDs are valid without another prompt only when they follow the exact
   authorized derivation.
@@ -37,17 +52,19 @@ filesystem, or network write operations.
   children are reused before creation. Month creation targets root
   `1150372234001008260`; entry content targets only the child. A new entry
   contains the resolved type-specific status: `是否上线：未合并` for a
-  business project, or `当前版本：canary|latest` for a
-  tooling/library project. Tooling `DEPLOY` gates Wiki writes on a matching
-  successful `canary|official` release readback; `SKIP` uses existing evidence
-  or preserves the valid prior field without build queries or a canary default.
+  business project, or `当前版本：canary|latest|待发布` for a
+  tooling/library project. With `BUILD_SUBMITTED`, preserve an evidenced prior
+  channel or use `当前版本：待发布` when absent. Queue acceptance must not be
+  converted into publication evidence. `SKIP` keeps its existing evidence rules.
   The final result retains the
   actual child ID/URL plus source-branch identity for `going-live`.
 - Under `STANDARD`, a drafter result with
   `terminal_state=SKIPPED_BY_POLICY` is valid only when
   `skip_reason=NON_FUNCTIONAL_CONTINUE` is supported by the current reviewed
-  change; it forbids Wiki and Wiki-comment operations and needs no Wiki
-  readback.
+  change and a verified owner page/current repository+branch entry with exact
+  target/body readback retained for go-live. It forbids Wiki and Wiki-comment
+  writes; no post-write readback is needed because no write occurs. Missing
+  page/entry requires a validated creation/append draft instead of a skip.
 
 For `PRE_GIT_WRITE`, accept exactly one operation:
 `GIT_DELIVERY_BUNDLE|COMMIT|PUSH|MR_CREATE_OR_UPDATE|MR_MERGE`. Validate only the current payload
@@ -65,6 +82,13 @@ MR writes use `gitlab-mcp`. Derived commit/MR/merge IDs do not require another
 Agent validation or confirmation. Require deterministic bound checks and
 readbacks at each write, fresh source/target SHA and actual approval checks
 before merge, no auto-delete/squash/rebase, and final source containment.
+For an already-delivered test target or explicitly disabled merge, accept
+`CONTAINMENT_ONLY` with the reviewed source SHA and actual dev/develop target.
+Require `VERIFIED`, `operation=VERIFY_CONTAINMENT_ONLY`, exact ref/target revision,
+`containment=true` and writes=0; it needs no MR IID or merge readback and must
+not claim a new merge. Missing containment blocks later delivery without
+falling back to MR creation. It cannot replace an outstanding exact-MR manual
+handoff, default-branch merge evidence or cleanup permission.
 Do not require future readbacks before execution. Individual-operation modes
 remain for a genuine standalone action; do not expand a bundle back into four
 private reviewer calls or review every CI poll.
@@ -73,7 +97,9 @@ An actual conflict may instead use the explicitly confirmed shared
 [A → C → B flow](../../../references/conflict-merge.md). Validate the separate
 exact C/B MR scope, resolution review and original A identity; do not require
 the ordinary source-restricted executor to accept C. Default conditional C
-cleanup is authorized only when exact local/remote C, worktree and purpose
+resolution/MR authority may already come from the main execution checklist;
+do not ask again when exact C/path bindings follow that confirmed rule.
+Cleanup is a separate permission, authorized only when exact local/remote C, worktree and purpose
 were included in that ACB confirmation. Respect later retention instructions,
 require exact C → B merged and full-tip containment proof plus fresh resource
 safety checks, and never include original A deletion. This authority can be
@@ -89,16 +115,23 @@ no Wiki material.
 
 For `JENKINS_TEST_DEPLOY`, require `deployment_mode=DEPLOY`, the release-safety
 fields, exact Jenkins Job/parameters, test environment/channel, and expected
-`origin/develop` SHA, plus `tool_route=jenkins-mcp`. A later `DEPLOYED` result requires terminal `SUCCESS` and
-build evidence for that SHA. Validate the full `run-jenkins-release.mjs`
+delivered SHA of the exact confirmed remote test target, plus `tool_route=jenkins-mcp`
+and `completionMode=TRIGGER_ACCEPTED`. Require an exact accepted Job/queue URL/ID
+and submitted params for `BUILD_SUBMITTED`; no queue/build/log polling or terminal
+SUCCESS/actual SCM proof is required before Wiki/TAPD. A result claiming
+`DEPLOYED` still requires terminal SUCCESS and actual SCM proof. Validate the full `run-jenkins-release.mjs`
 invocation once with exact instance/Job URL, ref/version/channel/parameters,
 config/definition or explicitly displayed metadata-only binding fingerprints,
 source repository and expected delivered SHA. Adapter-derived parameters and
 pipeline-computed version policy require the exact verified Jenkinsfile and
-whole-project scope. The actual pipeline SHA and published package versions
-must be read back for this package adapter; a source identity is not a version.
+whole-project scope. Check pipeline source before trigger, but do not wait for
+actual pipeline checkout or published package versions in submission mode;
+a source identity is not a version and `BUILD_SUBMITTED` is not `RELEASED`.
 Its only write is through `jenkins-mcp`; the declared GET-only API read fallback
-must stay within that instance and Job and bind queue/build/actual SCM SHA.
+must stay within that instance and Job. In `TRIGGER_ACCEPTED`, validate the
+returned queue identity locally without queue/build/log GETs; no build number
+or actual SCM SHA is required. Only an existing `BUILD_TERMINAL` result claiming
+`DEPLOYED` requires queue/build/actual SCM binding.
 No per-poll validator is needed. Source SHA must identify the intended target
 merge revision, not merely the original feature tip or any changes-list entry.
 `deployment_mode=SKIP` permits no Jenkins build/deploy/parameter/poll operation
@@ -164,11 +197,14 @@ Continue already waiting skips these writes; Story/Task rejects Bug status/owner
 Changed state, version, assignment facts or metadata blocks before update. Partial/unknown
 readback reports actual known effects and never rolls back/retries.
 
-For final `POST_WRITE`, require successful merge/develop containment and deployment
-state `DEPLOYED|SKIPPED_BY_INTENT`. Under `DEPLOY`, require Jenkins success/SHA
-proof before Wiki/TAPD writes. Require Wiki readback and work-item link state
+For final `POST_WRITE`, require every required repository's merge/confirmed-target containment and deployment
+state `BUILD_SUBMITTED|DEPLOYED|SKIPPED_BY_INTENT`. Under `DEPLOY`, accept the
+exact `BUILD_SUBMITTED` receipt before Wiki/TAPD writes without waiting. Reject
+an absent/unknown trigger receipt and any claim of deployment/publication based
+only on queue acceptance. Require Wiki readback and work-item link state
 `LINKED|ALREADY_LINKED` under `STANDARD` whenever the Wiki target is validated;
-a policy skip requires no such readbacks.
+a policy skip requires retained existing target/body/entry evidence, but no
+post-write readbacks.
 For `INITIAL`, require applicable waiting-test/owner/version readbacks; for
 `CONTINUE` already in `待测试`, require no status/owner/version write and public
 `SKIPPED_ALREADY_WAITING_TEST`. Verify ordering and truthful completed effects.

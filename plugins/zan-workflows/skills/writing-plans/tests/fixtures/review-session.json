@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "sessionId": "session-1",
   "deliveryUnitKey": "sample/login",
   "deliveryUnitKind": "page",
@@ -18,7 +18,6 @@
   "cards": [
     {
       "id": "REV-001",
-      "dimension": "页面定义",
       "links": {
         "features": ["F-001"],
         "apis": [],
@@ -27,14 +26,17 @@
         "tasks": ["T-001"],
         "evidence": ["E-001"]
       },
-      "sourceEvidence": [{"id": "E-001", "kind": "prototype", "label": "登录表单", "selector": "#login-form"}],
-      "reviewGoal": "确认页面职责",
-      "design": "提供身份验证入口",
-      "regionAndComponents": "主内容区中的登录表单",
+      "sourceEvidence": [
+        {
+          "id": "E-001",
+          "kind": "prototype",
+          "label": "登录表单",
+          "selector": "#login-form"
+        }
+      ],
       "interactionStates": ["初始", "提交中", "失败", "成功"],
       "relatedApis": [],
       "mockScenarios": [],
-      "acceptanceCriteria": ["输入有效凭据后触发提交"],
       "implementationPlan": {
         "status": "ready",
         "summary": "使用示例项目现有 Zan 表单能力实现登录入口",
@@ -49,11 +51,32 @@
       "userNote": "",
       "reviewResult": null,
       "reopened": false,
-      "evidenceChanged": false
+      "evidenceChanged": false,
+      "module": {
+        "name": "确认页面职责",
+        "parentId": null,
+        "purpose": "提供身份验证入口",
+        "inputs": ["用户操作登录页面"],
+        "outputs": ["输入有效凭据后触发提交"],
+        "rules": ["初始", "提交中", "失败", "成功"],
+        "scenarios": [
+          {
+            "id": "REV-001-S-1",
+            "given": "用户处于登录页面",
+            "when": "操作登录表单",
+            "then": "输入有效凭据后触发提交"
+          }
+        ],
+        "questions": [],
+        "change": {
+          "kind": "modified",
+          "summary": "提供身份验证入口"
+        },
+        "revision": 1
+      }
     },
     {
       "id": "REV-002",
-      "dimension": "交互验收",
       "links": {
         "features": ["F-002"],
         "apis": ["API-001"],
@@ -62,14 +85,18 @@
         "tasks": ["T-002"],
         "evidence": ["E-002"]
       },
-      "sourceEvidence": [{"id": "E-002", "kind": "prototype", "label": "登录表单", "selector": "#login-form", "path": "/evidence/login.png"}],
-      "reviewGoal": "确认登录表单",
-      "design": "输入与提交状态应清晰可见",
-      "regionAndComponents": "登录表单",
+      "sourceEvidence": [
+        {
+          "id": "E-002",
+          "kind": "prototype",
+          "label": "登录表单",
+          "selector": "#login-form",
+          "path": "/evidence/login.png"
+        }
+      ],
       "interactionStates": ["账号为空", "密码错误"],
       "relatedApis": ["POST /login"],
       "mockScenarios": ["账号为空", "密码错误"],
-      "acceptanceCriteria": ["错误提示可见", "提交可重试"],
       "implementationPlan": {
         "status": "ready",
         "summary": "复用示例项目 Zan 表单组件完成校验、提交和登录反馈",
@@ -85,20 +112,56 @@
       "reviewResult": null,
       "reopened": false,
       "evidenceChanged": false,
-      "telepath": "reviewer-visible evidence marker"
+      "telepath": "reviewer-visible evidence marker",
+      "module": {
+        "name": "确认登录表单",
+        "parentId": null,
+        "purpose": "输入与提交状态应清晰可见",
+        "inputs": ["用户操作登录页面"],
+        "outputs": ["错误提示可见", "提交可重试"],
+        "rules": ["账号为空", "密码错误"],
+        "scenarios": [
+          {
+            "id": "REV-002-S-1",
+            "given": "用户处于登录页面",
+            "when": "操作登录表单",
+            "then": "错误提示可见"
+          },
+          {
+            "id": "REV-002-S-2",
+            "given": "用户处于登录页面",
+            "when": "操作登录表单",
+            "then": "提交可重试"
+          }
+        ],
+        "questions": [],
+        "change": {
+          "kind": "modified",
+          "summary": "输入与提交状态应清晰可见"
+        },
+        "revision": 1
+      }
     },
     {
       "id": "REV-003",
-      "dimension": "交互状态",
-      "links": {"features": [], "apis": [], "uiStates": [], "dependencies": [], "tasks": [], "evidence": []},
-      "sourceEvidence": [{"id": "E-003", "kind": "project-rule", "label": "示例项目交互状态规范"}],
-      "reviewGoal": "复核重新打开项",
-      "design": "重新评审已确认项",
-      "regionAndComponents": "登录表单",
+      "links": {
+        "features": [],
+        "apis": [],
+        "uiStates": [],
+        "dependencies": [],
+        "tasks": [],
+        "evidence": []
+      },
+      "sourceEvidence": [
+        {
+          "id": "E-003",
+          "kind": "project-rule",
+          "label": "示例项目交互状态规范"
+        }
+      ],
       "interactionStates": ["重新打开"],
       "relatedApis": [],
       "mockScenarios": [],
-      "acceptanceCriteria": ["重新评审"],
       "implementationPlan": {
         "status": "ready",
         "summary": "按现有交互状态模型恢复并重新验证登录表单",
@@ -113,20 +176,50 @@
       "userNote": "",
       "reviewResult": null,
       "reopened": true,
-      "evidenceChanged": false
+      "evidenceChanged": false,
+      "module": {
+        "name": "复核重新打开项",
+        "parentId": null,
+        "purpose": "重新评审已确认项",
+        "inputs": ["用户操作登录页面"],
+        "outputs": ["重新评审"],
+        "rules": ["重新打开"],
+        "scenarios": [
+          {
+            "id": "REV-003-S-1",
+            "given": "用户处于登录页面",
+            "when": "操作登录表单",
+            "then": "重新评审"
+          }
+        ],
+        "questions": [],
+        "change": {
+          "kind": "modified",
+          "summary": "重新评审已确认项"
+        },
+        "revision": 1
+      }
     },
     {
       "id": "REV-004",
-      "dimension": "来源证据",
-      "links": {"features": [], "apis": [], "uiStates": [], "dependencies": [], "tasks": [], "evidence": []},
-      "sourceEvidence": [{"id": "E-004", "kind": "prototype", "label": "变化后的登录表单证据"}],
-      "reviewGoal": "复核变化证据",
-      "design": "证据变化触发复评",
-      "regionAndComponents": "登录表单",
+      "links": {
+        "features": [],
+        "apis": [],
+        "uiStates": [],
+        "dependencies": [],
+        "tasks": [],
+        "evidence": []
+      },
+      "sourceEvidence": [
+        {
+          "id": "E-004",
+          "kind": "prototype",
+          "label": "变化后的登录表单证据"
+        }
+      ],
       "interactionStates": ["证据变化"],
       "relatedApis": [],
       "mockScenarios": [],
-      "acceptanceCriteria": ["变化证据已复核"],
       "implementationPlan": {
         "status": "ready",
         "summary": "以变化后的原型证据重新核对组件组合和交互",
@@ -141,7 +234,29 @@
       "userNote": "",
       "reviewResult": null,
       "reopened": false,
-      "evidenceChanged": true
+      "evidenceChanged": true,
+      "module": {
+        "name": "复核变化证据",
+        "parentId": null,
+        "purpose": "证据变化触发复评",
+        "inputs": ["用户操作登录页面"],
+        "outputs": ["变化证据已复核"],
+        "rules": ["证据变化"],
+        "scenarios": [
+          {
+            "id": "REV-004-S-1",
+            "given": "用户处于登录页面",
+            "when": "操作登录表单",
+            "then": "变化证据已复核"
+          }
+        ],
+        "questions": [],
+        "change": {
+          "kind": "modified",
+          "summary": "证据变化触发复评"
+        },
+        "revision": 1
+      }
     }
   ]
 }

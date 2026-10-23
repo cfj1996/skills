@@ -26,6 +26,16 @@ discovery and multi-project grouping. One Story/Bug has one target; its page
 may contain multiple repository/branch entries. Produce the complete shared
 body, retaining all included projects and their distinct status fields.
 
+An entrypoint's pre-execution template preview uses the existing
+[template-preview rules](references/wiki-template.md#确定清单中的模板预览) and
+does not invoke this formal drafting procedure before implementation is reviewed.
+It has no `VALIDATED` state, target/body fingerprint or write authority by itself.
+When submission is planned, replace placeholders with evidenced facts. A main
+entry's confirmed complete execution checklist may authorize that scoped
+completion and write; the consumer compares the exact validated draft to it
+without a routine second confirmation. Standalone submission still obtains
+its own exact-plan approval; this drafting skill remains read-only in either context.
+
 ## Inputs
 
 For a standalone call, use the current TAPD work identifier from the request or
@@ -40,13 +50,12 @@ invent a value or render a placeholder.
 
 ## Procedure
 
-1. For `CONTINUE`, before any Wiki query, classify the
+1. For `CONTINUE`, classify the
    current-round change from the reviewed diff and implementation/verification
    evidence as `FUNCTIONAL_IMPACT|NON_FUNCTIONAL`; an ambiguous classification
-   blocks. If it is `NON_FUNCTIONAL`, return `SKIPPED_BY_POLICY` with
-   `skip_reason=NON_FUNCTIONAL_CONTINUE` and do not plan or create a Wiki
-   target; retain an already-read existing target only when it is available for
-   a later explicit `going-live` handoff.
+   blocks. Classification alone does not skip target discovery. A non-functional
+   continuation may skip body writes only after step 2 verifies an existing
+   owner page and the current repository/original-branch entry.
 2. Reuse a current complete discovery handoff, or call
    [ensure-test-wiki.mjs](../submitting-for-test/scripts/ensure-test-wiki.mjs)
    once without `--execute` to obtain the target, existing body/hash and
@@ -63,12 +72,19 @@ invent a value or render a placeholder.
    supplied by the helper or list Wiki pages. Under `CONTINUE`, reuse a matching current-conversation
    target after checking details and current comments for conflicts. Retain
    the exact existing ID/parent/title/hash; do not rediscover it at execution.
+   For `NON_FUNCTIONAL`, only `REUSE_EXISTING` plus `REUSE_ENTRY` permits
+   `SKIPPED_BY_POLICY` with `skip_reason=NON_FUNCTIONAL_CONTINUE`: retain the
+   owner evidence, exact target and body readback for `going-live`, and return
+   no proposed body. A missing page or `APPEND_ENTRY` continues normal drafting
+   below. Unavailable or conflicting evidence blocks; it never proves absence.
 3. When the helper supplied a complete target, reuse it with no further Wiki
    queries. Only when no matching link or complete helper target exists,
    query `get_wiki(name=YYYY-MM)` once and select
    the month whose returned `parent_wiki_id` equals the fixed `提测文档` root.
    Then query the deterministic child title once; filter returned rows by the
-   verified month ID and reuse a unique matching child or plan creation.
+   verified month ID and plan creation when none exists. A same-title child
+   without an exact owner link is an ownership conflict, even if its repository
+   and branch match; block instead of reusing or creating another page.
    `get_wiki` does not support `parent_wiki_id` as a query option: never pass it,
    enumerate every Wiki page, or retry an unchanged query with a new limit or
    sort order. An ambiguous or unavailable result blocks instead of widening
@@ -93,22 +109,25 @@ invent a value or render a placeholder.
    Never use `merge/*`. The page may contain multiple branches and the same
    branch name in different repositories; select the entry by repository plus
    branch, not by a page-wide branch count.
-6. For a `FUNCTIONAL_IMPACT` continuation, locate `# 前端`. If this
-   repository/branch has no entry, append its complete new canonical entry.
-   Otherwise reuse the matching entry and append the affected scope to its
+6. For an existing target, locate `# 前端`. If this repository/branch has no
+   entry, append its complete new canonical entry, including a non-functional
+   continuation that could not skip. For a `FUNCTIONAL_IMPACT` continuation
+   with a matching entry, append the affected scope to its
    existing `影响范围` list. For a business project, also change `已合并` back to
    `未合并` when the new current-round commits are not contained in
-   `origin/master`; preserve an existing `未合并`. A new functional submission
+   the verified remote default ref (`origin/master` or `origin/main`); preserve an existing `未合并`. A new functional submission
    round also resets an existing `待合并` to `未合并`; a non-functional skip
    retains the existing body. Only going-live writes 待合并 after exact open-MR
    proof. For a tooling project,
    resolve `当前版本` using the channel evidence and minimal legacy-field
    replacement rules in `wiki-template.md`. Missing or conflicting status facts
    block. Never create a second entry for the same repository/branch identity. For
-   `INITIAL`, render
+   a new target, render
    a complete body beginning with `# 前端` and sequence `1`, initializing each
    new entry with `是否上线：未合并` for a business project, or
-   `当前版本：canary|latest` for a tooling/library project.
+   `当前版本：canary|latest` for a tooling/library project, or `当前版本：待发布`
+   under `TRIGGER_ACCEPTED` when no existing publication is evidenced. Preserve
+   an evidenced prior channel; queue acceptance never proves a new publication.
 7. For a policy skip, map validation to `NOT_RUN` with its normalized reason.
    Otherwise, give the target plan, hierarchy/readback evidence, normalized
    facts, calculation, patch, and proposed body to the private read-only
@@ -128,4 +147,5 @@ blocker and no claimed final body.
 
 No input/output JSON, report file, runtime state, or recovery information is
 created. When called by `submitting-for-test`, the draft exists only in memory
-until that skill displays the complete rendered Markdown for authorization.
+and is consumed under the main execution-checklist authority or the standalone
+submission's exact confirmation; drafting itself never authorizes a write.

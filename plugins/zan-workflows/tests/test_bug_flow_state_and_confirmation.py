@@ -4,96 +4,72 @@ import unittest
 
 PLUGIN_ROOT = Path(__file__).resolve().parents[1]
 FIXING = (PLUGIN_ROOT / "skills/fixing-bug/SKILL.md").read_text()
-FIXING_WORKFLOW = (
-    PLUGIN_ROOT / "skills/fixing-bug/references/workflow.md"
-).read_text()
 PREPARING = (PLUGIN_ROOT / "skills/preparing-work/SKILL.md").read_text()
-BRANCH_RULES = (
-    PLUGIN_ROOT / "skills/preparing-work/references/collection-and-branch.md"
-).read_text()
+BRANCH_RULES = (PLUGIN_ROOT / "skills/preparing-work/references/collection-and-branch.md").read_text()
 IMPLEMENTING = (PLUGIN_ROOT / "skills/implementing-work/SKILL.md").read_text()
 SUBMITTING = (PLUGIN_ROOT / "skills/submitting-for-test/SKILL.md").read_text()
-DEPLOYMENT = (
-    PLUGIN_ROOT
-    / "skills/submitting-for-test/references/deployment-and-confirmation.md"
-).read_text()
+DEPLOYMENT = (PLUGIN_ROOT / "skills/submitting-for-test/references/deployment-and-confirmation.md").read_text()
 
 
 class BugFlowStateAndConfirmationTests(unittest.TestCase):
-    def test_continue_reuses_original_branch_without_new_status_cycle(self):
+    def test_continue_reuses_branch_and_preserves_waiting_test_owner(self):
         self.assertIn("work_mode=AUTO|INITIAL|CONTINUE", FIXING)
-        self.assertIn("Never create a “follow-up” branch", FIXING)
+        self.assertIn("不新建“后续修复”分支", FIXING)
+        self.assertIn("原项目、仓库和分支", FIXING)
         self.assertIn("CONTINUE", PREPARING)
         self.assertIn("Never derive a second branch", BRANCH_RULES)
-        self.assertIn("SKIPPED_ALREADY_WAITING_TEST", IMPLEMENTING)
-        self.assertIn("Do not create another branch or reset TAPD status", FIXING_WORKFLOW)
+        for text in [FIXING, IMPLEMENTING]:
+            self.assertIn("SKIPPED_ALREADY_WAITING_TEST", text)
+        self.assertIn("保留状态与处理人", FIXING)
 
-    def test_deployment_is_optional_and_direct_submit_is_supported(self):
-        self.assertIn("deployment_mode=AUTO|DEPLOY|SKIP", FIXING)
-        self.assertIn("`DEPLOY`", DEPLOYMENT)
-        self.assertIn("`SKIP`", DEPLOYMENT)
-        self.assertIn("otherwise select `SKIP`", DEPLOYMENT)
+    def test_repair_records_bracket_source_and_review(self):
+        self.assertIn("bug-repair-owner.md", FIXING)
+        self.assertIn("bug-repair-record.md", FIXING)
+        self.assertIn("联合写入读回", FIXING)
+        self.assertIn("开始评论读回后改源码", FIXING)
+        self.assertIn("验证及独立评审通过后写完成评论", FIXING)
+        self.assertIn("评论失败保留已有代码与评审结果", FIXING)
+
+    def test_explicit_implementation_endpoint_stops_before_submission_even_plan(self):
+        self.assertIn("delivery_mode=IMPLEMENT|SUBMIT|GO_LIVE", FIXING)
+        self.assertIn("普通“修复”默认 `SUBMIT`", FIXING)
+        self.assertIn("只修复验证/只开发、不提测", FIXING)
+        stop = FIXING.index("`IMPLEMENT` 在 `REVIEWED` 结束")
+        delivery = FIXING.index("## 4. 按请求交付")
+        self.assertIn("不调用 `submitting-for-test`，包括其 PLAN 阶段", FIXING[stop:delivery])
+        self.assertIn("只修复时不解析、不询问 Wiki/Jenkins", FIXING)
+        self.assertIn("测试反馈不覆盖本轮明确终点", FIXING)
+        self.assertIn("复用仍有效的 `ReviewedChange`", FIXING)
+
+    def test_submission_remains_explicit_optional_and_two_phase(self):
+        for marker in ["submission_profile=AUTO|STANDARD|NO_WIKI", "deployment_mode=AUTO|DEPLOY|SKIP",
+                       "需要提测 Wiki（会创建/更新）", "不需要提测 Wiki",
+                       "submission_phase=PLAN", "submission_phase=EXECUTE", "dev/develop"]:
+            self.assertIn(marker, FIXING)
+        self.assertIn("execution-checklist.md#执行清单的确认复用", FIXING)
+        self.assertIn("单独调用提测技能仍按其独立计划确认", FIXING)
+        self.assertIn("Select `DEPLOY`; preserve an explicit `SKIP`", DEPLOYMENT)
         self.assertIn("SKIPPED_BY_INTENT", DEPLOYMENT)
+        self.assertIn("one complete `SubmissionPlan`", DEPLOYMENT)
+        self.assertIn("commit SHA, MR ID, Wiki/month/child ID", DEPLOYMENT)
+        self.assertIn("do not require another confirmation", DEPLOYMENT)
 
-    def test_deploy_must_finish_before_wiki_and_waiting_test_writes(self):
-        deployment_gate = SUBMITTING.index("Resolve the deployment gate")
-        wiki_write = SUBMITTING.index("execute the authorized Wiki plan")
-        status_write = SUBMITTING.index("Apply the status policy")
-        self.assertLess(deployment_gate, wiki_write)
-        self.assertLess(wiki_write, status_write)
-        self.assertIn("FAILED|UNKNOWN", SUBMITTING)
+    def test_deployment_and_wiki_registration_keep_order(self):
+        deployment = SUBMITTING.index("deployment gate through `jenkins-mcp`")
+        wiki = SUBMITTING.index("execute the authorized Wiki plan")
+        status = SUBMITTING.lower().index("apply the status policy")
+        self.assertLess(deployment, wiki)
+        self.assertLess(wiki, status)
         self.assertIn("blocks every later Wiki/TAPD write", SUBMITTING)
 
-    def test_submission_flow_uses_two_confirmations_and_reuses_derived_ids(self):
-        self.assertIn("exact branch action and verified base ref/SHA", FIXING)
-        self.assertIn(
-            "scope/start confirmation -> consolidated submit confirmation",
-            FIXING_WORKFLOW,
-        )
-        self.assertIn("one complete `SubmissionPlan`", DEPLOYMENT)
-        self.assertIn("do not require another confirmation", DEPLOYMENT)
-        self.assertIn("commit SHA, MR ID, Wiki/month/child ID", DEPLOYMENT)
-
-    def test_repair_endpoint_stops_before_any_submission_capability(self):
-        self.assertIn("delivery_mode=IMPLEMENT|SUBMIT|GO_LIVE", FIXING)
-        self.assertRegex(FIXING, r"“修复” defaults to\s+`IMPLEMENT`")
-        self.assertIn(
-            "For `IMPLEMENT`, do not resolve or ask about Wiki/deployment settings",
-            FIXING,
-        )
-        self.assertIn("Do not call\n   `submitting-for-test`, even its read-only PLAN phase", FIXING)
-        implementation_end = FIXING.index("If it returns `REVIEWED` and `delivery_mode=IMPLEMENT`")
-        submission = FIXING.index("Only for `SUBMIT|GO_LIVE`, call `submitting-for-test`")
-        self.assertLess(implementation_end, submission)
-        self.assertIn("then continue with the next confirmed Bug", FIXING)
-
-    def test_continue_does_not_infer_submission_from_existing_state(self):
-        self.assertRegex(
-            FIXING,
-            r"Existing Wiki links,\s+`待测试` status or test-environment feedback never\s+select submission by themselves",
-        )
-        self.assertIn("reuse the previously explicit", FIXING)
-        self.assertRegex(FIXING, r"later requests submission of an `IMPLEMENT` result, reuse its\s+still-current `ReviewedChange`")
-        self.assertIn("later submission still requires its own exact `SubmissionPlan` confirmation", FIXING)
-
-    def test_submission_profile_is_explicit_and_submission_plan_stops_before_writes(self):
-        self.assertIn("submission_profile=AUTO|STANDARD|NO_WIKI", FIXING)
-        self.assertIn("PENDING_SUBMISSION_PROFILE", FIXING)
-        self.assertIn("STANDARD（会创建/更新 Wiki）", FIXING)
-        self.assertIn("NO_WIKI（不调用任何 Wiki 能力）", FIXING)
-        self.assertIn("submission_phase=PLAN", FIXING)
-        self.assertIn("AWAITING_SUBMISSION_CONFIRMATION", FIXING)
-        self.assertIn("submission_phase=EXECUTE", FIXING)
-        self.assertIn("perform no write", SUBMITTING)
-
-    def test_go_live_cleanup_is_deferred_and_separately_confirmed(self):
-        self.assertIn("operation=DELIVER", FIXING)
-        self.assertIn("operation=CLEANUP", FIXING)
-        self.assertIn("do not execute cleanup inside the\n   per-Bug loop", FIXING)
-        self.assertIn("AWAITING_CLEANUP_CONFIRMATION", FIXING)
-        self.assertIn("another separate exact confirmation", (
-            PLUGIN_ROOT / "skills/fixing-bug/references/contracts.md"
-        ).read_text())
+    def test_go_live_and_cleanup_are_delegated_without_early_shared_cleanup(self):
+        for marker in ["zan-workflows:going-live", "AWAITING_MERGE", "userAction.message",
+                       "已合并，继续上线", "operation=CLEANUP"]:
+            self.assertIn(marker, FIXING)
+        self.assertIn("续接先只读核实同一 MR", FIXING)
+        self.assertIn("全部相关 Bug 结束后", FIXING)
+        self.assertIn("单独确认", FIXING)
+        self.assertIn("开发远程分支不能由本地清理授权推导删除", FIXING)
 
 
 if __name__ == "__main__":

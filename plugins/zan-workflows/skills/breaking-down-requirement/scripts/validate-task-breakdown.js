@@ -7,6 +7,20 @@ const canonical = value => Array.isArray(value) ? value.map(canonical) : object(
   ? Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])])) : value;
 const equal = (a, b) => JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
 const fingerprintProposal = proposal => createHash('sha256').update(JSON.stringify(canonical(proposal))).digest('hex');
+// Strip only paired Markdown wrappers; punctuation inside a key remains part of its identity.
+function hasTaskMarker(description, storyId, key) {
+  if (typeof description !== 'string') return false;
+  const marker = `zan-task:${storyId}:${key}`;
+  return description.split(/[\s<>"'`()\[\]{}]+/u).some(token => {
+    while (token !== marker) {
+      const wrapper = ['**', '__', '~~', '*', '_'].find(value =>
+        token.length > value.length * 2 && token.startsWith(value) && token.endsWith(value));
+      if (!wrapper) return false;
+      token = token.slice(wrapper.length, -wrapper.length);
+    }
+    return true;
+  });
+}
 
 // Fixed-point inputs support up to four decimal places; final estimates use whole hours.
 function units(value) {
@@ -64,7 +78,10 @@ function validateTaskBreakdown(proposal) {
     check(Number.isSafeInteger(estimate.hours) && estimate.hours > 0, `${task.key}: final estimate must be a positive integer number of hours`);
     if (units(estimate.normalHours) !== null) check(estimate.hours === estimateHours(estimate.normalHours), `${task.key}: final estimate calculation is invalid`);
     const payload = task.payload || {};
-    const stableIdentity = text(payload.description) && (payload.description.includes(`zan-task:${requirement.id}:${task.key}`) || (task.action === 'REUSE' && text(task.linkEvidence)));
+    const historicalDescription = Object.hasOwn(payload, 'description') &&
+      (typeof payload.description === 'string' || payload.description === null);
+    const stableIdentity = hasTaskMarker(payload.description, requirement.id, task.key) ||
+      (task.action === 'REUSE' && historicalDescription && text(task.linkEvidence));
     check(payload.name === task.name && stableIdentity, `${task.key}: payload requires approved title and stable description marker or evidenced REUSE identity`);
     check(payload[binding.storyField] === requirement.id && payload[binding.ownerField] === task.owner?.account && payload[binding.estimateField] === estimate.hours, `${task.key}: payload must bind Story, developer and estimated hours`);
     check((payload.id === undefined || payload.id === task.id) && (payload.workspace_id === undefined || String(payload.workspace_id) === requirement.workspaceId), `${task.key}: payload identity conflicts with target`);

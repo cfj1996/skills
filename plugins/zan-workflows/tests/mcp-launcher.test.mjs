@@ -50,7 +50,7 @@ test('npm launch options route public dependencies and only YApi company package
     }
   }
   assert.deepEqual(buildLaunch('tapd-mcp', config, inherited).args,
-    ['--from', 'zan-tapd-mcp==0.0.2', 'mcp-server-tapd']);
+    ['--from', 'zan-tapd-mcp==0.0.3', 'mcp-server-tapd']);
 });
 
 test('missing services, invalid schema and incomplete YApi credentials fail closed', () => {

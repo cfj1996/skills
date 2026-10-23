@@ -9,177 +9,168 @@ Preferred lead model profile: `CRITICAL`. Read the shared
 [model-routing policy](../../references/model-routing.md) when model selection
 or delegation is available; do not spawn an agent merely to change models.
 
-Produce one in-memory `ReviewedChange` from one approved
-`TapdWorkDefinition`. This skill owns source changes, relevant verification,
-and an independent private review. It does not submit, merge to `develop` or
-`master`, publish a version, or write a Wiki.
+Produce one in-memory `ReviewedChange` from an approved `TapdWorkDefinition`:
+implement the confirmed scope, verify relevant behavior, and obtain independent
+review. Submission, merge, publication and Wiki writes belong to later stages.
+For approved work spanning projects, accept `work_definitions`: the complete set
+of single-project definitions for one Bug, or one Story and its selected Tasks.
+Verify the parent Story and selected scope before grouping requirement work;
+do not add sibling Tasks. Return per-repository `reviewed_changes` only after
+all required work passes. A grouped Bug shares one start/completion record.
+Single-definition calls keep the original input/result. Do not combine different
+Bugs or Stories, or drop a required project to close early.
 
 Read [contracts.md](references/contracts.md),
-[development-rules.md](references/development-rules.md), plus the shared
-[tool-routing policy](../../references/tool-routing.md) before editing. Any
-authorized TAPD status write uses `tapd-mcp`, never browser automation by default.
-Read [acceptance-scenarios.md](references/acceptance-scenarios.md) only for an
-edge case or regression check.
+[development-rules.md](references/development-rules.md) and
+[tool-routing policy](../../references/tool-routing.md) before editing.
+For Bugs also load [status and repair owner](references/bug-repair-owner.md)
+and [repair records](references/bug-repair-record.md). Load
+[acceptance-scenarios.md](references/acceptance-scenarios.md) only for an
+ambiguous case or regression check.
 
-Use [adaptive-workflow.md](../../references/adaptive-workflow.md) for
-`workflow_profile=AUTO|QUICK|STANDARD|FULL` and independent
-`verification_risk=NORMAL|HIGH`. An omitted profile uses the legacy `STANDARD`
-contract. Resolve `AUTO` from the actual scope before choosing the execution
-input; high risk increases verification depth, not preparation paperwork.
+## 1. Verify the approved input and fixed branch
 
-## Input gate
+Require `READY_FOR_HANDOFF`, confirmed scope, verified project/repository,
+exact branch action `CREATE|USE_EXISTING`, matching current-conversation
+branch/scope authorization, and preparation `VALIDATION_PASSED`.
+The status action must be
+`WRITE_ACTIVE|NO_CHANGE|SKIPPED_ALREADY_WAITING_TEST|NOT_APPLICABLE_NON_BUG`;
+only `WRITE_ACTIVE` needs status-write authorization.
 
-Accept only `terminal_state=READY_FOR_HANDOFF` with:
+For grouped work, first verify all definitions, their confirmed complete scope,
+repository/branch bindings and the same Bug or verified parent Story identity.
+Bug definitions also agree on the common status/repair-account facts.
+Deduplicate subprojects sharing the same repository and fixed branch; conflicting
+bindings block. Re-read every repository path, Git root, origin, refs, HEAD and
+working-tree status before the first write. One invalid definition blocks the Bug.
 
-- a verified project/repository fingerprint;
-- confirmed scope;
-- an exact branch action `CREATE|USE_EXISTING`; and
-- a current-conversation confirmation source binding repository, scope, fixed
-  branch, source/base, target branch, operation and purpose; and
-- status action `WRITE_ACTIVE|NO_CHANGE|SKIPPED_ALREADY_WAITING_TEST|NOT_APPLICABLE_NON_BUG`,
-  with a current-conversation authorization source only for `WRITE_ACTIVE`; and
-- public preparation validation `VALIDATION_PASSED`.
+For each repository, immediately before its source work refresh mutable Git
+facts. For `CREATE`, create the exact approved branch from the verified base
+ref/SHA and confirm its actual ref. For `USE_EXISTING`, select the approved
+branch and confirm its ref; prior commits for this Bug are not required.
+Reuse matching authorization without another prompt. Changed facts or
+overlapping pre-existing edits block; preserve unrelated changes.
 
-Re-read actual repository path, Git root, origin, branch refs, HEAD, and
-`git status --short`. A mismatch blocks before edits.
-Reuse verified project knowledge, the applicable Plan/implementation brief or
-Bug investigation summary, and scope from the handoff. Check the
-project's Node/package-manager version and relevant verification commands
-before the first project verification command so an avoidable runtime mismatch does not start a
-trial-and-error sequence.
+Work directly on the fixed branch. Do not create a temporary branch/worktree,
+move implementation elsewhere, or stash/reset unrelated work.
 
-## Fixed-branch execution
+## 2. Check scope, task links and Bug records
 
-- `CREATE`: create the exact approved branch from the definition's exact
-  verified base ref/SHA using the matching confirmation source, then verify
-  the current branch name and ref. Do not ask again while the bound facts match.
-- `USE_EXISTING`: check out/use the exact approved existing branch and verify
-  its actual ref. Do not require this Bug to have prior commits or generated
-  evidence on the branch.
-- Work directly in the verified repository on that fixed branch. Do not create
-  a temporary branch or worktree, stash unrelated work, or implement on a
-  substitute branch.
+Reuse the approved `implementationBrief`, Bug investigation summary or formal
+Plan. A brief covers behavior, exclusions, current evidence, ordered steps and
+verification. Small changes need no formal Plan, Task creation or estimate;
+existing formal Plan/Task requirements and blockers remain binding.
 
-If pre-existing changes overlap the approved scope or make attribution unsafe,
-return `BLOCKED` and explain the overlap. Do not modify or erase them.
+For formal requirement Task/Plan work, apply the
+[task contract](../breaking-down-requirement/references/contracts.md): require
+`TASKS_READY`, real selected Task IDs, verified owners, positive final estimates,
+dependencies, acceptance and Plan `tapdTaskKey` links. Check current readbacks;
+stale scope/owner/hours or unmapped steps return to task preparation. Execute
+only selected Tasks on the original branch. A completed step does not authorize
+a Task status write. Show only final estimated hours.
 
-## Implementation
+Bug work does not acquire requirement-only Task/Plan gates. Run the following
+once per Bug before any repository's source edits, using the complete approved
+repair scope. A successful shared status/owner change is an expected effect;
+reuse its readback for the other definitions instead of replaying their old payload:
 
-For an eligible `QUICK` change without an existing formal Plan/Task breakdown,
-accept an in-memory `implementationBrief` with `behaviors`, `exclusions`,
-`evidence`, `steps`, and `verification`. It describes the approved observable
-behavior, boundaries, current source/contract evidence, executable behavior
-slices and how each result is checked. Resolve material unknowns before edits;
-the brief reuses the approved `TapdWorkDefinition` and its authorization. It
-does not require a formal Plan, Task creation, estimates or schedule. Preserve
-an existing formal Plan/Task contract and its blockers; selecting `QUICK` cannot
-bypass them. `STANDARD|FULL` requirement development keeps `TASKS_READY` and
-Plan-to-Task checks. Bug repairs do not acquire requirement Task/Plan gates
-merely because their profile is `STANDARD|FULL`; their scoped investigation and
-implementation summary may remain in the conversation.
+1. Refresh the Bug state, owner and repair-account evidence using the
+   [owner rules](references/bug-repair-owner.md). Reuse the checklist's exact
+   authorization; a standalone call obtains any missing authorization through
+   the same Chinese TAPD/record preview. Changed facts require an updated preview.
+2. For `WRITE_ACTIVE`, call [change-reviewer](agents/change-reviewer.md) with
+   `PRE_STATUS_WRITE`. After it passes, send one `tapd-mcp` `update_bug`
+   containing both status and `current_owner`; immediately read both back and
+   run the owner's helper validation. Partial readback blocks source edits,
+   retaining actual effects without automatic rollback or retry.
+3. `NO_CHANGE` requires matching active state and repair owner. A waiting-test
+   `CONTINUE` preserves both fields using `SKIPPED_ALREADY_WAITING_TEST`.
+4. Apply the [record rules](references/bug-repair-record.md): diagnose and
+   verify introduction evidence, then create/reuse the authorized start comment
+   and read it back before the first edit. Preserve unknown history explicitly,
+   omit an absent related requirement, and keep one flat record per Bug.
 
-使用正式 Task/Plan 的需求开发在第一项业务源码修改前，按
-[实施排期推荐](references/implementation-schedule.md) 展示所选 Task 的建议
-起止日期/工作日窗口：复用已确认的预估工时、当前剩余范围、人员可用时间
-和依赖。复用编排传入的共享 `scheduleRecommendation`，独立调用则自行生成。
-它是推荐，不要求新增确认才能继续已授权实施，也不写 TAPD 日期或 Plan；
-用户另行要求回写时再展示精确日期变更并确认。纯 `QUICK` brief 和 Bug 不强制
-估时排期；用户明确要求时间建议时可以按已知信息给出，不虚构 Task 或工时。
+Story/Task uses `NOT_APPLICABLE_NON_BUG` and skips Bug status and record writes.
+Use `tapd-mcp` for authorized writes, following the shared tool-routing policy.
 
-1. After the repository/branch/scope gate passes, handle TAPD status by item type:
-   - for Story/Task, require `NOT_APPLICABLE_NON_BUG` and perform no status
-     validation, authorization request, write, or readback;
-   - only for Bug, apply the remaining status rules below;
-   - read [修复中状态与处理人](references/bug-repair-owner.md), reuse the prepared
-     verified `repairOwner`, and refresh actual `status,current_owner` plus
-     repair-identity evidence before writing. Changed facts require an updated
-     checklist; missing/ambiguous repair identity blocks the write;
-   - reuse the confirmed `fixing-bug` checklist authorization when it binds the
-     same item, current state/owner, verified repair account, combined
-     `修复中`+`current_owner` payload, purpose, branch, and scope;
-   - for standalone invocation, display those exact facts and obtain one
-     authorization;
-   - for `CONTINUE` already in `待测试`, use
-     `SKIPPED_ALREADY_WAITING_TEST` and perform no status or owner write;
-   - use `NO_CHANGE` only when the item is already `修复中` and its handler
-     matches the verified repair account. Otherwise use `WRITE_ACTIVE`, even
-     if only the owner needs correction.
-   Call [agents/change-reviewer.md](agents/change-reviewer.md) with
-   `validation_phase=PRE_STATUS_WRITE` only for `WRITE_ACTIVE`. Send one
-   `tapd-mcp` `update_bug` with both status and `current_owner`, then immediately
-   read both fields back and run the helper's readback validation. A successful
-   status-only readback is `BLOCKED` before source edits; retain actual effects
-   without automatic rollback or retry. Never ask again merely because
-   authorization came from the confirmed checklist.
-2. Diagnose the Bug or plan the requested Story/Task within the approved scope.
-   For requirement development using `STANDARD|FULL` or an existing formal
-   Plan/Task breakdown, consume the selected `TASKS_READY` Task records and the
-   Plan's `tapdTaskKey` links under the
-   [task contract](../breaking-down-requirement/references/contracts.md).
-   Verify the real Task IDs, assigned developers, positive final workload
-   estimates, dependencies and acceptance against current readbacks before
-   implementation. Execute only the selected Tasks and their linked steps on
-   the original bound branch. Missing Task data, stale scope/person/hours or
-   unmapped steps return to task breakdown/confirmation; never create Tasks or
-   infer permission to edit a coworker's unselected Task. Non-TAPD/Bug flows
-   retain their existing contract. Report verification for the selected formal
-   Tasks; completion
-   of one step never authorizes a Task done/status write. Conversation and
-   progress show final estimated hours only; do not disclose internal base
-   effort, coefficients, formulas or calculation comparisons.
-   For existing functionality, identify which affected behaviors remain valid
-   and which the current request authorizes changing or removing. Reuse current
-   requirement/acceptance references and confirmed amendments; existing code or
-   a reference implementation does not authorize changing those requirements.
-   Keep this comparison in the existing scope/implementation summary, with
-   detail proportional to the affected behavior. For adopted Zan projects,
-   reuse the effective `ZAN-SCOPE-MINIMAL-001` rule from the supplied project
-   context (`standards/zan-system/rules/scope-minimization.md`); a newer central
-   version does not automatically change the project's adopted requirements.
-3. Implement the smallest coherent change in observable behavior slices.
-   Validate the assumption most likely to invalidate the approach first, then
-   complete and check each slice before expanding the next. A slice follows a
-   behavior through the layers in scope, rather than completing every file of
-   one technical layer first. Choose project tests, reproduction or browser
-   checks for the behavior; when tests are appropriate, exercise public
-   interfaces instead of mirroring private implementation details. For
-   `verification_risk=HIGH`, cover the relevant failure paths, compatibility
-   and preserved behavior at the actual affected boundaries. `QUICK` never
-   lowers this depth; an unavailable required check remains a blocker.
-   Add or update ordinary project tests when appropriate. During edits run
-   focused tests, type/lint checks
-   that exercise the changed files; run the broader required suite and build
-   once after the coherent diff is stable. Repeat a broad gate only if a later
-   change can invalidate its result. Do not rerun `git status`, diff statistics
-   or `git diff --check` after every local edit; inspect the final change set
-   before review. Run relevant project verification commands.
-   Verification output stays in the current execution; do not copy it into a
-   workflow evidence directory.
-4. Compare the final diff with the starting status and approved scope. Exclude
-   unrelated paths. Inspect deleted, replaced, moved or disconnected logic
-   against the affected behavior expectations: verify the authorized change or
-   reachable replacement and run risk-appropriate checks for behaviors that
-   must remain. Recheck affected behavior after later edits invalidate earlier
-   evidence; source deletion alone is not proof of behavior loss.
-5. Give the exact diff, scope, applicable Plan/implementation brief or Bug
-   investigation summary, resolved profile/risk, affected behavior expectations
-   with their source references,
-   repository/branch facts, and verification results and gaps
-   to [agents/change-reviewer.md](agents/change-reviewer.md) with
-   `validation_phase=POST_CHANGE_REVIEW`. The reviewer is
-   read-only and returns one private verdict line. Map it to
-   `REVIEW_PASSED|REVIEW_FAILED|NOT_RUN`, retain only a normalized reason, and
-   discard the private line.
-   Every profile requires independent review of both requirement behavior and
-   engineering design/test coupling; this does not require two reviewer agents.
-   One coherent final diff gets one independent review. If review feedback
-   causes a change, recheck the affected paths and review that delta; do not
-   restart the whole preparation and implementation workflow.
-6. Return one in-memory `ReviewedChange`. Do not create a report file, runtime
-   record, raw data file, or generated test-evidence directory.
+Only when the user requests scheduling or date handling, load
+[implementation-schedule.md](references/implementation-schedule.md). A formal
+Task alone does not trigger scheduling, date writes or a new confirmation.
 
-## Output rule
+## 3. Implement and verify
 
-Return `REVIEWED` only when repository, branch, scope, verification, and review
-all pass. Otherwise return `BLOCKED` with the first truthful blocker. Do not
-commit, push, submit, merge, publish, or write a Wiki in this skill.
+The lead runs this skill and owns shared operations. For multiple implementation
+steps, apply [多任务实施](references/parallel-execution.md): use the lead directly
+for small work; dispatch independent, ready scopes to
+[开发子代理](agents/task-implementer.md), normally at most two concurrently and
+never more than three. Dependency, file ownership and shared-resource checks
+apply across all projects. Unavailable delegation or inseparable changes use
+serial execution, without creating extra Plans, Tasks, branches or ledgers.
+
+Keep each repository's baseline, actual diff and verification separately. The
+lead verifies predecessor outputs before releasing dependent work, and retains
+completed effects when a task blocks. Pause affected dependents; independent
+authorized work can continue only while its scope/resources remain valid.
+Before integration and final review, stop related writers and verify they have
+finished; then run agreed cross-task/cross-repository acceptance on stable code.
+Missing required work blocks the whole handoff. A Bug also cannot publish its
+completion comment or hand out a partly eligible `ReviewedChange`.
+
+Use current requirement/acceptance references and confirmed amendments to
+identify behaviors to preserve, change or remove. Existing code and reference
+implementations do not override those requirements. For adopted Zan projects,
+reuse the effective `ZAN-SCOPE-MINIMAL-001` rule from the verified context.
+
+Implement the smallest coherent change in observable behavior slices. Check
+the assumption most likely to invalidate the approach first, then verify each
+slice before expanding. Concrete risks such as permissions, amounts, data
+consistency and shared interfaces determine failure, regression and compatibility
+coverage; a small diff does not lower that coverage.
+
+Before verification, check the project's Node/package-manager version and
+relevant commands. Use focused tests, reproduction, browser, type or lint checks
+as appropriate. Tests should observe public behavior rather than mirror private
+implementation. Run the required broader suite/build once the diff is stable;
+repeat only checks invalidated by later changes. Record actual results and gaps
+in memory, without workflow evidence files. Never report unrun checks as passed.
+
+## 4. Review, complete records and return
+
+Compare the final diff with the starting baseline and approved scope. Exclude
+unrelated paths; check removed, moved or disconnected logic against authorized
+behavior changes or a reachable equivalent replacement.
+For delegated work, the lead reconciles actual task/path changes and verification
+coverage before review. Worker self-checks are evidence, not independent review.
+Use one whole-project review where it covers multiple tasks; parallel read-only
+reviews of stable independent repositories still need integration acceptance.
+
+Give the exact diff, approved scope, Plan/brief, behavior expectations and their
+sources, repository/branch facts, concrete risks and verification results/gaps
+to [change-reviewer](agents/change-reviewer.md) with `POST_CHANGE_REVIEW`.
+For a grouped Bug, obtain this review for every required repository, supply the
+full Bug boundary and applicable cross-repository acceptance, and attribute
+comment claims to the evidence each review covers. Do not infer that one
+repository's review accepts another repository.
+For Bugs include start-record readback, record authorization and the proposed
+complete final comment. One independent review covers requirement behavior and
+engineering design/test coupling. Map its private line to
+`REVIEW_PASSED|REVIEW_FAILED|NOT_RUN`, retain a concise reason and discard the raw
+line. If review causes edits, verify and review the affected delta.
+
+After all required repositories and cross-repository acceptance pass verification
+and review, refresh their source/diff facts; changed evidence reopens only the
+affected checks/review. Aggregate the reviewed claims into one flat Bug completion
+record, append/reuse it once and read it back under the same authorization. A comment failure blocks
+handoff while preserving the actual code/review result; resume only missing work.
+Story/Task has no repair-record obligation.
+
+Return `REVIEWED` only when repository, branch, scope, verification, review and
+applicable Bug records pass; otherwise return `BLOCKED` with the actual gap.
+Keep one in-memory `ReviewedChange`, or `reviewed_changes` for grouped work,
+paired to definitions by canonical repo/origin/fixed_branch, not array position.
+Each grouped result retains its selected scope and the confirmed required set;
+Bug results also reference the same complete repair record. Until the whole scope closes, report `BLOCKED` plus actual
+per-repository progress without labelling partial results `REVIEWED`. On resume,
+verify existing comments and completed source/review evidence, then only finish
+missing or invalidated work. Add no report file or runtime ledger.
+Do not commit, push, submit, merge, publish, or write a Wiki in this skill.

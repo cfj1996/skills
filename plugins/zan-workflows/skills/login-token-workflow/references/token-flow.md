@@ -9,8 +9,8 @@
 Acquire authentication at runtime in this order:
 
 1. Reuse an already authenticated browser session and read the required cookies without exposing them.
-2. If no authenticated session is available, request the password as runtime-only user input.
-3. If configured, retrieve it from an approved secret store.
+2. If configured, retrieve credentials from an approved secret store without exposing them.
+3. Otherwise open the login page and let the user enter their password there; do not request it in chat. After login, read only the cookies needed for the selected page type.
 
 Never record a reusable password in this reference, a prompt, shell history, command output, logs,
 or generated artifacts. Do not echo or persist the runtime credential.
@@ -21,6 +21,9 @@ Read these cookies from the response:
 - `fx_admin_siteId` -> merchant id
 
 ## 2. C-end user token
+
+Run this step only for a C-end page. Merchant pages use the admin token directly
+and do not require a C-end user ID or an exchange request.
 
 Use the merchant platform token and merchant id to call:
 

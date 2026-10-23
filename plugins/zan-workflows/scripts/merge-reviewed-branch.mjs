@@ -20,16 +20,45 @@ async function checkRepository(input) {
   }
 }
 
-async function containsSource(input) {
+export async function inspectTargetContainment(input) {
   try {
     await run('git', ['fetch', '--no-tags', 'origin',
       `+refs/heads/${input.targetBranch}:refs/remotes/origin/${input.targetBranch}`], { cwd: input.repositoryPath });
-    await run('git', ['merge-base', '--is-ancestor', input.sourceSha, `refs/remotes/origin/${input.targetBranch}`], {
-      cwd: input.repositoryPath,
-    });
     const target = await run('git', ['rev-parse', `refs/remotes/origin/${input.targetBranch}`], { cwd: input.repositoryPath });
-    return { contained: true, targetSha: target.stdout.trim() };
+    const targetSha = target.stdout.trim();
+    try {
+      await run('git', ['merge-base', '--is-ancestor', input.sourceSha, targetSha], { cwd: input.repositoryPath });
+      return { contained: true, targetSha };
+    } catch (error) {
+      if (error.code === 1) {
+        const shallow = await run('git', ['rev-parse', '--is-shallow-repository'], { cwd: input.repositoryPath });
+        if (shallow.stdout.trim() === 'true') throw new Error('浅克隆无法排除缺失的祖先关系');
+        return { contained: false, targetSha };
+      }
+      throw error;
+    }
   } catch { throw new Error('远端目标分支的 source SHA 包含关系未能验证'); }
+}
+
+async function containsSource(input) {
+  const proof = await inspectTargetContainment(input);
+  if (!proof.contained) throw new Error('远端目标分支的 source SHA 包含关系未能验证');
+  return proof;
+}
+
+async function testTargetReceipt(input, targetSha, io) {
+  const proof = input.sourceSha === targetSha ? { contained: true, targetSha }
+    : await (io.inspectContainment || inspectTargetContainment)(input);
+  if (typeof proof?.contained !== 'boolean' || !SHA.test(proof.targetSha || '')) {
+    throw new Error('测试分支包含关系不可核实');
+  }
+  if (proof.targetSha !== targetSha) throw new Error('包含关系核验时目标分支 SHA 已变化，需要更新清单');
+  if (!proof.contained) return null;
+  return { state: 'VERIFIED', operation: 'VERIFY_CONTAINMENT_ONLY', projectId: input.projectId,
+    repositoryPath: input.repositoryPath, originUrl: input.originUrl,
+    sourceBranch: input.sourceBranch, targetBranch: input.targetBranch, sourceSha: input.sourceSha,
+    targetSha, observedTargetSha: targetSha, deliveredSha: targetSha, containment: true,
+    mrIid: null, mrUrl: null, mergeReadback: false, mergeCommitSha: null, writes: 0 };
 }
 
 function bindMr(mr, input, allowMissingSha = false) {
@@ -75,15 +104,26 @@ function mergeState(mr, input) {
 
 function mergeMode(input) {
   const mode = input.mergeMode ?? 'AUTO';
-  if (!['AUTO', 'MANUAL', 'VERIFY_ONLY'].includes(mode)) throw new Error('合并模式无效');
+  if (!['AUTO', 'MANUAL', 'VERIFY_ONLY', 'CONTAINMENT_ONLY'].includes(mode)) throw new Error('合并模式无效');
   if (mode === 'VERIFY_ONLY' && (input.execute || !/^[1-9]\d*$/.test(String(input.mrIid)) || !SHA.test(input.sourceSha || ''))) {
     throw new Error('人工合并核验必须只读并绑定原 MR IID 和 source SHA');
+  }
+  if (mode === 'CONTAINMENT_ONLY' && (input.execute || input.mrIid ||
+      !['dev', 'develop'].includes(input.targetBranch) || !SHA.test(input.sourceSha || ''))) {
+    throw new Error('只读包含关系核验必须绑定测试分支和已评审 source SHA，不能执行 MR 写入');
   }
   return mode;
 }
 
+function checkDefaultTarget(project, input) {
+  if (['master', 'main'].includes(input.targetBranch) && project.default_branch !== input.targetBranch) {
+    throw new Error(`${input.targetBranch} 未验证为实际默认分支，需要更新清单`);
+  }
+}
+
 export function mergeRequiredTools(input) {
   const mode = mergeMode(input);
+  if (mode === 'CONTAINMENT_ONLY') return ['get_branch', 'get_project'];
   return ['get_branch', 'get_project', 'get_merge_request', 'list_merge_requests',
     ...(input.execute && !input.mrIid ? ['create_merge_request'] : []),
     ...(input.execute && mode === 'AUTO' ? ['merge_merge_request', 'get_merge_request_approval_state'] : [])];
@@ -140,7 +180,7 @@ export async function mergeReviewedBranch(call, input, io = {}) {
   const [target, project, candidates] = await Promise.all([
     readTool(call, 'get_branch', { ...projectArgs, branch_name: input.targetBranch }),
     readTool(call, 'get_project', projectArgs),
-    input.mrIid
+    mode === 'CONTAINMENT_ONLY' ? Promise.resolve([]) : input.mrIid
       ? readTool(call, 'get_merge_request', { ...projectArgs, merge_request_iid: String(input.mrIid) }).then(mr => [mr])
       : readTool(call, 'list_merge_requests', { ...projectArgs, source_branch: input.sourceBranch,
         target_branch: input.targetBranch, state: 'opened', per_page: 2, page: 1 }),
@@ -151,7 +191,13 @@ export async function mergeReviewedBranch(call, input, io = {}) {
   if (![project?.ssh_url_to_repo, project?.http_url_to_repo].filter(Boolean).some(url => repositoryKey(url) === repositoryKey(input.originUrl))) {
     throw new Error('GitLab 项目与确认的源码仓库不一致');
   }
-  if (input.targetBranch === 'main' && project.default_branch !== 'main') throw new Error('main 未验证为实际默认分支');
+  checkDefaultTarget(project, input);
+  if (mode === 'CONTAINMENT_ONLY') {
+    if (input.targetSha && input.targetSha !== target.commit.id) throw new Error('目标分支 SHA 已变化');
+    const receipt = await testTargetReceipt(input, target.commit.id, io);
+    if (!receipt) throw new Error('测试分支尚未包含已评审变更；本轮未授权合并，不执行其他交付');
+    return receipt;
+  }
   if (candidates.length > 1) throw new Error('同一源/目标有多个打开 MR，停止自动选择');
   let mr = candidates[0];
   if (mr) {
@@ -169,6 +215,10 @@ export async function mergeReviewedBranch(call, input, io = {}) {
   if (mr) bindMr(mr, plan);
   if (mode === 'VERIFY_ONLY' && !mr) throw new Error('原 MR 未能读回；不会重新创建');
   if (mode !== 'VERIFY_ONLY' && target.commit.id !== plan.targetSha && mr?.state !== 'merged') throw new Error('目标分支 SHA 已变化');
+  if (!mr && ['dev', 'develop'].includes(input.targetBranch)) {
+    const receipt = await testTargetReceipt(plan, target.commit.id, io);
+    if (receipt) return receipt;
+  }
   if (!mr) requireText(input.title, '新 MR 标题');
   if (!input.execute && mode !== 'VERIFY_ONLY') return {
     ...plan, execute: false, confirmed: false, state: 'AWAITING_CONFIRMATION',
@@ -203,11 +253,13 @@ export async function mergeReviewedBranch(call, input, io = {}) {
       }
       phase = 'CHECK_MERGE';
       const approvals = await verifyMergeApprovals(call, mrArgs, plan, project, io);
-      const [freshSource, freshTarget, freshMr] = await Promise.all([
+      const [freshSource, freshTarget, freshMr, freshProject] = await Promise.all([
         readTool(call, 'get_branch', { ...projectArgs, branch_name: input.sourceBranch }),
         readTool(call, 'get_branch', { ...projectArgs, branch_name: input.targetBranch }),
         readTool(call, 'get_merge_request', mrArgs),
+        ['master', 'main'].includes(input.targetBranch) ? readTool(call, 'get_project', projectArgs) : project,
       ]);
+      checkDefaultTarget(freshProject, input);
       if (freshSource?.commit?.id !== plan.sourceSha || freshTarget?.commit?.id !== plan.targetSha) {
         throw new Error('合并前 source/target SHA 已变化，需要更新清单');
       }

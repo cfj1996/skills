@@ -58,6 +58,12 @@ Do not escalate merely because a task has many files, long tool output, or a
 strict template. Prefer `BALANCED` for read-only pagination, filtering,
 formatting, and deterministic validation.
 
+## Implementation worker
+
+The implementation worker in `implementing-work/agents/task-implementer.md`
+inherits the runtime's model and effort by default. Delegation is chosen for
+independent work, not to emulate a profile; workers do not spawn further agents.
+
 ## Managed MR reviewer roles
 
 - Use `agents/mr-code-reviewer.md` for routine, bounded MRs.

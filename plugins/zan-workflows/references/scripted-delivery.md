@@ -9,7 +9,12 @@ releases and all package publications retain the complete flow below.
 Use one confirmed in-memory plan per operation bundle. Scripts receive JSON
 through stdin and return JSON on stdout; do not save workflow plan/result
 files. `--execute` is an execution switch, not evidence of human authorization.
-The caller must bind the current displayed plan and actual confirmation first.
+The caller must first bind the actual human confirmation to the current exact
+plan: reuse a main entry's complete execution checklist after scope comparison,
+or obtain the standalone skill's own plan confirmation. Follow
+[confirmation reuse](execution-checklist.md#执行清单的确认复用); a PLAN result or
+`confirmed=true` alone is not evidence, and internal preview/execution calls do
+not require another human turn when the main authorization already covers them.
 
 ## Reuse one live MCP session
 
@@ -63,11 +68,31 @@ Required plan facts: `projectId`, `repositoryPath`, exact `originUrl`, original
 `sourceBranch`, `targetBranch`, `purpose`, current `reviewPassed=true`, explicit
 `pipelineRequired` and new-MR title/description when applicable. Preview binds
 `sourceSha`, `targetSha` and any exact `mrIid`. Execute also needs the matching
-confirmation (`confirmed=true`). Targets are `develop|dev|master` or `main`
-only after it is verified as the actual default. Source remains the original
+confirmation (`confirmed=true`). Test-delivery targets are the verified
+`develop|dev`; default-delivery targets `master|main` must both match the
+project's actual default branch during preview and again before merging.
+A default-branch change invalidates the plan even when its old ref has not moved.
+For test targets only, an AUTO/MANUAL call with no open MR first checks whether
+the reviewed source is already contained in the current target. Equal live
+tips or fetched ancestry return `state=VERIFIED`,
+`operation=VERIFY_CONTAINMENT_ONLY`, `containment=true` and writes=0, without
+creating an MR, waiting for CI or claiming an MR merge. `deliveredSha` and
+`observedTargetSha` are the verified test-target tip. An unavailable check or
+changed target blocks before writing; an evidenced non-containing target may
+continue the already-authorized ordinary MR path.
+
+When the checklist disables merging or the developer already delivered the
+change, call `mergeMode=CONTAINMENT_ONLY` with `execute=false`, the exact reviewed
+source SHA and dev/develop target. It needs only project/target read tools and
+never falls through to an MR write if containment is absent. It can verify
+the immutable source even if its remote branch is gone. It is a Git delivery
+receipt for test submission, not default-branch MR/cleanup evidence, and does
+not clear an outstanding exact-MR manual handoff in a workflow session.
+Source remains the original
 `feature/*|fixbug/*`; conflict branches use the shared
-[A → C → B flow](conflict-merge.md), with exact temporary cleanup included
-in its confirmation by default and an explicit user retention override.
+[A → C → B flow](conflict-merge.md), reusing the main checklist's conditional
+resolution authority or obtaining standalone confirmation. Temporary cleanup
+requires its own exact covered resources; automatic resolution alone grants none.
 
 ```bash
 node scripts/merge-reviewed-branch.mjs --json <<'PLAN'
@@ -212,9 +237,16 @@ Missing static `jenkins_job_urls` is not a blocker until this precise lookup
 actually fails. STANDARD+SKIP may use it solely for the required Wiki link;
 parameter/build/queue/log queries and triggers stay forbidden under SKIP.
 
-`scripts/run-jenkins-release.mjs` owns one trigger, queue/build waiting and
-source/parameter verification. Job lookup and release intent stay with the
-producer; scripts do not guess a Job from cwd or repository name.
+`scripts/run-jenkins-release.mjs` owns one trigger. `completionMode` is
+`BUILD_TERMINAL` by default for standalone releases and go-live, with exact
+queue/build waiting and source/parameter verification. Test submission uses
+`TRIGGER_ACCEPTED`: preview and execute with that mode, return `BUILD_SUBMITTED`
+as soon as the exact Job/queue URL/ID is accepted, and perform no queue/build/log
+read or wait. Retain submitted parameters and planned ref/SHA in the receipt;
+it does not prove actual checkout, deployment or publication. Only canary test
+builds may use this mode; official/production releases must wait. Unknown or
+missing trigger receipts block later writes without retrying. Job lookup and
+release intent stay with the producer; scripts do not guess a Job from cwd.
 
 Required facts: `targetProject`, `releaseTarget` (package name for a package),
 `targetEnvironment`, `jobName`, evidenced `jobUrl`, `releaseRef`, `expectedSha`,
@@ -222,7 +254,10 @@ Required facts: `targetProject`, `releaseTarget` (package name for a package),
 `releaseKind=deployment|package`, `purpose`, exact `params`, `refParameter` and
 any `versionParameter`/`channelParameter`. An adapter may resolve these during
 preview. No version parameter means a deployment source identity equal to
-the confirmed SHA. Package canary binds a non-official channel; official
+the confirmed SHA. Package releases require a real version bound to a live Job
+parameter or the verified `npm-tools-v1` computed-version contract; a source SHA
+or a caller-provided `PIPELINE_COMPUTED` label cannot substitute for either.
+Package canary binds a non-official channel; official
 versions are stable, explicitly bound or read back through the computed
 adapter below. Review the actual Job/channel semantics before confirmation.
 
@@ -247,7 +282,9 @@ needed and readable; legacy plans with `jobConfigHash` retain XML verification.
 Only XML HTTP 403 permits a metadata preview in that mode. Reuse its returned
 mode for execution without retrying XML. Other XML errors stop. A binding
 mode/identity or parameter change blocks execution. Queue/build/parameters
-and actual target repository SHA remain mandatory.
+and actual target repository SHA remain mandatory for `BUILD_TERMINAL`;
+`TRIGGER_ACCEPTED` verifies the source ref before triggering and returns only
+the accepted queue receipt.
 
 `npm-tools-v1` recognizes `PROJECT_NAME` and `RELEASE_TYPE`. It requires
 `pipelineSource` with verified `repositoryPath`, `repositoryUrl`, `ref`, full
@@ -255,13 +292,15 @@ and actual target repository SHA remain mandatory.
 out/editing it; parse the maintained Jenkinsfile's literal project map,
 canary/official branch rule and publication-summary contract. Unfamiliar
 scripts stop. Bind its body hash, repository and release-type selection;
-verify both refs before trigger and both actual SCM SHAs afterwards.
+verify both refs before trigger and, in `BUILD_TERMINAL`, both actual SCM SHAs
+afterwards. `TRIGGER_ACCEPTED` returns before checkout/publication, with null
+`version`, source `versionIdentity`, and no `publishedPackages`.
 
 This pipeline publishes the whole selected project and computes versions.
 Require displayed `releaseScope=PROJECT`, `releaseTarget=targetProject` and
 `versionStrategy=PIPELINE_COMPUTED`; never widen a single-package request
 silently. Plan `version` is the confirmed source SHA as an identity, not a
-predicted npm version. After SUCCESS parse the exact build's bounded
+predicted npm version. In `BUILD_TERMINAL`, after SUCCESS parse the exact build's bounded
 publication summary (at most 2 MiB), matching project/channel and stable
 versus prerelease versions. Return actual `publishedPackages`, null `version`
 and source `versionIdentity`. Missing publication evidence cannot return
@@ -290,12 +329,19 @@ node scripts/run-jenkins-release.mjs --json <<'PLAN'
 PLAN
 ```
 
+The example above is a terminal-release plan. For test submission, also include
+`"completionMode": "TRIGGER_ACCEPTED"` in both preview and execution; omitting
+it selects the helper's terminal-wait default.
+
 Prefer a fixed SHA ref when the Job supports it. Branch-only Jobs still need
-the confirmed expected revision and actual checkout evidence; a changed
-checkout yields `UNKNOWN`, never a false successful release. Other package
+the confirmed expected revision before triggering. In `BUILD_TERMINAL`, require
+actual checkout evidence; a changed checkout yields `UNKNOWN`, never a false
+successful release. `TRIGGER_ACCEPTED` requires neither an actual checkout nor
+a build number, and returns after local validation of the exact queue receipt.
+Other package
 Jobs without explicit versions or a recognized computed-version contract,
-or Jobs without target-SCM BuildData, still need a specific evidence
-improvement. Do not match any SHA in changes or logs as a substitute.
+or terminal-release Jobs without target-SCM BuildData, still need a specific
+evidence improvement. Do not match any SHA in changes or logs as a substitute.
 Before triggering, symbolic branch/tag refs get one controlled read-only Git
 query; changed SHAs and branch/tag name collisions block the trigger. Annotated
 tags compare their peeled commit. This is a write-boundary check, not another
@@ -310,7 +356,10 @@ exists. Queue/build polling shares one deadline (default 30 minutes), sleeps
 at most 30 seconds and emits only state changes. Do not replace this with
 Agent polling, console downloads or repeated Job/rule discovery.
 
-`DEPLOYED|RELEASED` requires the exact build's `SUCCESS`, planned parameters
+`BUILD_SUBMITTED` is sufficient for test-submission Wiki/TAPD gates only with
+its exact queue receipt. Tooling Wiki preserves an evidenced current channel,
+or records `当前版本：待发布`; do not claim canary publication from a submitted Job.
+`DEPLOYED|RELEASED` still requires the exact build's `SUCCESS`, planned parameters
 and repository-specific actual SCM SHA. `FAILED|UNKNOWN` prevents subsequent
 Wiki/TAPD/version writes. A failed/unknown trigger is never repeated. Actual
 CI/build duration remains owned by GitLab/Jenkins; this flow removes Agent
@@ -370,7 +419,10 @@ interpretation. Execution refreshes those facts before one update/readback;
 native fallback retains any collected custom metadata fingerprint.
 
 Execution also carries the existing consolidated confirmation and
-`prerequisites`: `git=VERIFIED`, `deployment=DEPLOYED|SKIPPED_BY_INTENT`,
+`prerequisites`: `git=VERIFIED`,
+`deployment=BUILD_SUBMITTED|DEPLOYED|SKIPPED_BY_INTENT`,
+plus the helper's full `deploymentReceipt` for `BUILD_SUBMITTED` (state,
+completionMode, Job/queue URL/ID, source repository/SHA, submitted params, writes=1),
 `profile=STANDARD|NO_WIKI`, with `wiki=VERIFIED|SKIPPED_NON_FUNCTIONAL` for
 STANDARD or `SKIPPED_NO_WIKI` for NO_WIKI. This helper never calls Wiki tools.
 Continue already waiting skips status, owner and version writes; a completely matching final

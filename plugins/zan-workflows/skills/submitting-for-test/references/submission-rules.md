@@ -6,12 +6,15 @@ Prepare one consolidated authorization using
 [deployment-and-confirmation.md](deployment-and-confirmation.md). For every
 external write inside that unchanged authorized plan:
 
-1. The consolidated plan has already displayed the exact target, payload,
-   operation and purpose; do not repeat that display or broad discovery for
-   each operation.
+1. The main execution checklist has confirmed the operation/target/purpose
+   and allowed derivations, or the standalone plan has confirmed the exact
+   payload. Calculate and validate the current exact bindings before writing;
+   do not repeat user display/approval or broad discovery for each operation.
 2. Re-read only the mutable facts for this specific write immediately before
    execution. Reuse the consolidated authorization when they still match;
-   obtain a fresh one only when a bound fact or operation changes.
+   stop stale bindings and refresh the accurate plan when needed. Reuse
+   authority for permitted technical derivations; material scope/operation
+   changes need fresh approval.
 3. Ask the private validator to check this operation, execute only after it
    passes, and read the result back before proceeding.
 
@@ -40,17 +43,27 @@ transport for these systems.
 
 ## Git delivery
 
-Use the original fixed business branch as source and exactly `develop` as
-target. Keep commits already inherited by the branch separate from the current
-reviewed change. Never rebuild on `develop`, substitute `merge/*`, or include
+Use the original fixed business branch as source and the verified, confirmed
+`dev` or `develop` branch as target. Preserve the upstream exact selection;
+standalone calls resolve it from project policy and remote evidence before
+confirmation. Both existing names without a selected target are an unresolved gap. Keep commits already inherited by the branch separate from the current
+reviewed change. Never rebuild on the test target, substitute `merge/*`, or include
 unreviewed paths.
 
-When uncommitted, the exact reviewed diff/file list is the commit payload in
+When delivery is already present, or merging is explicitly disabled, run the
+merge helper read-only with `mergeMode=CONTAINMENT_ONLY`, exact reviewed source
+SHA and actual dev/develop target. Require its `VERIFIED`/
+`VERIFY_CONTAINMENT_ONLY` receipt, containment and zero writes; no MR is needed
+and no new merge may be claimed. Use its verified target `deliveredSha` for
+testing. All reviewed delivery changes must already be committed in the bound
+source SHA; pending uncommitted delivery changes or missing/unknown containment
+block before any commit/push, without silently enabling merge.
+For an ordinary authorized merge, when uncommitted, the exact reviewed diff/file list is the commit payload in
 the displayed bundle. Commit/push only that payload with local Git, reuse the
 derived SHA, then invoke `merge-reviewed-branch.mjs` once with the confirmed
 source/target facts. Do not redisplay/revalidate push, MR and merge merely
 because the stage changed. Prove current-round containment in
-`origin/develop` before any TAPD, Wiki or version write. A real MR metadata
+the exact confirmed remote test target before any TAPD, Wiki or version write. A real MR metadata
 change or conflict gets its own exact plan; no history rewrite or duplicate MR.
 
 ## Standard Wiki
@@ -63,8 +76,10 @@ it into Task-titled pages. Preserve separate repository/branch entries.
 Give current work handoffs—not a user-supplied Wiki URL—to
 `zan-workflows:drafting-wiki`. Require `terminal_state=VALIDATED` and one target
 plan, or `terminal_state=SKIPPED_BY_POLICY` with
-`skip_reason=NON_FUNCTIONAL_CONTINUE` and no Wiki operation. Discovery order is
-mandatory for the validated path:
+`skip_reason=NON_FUNCTIONAL_CONTINUE`, a verified existing owner page/current
+repository+branch entry with retained target/body readback, and no Wiki
+operation. Missing history follows normal drafting. Discovery order is
+mandatory for both paths:
 
 1. Resolve the common owner and check its/current-item links; when the Story
    has no link, check its exact child Tasks and their comments as described in
@@ -75,7 +90,8 @@ mandatory for the validated path:
 2. Otherwise query `get_wiki(name=YYYY-MM)` and select the result whose
    returned `parent_wiki_id` is root `1150372234001008260`.
 3. Query the owner-based deterministic child title once and compare returned parent IDs.
-   Reuse the unique matching child or plan `MM-DD: 中文简述` creation. Never pass
+   A same-title child without an owner link blocks; repository/branch matching
+   is not ownership evidence. If absent, plan `MM-DD: 中文简述` creation. Never pass
    unsupported `parent_wiki_id` to `get_wiki`, list all Wiki pages, or repeat
    an unchanged query with a different page size/order.
 
@@ -146,16 +162,17 @@ Never write the canonical entry body into the month page. For the validated
 path, read back the final child, retain its actual ID/URL and original source
 branch for `going-live`, and require the expected body including the resolved
 status (`是否上线：未合并` for a business project, or
-`当前版本：canary|latest` for a tooling/library project)
-before continuing. For tooling `DEPLOY`, before the Wiki write, require the
-successful release result's actual channel to match the draft: `canary` maps
-to `canary`, `official` to `latest`. A planned parameter or
-develop/master merge alone is insufficient. Under `SKIP`, apply the existing
+`当前版本：canary|latest|待发布` for a tooling/library project)
+before continuing. For tooling submission with `TRIGGER_ACCEPTED`, the exact
+`BUILD_SUBMITTED` receipt permits Wiki writes without waiting for publication.
+Preserve an evidenced prior channel or use `当前版本：待发布` when none exists.
+Only a verified release may change the field to its actual published channel:
+`canary` maps to `canary`, `official` to `latest`. Queue acceptance, a planned
+parameter or develop/master merge alone is insufficient publication evidence. Under `SKIP`, apply the existing
 release-evidence/preservation rules in `drafting-wiki`; do not default to canary
-or add deployment queries. A policy skip has no
-child write/readback or Wiki update,
-but retains any existing target readback needed by an explicitly requested
-`going-live` step.
+or add deployment queries. A policy skip has no child write or post-write
+readback, but must retain the verified owner page and matching current entry's
+exact target/body readback for `going-live`.
 
 Use the TAPD workspace from the current work item for every Wiki operation:
 
@@ -199,9 +216,15 @@ or write a Wiki-link comment.
 ## Test deployment and TAPD status
 
 Follow [deployment-and-confirmation.md](deployment-and-confirmation.md).
-Resolve `DEPLOY|SKIP`, finish the deployment gate after develop containment,
-then write Wiki/TAPD data. `DEPLOY` requires Jenkins success and expected SHA
-proof; `SKIP` records `SKIPPED_BY_INTENT` and must not claim a published test
+Resolve `DEPLOY|SKIP`, finish the deployment gate after confirmed test-target containment,
+then write Wiki/TAPD data. `DEPLOY` uses `TRIGGER_ACCEPTED`: verify the expected
+target ref/SHA before trigger, require the exact `BUILD_SUBMITTED` queue receipt,
+and continue without waiting for the build. Retain the receipt for registration
+and report only build submission. A queued or building task is sufficient;
+do not require a build number, terminal result, actual checkout or publication
+readback before Wiki/TAPD. A missing, rejected or unknown trigger receipt blocks
+later writes and must not be retried automatically.
+`SKIP` records `SKIPPED_BY_INTENT` and must not claim a published test
 environment.
 
 Use the status operation appropriate to the work mode. `INITIAL` writes and

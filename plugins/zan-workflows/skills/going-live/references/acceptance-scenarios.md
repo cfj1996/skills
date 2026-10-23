@@ -4,6 +4,8 @@
 | --- | --- |
 | Submitted original branch with valid authorization | Merge that branch directly to `master` and verify containment. |
 | One complete checklist displays merge and exact Wiki patch | One confirmation binds both distinct scopes; validate once and run the merge and update-only executors without another question. |
+| A main execution checklist already explicitly covers go-live targets and required operations | Compare the accurate current plan/derivations to that authority and continue without another stage approval; standalone go-live still confirms its own exact plan. |
+| Main workflow delivery finds cleanup candidates without deletion authority | Report actual delivery and exact candidates as next-step advice, retain them and do not append a cleanup approval question. |
 | Wiki patch was omitted or materially changed | Obtain its exact new preview/authorization before write; never inherit merge authority alone. |
 | CI is running for the exact approved MR | Let the executor wait with bounded backoff; no Agent/rule/reviewer loop. |
 | Verified actual default is main | Use the actual main target/ref and its containment proof; do not silently target a different master branch. |
