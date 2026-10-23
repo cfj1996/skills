@@ -25,7 +25,7 @@ clear:
 
 | Mode | Trigger | Result requirement |
 | --- | --- | --- |
-| `DEPLOY` | “发布测试环境”“发布版本”“部署并提测” or a named project policy requiring deployment | Jenkins test deployment must succeed and prove the expected ref/SHA |
+| `DEPLOY` | “发布测试环境”“发布版本”“部署并提测” or a named project policy requiring deployment | Jenkins must accept the exact confirmed test build; continue on `BUILD_SUBMITTED` without waiting |
 | `SKIP` | “直接提测”“跳过发布”“不发测试环境” | No build/deploy/parameter/poll calls; allow only missing canonical Wiki Job metadata lookup; record `SKIPPED_BY_INTENT` |
 | `AUTO` | No explicit override within selected test delivery | Select `DEPLOY`; preserve an explicit `SKIP` or overall non-delivery scope |
 
@@ -112,7 +112,7 @@ every included repository's deployment gate is resolved:
 
 ```text
 Each repository: Git commit/push/MR -> confirmed test-target containment
-  -> DEPLOY: Jenkins SUCCESS + expected ref/SHA proof
+  -> DEPLOY: confirmed ref/SHA + accepted exact Jenkins queue (BUILD_SUBMITTED)
      SKIP: no Jenkins deployment call + SKIPPED_BY_INTENT
 All required repositories pass:
   -> one shared Wiki create/update/readback when STANDARD
@@ -120,38 +120,33 @@ All required repositories pass:
   -> one Bug registration with waiting-test/test-version writes when required
 ```
 
-For `DEPLOY`, resolve the Jenkins Job through workspace project knowledge and
-the release-safety policy. Jenkins success alone is insufficient: read back the
-build parameters and repository-specific SCM evidence needed to prove it built the expected
-delivered commit of that exact confirmed remote test target. For an application
-deployment without a semantic-version parameter, that SHA may identify its
-build. Package publication still requires an explicit package version or the
-supported pipeline-computed version contract and actual version readback;
-a source SHA cannot stand in for a package version.
+For `DEPLOY`, resolve the exact Job and preview its parameters/fingerprints once.
+Use the [scripted delivery executors](../../../references/scripted-delivery.md)
+with `completionMode=TRIGGER_ACCEPTED` in both PLAN and EXECUTE, reusing the
+unchanged consolidated authority. The helper refreshes symbolic ref/SHA before
+triggering once; pin the delivered merge SHA when supported. A changed source
+blocks rather than silently including later commits. Package adapter/version/
+whole-project scope checks remain required before submission.
 
-Use the [scripted delivery executors](../../../references/scripted-delivery.md).
-Preview exact Job/ref/version/channel selections once; pass the unchanged
-configuration or explicitly displayed metadata-only binding fingerprints and
-consolidated authority into one execution. Use one live workflow session for
-preview/execution and later helpers. Actual parameter names and supported
-computed-version policies come from the Job adapter; an entire-project
-package release scope must be displayed before confirmation.
-Queue/build waiting stays in the process with bounded backoff and state-change
-progress. Do not repeatedly fetch rules, branch history, console logs or Job
-definitions while waiting. The helper checks a symbolic source ref once
-immediately before trigger and verifies the actual target SCM revision after
-completion. Pin the delivered merge SHA when the Job supports it; a later
-external target advancement is a real changed fact and cannot be silently
-included. For a package release, retain `releaseKind=package` and actual
-`RELEASED` evidence while mapping to the existing `DEPLOYED` gate; report the
-package result, not an application-environment deployment.
+An accepted response must identify the exact Job and a valid queue URL/ID on
+the same instance. Retain the helper's `BUILD_SUBMITTED` receipt, including
+submitted params and planned source identity, in `prerequisites.deploymentReceipt`.
+Do not poll the queue/build, wait for startup or terminal SUCCESS, or fetch logs.
+Unknown/missing receipts block later writes; do not retry the trigger. Report
+“构建任务已提交” with its queue link. Actual deployment, checkout and package
+versions remain unverified; a source SHA must never become a package version.
+For tooling Wiki entries preserve an evidenced current channel or use
+`当前版本：待发布` if none exists; do not infer publication from queue acceptance.
+Standalone/official releases and go-live keep `BUILD_TERMINAL` and their full
+source/publication verification; this shortcut belongs only to test submission.
 
 Deployment states are:
 
 ```text
-DEPLOYED | SKIPPED_BY_INTENT | FAILED | UNKNOWN | NOT_ATTEMPTED
+BUILD_SUBMITTED | DEPLOYED | SKIPPED_BY_INTENT | FAILED | UNKNOWN | NOT_ATTEMPTED
 ```
 
+- `BUILD_SUBMITTED` permits later Wiki/TAPD writes with the exact queue receipt.
 - `DEPLOYED` permits later Wiki/TAPD writes only after `SUCCESS` and ref/SHA
   proof.
 - `SKIPPED_BY_INTENT` permits direct提测 but the result must say the test
@@ -161,7 +156,7 @@ DEPLOYED | SKIPPED_BY_INTENT | FAILED | UNKNOWN | NOT_ATTEMPTED
 
 ## TAPD status policy
 
-- `INITIAL`: after `DEPLOYED` or `SKIPPED_BY_INTENT`, write/read `待测试`, the
+- `INITIAL`: after `BUILD_SUBMITTED`, `DEPLOYED` or `SKIPPED_BY_INTENT`, write/read `待测试`, the
   waiting-test owner and the test-version field exactly once.
 - `CONTINUE` while already `待测试`: use
   `SKIPPED_ALREADY_WAITING_TEST`; do not write `修复中`, `待测试`, or the same

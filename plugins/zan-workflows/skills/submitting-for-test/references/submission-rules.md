@@ -154,11 +154,13 @@ Never write the canonical entry body into the month page. For the validated
 path, read back the final child, retain its actual ID/URL and original source
 branch for `going-live`, and require the expected body including the resolved
 status (`是否上线：未合并` for a business project, or
-`当前版本：canary|latest` for a tooling/library project)
-before continuing. For tooling `DEPLOY`, before the Wiki write, require the
-successful release result's actual channel to match the draft: `canary` maps
-to `canary`, `official` to `latest`. A planned parameter or
-develop/master merge alone is insufficient. Under `SKIP`, apply the existing
+`当前版本：canary|latest|待发布` for a tooling/library project)
+before continuing. For tooling submission with `TRIGGER_ACCEPTED`, the exact
+`BUILD_SUBMITTED` receipt permits Wiki writes without waiting for publication.
+Preserve an evidenced prior channel or use `当前版本：待发布` when none exists.
+Only a verified release may change the field to its actual published channel:
+`canary` maps to `canary`, `official` to `latest`. Queue acceptance, a planned
+parameter or develop/master merge alone is insufficient publication evidence. Under `SKIP`, apply the existing
 release-evidence/preservation rules in `drafting-wiki`; do not default to canary
 or add deployment queries. A policy skip has no child write or post-write
 readback, but must retain the verified owner page and matching current entry's
@@ -207,8 +209,14 @@ or write a Wiki-link comment.
 
 Follow [deployment-and-confirmation.md](deployment-and-confirmation.md).
 Resolve `DEPLOY|SKIP`, finish the deployment gate after confirmed test-target containment,
-then write Wiki/TAPD data. `DEPLOY` requires Jenkins success and expected SHA
-proof; `SKIP` records `SKIPPED_BY_INTENT` and must not claim a published test
+then write Wiki/TAPD data. `DEPLOY` uses `TRIGGER_ACCEPTED`: verify the expected
+target ref/SHA before trigger, require the exact `BUILD_SUBMITTED` queue receipt,
+and continue without waiting for the build. Retain the receipt for registration
+and report only build submission. A queued or building task is sufficient;
+do not require a build number, terminal result, actual checkout or publication
+readback before Wiki/TAPD. A missing, rejected or unknown trigger receipt blocks
+later writes and must not be retried automatically.
+`SKIP` records `SKIPPED_BY_INTENT` and must not claim a published test
 environment.
 
 Use the status operation appropriate to the work mode. `INITIAL` writes and

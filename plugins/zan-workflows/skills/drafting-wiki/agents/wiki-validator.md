@@ -84,8 +84,12 @@ Validate these invariants in order:
    link, and exactly one valid type-specific status: `是否上线：未合并` for a
    business project at test submission; `当前版本：canary` for
    tooling `canary` or `当前版本：latest` for tooling `official`. Tooling
-   has no `是否上线` line. Check release evidence, or the exact planned channel
-   with a conditional successful-release gate under `DEPLOY`; under `SKIP`,
+   has no `是否上线` line. Under `TRIGGER_ACCEPTED`, preserve an evidenced prior
+   channel or use `当前版本：待发布` when no publication is evidenced; this pending
+   value is valid for new pages, appended entries and reuse. Queue acceptance is not publication evidence, and
+   submission does not wait for publication before writing. For a release that
+   waits to completion, check release evidence or an exact planned channel with
+   a conditional successful-release gate. Under `SKIP`,
    preserve valid existing evidence without querying builds or defaulting to
    canary. A master merge alone cannot prove the latest publication. It contains no
    process narration, validation verdict, write instruction, or unsupported

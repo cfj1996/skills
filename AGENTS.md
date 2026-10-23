@@ -82,6 +82,13 @@ For existing-branch ancestry and continuation checks, run
 These tests use disposable local Git fixtures to cover equal, local-ahead,
 remote-ahead, diverged and incomplete-history refs, with no external calls.
 
+For submission completion policy across legacy rules, release guidance,
+validators and new/reused tooling Wiki entries, run
+`python3 -m unittest discover -s plugins/zan-workflows/tests -p 'test_submission_completion_policy.py'`.
+These checks read local instructions only; build-receipt and no-poll behavior
+is covered by `delivery-helpers.test.mjs`, `adaptive-delivery.test.mjs` and
+`registration-closeout.test.mjs`, using simulated Jenkins/TAPD responses.
+
 ## Coding Style & Naming Conventions
 
 Write skill docs in concise Markdown with clear `#`/`##` headings, short rule lists, and fenced command examples. Preserve the existing mix of English headings and Chinese workflow detail where the skill already uses it. Name new skill folders with lowercase kebab-case, keep the entry file exactly `SKILL.md`, and use descriptive agent filenames such as `collector.md` or `reviewer.md`.

@@ -40,9 +40,10 @@ For the proposed scoped operations, validate:
 5. A `STANDARD` submission, including one whose test-submission Wiki state is
    `SKIPPED_BY_POLICY`, identifies one existing Wiki page and one unique entry
    by the original source branch. A tooling project must read exactly
-   one valid `当前版本：canary` or `当前版本：latest` field,
+   one valid `当前版本：canary`, `当前版本：latest` or submission's
+   `当前版本：待发布` field (待发布 supplies no publication evidence),
    with no `是否上线` field. An involved package plans only the authorized
-   `canary` to `latest` patch or unchanged `latest` readback, conditional on
+   `canary`/`待发布` to `latest` patch or unchanged `latest` readback, conditional on
    official publication, current registry latest and delivered consumers.
    `SKIPPED_TOOL_PROJECT` is valid only without an involved publishable package.
    For a business project,

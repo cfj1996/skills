@@ -17,7 +17,7 @@ complete `SubmissionPlan` (visible for standalone confirmation or material chang
 | Authorization | complete execution checklist and actual human confirmation from a main entry, or the standalone plan's own confirmation; current scope-coverage comparison, exact technical plan/bound facts, deterministic derivations, and any reauthorization reason |
 | Git delivery | per repository: original source branch/SHA, verified confirmed test target (`dev` or `develop`), current-round commits, commit/push/MR/merge results, actual-target containment |
 | Conflict handoff | when A → C → B was used, exact ConflictMergeHandoff including original A/B, C MR/revisions/containment, temporary resources, upfront cleanup authority, latest retention policy and per-resource cleanup/deferred outcome; retain it even if C is absent |
-| Deployment | `DEPLOYED|SKIPPED_BY_INTENT|FAILED|UNKNOWN|NOT_ATTEMPTED`, Jenkins job/environment/ref/version/channel/purpose and trigger/readback evidence when applicable |
+| Deployment | `BUILD_SUBMITTED|DEPLOYED|SKIPPED_BY_INTENT|FAILED|UNKNOWN|NOT_ATTEMPTED`, Jenkins job/environment/ref/version/channel/purpose and trigger/readback evidence when applicable |
 | Shared Wiki | `sharedWikiPlan`, `wikiOwner` (workspace/type/ID), owner/Task relationship readback, one target per Story/Bug, repository+branch entry identities, complete combined body/hash, all comment targets and included project gates; same final page ID in every participating result |
 | Wiki | `WRITTEN|SKIPPED_BY_POLICY|BLOCKED|NOT_ATTEMPTED`, auto-resolved target plan when written or retained for `going-live`, hierarchy evidence, create/update authorizations and readbacks when written, actual final child ID/URL and source-branch identity when available, business merge-status or tooling current-version/channel readback, and final body when applicable |
 | TAPD | exact status action, waiting-test owner and source (`te` or `reporter`) for Bug transitions, owner write/readback result, exact `Bug|Story|Task` Wiki-link result when applicable, duplicate/conflict evidence, and write/readback results |
@@ -94,9 +94,11 @@ complete `SubmissionPlan` (visible for standalone confirmation or material chang
   per-step Agent validators. The merge executor supplies the actual delivered
   merge revision and observed target tip; deployment must not confuse the
   original feature SHA with the target merge SHA. Jenkins executes one trigger
-  and verifies its exact queue/build, actual parameters and target SCM source.
-  A verified package `RELEASED` maps to `DEPLOYED` with its release kind retained
-  and no claim that an application environment was deployed.
+  with `completionMode=TRIGGER_ACCEPTED`, checks the exact accepted queue URL/ID,
+  and returns `BUILD_SUBMITTED`; retain Job, source ref/SHA and submitted params
+  as `deploymentReceipt`. No queue/build/log polling is performed. Report only
+  build submission, including for canary packages, never completed deployment,
+  publication, actual checkout SHA or an invented package version.
 - `STANDARD` requires either a complete in-memory `ValidatedWikiDraft` with
   `terminal_state=VALIDATED`, its full rendered Markdown and calculated minimal
   patch or new-page body, an auto-resolved
@@ -108,10 +110,10 @@ complete `SubmissionPlan` (visible for standalone confirmation or material chang
   repository/branch entry with exact target/body readback, no rendered body,
   and no Wiki/comment operation. A newly created entry reads back the exact status derived from
   project type: `是否上线：未合并` for a business project, or
-  `当前版本：canary|latest` for a tooling/library project.
-  Tooling `DEPLOY` requires the successful actual release channel to match
-  the draft before Wiki writes; `SKIP` uses existing release evidence or
-  preserves a valid existing current-version field, never an inferred publication.
+  `当前版本：canary|latest|待发布` for a tooling/library project.
+  An accepted tooling build is not publication evidence: preserve an evidenced
+  current channel, or use `当前版本：待发布` when none exists. Only verified
+  publication may update the channel. `SKIP` keeps its existing evidence rules.
 - Wiki creation and functional supplementation plus their comment are one
   `WIKI_WRITE_AND_LINK_BUNDLE` with one pre-invocation validation. Its internal
   readbacks satisfy the per-write invariant without extra Agent validators.
@@ -136,13 +138,17 @@ complete `SubmissionPlan` (visible for standalone confirmation or material chang
   and exact retained readback; it omits Wiki and Wiki-comment writes while still
   completing the remaining authorized submission steps. Missing history uses
   the normal draft path; unresolved evidence blocks before delivery writes.
-- `DEPLOY` requires Jenkins terminal `SUCCESS` plus evidence that the expected
-  delivered SHA of the exact confirmed test target was built. `SKIP` performs no Jenkins build/deploy or
+- `DEPLOY` uses `completionMode=TRIGGER_ACCEPTED` and requires the exact accepted
+  Jenkins queue receipt for the confirmed delivered test-target ref/SHA and
+  parameters. `BUILD_SUBMITTED` permits Wiki/TAPD without waiting for a build.
+  A missing/failed/unknown trigger blocks and must never be retried automatically.
+  `DEPLOYED` remains valid only with terminal SUCCESS and actual SCM proof.
+  `SKIP` performs no Jenkins build/deploy or
   parameter/poll call; exact metadata-only canonical Wiki Job lookup is the
   sole read-only exception. It records
   `SKIPPED_BY_INTENT`. `FAILED|UNKNOWN` forbids later Wiki/status/version writes.
 - `INITIAL` writes `待测试`/waiting-test owner/test version only after
-  `DEPLOYED|SKIPPED_BY_INTENT`. `CONTINUE` already in `待测试` performs no status
+  `BUILD_SUBMITTED|DEPLOYED|SKIPPED_BY_INTENT`. `CONTINUE` already in `待测试` performs no status
   or owner write, or duplicate test-version write.
 - Status, waiting-test owner and test version use one
   `TAPD_REGISTRATION_BUNDLE`: exact item,

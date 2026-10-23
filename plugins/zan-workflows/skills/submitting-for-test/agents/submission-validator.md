@@ -52,10 +52,10 @@ filesystem, or network write operations.
   children are reused before creation. Month creation targets root
   `1150372234001008260`; entry content targets only the child. A new entry
   contains the resolved type-specific status: `是否上线：未合并` for a
-  business project, or `当前版本：canary|latest` for a
-  tooling/library project. Tooling `DEPLOY` gates Wiki writes on a matching
-  successful `canary|official` release readback; `SKIP` uses existing evidence
-  or preserves the valid prior field without build queries or a canary default.
+  business project, or `当前版本：canary|latest|待发布` for a
+  tooling/library project. With `BUILD_SUBMITTED`, preserve an evidenced prior
+  channel or use `当前版本：待发布` when absent. Queue acceptance must not be
+  converted into publication evidence. `SKIP` keeps its existing evidence rules.
   The final result retains the
   actual child ID/URL plus source-branch identity for `going-live`.
 - Under `STANDARD`, a drafter result with
@@ -108,16 +108,23 @@ no Wiki material.
 
 For `JENKINS_TEST_DEPLOY`, require `deployment_mode=DEPLOY`, the release-safety
 fields, exact Jenkins Job/parameters, test environment/channel, and expected
-delivered SHA of the exact confirmed remote test target, plus `tool_route=jenkins-mcp`. A later `DEPLOYED` result requires terminal `SUCCESS` and
-build evidence for that SHA. Validate the full `run-jenkins-release.mjs`
+delivered SHA of the exact confirmed remote test target, plus `tool_route=jenkins-mcp`
+and `completionMode=TRIGGER_ACCEPTED`. Require an exact accepted Job/queue URL/ID
+and submitted params for `BUILD_SUBMITTED`; no queue/build/log polling or terminal
+SUCCESS/actual SCM proof is required before Wiki/TAPD. A result claiming
+`DEPLOYED` still requires terminal SUCCESS and actual SCM proof. Validate the full `run-jenkins-release.mjs`
 invocation once with exact instance/Job URL, ref/version/channel/parameters,
 config/definition or explicitly displayed metadata-only binding fingerprints,
 source repository and expected delivered SHA. Adapter-derived parameters and
 pipeline-computed version policy require the exact verified Jenkinsfile and
-whole-project scope. The actual pipeline SHA and published package versions
-must be read back for this package adapter; a source identity is not a version.
+whole-project scope. Check pipeline source before trigger, but do not wait for
+actual pipeline checkout or published package versions in submission mode;
+a source identity is not a version and `BUILD_SUBMITTED` is not `RELEASED`.
 Its only write is through `jenkins-mcp`; the declared GET-only API read fallback
-must stay within that instance and Job and bind queue/build/actual SCM SHA.
+must stay within that instance and Job. In `TRIGGER_ACCEPTED`, validate the
+returned queue identity locally without queue/build/log GETs; no build number
+or actual SCM SHA is required. Only an existing `BUILD_TERMINAL` result claiming
+`DEPLOYED` requires queue/build/actual SCM binding.
 No per-poll validator is needed. Source SHA must identify the intended target
 merge revision, not merely the original feature tip or any changes-list entry.
 `deployment_mode=SKIP` permits no Jenkins build/deploy/parameter/poll operation
@@ -184,8 +191,10 @@ Changed state, version, assignment facts or metadata blocks before update. Parti
 readback reports actual known effects and never rolls back/retries.
 
 For final `POST_WRITE`, require every required repository's merge/confirmed-target containment and deployment
-state `DEPLOYED|SKIPPED_BY_INTENT`. Under `DEPLOY`, require Jenkins success/SHA
-proof before Wiki/TAPD writes. Require Wiki readback and work-item link state
+state `BUILD_SUBMITTED|DEPLOYED|SKIPPED_BY_INTENT`. Under `DEPLOY`, accept the
+exact `BUILD_SUBMITTED` receipt before Wiki/TAPD writes without waiting. Reject
+an absent/unknown trigger receipt and any claim of deployment/publication based
+only on queue acceptance. Require Wiki readback and work-item link state
 `LINKED|ALREADY_LINKED` under `STANDARD` whenever the Wiki target is validated;
 a policy skip requires retained existing target/body/entry evidence, but no
 post-write readbacks.

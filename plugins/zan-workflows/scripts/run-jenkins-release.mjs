@@ -122,6 +122,13 @@ export function releaseRequiredTools(input) {
 
 export async function runJenkinsRelease(call, reader, input, io = {}) {
   validateWait(io);
+  const completionMode = input.completionMode ?? 'BUILD_TERMINAL';
+  if (!['BUILD_TERMINAL', 'TRIGGER_ACCEPTED'].includes(completionMode) ||
+      (completionMode === 'TRIGGER_ACCEPTED' && (input.releaseChannel !== 'canary' ||
+        (input.releaseKind === 'deployment' && input.targetEnvironment !== 'test')))) {
+    throw new Error('提交即返回仅用于测试提测构建；正式发布必须等待构建完成');
+  }
+  input = { ...input, completionMode };
   const requestedBindingMode = bindingMode(input);
   for (const key of ['targetProject', 'releaseTarget', 'targetEnvironment', 'jobName', 'jobUrl',
     'releaseRef', 'releaseChannel', 'purpose', 'sourceRepository', 'expectedSha']) requireText(input[key], key);
@@ -194,6 +201,7 @@ export async function runJenkinsRelease(call, reader, input, io = {}) {
   result.jobBindingMode = jobBindingMode;
   result.jobAdapter = input.jobAdapter;
   result.versionStrategy = input.versionStrategy || 'EXPLICIT';
+  result.completionMode = completionMode;
   let phase = 'TRIGGER';
   const waitOptions = { ...io, deadline: (io.now || Date.now)() + (io.maxWaitMs ?? 1800000) };
   try {
@@ -202,9 +210,15 @@ export async function runJenkinsRelease(call, reader, input, io = {}) {
     result.writes++;
     if (triggered?.jobName !== input.jobName || !triggered.queueUrl) throw new Error('触发结果缺少确切队列；不要重试发布');
     const queue = reader.queueIdentity(triggered.queueUrl);
+    if (!Number.isSafeInteger(queue.id) || queue.id < 1) throw new Error('触发结果缺少确切队列 ID；不要重试发布');
     result.queueUrl = queue.url || triggered.queueUrl;
     result.queueId = queue.id;
     io.onProgress?.({ state: 'TRIGGERED', queueId: result.queueId, queueUrl: result.queueUrl });
+    if (completionMode === 'TRIGGER_ACCEPTED') {
+      // The accepted queue is the submission receipt, not evidence of a completed build.
+      return { ...result, state: 'BUILD_SUBMITTED', submittedParams: { ...input.params },
+        ...(input.releaseKind === 'package' ? { version: null, versionIdentity: input.expectedSha } : {}) };
+    }
     phase = 'WAIT_QUEUE';
     const queued = await pollState(() => reader.queue(triggered.queueUrl), item => {
       if (item.cancelled) {

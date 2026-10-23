@@ -259,6 +259,24 @@ function jenkins({ forbidden = false, packageJob = false, modifyIdentity, badPip
   return { base, calls, call, reader, io: { checkSource: async () => {}, readPipeline: async () => npmBody } };
 }
 
+test('computed canary submission returns before queue/build/publication reads without inventing a package version', async () => {
+  const fake = jenkins({ packageJob: true });
+  const input = { ...fake.base, releaseChannel: 'canary', releaseRef: 'develop', completionMode: 'TRIGGER_ACCEPTED' };
+  const plan = await runJenkinsRelease(fake.call, fake.reader, input, fake.io);
+  const reader = { ...fake.reader,
+    queue: async () => assert.fail('must not wait for queue'),
+    build: async () => assert.fail('must not wait for build'),
+    console: async () => assert.fail('must not read publication log') };
+  const result = await runJenkinsRelease(fake.call, reader, { ...plan, execute: true, confirmed: true }, fake.io);
+  assert.equal(result.state, 'BUILD_SUBMITTED');
+  assert.equal(result.releaseKind, 'package');
+  assert.equal(result.version, null);
+  assert.equal(result.versionIdentity, sha);
+  assert.equal(result.sourceVerified, false);
+  assert.equal(result.publishedPackages, undefined);
+  assert.equal(fake.calls.filter(row => row.name === 'jenkins_trigger_build').length, 1);
+});
+
 test('branch-only deployment defaults to metadata and never requests XML during preview or execution', async () => {
   const fake = jenkins({ forbidden: true });
   const plan = await runJenkinsRelease(fake.call, fake.reader, fake.base, fake.io);

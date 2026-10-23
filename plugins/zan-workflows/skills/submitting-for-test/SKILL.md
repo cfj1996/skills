@@ -183,21 +183,22 @@ requires a refreshed confirmation. Never rebuild on the test target or use
 7. Resolve every repository's deployment gate through `jenkins-mcp`:
    - `DEPLOY`: validate `JENKINS_TEST_DEPLOY` once, then run
      [run-jenkins-release.mjs](../../scripts/run-jenkins-release.mjs) once with
-     the exact confirmed release plan and Job/config fingerprints. It triggers
-     through `jenkins-mcp` once, tracks the exact queue/build itself, and
-     requires `SUCCESS`, actual parameters and target-repository SCM SHA.
-     Record its narrowly scoped GET-only API read fallback for fields missing
-     from MCP. No Agent polling, repeated console fetch, routing or per-poll
-     validation. A verified package `RELEASED` maps to the existing deployment
-     gate `DEPLOYED` while retaining `releaseKind=package`; report package
-     publication accurately rather than claiming an application deployment;
+     the exact confirmed release plan, `completionMode=TRIGGER_ACCEPTED` and
+     Job/config fingerprints. It checks the delivered target ref/SHA before
+     triggering through `jenkins-mcp` once. An accepted exact Job/queue URL/ID
+     returns `BUILD_SUBMITTED` with submitted parameters. Do not wait for queue
+     execution or build completion, fetch logs, or require `SUCCESS`/actual SCM
+     checkout to continue. Retain the receipt as `deploymentReceipt` for TAPD
+     registration. This applies to both main entries and standalone submission,
+     including canary package builds. Report “构建任务已提交” and the queue link;
+     it proves neither deployment nor publication, and supplies no actual npm version;
    - `SKIP`: make no Jenkins build/deploy/parameter/queue/log call and record
      `SKIPPED_BY_INTENT`. Only a STANDARD Wiki's missing canonical Job URL
      permits the earlier exact read-only metadata lookup. NO_WIKI+SKIP has no
      reason to load or call Jenkins.
    `FAILED|UNKNOWN` blocks every later Wiki/TAPD write.
 8. Only after every required repository passes Git containment and
-   `DEPLOYED|SKIPPED_BY_INTENT`, execute the authorized Wiki plan under
+   `BUILD_SUBMITTED|DEPLOYED|SKIPPED_BY_INTENT`, execute the authorized Wiki plan under
    `STANDARD` only when the drafter returned `VALIDATED`. For creation,
    functional `CONTINUE` supplementation, or unchanged reuse, run
    [ensure-test-wiki.mjs](scripts/ensure-test-wiki.mjs) once with the exact

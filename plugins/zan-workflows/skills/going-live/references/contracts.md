@@ -89,7 +89,7 @@ that exact name through plan, executor, validation and containment checks.
 - `UPDATED_LATEST` requires verified official publication and same-registry latest
   readback for every required package, verified current consuming projects,
   their reviewed upgrade revisions delivered to the default target, exact Wiki
-  authorization, and a minimal `当前版本：canary` to `当前版本：latest`
+  authorization, and a minimal `当前版本：canary` or submission's `当前版本：待发布` to `当前版本：latest`
   patch plus exact-body readback. `ALREADY_LATEST` performs no Wiki write but
   requires the same package/consumer gates; the label itself is insufficient.
 - Read-only package latest and subsequent consumer-version checks both precede
@@ -124,8 +124,11 @@ that exact name through plan, executor, validation and containment checks.
   `是否上线：已合并` field and performs no Wiki write.
 - The merge-status field denotes current-round commit containment in
   `origin/master`; it does not claim that a production version was published.
-  Tooling `当前版本` denotes a verified `canary|official` publication channel;
-  master containment cannot change it or prove an official release.
+  Tooling `当前版本` denotes a verified `canary|official` publication channel,
+  or submission's `待发布` when publication is not yet evidenced. 待发布 does
+  not satisfy latest verification; only the full verified release/reuse and
+  consumer gates permit replacing it with latest. Master containment cannot
+  change the field or prove an official release.
 - `SKIPPED_TOOL_PROJECT` has no Wiki patch and requires no Wiki-write
   authorization; it never substitutes for an involved package's latest flow.
   `NO_WIKI` omits only Wiki operations, not release/consumer verification.

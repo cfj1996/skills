@@ -229,8 +229,9 @@ user specifies whether to include or exclude the remote temporary rows.
    the entry by the original source branch. Resolve the project category and
    service type before planning the Wiki operation:
    - for an involved tooling package, require exactly one valid `当前版本`
-     field with `canary` or `latest`, and no `是否上线` field. Plan
-     `UPDATED_LATEST` for the minimal `canary` to `latest` patch, or
+     field with `canary`, `latest` or submission's `待发布`, and no `是否上线` field.
+     `待发布` is not publication evidence; keep full latest/source/consumer checks.
+     Plan `UPDATED_LATEST` for the minimal `canary`/`待发布` to `latest` patch, or
      `ALREADY_LATEST` for unchanged readback. Both require verified official
      publication and affected consumers at the registry's current latest;
    - for a tooling project with no involved publishable package, preserve its

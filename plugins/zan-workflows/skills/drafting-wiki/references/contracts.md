@@ -100,12 +100,18 @@
 - Every new business entry initializes `是否上线：未合并`. Tooling/library
   entries instead use `当前版本：canary` for `canary` or
   `当前版本：latest` for `official`, following the release-evidence rules
-  in `wiki-template.md`; no tooling `是否上线` field is rendered. A business
+  in `wiki-template.md`. For `TRIGGER_ACCEPTED` without prior publication
+  evidence, a new entry uses `当前版本：待发布`, including on a newly created page;
+  it does not wait for publication. No tooling `是否上线` field is rendered. A business
   entry changes to `已合并` only after the original branch is verified in
   the verified remote default ref (`origin/master` or `origin/main`); it is not a production-publication claim.
 - Reused valid content is immutable outside the declared minimal patch. A
   matching entry must already use the current status contract: business
-  `未合并|待合并|已合并`, or tooling `当前版本：canary|latest`.
+  `未合并|待合并|已合并`, or tooling `当前版本：canary|latest|待发布`.
+  Under `TRIGGER_ACCEPTED`, preserve an evidenced prior channel or use 待发布
+  when none exists; an accepted queue is not publication evidence and does not
+  require waiting before Wiki writes. A later verified publication may replace
+  待发布 with its actual channel.
   Exactly one legacy tooling `是否上线：无需上线` line may be replaced with
   the evidenced `当前版本` line in the declared minimal patch. Missing,
   conflicting or other non-current values block. Only the declared scope

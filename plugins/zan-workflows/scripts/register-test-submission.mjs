@@ -44,8 +44,18 @@ const assigneeFields = item => Object.fromEntries(['current_owner', 'te', 'repor
 
 function checkPrerequisites(input) {
   const gates = input.prerequisites;
-  if (!gates || gates.git !== 'VERIFIED' || !['DEPLOYED', 'SKIPPED_BY_INTENT'].includes(gates.deployment)) {
-    throw new Error('登记前必须有 Git 交付和部署/跳过部署的成功证据');
+  if (!gates || gates.git !== 'VERIFIED' || !['BUILD_SUBMITTED', 'DEPLOYED', 'SKIPPED_BY_INTENT'].includes(gates.deployment)) {
+    throw new Error('登记前必须有 Git 交付和构建提交/部署/跳过部署的成功证据');
+  }
+  if (gates.deployment === 'BUILD_SUBMITTED') {
+    const receipt = gates.deploymentReceipt;
+    if (receipt?.state !== 'BUILD_SUBMITTED' || receipt.completionMode !== 'TRIGGER_ACCEPTED' ||
+        receipt.writes !== 1 || !Number.isSafeInteger(receipt.queueId) || receipt.queueId < 1 ||
+        !receipt.queueUrl || !receipt.jobUrl || !receipt.jobName || !receipt.sourceRepository ||
+        !/^[a-f\d]{40}(?:[a-f\d]{24})?$/i.test(receipt.expectedSha || '') ||
+        !receipt.submittedParams || !Object.keys(receipt.submittedParams).length) {
+      throw new Error('登记前缺少本次 Jenkins 构建提交的确切队列和参数回执');
+    }
   }
   if (gates.profile === 'NO_WIKI' ? gates.wiki !== 'SKIPPED_NO_WIKI'
     : gates.profile !== 'STANDARD' || !['VERIFIED', 'SKIPPED_NON_FUNCTIONAL'].includes(gates.wiki)) {

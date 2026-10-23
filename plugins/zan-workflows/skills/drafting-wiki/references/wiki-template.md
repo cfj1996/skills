@@ -121,11 +121,17 @@ preview as a validated body.
     source SHA and build evidence in claims. A newer verified publication may
     change the value in either direction. Do not infer a publication from the
     project category, Job name, selected parameter, or a master merge.
-    A `DEPLOY` draft may bind the exact planned channel, but its Wiki write is
-    conditional on the matching successful release readback. Under `SKIP`, use
+    For test submission with `completionMode=TRIGGER_ACCEPTED`, an accepted
+    `BUILD_SUBMITTED` receipt permits writing without publication readback:
+    preserve a valid evidenced current channel, or use `- 当前版本：待发布`
+    when no prior publication is evidenced. Queue acceptance does not establish
+    a new canary channel or an actual package version. This pending value is
+    valid on reuse and changes only after verified publication. For a release
+    that waits to completion, a draft may bind the planned channel conditional
+    on its matching successful release readback. Under `SKIP`, use
     existing release evidence or preserve a valid existing `当前版本` field;
     do not query builds, require deployment selections, or default to canary.
-    If the channel cannot be resolved, block the final body.
+    Outside the accepted/pending submission path, unresolved channel evidence blocks the final body.
   An unresolved project type blocks; never guess.
 - For `CONTINUE`, classify the current-round change before patching. If it is
   `NON_FUNCTIONAL` and the verified owner page already contains this repository/

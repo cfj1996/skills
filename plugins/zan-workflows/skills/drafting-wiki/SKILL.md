@@ -125,7 +125,9 @@ invent a value or render a placeholder.
    a new target, render
    a complete body beginning with `# 前端` and sequence `1`, initializing each
    new entry with `是否上线：未合并` for a business project, or
-   `当前版本：canary|latest` for a tooling/library project.
+   `当前版本：canary|latest` for a tooling/library project, or `当前版本：待发布`
+   under `TRIGGER_ACCEPTED` when no existing publication is evidenced. Preserve
+   an evidenced prior channel; queue acceptance never proves a new publication.
 7. For a policy skip, map validation to `NOT_RUN` with its normalized reason.
    Otherwise, give the target plan, hierarchy/readback evidence, normalized
    facts, calculation, patch, and proposed body to the private read-only

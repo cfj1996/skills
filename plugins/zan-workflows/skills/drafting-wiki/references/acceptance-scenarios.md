@@ -31,7 +31,8 @@
 | A newer verified canary publication follows an official publication for the same target | Update the matching entry to `当前版本：canary`; preserve other text. |
 | Reused tooling entry still contains `是否上线：无需上线` and the channel is evidenced | Replace only that line with the resolved `当前版本` field in the explicit minimal patch. |
 | Tooling entry has both `是否上线` and `当前版本`, or conflicting channel evidence | Block; do not guess which field or publication wins. |
-| Tooling `DEPLOY` draft uses a confirmed planned channel | Gate its Wiki write on matching successful release readback; a plan is not publication evidence. |
+| Tooling submission uses `TRIGGER_ACCEPTED` | Preserve an evidenced prior channel or use 当前版本：待发布; accept the exact queue receipt without waiting for publication, never invent package versions. |
+| Tooling full-release draft uses a confirmed planned channel | Gate a new published channel on matching successful release readback; a plan is not publication evidence. |
 | Tooling `SKIP` has neither existing release evidence nor a valid prior current-version field | Block the final body; do not default to canary or query builds. |
 | The project is a business project | Render the red service marker `更新服务`. |
 | The project is a tooling/library project or package | Render the red service marker `工具服务-无需上线`. |

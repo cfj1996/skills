@@ -94,6 +94,37 @@ class RequirementDevelopmentFlowTests(unittest.TestCase):
         self.assertIn("业务应用生产部署不由本入口推导", SKILL)
         self.assertIn("不能提前删除其他项目仍使用的分支/工作树", SKILL)
 
+    def test_business_scope_does_not_disable_default_test_delivery(self):
+        checklist = read("references/execution-checklist.md")
+        adaptive = read("references/adaptive-workflow.md")
+        for text in [SKILL, checklist, adaptive]:
+            for scope_only in ["只开发 B 端相关功能", "仅改前端", "所选 Task"]:
+                with self.subTest(scope=scope_only):
+                    self.assertIn(scope_only, text)
+        self.assertIn("只缩小实施范围，仍默认 SUBMIT", SKILL)
+        self.assertIn("明确“仅开发验证”", SKILL)
+
+    def test_complete_template_precedes_the_single_execution_question(self):
+        checklist = read("references/execution-checklist.md")
+        template_section = checklist.split("## 完整展示模板\n", 1)[1].split("## 展示顺序与语言", 1)[0]
+        template = re.search(r"```markdown\n(.*?)\n```", template_section, re.S).group(1)
+        ordered = ["## 确定清单", "**执行项目名称：**", "**关联需求：**", "**本轮交付：**",
+                   "### TAPD 任务", "| 序号 | 标题 | 工时 |", "### 执行内容",
+                   "| 项目 | 分支 | 交付范围 | 实施方案 | 验收标准 | 待决事项 |",
+                   "### 本轮写入事项", "### 合并与测试环境", "**合并到测试分支：**",
+                   "**是否需要提测 Wiki：**", "**部署测试环境：**", "### 提测 Wiki 模板预览",
+                   "是否按以上确定清单执行？"]
+        positions = [template.index(marker) for marker in ordered]
+        self.assertEqual(positions, sorted(positions))
+        self.assertEqual(template.count("是否按以上确定清单执行？"), 1)
+        self.assertTrue(template.endswith("是否按以上确定清单执行？"))
+        self.assertIn("#确认前准备", SKILL)
+        self.assertIn("#完整展示模板", SKILL)
+        self.assertIn("不能当成整份模板", SKILL)
+        preparation = checklist.split("## 确认前准备\n", 1)[1].split("## 完整展示模板", 1)[0]
+        for invariant in ["准确环境", "Job 名称/URL", "只读准备", "不伪造提交", "Plan 也不提前保存"]:
+            self.assertIn(invariant, preparation)
+
     def test_progress_reports_actual_results_and_no_next_stage_on_blocker(self):
         self.assertIn("references/progress-guidance.md", SKILL)
         self.assertIn("不能推荐提交测试", PROGRESS)
