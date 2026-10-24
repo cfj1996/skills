@@ -23,6 +23,8 @@ description: Implement one assigned, approved scope on a verified fixed branch a
   最可能推翻方案的行为，再完成当前范围；不得将真实集成悄悄改成 Mock。
 - 运行分配的、不争用共享资源的局部检查，明确成功、失败和未覆盖项。
   安装依赖、改测试环境或占用未分配资源需要主代理处理。
+  遵守 [本地验证预算](../../../references/local-verification.md)；全仓检查和
+  重型类型检查/build 交主代理串行安排，不自行与其他任务并跑或超限重试。
 - 不创建/切换分支或工作树，不 fetch/stage/commit/push/stash/reset/merge/rebase，
   不回退他人代码。只读 Git 可用于检查自身差异和实际基线。
 - 不写 TAPD、评论、Wiki，不创建/合并 MR、触发 Jenkins 或其他外部写入。

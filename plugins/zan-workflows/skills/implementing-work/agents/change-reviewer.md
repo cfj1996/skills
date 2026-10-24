@@ -56,6 +56,10 @@ contract and its blockers remain binding. Check in order:
    before a later change. Keep inspection scoped to the affected behavior.
 3. Pre-existing changes are not attributed to the current Bug.
 4. Relevant verification is present and truthful; failures are not hidden.
+   Apply [local verification budgets](../../../references/local-verification.md):
+   assess actual behavior/risk coverage rather than demanding whole-project
+   lint/type/build by default. A timeout/resource stop is incomplete evidence;
+   preserve mandatory-check blockers and do not treat queued CI as a pass.
 5. No workflow record/evidence files were created as part of the change.
 6. No submission, Wiki, merge, or release operation is included.
 7. An applicable Bug activation has exact status and repair-owner readbacks,

@@ -127,12 +127,17 @@ slice before expanding. Concrete risks such as permissions, amounts, data
 consistency and shared interfaces determine failure, regression and compatibility
 coverage; a small diff does not lower that coverage.
 
-Before verification, check the project's Node/package-manager version and
-relevant commands. Use focused tests, reproduction, browser, type or lint checks
-as appropriate. Tests should observe public behavior rather than mirror private
-implementation. Run the required broader suite/build once the diff is stable;
-repeat only checks invalidated by later changes. Record actual results and gaps
-in memory, without workflow evidence files. Never report unrun checks as passed.
+Before verification, apply [local verification budgets](../../references/local-verification.md):
+inspect the project's runtime and actual script scope, then select the smallest
+sufficient behavior tests/reproduction and affected file/package checks. Do not
+automatically chain whole-project lint, typecheck and build after development.
+Broaden only for an explicit requirement or a concrete uncovered risk; retain
+required checks as blockers when incomplete. Keep heavy checks serial across
+repositories/workers and run them with the bounded executor. Tests should observe
+public behavior rather than mirror private implementation. Reuse valid evidence;
+repeat only checks invalidated by later changes. Record actual scope, results and
+gaps in memory, without workflow evidence files. Never report unrun, timed-out or
+resource-limited checks as passed.
 
 ## 4. Review, complete records and return
 

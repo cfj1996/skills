@@ -101,6 +101,14 @@ These checks read local instructions only; build-receipt and no-poll behavior
 is covered by `delivery-helpers.test.mjs`, `adaptive-delivery.test.mjs` and
 `registration-closeout.test.mjs`, using simulated Jenkins/TAPD responses.
 
+For bounded local lint/type/test/build execution, run
+`node plugins/zan-workflows/scripts/run-local-check.mjs --kind test -- node --test plugins/zan-workflows/tests/local-verification.test.mjs`.
+These tests use small disposable local processes to cover deadlines, aggregate
+process-group memory, cancellation, bounded output, output-channel failure and descendant cleanup.
+They perform no external calls or writes. The complete Node suite includes them.
+The helper's scope and budgets are documented in
+`plugins/zan-workflows/references/local-verification.md`.
+
 ## Coding Style & Naming Conventions
 
 Write skill docs in concise Markdown with clear `#`/`##` headings, short rule lists, and fenced command examples. Preserve the existing mix of English headings and Chinese workflow detail where the skill already uses it. Name new skill folders with lowercase kebab-case, keep the entry file exactly `SKILL.md`, and use descriptive agent filenames such as `collector.md` or `reviewer.md`.

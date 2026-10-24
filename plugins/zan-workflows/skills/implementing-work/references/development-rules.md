@@ -58,8 +58,11 @@ same branch.
   uncertain assumption early, and observe behavior through the public boundary
   relevant to this change. Concrete risks determine exceptional, compatibility
   and preserved-behavior cases, including for a narrow change.
-- Use project-native formatting, static checks, tests, builds, or focused
-  reproduction commands relevant to the change.
+- Follow [本地验证范围与资源预算](../../../references/local-verification.md)
+  for project-native checks: affected scope first, explicit reasons for full
+  checks, bounded execution and one heavy command at a time across workers.
+  A tool wait timeout alone does not terminate a check. Preserve required-check
+  blockers; do not retry OOM/timeouts with larger heaps or unchanged commands.
 - Never claim an unrun check passed. Report unavailable or failing required
   checks as blockers.
 - Do not create workflow-owned evidence such as `raw.md`, `raw.json`,
