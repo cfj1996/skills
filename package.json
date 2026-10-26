@@ -7,7 +7,7 @@
     "skills/team-identity-map/",
     "skills/login-token-workflow/",
     "skills/project-memory-context/",
-    "skills/managed-mr-review/",
+    "plugins/zan-workflows/",
     "prompts/mr-code-reviewer.md"
   ],
   "scripts": {

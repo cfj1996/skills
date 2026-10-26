@@ -23,7 +23,7 @@ class ToolRoutingTests(unittest.TestCase):
             "drafting-wiki",
             "going-live",
             "linking-tapd-wiki",
-            "managed-mr-review",
+            "merge-request-review",
         ]
         for skill in skills:
             with self.subTest(skill=skill):

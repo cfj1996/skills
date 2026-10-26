@@ -137,9 +137,16 @@ MR 和已完成效果；清理按准确资源清单单独确认，不在主入�
 
 辅助能力仍可单独使用：[项目知识](skills/workspace-project-knowledge/SKILL.md)、
 [Wiki 起草](skills/drafting-wiki/SKILL.md)、[补 Wiki 链接](skills/linking-tapd-wiki/SKILL.md)、
-[构建发布](skills/running-release/SKILL.md)、[MR 审核](skills/managed-mr-review/SKILL.md)、
+[构建发布](skills/running-release/SKILL.md)、[合并请求 Review](skills/merge-request-review/SKILL.md)、
 [登录令牌](skills/login-token-workflow/SKILL.md)、[人员映射](skills/team-identity-map/SKILL.md)、
 [历史记忆](skills/project-memory-context/SKILL.md)。不要在开始时一并加载全部能力。
+
+合并请求 Review 使用 `$merge-request-review`。可审核指定 GitLab MR、明确项目或
+经核实的当前用户待处理列表，覆盖 B/C 端、小程序、后端、工具包和工程配置；
+通用检查包含修改依据、正确性、工程设计、兼容影响与验证，专项按实际改动加载。
+项目知识、TAPD/Wiki 与 Zan 按实际适用要求使用。旧管辖配置不再决定审核资格，
+未登记项目可直接基于 GitLab 和仓库证据审核；原有分支及合并授权门禁继续适用。
+技能已更名，旧调用名称需更新；仓库历史文档中的旧名称仅记录当时状态。
 
 ## 当前数据格式
 

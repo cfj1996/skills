@@ -5,7 +5,7 @@ preferences, not user input gates. A skill cannot replace the active parent
 model: never block, ask the user to switch models, or spawn an otherwise
 unneeded agent solely to emulate a profile. Apply a profile when the current
 client can choose the lead model or when a skill explicitly binds a
-private/subagent role to a model. `managed-mr-review` reviewer agents leave
+private/subagent role to a model. `merge-request-review` reviewer agents leave
 model and reasoning effort unset for the runtime's default assignment.
 
 ## Profiles
@@ -32,7 +32,7 @@ standard to compensate for model availability.
 | `going-live` | `CRITICAL` | Merges an original repair branch to `master` and maintains Wiki online state |
 | `running-release` | `CRITICAL` | Runs one confirmed Jenkins deployment/package release and verifies its exact build/source |
 | `linking-tapd-wiki` | `CRITICAL` | Plans or writes an exact TAPD work-item comment with conflict and readback gates |
-| `managed-mr-review` | Conditional | Lead discovery and routine review are `BALANCED`; high-risk review and all merge decisions are `CRITICAL`. Reviewer agents use runtime defaults |
+| `merge-request-review` | Conditional | Lead discovery and routine review are `BALANCED`; high-risk review and all merge decisions are `CRITICAL`. Reviewer agents use runtime defaults |
 | `drafting-wiki` | `BALANCED` | Read-only target resolution and deterministic Markdown/sequence calculation |
 | `writing-plans` | `BALANCED` | Resolves remote-master scope, chooses dialogue or panel review, and writes branch-bound Plans |
 | `breaking-down-requirement` | Conditional | Read-only task scope/estimates use `BALANCED`; confirmed TAPD creates/updates and recovery use `CRITICAL` |

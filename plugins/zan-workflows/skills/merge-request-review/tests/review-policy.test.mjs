@@ -1,14 +1,12 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readFile, mkdtemp, rm } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import test from 'node:test';
 import { classifyAdoption, evaluateMergeReadiness } from '../scripts/review-policy.mjs';
 
 const skillRoot = resolve(dirname(new URL(import.meta.url).pathname), '..');
-const standaloneRoot = resolve(skillRoot, '../../../../skills/managed-mr-review');
-const knowledgeRoot = process.env.PROJECT_KNOWLEDGE_ROOT
-  ? resolve(process.env.PROJECT_KNOWLEDGE_ROOT, 'workflows/managed-mr-review')
-  : null;
 
 const read = (file) => readFile(file, 'utf8');
 const currentChange = { sourceSha: 'a'.repeat(40), targetSha: 'b'.repeat(40), documentHashes: {} };
@@ -18,75 +16,28 @@ const reviewBinding = { currentChange, changeReview: { ...currentChange,
   documentation: { status: 'not-required', exemption: 'NOT_APPLICABLE', evidence: ['非提测维护'] },
 } };
 
-const readIfPresent = async (file) => {
+test('renamed CLI reviews an ordinary project without central config or a project allowlist', async () => {
+  const workspace = await mkdtemp(resolve(tmpdir(), 'merge-request-review-'));
   try {
-    return await read(file);
+    const run = (command, payload) => JSON.parse(execFileSync(process.execPath, [
+      resolve(skillRoot, 'scripts/review-policy.mjs'), command, JSON.stringify(payload),
+    ], {
+      cwd: workspace,
+      env: { ...process.env, PROJECT_KNOWLEDGE_ROOT: resolve(workspace, 'unregistered-knowledge') },
+      encoding: 'utf8',
+    }));
+    const mode = run('classify-adoption', { agentDocument: 'missing', adoptionDocument: 'missing' });
+    assert.equal(mode.reviewMode, 'ordinary');
+    assert.deepEqual(run('evaluate-merge', {
+      ...reviewBinding,
+      codeReview: 'pass', safety: 'pass', mergeability: 'mergeable',
+      pipeline: 'none', pipelineRequired: false, approval: 'not-required',
+      unresolvedDiscussions: false, zanStatus: mode.zanStatus,
+    }), { mergeAllowed: true, blockers: [] });
   }
-  catch (error) {
-    if (error?.code === 'ENOENT') return null;
-    throw error;
+  finally {
+    await rm(workspace, { recursive: true, force: true });
   }
-};
-
-test('central config keeps identity fields explicit and distinguishes duplicate names', { skip: !knowledgeRoot }, async () => {
-  const config = await read(resolve(knowledgeRoot, 'config.yaml'));
-
-  assert.match(config, /kind: ManagedMrReviewConfiguration/);
-  assert.match(config, /personId: team-lead-chen-fangjie\n\s+name: 陈方杰\n\s+gitlabUsername: chenfangjie/);
-  assert.match(config, /name: 刘奕君\n/);
-  assert.match(config, /name: 刘子昱\n/);
-  assert.match(config, /name: 李金涛\n/);
-  assert.match(config, /name: 刘奕君\n\s+gitlabUsername: liuyijun/);
-  assert.match(config, /name: 刘子昱\n\s+gitlabUsername: liuziyu/);
-  assert.match(config, /name: 李金涛\n\s+gitlabUsername: lijintao/);
-  assert.match(config, /personId: team-member-1/);
-  assert.match(config, /personId: team-member-2/);
-  assert.match(config, /personId: team-member-3/);
-});
-
-test('central config owns governed project list and explicit review-mode policy', { skip: !knowledgeRoot }, async () => {
-  const config = await read(resolve(knowledgeRoot, 'config.yaml'));
-
-  for (const projectId of [
-    'admin_menu', 'jbz_admin', 'kp_admin', 'order-admin', 'poster_admin',
-    'statistics_admin', 'store_admin', 'supplier-admin-web', 'ledger_admin',
-    'weixin-live', 'zan-projects', 'zan-devops', 'provider-mobile', 'fronted',
-    'vantix-frontend',
-  ]) {
-    assert.match(config, new RegExp(`^      - ${projectId.replace('-', '\\-')}$`, 'm'));
-  }
-
-  assert.match(config, /unresolvedProjectPolicy: defer-and-report/);
-  assert.match(config, /notAdopted:/);
-  assert.match(config, /reviewMode: ordinary/);
-  assert.match(config, /mergeAllowed: subject-to-ordinary-review-gates/);
-  assert.match(config, /misconfigured:/);
-  assert.match(config, /governanceBlocksMerge: true/);
-});
-
-test('available skill entrypoints delegate scope and routing to project knowledge', { skip: !knowledgeRoot }, async () => {
-  const [pluginSkill, standaloneSkill, reference, taskRouting] = await Promise.all([
-    read(resolve(skillRoot, 'SKILL.md')),
-    readIfPresent(resolve(standaloneRoot, 'SKILL.md')),
-    read(resolve(skillRoot, 'references/zan-conformance.md')),
-    read(resolve(process.env.PROJECT_KNOWLEDGE_ROOT, 'standards/zan-system/manifests/task-routing.yaml')),
-  ]);
-
-  for (const skill of [pluginSkill, standaloneSkill].filter(Boolean)) {
-    assert.match(skill, /workflows\/managed-mr-review\/config\.yaml/);
-    assert.match(skill, /禁止恢复到 skill 文档、历史记忆或任何内置白名单/);
-    assert.match(skill, /typeCheckCommand.*testCommand.*conformanceCommand/s);
-    assert.match(skill, /MUST.*SHOULD/);
-    assert.match(skill, /ordinary.*not-adopted/s);
-    assert.match(skill, /代码结论.*合并资格/s);
-    assert.match(skill, /pipeline = none/);
-  }
-  assert.match(reference, /changed file → path\/diff signals → task-routing route id/);
-  assert.match(reference, /not-adopted.*未接入本身不阻断/s);
-  assert.match(reference, /unknown.*不得变成 `pass`/s);
-  assert.match(taskRouting, /changedFileRouting:/);
-  assert.match(taskRouting, /routeField: changedFileMatch/);
-  assert.match(taskRouting, /unmatchedPolicy: unknown-and-defer/);
 });
 
 test('not-adopted projects use ordinary review and do not inherit a Zan blocker', async () => {
@@ -139,6 +90,80 @@ test('valid declared adoption enables Zan-enhanced review', () => {
   });
 });
 
+test('admin-only adoption does not gate an excluded CLI change with verified scope evidence', () => {
+  const mode = classifyAdoption({
+    agentDocument: 'present',
+    adoptionDocument: 'valid',
+    adoptionDeclared: true,
+    adoptionScope: 'not-applicable',
+    scopeEvidence: ['HEAD:AGENTS.md and standard-adoption.yaml cover apps/admin only; the full diff and affected consumers are confined to packages/cli'],
+  });
+  assert.deepEqual(mode, {
+    reviewMode: 'ordinary',
+    zanStatus: 'not-adopted',
+    codeReviewContinues: true,
+    zanMatrixRequired: false,
+    governanceBlocksMerge: false,
+  });
+  const gates = { ...reviewBinding, codeReview: 'pass', safety: 'pass',
+    mergeability: 'mergeable', pipeline: 'success', pipelineRequired: true,
+    approval: 'not-required', unresolvedDiscussions: false, zanStatus: mode.zanStatus };
+  assert.deepEqual(evaluateMergeReadiness(gates), { mergeAllowed: true, blockers: [] });
+  assert.deepEqual(evaluateMergeReadiness({ ...gates, safety: 'unknown', pipeline: 'failed' }), {
+    mergeAllowed: false, blockers: ['safety', 'pipeline-failed'],
+  });
+});
+
+test('unknown adoption scope cannot inherit a valid root adoption or bypass governance', () => {
+  const mode = classifyAdoption({
+    agentDocument: 'present', adoptionDocument: 'valid', adoptionDeclared: true,
+    adoptionScope: 'unknown',
+  });
+  assert.equal(mode.zanStatus, 'unknown');
+  assert.equal(mode.governanceBlocksMerge, true);
+  assert.deepEqual(evaluateMergeReadiness({ ...reviewBinding,
+    codeReview: 'pass', safety: 'pass', mergeability: 'mergeable', zanStatus: mode.zanStatus,
+  }), { mergeAllowed: false, blockers: ['zan-governance'] });
+});
+
+test('an exclusion without concrete scope evidence remains unknown', () => {
+  for (const scopeEvidence of [undefined, null, [], [''], ['  '], 'outside', [null], ['scope checked', 1]]) {
+    const mode = classifyAdoption({
+      agentDocument: 'present', adoptionDocument: 'valid', adoptionDeclared: true,
+      adoptionScope: 'not-applicable', scopeEvidence,
+    });
+    assert.equal(mode.zanStatus, 'unknown', JSON.stringify(scopeEvidence));
+    assert.equal(mode.governanceBlocksMerge, true);
+  }
+});
+
+test('verified exclusions isolate unrelated broken configuration while applicable failures still block', () => {
+  const facts = { agentDocument: 'present', adoptionDocument: 'invalid', adoptionDeclared: true };
+  assert.equal(classifyAdoption({ ...facts, adoptionScope: 'applicable' }).zanStatus, 'misconfigured');
+  assert.equal(classifyAdoption(facts).zanStatus, 'misconfigured');
+  assert.equal(classifyAdoption({ ...facts, adoptionScope: 'not-applicable',
+    scopeEvidence: ['The readable inherited project rule explicitly limits this declaration to apps/admin; packages/cli has no applicable adoption'],
+  }).zanStatus, 'not-adopted');
+});
+
+test('scope values are validated and omitted scope preserves existing classification', () => {
+  const facts = { agentDocument: 'present', adoptionDocument: 'valid', adoptionDeclared: true };
+  assert.deepEqual(classifyAdoption(facts), classifyAdoption({ ...facts, adoptionScope: 'applicable' }));
+  for (const adoptionScope of [null, false, '', 'outside', [], {}]) {
+    assert.throws(() => classifyAdoption({ ...facts, adoptionScope }), /adoptionScope/);
+  }
+});
+
+test('classify-adoption CLI preserves root file facts while applying a verified exclusion', () => {
+  const input = { agentDocument: 'present', adoptionDocument: 'valid', adoptionDeclared: true,
+    adoptionScope: 'not-applicable', scopeEvidence: ['Root adoption covers apps/admin; verified change affects packages/cli only'] };
+  const mode = JSON.parse(execFileSync(process.execPath, [
+    resolve(skillRoot, 'scripts/review-policy.mjs'), 'classify-adoption', JSON.stringify(input),
+  ], { encoding: 'utf8' }));
+  assert.equal(mode.zanStatus, 'not-adopted');
+  assert.equal(mode.zanMatrixRequired, false);
+});
+
 test('missing pipeline is informational unless the project requires it', () => {
   const ordinary = evaluateMergeReadiness({
     ...reviewBinding,
@@ -180,6 +205,32 @@ const passingReview = {
   safety: 'pass',
   mergeability: 'mergeable',
 };
+
+test('ordinary review binds Issue and required migration docs without a TAPD Wiki', () => {
+  const documentHashes = { 'gitlab:issues/17': 'c'.repeat(64), 'repo:MIGRATION.md': 'd'.repeat(64) };
+  const changeReview = { ...reviewBinding.changeReview, documentHashes,
+    documentation: { status: 'pass', evidence: ['Issue #17 and MIGRATION.md cover the public API change'] },
+  };
+  const currentChange = { ...reviewBinding.currentChange, documentHashes };
+  assert.deepEqual(evaluateMergeReadiness({ ...passingReview, changeReview, currentChange }), {
+    mergeAllowed: true, blockers: [],
+  });
+  const changedDocs = { ...currentChange, documentHashes: { ...documentHashes, 'repo:MIGRATION.md': 'e'.repeat(64) } };
+  assert.deepEqual(evaluateMergeReadiness({ ...passingReview, changeReview, currentChange: changedDocs }), {
+    mergeAllowed: false, blockers: ['change-documentation-stale'],
+  });
+});
+
+test('required delivery documentation still blocks when missing or outdated in ordinary mode', () => {
+  for (const [status, blocker] of [['unknown', 'change-documentation-unknown'], ['fail', 'change-documentation']]) {
+    const changeReview = { ...reviewBinding.changeReview,
+      documentation: { status, evidence: ['Project delivery requires a test Wiki; current behavior is not covered'] },
+    };
+    assert.deepEqual(evaluateMergeReadiness({ ...passingReview, zanStatus: 'not-adopted', changeReview }), {
+      mergeAllowed: false, blockers: [blocker],
+    });
+  }
+});
 
 test('merge readiness accepts evidenced ordinary and adopted success paths', () => {
   for (const evidence of [

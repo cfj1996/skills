@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { evaluateChangeConsistency } from '../scripts/change-consistency.mjs';
-import { evaluateMergeReadiness } from '../skills/managed-mr-review/scripts/review-policy.mjs';
+import { evaluateMergeReadiness } from '../skills/merge-request-review/scripts/review-policy.mjs';
 import { assertWikiEntryUpdate, wikiReviewHash } from '../scripts/wiki-entry.mjs';
 
 const branch = 'feature/alice.1024.权限调整';

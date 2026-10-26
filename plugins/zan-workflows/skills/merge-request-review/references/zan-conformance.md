@@ -1,17 +1,39 @@
 # Zan System MR 合规审核
 
-本参考只定义审核方法；规范正文、项目事实和项目命令仍以 centralized `project-knowledge` 与目标仓库为准。
+本参考只定义 Zan 审核方法；规范正文按项目正式采用的来源/版本读取，项目事实和命令从目标仓库核实。
+公司项目使用 centralized `project-knowledge` 中的适用标准；该知识库或旧管辖配置不是普通审核的前置条件。
 
 ## 接入状态分类
 
-先检查审核 HEAD 上的根 `AGENTS.md`、其 Zan 声明和 Adoption 文件，再运行 `scripts/review-policy.mjs classify-adoption`：
+先检查审核 HEAD 上的根和受影响路径适用的 `AGENTS.md`、继承的 Zan 声明和 Adoption
+范围，再按该范围的文件事实运行 `scripts/review-policy.mjs classify-adoption`。
+monorepo 按实际受影响子项目分类；某子项目采用 Zan 不能使未采用的同仓库路径自动受约束。
+保留各范围结果，按主流程汇总模式和阻断；文件确认不存在与读取失败必须分开。
+
+分类输入将文件事实与范围适用性分开：
+
+- `agentDocument`、`adoptionDocument` 保留实际文件状态，`adoptionDeclared` 保留文件中的真实声明。
+  不能为了排除子项目把存在的根 Adoption 标为 missing，或把已声明改成 false。
+- `adoptionScope=applicable|not-applicable|unknown` 表示该声明对当前受影响范围是否适用。
+  monorepo 必须显式传入；省略时保留单项目旧调用的 `applicable` 行为，不代表已验证范围。
+- `not-applicable` 必须同时给非空字符串数组 `scopeEvidence`，引用当前审核版本的范围声明、
+  继承关系及实际改动/受影响消费者。脚本只验证证据结构，主代理仍须核实内容。
+  有可靠独立依据排除该范围时，无关 Adoption 的存在或损坏不传播到当前子项目。
+- 范围未查清、相互冲突或依据不可读时传 `unknown`。`unknown` 或无有效证据的
+  `not-applicable` 返回 `unknown` 并保留治理阻断；非法范围枚举报错。
+
+例如根 Adoption 明确只覆盖 `apps/admin`，本次仅影响 `packages/cli`，仍保留
+`agentDocument=present`、`adoptionDocument=valid`、`adoptionDeclared=true`，另传
+`adoptionScope=not-applicable` 和核实后的 `scopeEvidence`，得到普通审核。
+同 MR 涉及管理端时，对管理端范围另传 `applicable`，不能把 CLI 的排除结论用于整个 MR。
+范围依据与对应 source/target SHA 保留在 preflight packet；依据或受影响范围变化时重新分类。
 
 | Zan 状态 | 识别条件 | 审核方式 | 合并影响 |
 | --- | --- | --- | --- |
-| `not-adopted` | 未声明 Zan，Adoption 不存在；两份文件都不存在也属于此状态 | 完整普通审核 | 未接入本身不阻断 |
+| `not-adopted` | 有证据确认当前范围不适用；或未声明 Zan 且 Adoption 不存在 | 完整普通审核 | 未接入/不适用本身不阻断 |
 | `adopted` | `AGENTS.md` 与有效 `StandardAdoption` 同时存在 | 普通审核 + Zan 增强审核 | `MUST fail/unknown` 阻断 |
 | `misconfigured` | 已声明/部分接入，但文件、schema 或命令配置无效 | 普通审核继续，报告治理异常 | 治理异常单独阻断 |
-| `unknown` | 工具、权限或读取失败导致无法分类 | 普通审核继续，报告证据缺口 | 状态确认前阻断 |
+| `unknown` | 范围未知、排除依据缺失，或工具/权限/读取失败导致无法分类 | 普通审核继续，报告证据缺口 | 状态确认前阻断 |
 
 代码结论不能被 Zan 状态覆盖。即使 `misconfigured/unknown`，仍要完成可完成的 diff、调用链和运行风险审核并独立输出 `通过/不通过/未完成`。
 
@@ -19,7 +41,7 @@
 
 本节只适用于 `adopted`。`not-adopted` 不做 changed-file Zan 路由，也不生成占位 `unknown` 矩阵。
 
-对每个 changed file 建立一条记录：
+对采用范围内每个 changed file 建立一条记录；范围外文件继续普通审核：
 
 ```text
 changed file → path/diff signals → task-routing route id → Rule / Capability / Binding / Recipe
@@ -33,8 +55,8 @@ changed file → path/diff signals → task-routing route id → Rule / Capabili
 
 `adopted` 按以下顺序读取目标项目：
 
-1. 根 `AGENTS.md`，确认 Zan 入口、适用路径、Adoption 文件和真实验证命令。
-2. 根 `standard-adoption.yaml`；若 `AGENTS.md` 声明了其它路径，读取该路径并校验 `kind: StandardAdoption`。
+1. 根及受影响路径适用的 `AGENTS.md`，确认继承关系、Zan 入口、采用范围、Adoption 文件和真实验证命令。
+2. 声明的 Adoption 文件；单项目默认根 `standard-adoption.yaml`，校验 `kind: StandardAdoption` 及其实际范围。
 3. `StandardAdoption.spec.configuration` 与有效 `exceptions`，确认 typecheck/test/conformance 命令和退出条件。
 
 Zan 合规只运行项目声明的命令。命令不存在、无法执行、输出不可获得或没有覆盖 changed files 时，对应结果为 `unknown`。不要用 package scripts 冒充 Zan 声明命令。
@@ -75,7 +97,7 @@ Zan 合规只运行项目声明的命令。命令不存在、无法执行、输�
   且 `adopted` 还要求 `zanMust = pass`。
 - `changeReview` 和当前只读事实 `currentChange` 遵循
   [变更与文档一致性](../../../references/change-consistency.md)；绑定 source/target SHA、
-  实际范围文档/当前 Wiki 条目指纹，并包含有证据的 scope/impact/documentation 结论。
+  实际范围依据/适用文档条目指纹，并包含有证据的 scope/impact/documentation 结论。
   这项对所有模式适用，省略、unknown、fail 或过期绑定都不能放行。明确文档豁免仅
   免除文档要求，不免除范围与影响核对。
 

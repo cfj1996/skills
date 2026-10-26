@@ -51,11 +51,11 @@ class ModelRoutingTests(unittest.TestCase):
                 ).read_text()
                 self.assertIn(f"profile: `{profile}`", skill)
 
-        managed = (
-            PLUGIN_ROOT / "skills/managed-mr-review/SKILL.md"
+        mr_review = (
+            PLUGIN_ROOT / "skills/merge-request-review/SKILL.md"
         ).read_text()
-        self.assertIn("发现阶段默认 `BALANCED`", managed)
-        self.assertIn("高风险审核和所有合并决策使用\n`CRITICAL`", managed)
+        self.assertIn("发现阶段默认 `BALANCED`", mr_review)
+        self.assertIn("高风险审核和所有合并决策使用\n`CRITICAL`", mr_review)
 
     def test_critical_validators_use_frontier_high_profile(self):
         critical_agents = [
@@ -81,10 +81,10 @@ class ModelRoutingTests(unittest.TestCase):
                 self.assertEqual(values["model"], "gpt-5.6-terra")
                 self.assertEqual(values["reasoning_effort"], "medium")
 
-    def test_managed_mr_reviewers_use_runtime_model_assignment(self):
+    def test_merge_request_reviewers_use_runtime_model_assignment(self):
         for agent in (
-            "skills/managed-mr-review/agents/mr-code-reviewer.md",
-            "skills/managed-mr-review/agents/mr-critical-reviewer.md",
+            "skills/merge-request-review/agents/mr-code-reviewer.md",
+            "skills/merge-request-review/agents/mr-critical-reviewer.md",
         ):
             with self.subTest(agent=agent):
                 values = agent_frontmatter(agent)
@@ -92,15 +92,15 @@ class ModelRoutingTests(unittest.TestCase):
                 self.assertNotIn("reasoning_effort", values)
 
         skill = (
-            PLUGIN_ROOT / "skills/managed-mr-review/SKILL.md"
+            PLUGIN_ROOT / "skills/merge-request-review/SKILL.md"
         ).read_text()
         self.assertIn("启动 reviewer 子代理时不指定 `model` 或 `reasoning_effort`", skill)
         policy = (PLUGIN_ROOT / "references/model-routing.md").read_text()
         self.assertIn("Do not specify `model` or `reasoning_effort`", policy)
 
-    def test_managed_mr_review_routes_by_risk_without_spark(self):
+    def test_merge_request_review_routes_by_risk_without_spark(self):
         skill = (
-            PLUGIN_ROOT / "skills/managed-mr-review/SKILL.md"
+            PLUGIN_ROOT / "skills/merge-request-review/SKILL.md"
         ).read_text()
         self.assertIn("`HIGH` 使用 `agents/mr-critical-reviewer.md`", skill)
         self.assertIn("`ROUTINE` 使用 `agents/mr-code-reviewer.md`", skill)

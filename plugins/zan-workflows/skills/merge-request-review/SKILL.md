@@ -1,9 +1,9 @@
 ---
-name: managed-mr-review
-description: Use when the user asks to find, review, or remotely merge open GitLab MRs for governed company repositories, checking implementation scope, impact and linked test Wiki alongside ordinary review, with additional Zan gates only for adopted projects.
+name: merge-request-review
+description: Use when the user asks to find, review, or remotely merge open GitLab merge requests, checking scope, correctness, engineering design and impact across project types, with project-specific delivery and Zan checks only when applicable.
 ---
 
-# 管辖项目 MR 审核
+# 合并请求 Review
 
 主代理模型配置按阶段动态路由：发现阶段默认 `BALANCED`；高风险审核和所有合并决策使用
 `CRITICAL`。reviewer 子代理的模型由运行环境默认分配。选择 reviewer 子代理前读取共享
@@ -13,7 +13,8 @@ description: Use when the user asks to find, review, or remotely merge open GitL
 
 ## 定位
 
-这个技能用于管理用户管辖项目的 GitLab MR，固定分成三步：
+这个技能处理用户指定或按明确范围发现的 GitLab MR，适用于 B 端、C 端、小程序、
+后端、工具包和工程配置等项目，固定分成三步：
 
 1. 获取有哪些需要用户合并的 MR。
 2. 对这些 MR 或用户指定的 MR 做 code review，输出审核报告。
@@ -23,30 +24,41 @@ description: Use when the user asks to find, review, or remotely merge open GitL
 
 默认只执行用户明确要求的步骤。只有用户明确说“合并”“自动合并”“合并通过的”“审核通过就合并”等合并意图时，才进入第 3 步。
 
-## 配置与仓库范围
+## 审核范围与项目身份
 
-在第 1 步前必须解析并校验
-`${PROJECT_KNOWLEDGE_ROOT}/workflows/managed-mr-review/config.yaml`（`kind: ManagedMrReviewConfiguration`）。
-`${PROJECT_KNOWLEDGE_ROOT}` 从当前工具的 workspace entry file 或环境配置解析；无法解析时立即标记为“暂缓：project-knowledge 不可用”。
+不设团队、管辖项目或 B 端白名单；不依赖旧管辖配置，也不要求项目先登记到知识库。
+按请求选择最小明确范围，再通过 GitLab 实时读回核实 host、project id/path 与 MR iid：
 
-- 管辖项目只来自 `spec.governedProjects.include`，项目路径和 GitLab project path 再从其 `source` 指向的 `data/workspace/project-relations.yaml` 解析。
-- 配置缺失、项目无法解析或配置校验失败时，必须明确报告并跳过该项目；禁止恢复到 skill 文档、历史记忆或任何内置白名单。
-- 只处理解析后目标分支为 `master` 或 `main` 的 open MR。
+- 指定 MR URL、`project!iid` 或项目路径时，只处理指定对象；简称或多 host 有歧义时先查证，仍无法唯一解析才询问。
+- “当前项目”从当前仓库已核实的 remote 解析；多个 remote 不得凭目录名猜测。
+- “需要我处理/合并”从 GitLab 当前账号及 reviewer、assignee、approval 等实际关系发现；
+  maintainer/owner 权限可说明处理资格，但不单独证明每个 MR 都需要当前用户处理。
+- 未提供对象时，复用当前对话已确定的项目/MR；没有明确上下文才补问范围。
+  不默认遍历账号全部可访问项目，也不以旧名单补齐范围。
+- 团队/人员筛选仅在用户提出时使用经核实的账号；未知身份不能从邮箱、显示名或提交人推断。
+- 项目可读即可进入审核；没有合并权限不妨碍只读审核。权限不足、对象不存在或身份无法核实要说明实际缺口。
 
-团队身份同样只来自 `spec.team`。`personId` 用于区分重复或不完整姓名；`gitlabUsername: null` 必须保持未确认，不得从提交人、邮箱或显示名推断。
+沿用现有分支边界：只处理目标为 `master` 或 `main` 的 open MR。
+项目规则、CI 和实际 diff 决定专项检查；公司项目可用知识库补充上下文。
+知识库未登记或不可用本身不阻断普通审核；适用标准或关键代码证据缺失仍须如实报告。
 
 ## 审核模式与结论模型
 
-先按项目执行一次 Adoption preflight，再决定审核模式。使用本技能的
+先按项目及实际受影响的采用范围执行 Adoption preflight，再决定审核模式。使用本技能的
 `scripts/review-policy.mjs classify-adoption` 固化分类，详细检查方法见
 [Zan conformance review reference](references/zan-conformance.md)：
 
 - `ordinary` / `not-adopted`：项目没有声明接入 Zan。执行完整普通 code review，不要求 Zan 路由、矩阵或声明命令；未接入本身不阻断代码结论或合并。
-- `zan-enhanced` / `adopted`：根 `AGENTS.md` 与有效 `StandardAdoption` 均存在。普通审核之外执行 Zan changed-file 路由、矩阵及声明的 `typeCheckCommand`、`testCommand`、`conformanceCommand`；`MUST fail/unknown` 阻断合并。
+- `zan-enhanced` / `adopted`：适用的 `AGENTS.md` 与有效 `StandardAdoption` 均存在。普通审核之外执行 Zan changed-file 路由、矩阵及声明的 `typeCheckCommand`、`testCommand`、`conformanceCommand`；`MUST fail/unknown` 阻断合并。
 - `ordinary-with-zan-warning` / `misconfigured`：项目已声明或部分接入 Zan，但 Adoption 无效或缺件。代码审核继续并独立给结论；治理配置异常单独阻断合并。
 - `ordinary-with-zan-warning` / `unknown`：工具或权限导致无法判断接入状态。代码审核继续；在状态可确认前，治理证据不足单独阻断合并。
 
-`AGENTS.md` 和 Adoption 都不存在时必须判为 `not-adopted`，不能判为“Zan 配置缺失”。只有“已声明但损坏”或“无法读取”才进入治理暂缓。
+受影响范围内 `AGENTS.md` 和 Adoption 都不存在时必须判为 `not-adopted`，不能判为“Zan 配置缺失”。
+monorepo 按继承规则和 Adoption 范围分类；同仓库无关子项目的采用或配置问题不传播。
+分类时显式传 `adoptionScope=applicable|not-applicable|unknown`，保留真实文件状态和声明。
+排除范围必须附 `scopeEvidence`；范围未知或排除依据缺失仍为 `unknown`，不能豁免治理检查。
+多范围 MR 保留各范围结果：任一适用范围 `misconfigured/unknown` 时治理阻断；否则有
+`adopted` 时使用增强模式且矩阵只覆盖采用范围，全为 `not-adopted` 时使用普通模式。
 
 代码结论和合并资格必须分开：
 
@@ -58,17 +70,20 @@ description: Use when the user asks to find, review, or remotely merge open GitL
 - 后端/YApi 契约不可见时，只在它确实导致关键正确性无法判断时将代码结论标为 `未完成`；不得把所有接口改动一律暂缓。
 
 **安全硬限制（禁止 develop 合并）**：
+- 本文 `develop` 同时包含工作区约定的 `dev` 别名；核实实际 ref 和历史。
 - **绝对不允许** `develop` 分支作为源分支合并到任何目标分支。
 - **绝对不允许** MR 提交历史中包含来自 `develop` 分支的合并记录（Merge commits）。
-- 违反上述规则的 MR 必须立即跳过或判定为 `不通过`，并在结果中明确写明“安全违规：禁止合并 develop 分支及其历史”。
+- 违反上述规则立即阻断合并，记录 `safety` 和“安全违规：禁止合并 develop 分支及其历史”。
+  可以停止审核并将代码结论标为 `未完成`；已有充分代码评审结论则保留，不能仅凭分支历史判代码不通过。
 
 目标分支不是 `master` / `main` 的 MR 必须跳过，并在结果说明中写明原因。
 
 “需要我合并”的判定：
 
 - 优先读取 GitLab 当前用户、reviewer、assignee、approval、maintainer/owner 权限和项目成员信息。
-- 如果 GitLab 工具不能判断当前用户身份或权限，则以 project-knowledge 配置解析出的管辖范围列出目标分支为 `master` / `main` 的 open MR，并在结果里标注“按 project-knowledge 管辖范围判定”。
-- 如果用户指定了 MR，则只处理指定 MR；范围外或目标分支不符的指定 MR 仍需明确标注原因。
+- 如果工具不能判断当前用户身份或处理关系，只在已明确的项目范围列出候选并标注“与当前用户的处理关系待核实”；
+  无项目范围时补问目标，不报告“没有待处理 MR”，也不回退到管辖名单。
+- 如果用户指定了 MR，则只处理指定 MR；目标分支或 open 状态不符的指定 MR 仍需明确标注原因。
 
 ## 工具优先级
 
@@ -81,15 +96,16 @@ description: Use when the user asks to find, review, or remotely merge open GitL
 
 ## 第 1 步：获取待合并 MR
 
-触发语义包括“有哪些需要我合并的 MR”“获取待合并 MR”“列一下管辖项目 MR”等。
+触发语义包括“有哪些需要我合并的 MR”“获取待合并 MR”“列一下这个项目的 MR”等。
 
 收集候选 MR：
 
 - `state = opened`
 - `target_branch in ["master", "main"]`
 - `source_branch != "develop"`（安全违规项，需显式标注）
-- 项目名在仓库范围内
-- 如工具支持，优先保留和当前用户 reviewer / assignee / approver / maintainer 权限相关的 MR
+- 位于本次请求明确的 MR/项目范围，或经核实的当前用户处理列表
+- 查询“需要我处理”时保留有 reviewer / assignee / approver 关系证据的 MR；
+  指定项目/MR 时不再按当前用户或团队关系过滤
 
 对每个候选 MR 至少读取：
 
@@ -135,29 +151,43 @@ description: Use when the user asks to find, review, or remotely merge open GitL
 
 ### 项目级 Preflight 与证据复用
 
-先按项目分组，再为每个项目读取一次集中配置、目标分支状态、项目审核模式和公共治理证据。项目知识通过
-[workspace-project-knowledge](../workspace-project-knowledge/SKILL.md) 获取：传入 canonical 项目/子项目、审核需要回答的问题和 `purpose: review`，复用已有有效 `KnowledgeContext`，只补充缺失知识。由该入口选择 Hub 或本地来源，MR 流程和 reviewer 不另行选择 provider 或强制检查本地图谱。生成 project preflight packet，至少包含：
+先按 host/project 分组，复用仓库身份和公共门禁；Adoption 分类与规则包按实际受影响
+子项目/采用范围分别建立，读取该范围继承的项目规则、声明及例外。范围不同的 MR
+不共享同一个 Adoption 结论，分类器输入必须来自实际文件、声明和独立的范围适用性判断。
+公司项目需要知识补充时，通过 [workspace-project-knowledge](../workspace-project-knowledge/SKILL.md)
+获取：传入 canonical 项目/子项目、审核问题和 `purpose: review`，复用有效 `KnowledgeContext`。
+由该入口选择 Hub 或本地来源，不重复 provider 查询；未登记项目可直接使用 GitLab 上的仓库规则、
+文档、CI 和审核版本源码，不将知识库登记设为准入条件。生成 project preflight packet，至少包含：
 
-- project id/path、目标分支 SHA、接入模式与判定证据；
+- project id/path、目标分支 SHA、接入模式、各范围 `adoptionScope/scopeEvidence` 及判定证据；
+- 受影响的项目类型、从 diff/调用链选择的专项检查，以及文档/交付要求的适用依据；
 - 项目明确声明的 pipeline/approval/test 要求；
-- 可复用的 `KnowledgeContext`（范围、来源/版本、证据和缺口）及适用标准资源路径；
+- 已取得的项目上下文（来源/版本、证据和缺口；有 `KnowledgeContext` 时复用）及适用标准资源路径；
 - 公共缺口与读取时间。
 
 每个 MR 再生成绑定 HEAD SHA 的 review packet，包含 diff、changed files、提交历史、pipeline、discussion、approval 和 mergeability。Reviewer 优先消费 packet，不重复加载 workspace 规则、项目路由、公共配置和无差异的标准资源。知识中的实现线索必须在该 MR HEAD 的源码核验；版本未知、范围不明或未命中不能证明代码缺陷或功能不存在。Hub 不可用本身不阻断审核，有等价证据时继续；关键代码证据仍不足时按现有规则标记 `未完成`。
 
-### 需求范围、影响和 Wiki 核对
+### 修改依据、影响和适用文档核对
 
 对 ordinary 和 zan-enhanced 都应用 [变更与文档一致性](../../references/change-consistency.md)。
-主代理只读获取 MR 描述/讨论中的准确 TAPD/Wiki 链接，经 TAPD 核实工作项、Task 父需求、
-Wiki 归属及当前仓库/原分支条目；无直接链接时沿准确工作项详情/评论追溯已有页。
-缺失/冲突报告具体缺口，不按相似标题/分支名猜测，不在 Review 中新建或修订 Wiki。
-同 MR 多工作项逐项核对；共享 Wiki 只评审当前及实际相关条目。
+主代理先读取 MR 描述、讨论及准确关联的 Issue、需求、设计文档或已确认反馈，核实本次目标、
+验收和排除范围；MR 描述可作为明确修改依据，不强制补建 TAPD。缺少关键业务决定时报告缺口，
+不能仅从 diff 倒推获准范围。再按项目规则、变更性质和已确认交付要求判断文档适用性：
 
-packet 增加已确认范围/反馈来源、当前完整 diff、重要行为变化及影响/验证、适用 Wiki
+- 属于 TAPD 提测/上线流程且要求 Wiki 时，经 TAPD 核实工作项、Task 父需求、Wiki 归属及
+  当前仓库/原分支条目；无直接链接时沿准确工作项详情/评论追溯已有页。同 MR 多工作项逐项核对。
+- 普通项目检查实际要求的 API/使用说明、迁移说明、变更记录等；没有 TAPD/Wiki 不构成缺陷。
+- 明确 NO_WIKI 只免除该 Wiki 要求，其他适用文档仍需核对；确认无文档要求时，可用
+  `NOT_APPLICABLE` 并附项目规则/实际影响依据。要求是否适用仍未知、必需文档找不到或内容过期时，
+  分别报告 unknown/fail，不能以未找到文档冒充不适用。
+
+只读当前及实际相关条目；不猜测文档归属，不在 Review 中新建或修订文档。
+
+packet 增加修改依据/已确认反馈来源、当前完整 diff、重要行为变化及影响/验证、适用文档
 正文与条目标识/指纹、文档适用性和缺口。普通和高风险 reviewer 都独立返回
 `changeReview` 的 scope、impact、documentation 及具体 evidence，不能以 Wiki 声明
 替代范围批准，不能以目录/行数小推断无影响。已批准的必要技术调整允许有明确理由。
-缺少 Wiki 不等于不适用；明确 NO_WIKI 或非提测维护才可凭依据豁免文档检查。
+缺少文档不等于不适用；文档豁免须有上述范围依据，不免除修改依据和影响核对。
 
 主代理用当前 source/target SHA 和所需范围文档/条目的指纹形成 `currentChange`，
 将其与 reviewer 的 `changeReview` 及既有检查传给
@@ -165,15 +195,17 @@ packet 增加已确认范围/反馈来源、当前完整 diff、重要行为变�
 可合并结论；在现有报告中列 `change-scope`、`change-impact`、`change-documentation`
 及对应 unknown/stale 阻断。评审完成后补文档只重新核对相关覆盖，不能解除其他阻断。
 
-管辖配置、Adoption、标准原文、分支 SHA 和 GitLab 实时门禁仍从现有权威来源精确读取；`KnowledgeContext` 不替代这些检查。缺少知识时向统一入口补查，不要求 reviewer 重跑全部 preflight。
+适用的项目规则、Adoption、标准原文、分支 SHA 和 GitLab 实时门禁仍从权威来源精确读取；
+`KnowledgeContext` 不替代这些检查，也不要求 reviewer 重跑全部 preflight。
 
-如果 MR 修改了 `AGENTS.md`、Adoption，或其 HEAD 上这些文件与 project preflight 不同，必须为该 MR 重新分类；否则同一项目复用一次 preflight 结果。
+仅当受影响的采用范围、继承规则、Adoption/Exception 及其版本均匹配时，才复用该范围
+preflight。MR 改变这些文件或涉及新的子项目时补充分类；根文件未变不能证明子项目结论可复用。
 
 ### 并行审核策略
 
 委派前先根据 MR 元数据、改动文件和 diff 做只读风险分类：
 
-- `HIGH`：changed hunk 实际修改权限/鉴权判断、租户或站点标识、支付/订单/账务/库存/结算计算、敏感数据访问、删除/批量写入、环境/部署配置、关键接口 payload/schema，或需要跨模块数据流推理的大型 diff。
+- `HIGH`：changed hunk 实际修改权限/鉴权判断、租户或站点标识、支付/订单/账务/库存/结算计算、敏感数据访问、删除/批量写入、环境/部署配置、关键接口 payload/schema、公开包 API/导出兼容性、持久化迁移、关键并发/重试机制，或需要跨模块数据流推理的大型 diff。
 - `ROUTINE`：改动边界清晰的 UI、文案、样式、展示分组或局部逻辑，且不修改上述关键行为。
 - “优惠券”“订单”等业务域名称只能作为初筛信号，不能脱离 changed hunk 的真实行为单独升级为 `HIGH`。ROUTINE reviewer 发现真实高风险信号时必须升级。
 
@@ -195,13 +227,10 @@ packet 增加已确认范围/反馈来源、当前完整 diff、重要行为变�
 - 如果同一个 MR 有多个代码结论，以更保守结论为准：`不通过` 优先于 `未完成`，`未完成` 优先于 `通过`。
 - 如果 subagent 超时或失败，对应 MR 标记为 `代码结论：未完成；合并资格：不可合并（code-review-incomplete）`，除非主代理已经完成等价审核。
 
-审核重点：
-
-- **安全合规检查（最高优先级阻断项）**：检查 MR 提交历史，严禁包含任何来自 `develop` 分支的合并记录。如果发现 `develop` 被合并到了当前源分支中，必须判定为 `不通过` 并详细说明违规路径。
-- 优先检查会阻断上线的问题：权限、数据污染、金额/库存/订单/账务逻辑、接口契约、路由、环境配置、兼容性、构建失败、类型错误、未处理异常。
-- 对大型 MR 先看入口文件、权限边界、核心数据流和跨模块调用，再看样式和低风险细节。
-- 对业务逻辑分支必须验证真实调用链可达性，不要只凭新增代码存在就下结论。
-- 对阻断问题给出具体文件路径、函数/区域或 diff 依据；证据不足时写明缺口。
+审核统一使用 [检查范围与意见判定](references/review-checklist.md)。普通与高风险 reviewer
+共用通用检查，按实际 changed hunk、调用链和运行平台加载专项；跨类型变更组合检查。
+工程设计是通用检查的一部分，高风险增加关键路径深度，不把普通审核缩成 UI/样式检查。
+提交历史中的 develop 违规继续单独阻断，注明具体路径。
 
 只有 `zan-enhanced` 模式必须附加 Zan 合规矩阵，至少包含 `Rule ID`、`MUST`/`SHOULD`、changed file:line 或 diff hunk、有效 Exception（如有）、`pass/fail/warning/unknown`、验证命令和输出证据。`MUST fail/unknown` 只改变合并资格，不覆盖独立代码结论；`SHOULD` 违反标为 warning。
 
@@ -224,6 +253,9 @@ packet 增加已确认范围/反馈来源、当前完整 diff、重要行为变�
 - `不可合并`：列出精确阻断项，例如 `code`、`safety`、`pipeline-failed`、`mergeability`、`zan-must` 或 `zan-governance`。
 
 主要问题必须简短具体。没有问题时写 `未发现阻断问题`；不要写泛泛的“建议加强测试”当作主要问题。
+有实际意见时按“必须修复、优化建议、需要重新设计、证据不足”标注，给出依据和是否阻断。
+优化建议通常不阻断；重新设计必须说明现方案的问题、局部修复为何不足和调整边界。
+不为填满分类制造意见；代码缺陷、标准门禁和证据缺口分别影响其对应结论。
 
 ### 阻断详情
 
@@ -280,7 +312,7 @@ packet 增加已确认范围/反馈来源、当前完整 diff、重要行为变�
 
 - **安全二次校验**：源分支不能是 `develop`，且提交历史中不能包含 `develop` 的合并记录。
 - 最新 HEAD SHA 必须与审核时记录的 SHA 一致；如果变了，停止合并该 MR 并标记为 `暂缓：审核后有新提交，需重新审核`。
-- 重新读取目标 SHA、范围依据和相关 Wiki 条目，更新 `currentChange` 并再次执行
+- 重新读取目标 SHA、范围依据和适用文档条目，更新 `currentChange` 并再次执行
   evaluate-merge；绑定变化先核对并刷新受影响检查。整页的无关项目/业务合并状态
   变化不自动使代码评审失效，写入防覆盖仍按整页指纹处理。
 - 目标分支仍必须是 `master` 或 `main`。

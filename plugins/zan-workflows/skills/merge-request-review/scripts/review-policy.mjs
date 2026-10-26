@@ -2,6 +2,7 @@ import { fileURLToPath } from 'node:url';
 import { evaluateChangeConsistency } from '../../../scripts/change-consistency.mjs';
 
 const DOCUMENT_STATES = new Set(['missing', 'present', 'valid', 'invalid', 'unreadable', 'unknown']);
+const ADOPTION_SCOPES = new Set(['applicable', 'not-applicable', 'unknown']);
 
 function assertDocumentState(name, value) {
   if (!DOCUMENT_STATES.has(value)) {
@@ -13,9 +14,29 @@ export function classifyAdoption({
   agentDocument = 'unknown',
   adoptionDocument = 'unknown',
   adoptionDeclared = null,
+  adoptionScope = 'applicable',
+  scopeEvidence = [],
 } = {}) {
   assertDocumentState('agentDocument', agentDocument);
   assertDocumentState('adoptionDocument', adoptionDocument);
+  if (!ADOPTION_SCOPES.has(adoptionScope)) {
+    throw new Error(`adoptionScope must be one of: ${[...ADOPTION_SCOPES].join(', ')}`);
+  }
+
+  // Scope is independent of physical file presence and declaration validity.
+  // An exclusion needs evidence; unknown scope must not inherit a root adoption.
+  if (adoptionScope !== 'applicable') {
+    const excluded = adoptionScope === 'not-applicable'
+      && Array.isArray(scopeEvidence) && scopeEvidence.length > 0
+      && scopeEvidence.every(item => typeof item === 'string' && item.trim().length > 0);
+    return {
+      reviewMode: excluded ? 'ordinary' : 'ordinary-with-zan-warning',
+      zanStatus: excluded ? 'not-adopted' : 'unknown',
+      codeReviewContinues: true,
+      zanMatrixRequired: false,
+      governanceBlocksMerge: !excluded,
+    };
+  }
 
   if (agentDocument === 'present'
     && adoptionDocument === 'valid'

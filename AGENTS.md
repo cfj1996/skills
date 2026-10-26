@@ -15,7 +15,7 @@ git status --short
 node --test plugins/zan-workflows/tests/*.test.mjs
 python3 -m unittest discover -s plugins/zan-workflows/tests -p 'test_*.py'
 node --test plugins/zan-workflows/skills/writing-plans/tests/*.test.mjs
-node --test plugins/zan-workflows/skills/managed-mr-review/tests/*.test.mjs
+node --test plugins/zan-workflows/skills/merge-request-review/tests/*.test.mjs
 python3 /Users/cfj/.codex/skills/.system/skill-creator/scripts/quick_validate.py \
   plugins/zan-workflows/skills/writing-plans
 python3 /Users/cfj/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py \
@@ -126,9 +126,10 @@ Write skill docs in concise Markdown with clear `#`/`##` headings, short rule li
 
 The `zan-workflows` plugin includes the Writing Plans skill's Node tests under `plugins/zan-workflows/skills/writing-plans/tests/`; run the complete suite and both official validators for every plugin change. For a standalone skill, run its owning workflow's targeted command, validate `skills/<skill-name>` with `skill-creator/scripts/quick_validate.py`, inspect generated artifacts when applicable, and confirm documented paths and commands still match the repository layout. Keep new scripts and tests inside their owning skill or plugin directory and document the exact command here.
 
-Also run `skills/managed-mr-review/tests/*.test.mjs` within the plugin. Set
-`PROJECT_KNOWLEDGE_ROOT` to the verified local knowledge repository when available
-to include its integration checks; otherwise report their skipped status.
+Also run `skills/merge-request-review/tests/*.test.mjs` within the plugin. These
+tests cover the renamed CLI without central configuration, ordinary and Zan
+review modes, evidence-backed monorepo adoption scope, applicable documentation and revision-bound merge gates using
+local fixtures; no project allowlist, TAPD data or remote writes are required.
 
 ## Commit & Pull Request Guidelines
 

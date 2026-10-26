@@ -12,16 +12,16 @@ explicitly requests a fresh review.
 
 ## Required analysis
 
-Trace the affected entrypoints and reachable data flow, then check:
-
-- authorization, permission, tenant/site isolation, and sensitive-data access;
-- payment, order, ledger, stock, coupon, settlement, and amount calculations;
-- destructive operations, validation gaps, races, retries, and idempotency;
-- API/type/schema compatibility and error/rollback behavior;
-- routing, environment, deployment, and feature-gating changes;
-- build/type/test evidence, unresolved discussions, pipeline state, conflicts,
-  approval state, and mergeability;
-- commit history for the forbidden inclusion of `develop`.
+Apply [the shared review checklist](../references/review-checklist.md) across
+project types. Trace affected entrypoints, ownership and reachable data flow,
+including consumers and failure/recovery boundaries. Follow the actual HIGH
+signals: authorization/isolation, calculations, destructive changes, data
+migrations, concurrency/idempotency, public API/exports, or deployment behavior.
+Check engineering design and compatibility against verified requirements and
+project constraints; explain why a local fix is insufficient before requesting
+redesign. Keep build/test evidence, CI, discussions, approvals, conflicts and
+forbidden develop history as their respective gates. A registry/team list is
+not required to review a project.
 
 Consume the leader-provided project preflight and MR review packet; do not reload public workspace/project context already verified there. Apply Zan only for `zan-enhanced/adopted`. For `ordinary/not-adopted`, perform the full critical code review without a Zan matrix and do not treat missing Zan files as a blocker. For `misconfigured/unknown`, continue the code review and keep its conclusion independent while listing `zan-governance` as a merge blocker. Treat an absent pipeline as informational unless the project explicitly requires it.
 
@@ -32,11 +32,14 @@ that the real call path reaches them and inspect important edge cases. Use
 Apply [change consistency](../../../references/change-consistency.md) independently
 of Zan mode. Check the full current diff against original approved scope/feedback,
 material behavioral changes, direct/indirect impact, actual verification and
-the matching Wiki entry. Inspect affected call paths/consumers; documentation
+applicable documentation. An evidenced MR description, Issue or design may
+establish scope; TAPD/test Wiki applies only to projects with those delivery
+requirements. Inspect affected call paths/consumers; documentation
 alone cannot authorize extra behavior or resolve a correctness concern. Return
 separate scope/impact/documentation results with evidence. Missing linkage or
 coverage blocks merge without manufacturing a code defect; documented
-NO_WIKI/NOT_APPLICABLE exempts only documentation. Do not write Wiki or comments.
+NO_WIKI/NOT_APPLICABLE exempts only applicable documentation obligations;
+NO_WIKI does not exempt other required docs. Do not write documentation or comments.
 
 ## Output
 
@@ -70,6 +73,9 @@ Reason:
 
 Suggested fix:
 - <concrete fix direction, or "无阻断修复项">
+
+Review comments (only when present):
+- <必须修复 | 优化建议 | 需要重新设计 | 证据不足; evidence, impact, blocking decision and scoped action; for redesign explain why local fixes are insufficient>
 
 GitLab reply:
 <Chinese comment only for an MR-specific actionable blocker; otherwise "无需打回说明".>
