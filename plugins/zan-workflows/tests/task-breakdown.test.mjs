@@ -5,11 +5,30 @@ import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 
 const require = createRequire(import.meta.url);
-const { estimateHours, fingerprintProposal, validateTaskBreakdown, validateConfirmation, validateTaskReadbacks, validatePlanTaskBindings } = require('../skills/breaking-down-requirement/scripts/validate-task-breakdown.js');
+const { estimateHours, fingerprintProposal, fingerprintEstimate, fingerprintTaskWork, validateTaskBreakdown, validateConfirmation, validateTaskReadbacks, validatePlanTaskBindings } = require('../skills/breaking-down-requirement/scripts/validate-task-breakdown.js');
 const { validatePagePlanModel } = require('../skills/writing-plans/scripts/validate-page-plan.js');
 
+// Simulated independent receipts are test fixtures, never production evidence.
+function reviewed(input) {
+  input.estimatorId = 'fixture-estimator';
+  input.estimateReview = {
+    status: 'PASSED', reviewerId: 'fixture-independent-reviewer', source: 'simulated review invocation',
+    estimateFingerprint: fingerprintEstimate(input),
+    taskKeys: input.tasks.filter(task => task.estimate?.mode === 'CALCULATED').map(task => task.key),
+    checks: Object.fromEntries(['scope', 'reuse', 'increment', 'shared', 'verification', 'risk']
+      .map(key => [key, { status: 'PASS', evidence: [`simulated ${key} check of the complete task set`] }])),
+  };
+  return input;
+}
+function retain(task) {
+  const hours = task.estimate.hours;
+  task.estimate = { mode: 'RETAINED', hours, retainedFrom: {
+    taskId: task.id, beforeFingerprint: task.beforeFingerprint, hours,
+    workFingerprint: fingerprintTaskWork(task), evidence: 'simulated exact old Task/scope/hours readback',
+  } };
+}
 function proposal() {
-  return {
+  return reviewed({
     schemaVersion: 1,
     requirement: { workspaceId: '123', id: '111230010000001', type: 'story' },
     scopeFingerprint: 'scope-and-master-sha',
@@ -18,11 +37,19 @@ function proposal() {
       key: 'DT-001', action: 'CREATE', project: 'sample', deliveryUnitKey: 'login', featureRefs: ['F-001'],
       name: '登录反馈', scope: '完善登录失败反馈', exclusions: ['重置密码'],
       owner: { account: 'alice', evidence: 'simulated workspace member lookup' },
-      estimate: { normalHours: 7.5, parts: [{ label: '开发', hours: 5 }, { label: '联调与自测', hours: 2.5 }], factor: 0.8, hours: 6, basis: '复用已有表单，增加失败反馈并验证边界' },
+      estimate: { mode: 'CALCULATED', coverage: 'FULL_TASK', normalHours: 7.5,
+        parts: [{ label: '开发', type: 'implementation', work: '复用表单，增加错误回显和重试状态', featureRefs: ['F-001'], hours: 5 },
+          { label: '联调与自测', type: 'verification', work: '验证失败、重试和成功跳转', featureRefs: ['F-001'], hours: 2.5 }],
+        factor: 0.8, hours: 6, basis: '复用已有表单，增加失败反馈并验证边界',
+        analysis: { scopeEvidence: ['需求 F-001 仅包含登录失败反馈'],
+          baselineEvidence: ['simulated source revision: login.vue and query wrapper'],
+          reuse: [{ capability: '现有登录表单', mode: 'ADAPT', evidence: ['login.vue 现有输入和校验'], delta: '只新增失败反馈和重试状态' }],
+          verification: ['失败时正确展示错误并允许重试'], confidence: 'HIGH', risks: [] },
+      },
       dependsOn: [], acceptance: ['失败时展示错误，允许重试'],
       payload: { name: '登录反馈', description: 'zan-task:111230010000001:DT-001\n已批准的范围和估算说明', story_id: '111230010000001', owner: 'alice', effort: 6 },
     }],
-  };
+  });
 }
 function records(input) {
   return input.tasks.map((task, i) => ({ key: task.key, id: task.id || `11123002000000${i + 1}`, readback: {
@@ -32,6 +59,7 @@ function records(input) {
   } }));
 }
 function binding(input = proposal()) {
+  reviewed(input);
   return { proposal: input, proposalFingerprint: fingerprintProposal(input), records: records(input), project: 'sample', deliveryUnitKey: 'login' };
 }
 function model() {
@@ -57,8 +85,9 @@ test('field decimal precision never permits fractional final hours in proposals,
     const input = proposal();
     input.fieldBinding.precision = precision;
     input.tasks[0].estimate.normalHours = 3;
-    input.tasks[0].estimate.parts = [{ label: '开发', hours: 3 }];
+    input.tasks[0].estimate.parts = [{ ...input.tasks[0].estimate.parts[0], hours: 3 }];
     input.tasks[0].estimate.hours = input.tasks[0].payload.effort = 2;
+    reviewed(input);
     assert.equal(validateTaskReadbacks(input, records(input)).valid, true);
 
     input.tasks[0].estimate.hours = input.tasks[0].payload.effort = 2.4;
@@ -85,7 +114,7 @@ test('missing developer, normal effort, basis, components or final effort preven
     p => { p.tasks[0].estimate.hours = 4.8; p.tasks[0].payload.effort = 4.8; },
     p => { p.tasks[0].estimate.factor = 1; },
   ]) {
-    const input = proposal(); change(input); assert.equal(validateTaskBreakdown(input).valid, false);
+    const input = proposal(); change(input); reviewed(input); assert.equal(validateTaskBreakdown(input).valid, false);
   }
 });
 
@@ -108,7 +137,7 @@ test('field unit, exact target, estimated field and stable marker are bound to t
     p => { p.tasks[0].payload.workspace_id = 'another-workspace'; },
     p => { p.tasks[0].payload.id = 'another-task'; },
   ]) {
-    const input = proposal(); change(input); assert.equal(validateTaskBreakdown(input).valid, false);
+    const input = proposal(); change(input); reviewed(input); assert.equal(validateTaskBreakdown(input).valid, false);
   }
 });
 
@@ -117,6 +146,7 @@ test('existing Tasks require exact ID and snapshot; creation cannot masquerade a
   task.action = 'UPDATE';
   assert.equal(validateTaskBreakdown(input).valid, false);
   task.id = 'existing-task'; task.beforeFingerprint = 'snapshot';
+  reviewed(input);
   assert.equal(validateTaskBreakdown(input).valid, true);
   assert.equal(validateTaskReadbacks(input, records(input)).valid, true);
   const wrong = records(input); wrong[0].id = 'different-task';
@@ -135,6 +165,7 @@ test('dependencies reject unknown keys, duplicate keys and cycles including acro
   input.tasks.push(second); input.tasks[0].dependsOn = ['DT-002'];
   assert.match(messages(validateTaskBreakdown(input)), /cycle/);
   second.dependsOn = [];
+  reviewed(input);
   assert.equal(validateTaskBreakdown(input).valid, true);
   second.key = 'DT-001';
   assert.equal(validateTaskBreakdown(input).valid, false);
@@ -248,6 +279,7 @@ test('an execution brief cannot hide stale ownership or missing step bindings in
 test('an existing exact Task can be reused without rewriting its historical description', () => {
   const input = proposal(), task = input.tasks[0];
   task.action = 'REUSE'; task.id = 'existing-task'; task.beforeFingerprint = 'snapshot';
+  retain(task);
   task.payload.description = 'Existing scope and estimate';
   assert.equal(validateTaskBreakdown(input).valid, false);
   task.linkEvidence = 'exact Task ID and parent Story readback, verified scope and estimate';
@@ -258,6 +290,7 @@ test('evidenced REUSE preserves an empty historical description and still requir
   for (const description of ['', '   ', null]) {
     const input = proposal(), task = input.tasks[0];
     task.action = 'REUSE'; task.id = 'existing-task'; task.beforeFingerprint = 'snapshot';
+    retain(task);
     task.linkEvidence = 'exact Task ID and parent Story, verified scope and estimate';
     task.payload.description = description;
     assert.equal(validateTaskReadbacks(input, records(input)).valid, true);
@@ -269,6 +302,7 @@ test('evidenced REUSE preserves an empty historical description and still requir
   for (const description of [undefined, {}, 123]) {
     const input = proposal(), task = input.tasks[0];
     task.action = 'REUSE'; task.id = 'existing-task'; task.beforeFingerprint = 'snapshot';
+    retain(task);
     task.linkEvidence = 'verified existing Task'; task.payload.description = description;
     assert.equal(validateTaskBreakdown(input).valid, false);
   }
@@ -287,6 +321,7 @@ test('stable Task markers compare the entire Story and key token across supporte
     `**${marker}**`, `*${marker}*`, `_${marker}_`, `__${marker}__`, `~~${marker}~~`,
     `***${marker}***`, `**_~~${marker}~~_**`, `<p>__*${marker}*__</p>`]) {
     task.payload.description = description;
+    reviewed(input);
     assert.equal(validateTaskReadbacks(input, records(input)).valid, true, description);
   }
   for (const description of [`${marker}0`, `${marker}-other`, `${marker}:child`, `prefix-${marker}`,
@@ -294,6 +329,7 @@ test('stable Task markers compare the entire Story and key token across supporte
     `**${marker}**_suffix`, `*${marker}**`, `~~${marker}~`,
     `zan-task:${input.requirement.id}0:${task.key}`, marker.replace('DT-001', 'DT-00')]) {
     task.payload.description = description;
+    reviewed(input);
     assert.equal(validateTaskBreakdown(input).valid, false, description);
     assert.equal(validateTaskReadbacks(input, records(input)).valid, false, description);
   }
@@ -316,5 +352,232 @@ test('stdin validator validates without remote writes and fails closed on bad JS
   const ok = spawnSync(process.execPath, [script.pathname], { input: JSON.stringify(proposal()), encoding: 'utf8' });
   assert.equal(ok.status, 0); assert.equal(JSON.parse(ok.stdout).proposalFingerprint, fingerprintProposal(proposal()));
   const invalid = spawnSync(process.execPath, [script.pathname], { input: '{', encoding: 'utf8' });
+  assert.equal(invalid.status, 1);
+});
+
+test('calculated effort needs actual scope, baseline, reuse, incremental work and verification evidence', () => {
+  for (const change of [
+    e => { e.analysis.scopeEvidence = []; },
+    e => { e.analysis.baselineEvidence = [' ']; },
+    e => { e.analysis.reuse = []; },
+    e => { e.analysis.reuse[0].evidence = []; },
+    e => { e.analysis.reuse[0].delta = ''; },
+    e => { e.analysis.reuse[0].mode = 'ASSUMED'; },
+    e => { e.parts[0].work = ''; },
+    e => { e.parts[0].featureRefs = ['F-FOREIGN']; },
+    e => { e.analysis.verification = []; },
+  ]) {
+    const input = proposal(); change(input.tasks[0].estimate); reviewed(input);
+    assert.equal(validateTaskBreakdown(input, { requireEstimateReview: false }).valid, false);
+    assert.equal(validateTaskBreakdown(input).valid, false, 'even a simulated pass cannot replace required evidence');
+  }
+});
+
+test('waiting time is not a cost category, while evidenced diagnosis work is allowed', () => {
+  const input = proposal();
+  input.tasks[0].estimate.parts[0].type = 'waiting'; reviewed(input);
+  assert.match(messages(validateTaskBreakdown(input)), /waiting time/);
+  input.tasks[0].estimate.parts[0].type = 'investigation';
+  input.tasks[0].estimate.parts[0].work = '复现并定位回显状态丢失的触发路径'; reviewed(input);
+  assert.equal(validateTaskBreakdown(input).valid, true);
+});
+
+test('unknown, failed, self-reviewed or incomplete independent reviews cannot authorize task writes', () => {
+  for (const change of [
+    p => { delete p.estimateReview; },
+    p => { p.estimateReview.status = 'REVISE'; },
+    p => { p.estimateReview.status = 'NEEDS_EVIDENCE'; },
+    p => { p.estimateReview.reviewerId = p.estimatorId; },
+    p => { p.estimateReview.source = ''; },
+    p => { p.estimateReview.taskKeys = []; },
+    p => { p.estimateReview.taskKeys = ['DT-001', 'DT-001']; },
+    p => { p.estimateReview.taskKeys = ['DT-OTHER']; },
+    p => { p.estimateReview.checks.reuse.status = 'UNKNOWN'; },
+    p => { p.estimateReview.checks.shared.status = 'FAIL'; },
+    p => { p.estimateReview.checks.increment.evidence = []; },
+  ]) {
+    const input = proposal(); change(input);
+    assert.equal(validateTaskBreakdown(input).valid, false);
+    const human = { source: 'human confirmed current hours', proposalFingerprint: fingerprintProposal(input) };
+    assert.equal(validateConfirmation(input, human).valid, false);
+    assert.equal(validateTaskReadbacks(input, records(input)).valid, false);
+  }
+});
+
+test('scope, reuse and baseline changes invalidate review even when displayed hours stay the same', () => {
+  for (const change of [
+    p => { p.tasks[0].scope += '；增加另一个角色的可见范围'; },
+    p => { p.tasks[0].estimate.analysis.baselineEvidence = ['new revision']; },
+    p => { p.tasks[0].estimate.analysis.reuse[0].mode = 'NEW'; },
+    p => { p.tasks[0].estimate.parts[0].work += '；改变公共默认值'; },
+    p => { p.tasks[0].estimate.analysis.risks.push({ description: '非关键展示差异', handling: '沿用既有行为', blocking: false }); },
+  ]) {
+    const input = proposal(); change(input);
+    assert.equal(input.tasks[0].estimate.hours, 6);
+    assert.equal(validateTaskBreakdown(input, { requireEstimateReview: false }).valid, true);
+    assert.match(messages(validateTaskBreakdown(input)), /current unchanged estimate/);
+    reviewed(input);
+    assert.equal(validateTaskBreakdown(input).valid, true);
+  }
+});
+
+test('one independent receipt must cover all calculated Tasks and preserves final confirmation binding', () => {
+  const input = proposal(), second = structuredClone(input.tasks[0]);
+  second.key = 'DT-002'; second.project = 'other'; second.owner.account = second.payload.owner = 'bob';
+  second.payload.description = 'zan-task:111230010000001:DT-002'; input.tasks.push(second);
+  reviewed(input);
+  assert.equal(validateTaskBreakdown(input).valid, true);
+  const human = { source: '确认', proposalFingerprint: fingerprintProposal(input) };
+  input.estimateReview.checks.risk.evidence = ['revised independent review notes'];
+  assert.equal(validateTaskBreakdown(input).valid, true);
+  assert.equal(validateConfirmation(input, human).valid, false);
+  input.estimateReview.taskKeys.pop();
+  assert.match(messages(validateTaskBreakdown(input)), /every calculated Task/);
+});
+
+test('shared implementation is charged once and consumers reference its prerequisite', () => {
+  const input = proposal(), first = input.tasks[0], second = structuredClone(first);
+  first.estimate.parts[0].sharedKey = 'login-error-feedback';
+  second.key = 'DT-002'; second.project = 'other';
+  second.payload.description = 'zan-task:111230010000001:DT-002';
+  second.dependsOn = ['DT-001'];
+  second.estimate.parts[0].sharedKey = 'login-error-feedback';
+  input.tasks.push(second); reviewed(input);
+  assert.match(messages(validateTaskBreakdown(input)), /charged more than once/);
+  second.estimate.parts = [{ ...second.estimate.parts[1], hours: 2, work: '验证另一个入口的消费适配' }];
+  second.estimate.normalHours = 2; second.estimate.hours = second.payload.effort = 2;
+  second.estimate.sharedRefs = ['login-error-feedback']; reviewed(input);
+  assert.equal(validateTaskBreakdown(input).valid, true);
+  for (const refs of [['missing-work'], ['login-error-feedback', 'login-error-feedback']]) {
+    second.estimate.sharedRefs = refs; reviewed(input);
+    assert.equal(validateTaskBreakdown(input).valid, false);
+  }
+  second.estimate.sharedRefs = ['login-error-feedback']; second.dependsOn = []; reviewed(input);
+  assert.match(messages(validateTaskBreakdown(input)), /owning prerequisite/);
+});
+
+test('existing Tasks retain exact hours without reconstructing normal effort or requiring a new review', () => {
+  const input = proposal(), task = input.tasks[0];
+  task.action = 'REUSE'; task.id = 'existing-task'; task.beforeFingerprint = 'exact-old-snapshot';
+  task.estimate.hours = task.payload.effort = 11; retain(task);
+  delete input.estimateReview; delete input.estimatorId;
+  assert.equal(task.estimate.normalHours, undefined);
+  assert.equal(validateTaskReadbacks(input, records(input)).valid, true);
+  task.estimate.hours = task.payload.effort = 9;
+  assert.match(messages(validateTaskBreakdown(input)), /retained hours/);
+});
+
+test('a retained pending prerequisite can own shared work without reconstructing its historical estimate', () => {
+  const input = proposal(), first = input.tasks[0], second = structuredClone(first);
+  first.action = 'REUSE'; first.id = 'existing-shared-task'; first.beforeFingerprint = 'old-task-readback'; retain(first);
+  first.estimate.sharedWork = [{ key: 'login-shared-core', work: '既有 Task 范围中的公共错误反馈能力，尚待实施',
+    featureRefs: ['F-001'], evidence: ['旧 Task 与 Plan 明确了公共交付，原工时已包含该工作'] }];
+  second.key = 'DT-002'; second.payload.description = 'zan-task:111230010000001:DT-002';
+  second.dependsOn = ['DT-001']; second.estimate.sharedRefs = ['login-shared-core'];
+  input.tasks.push(second); reviewed(input);
+  assert.deepEqual(input.estimateReview.taskKeys, ['DT-002']);
+  assert.equal(validateTaskReadbacks(input, records(input)).valid, true);
+  assert.equal(first.estimate.normalHours, undefined);
+  for (const invalidate of [
+    work => { work.hours = 2; },
+    work => { work.evidence = []; },
+    work => { work.featureRefs = ['F-FOREIGN']; },
+  ]) {
+    const changed = structuredClone(input); invalidate(changed.tasks[0].estimate.sharedWork[0]); reviewed(changed);
+    assert.match(messages(validateTaskBreakdown(changed)), /retained shared work/);
+  }
+  second.estimate.parts[0].sharedKey = 'login-shared-core'; reviewed(input);
+  assert.match(messages(validateTaskBreakdown(input)), /charged more than once/);
+});
+
+test('metadata-only updates retain hours but scope, acceptance and snapshot drift require fresh assessment', () => {
+  const input = proposal(), task = input.tasks[0];
+  task.action = 'UPDATE'; task.id = 'existing-task'; task.beforeFingerprint = 'snapshot'; retain(task);
+  delete input.estimateReview;
+  task.owner.account = task.payload.owner = 'bob';
+  task.name = task.payload.name = '登录反馈维护';
+  assert.equal(validateTaskReadbacks(input, records(input)).valid, true);
+  for (const change of [
+    t => { t.scope += '；新增密码重置'; },
+    t => { t.acceptance.push('允许其他租户登录'); },
+    t => { t.beforeFingerprint = 'changed-readback'; },
+    t => { t.estimate.retainedFrom.evidence = ''; },
+  ]) {
+    const value = structuredClone(input); change(value.tasks[0]);
+    assert.match(messages(validateTaskBreakdown(value)), /retained hours/);
+  }
+  task.action = 'CREATE';
+  assert.match(messages(validateTaskBreakdown(input)), /new Tasks cannot retain/);
+});
+
+test('continuation adds new work to the retained full-Task budget instead of replacing or discounting it', () => {
+  const input = proposal(), task = input.tasks[0];
+  task.action = 'UPDATE'; task.id = 'existing-task'; task.beforeFingerprint = 'readback-of-eight-hour-task';
+  const oldWorkFingerprint = fingerprintTaskWork(task);
+  task.scope += '；增加超时反馈';
+  task.estimate = { ...task.estimate, coverage: 'INCREMENTAL', normalHours: 2.5,
+    parts: [{ ...task.estimate.parts[0], hours: 2.5, work: '在保留原失败反馈基础上增加超时处理并验证' }],
+    retainedBase: { taskId: task.id, beforeFingerprint: task.beforeFingerprint, hours: 8,
+      workFingerprint: oldWorkFingerprint, evidence: '准确 Task 读回为 8 小时，原交付范围全部保留' },
+    hours: 10,
+  };
+  task.payload.effort = 10; reviewed(input);
+  assert.equal(validateTaskReadbacks(input, records(input)).valid, true);
+  for (const hours of [2, 8]) {
+    task.estimate.hours = task.payload.effort = hours; reviewed(input);
+    assert.match(messages(validateTaskBreakdown(input)), /final estimate calculation/);
+  }
+  task.estimate.hours = task.payload.effort = 10;
+  for (const change of [
+    t => { t.id = 'other-task'; },
+    t => { t.beforeFingerprint = 'new-readback'; },
+    t => { t.estimate.retainedBase.hours = 0; },
+    t => { t.estimate.retainedBase.workFingerprint = ''; },
+    t => { t.estimate.retainedBase.evidence = ''; },
+    t => { t.action = 'CREATE'; delete t.id; delete t.beforeFingerprint; },
+  ]) {
+    const value = structuredClone(input); change(value.tasks[0]); reviewed(value);
+    assert.match(messages(validateTaskBreakdown(value)), /incremental updates require/);
+  }
+  task.estimate.coverage = 'FULL_TASK'; reviewed(input);
+  assert.match(messages(validateTaskBreakdown(input)), /cannot add another historical budget/);
+});
+
+test('material evidence gaps block readiness but bounded non-blocking assumptions remain explicit', () => {
+  const input = proposal(), analysis = input.tasks[0].estimate.analysis;
+  analysis.confidence = 'MEDIUM';
+  analysis.risks = [{ description: '罕见展示文案可能调整', handling: '沿用已确认交互，变化再核对', blocking: false }]; reviewed(input);
+  assert.equal(validateTaskBreakdown(input).valid, true);
+  analysis.risks[0] = { description: '当前责任范围和复用能力未明确', handling: '先读取范围及基准源码', blocking: true }; reviewed(input);
+  assert.match(messages(validateTaskBreakdown(input)), /material estimate risk/);
+  for (const value of [null, [null], [{}], [{ blocking: 'false' }]]) {
+    analysis.risks = value; reviewed(input);
+    assert.equal(validateTaskBreakdown(input).valid, false);
+  }
+});
+
+test('a readback-backed Plan cannot bypass missing or stale effort review', () => {
+  const value = model();
+  delete value.taskBreakdown.proposal.estimateReview;
+  value.taskBreakdown.proposalFingerprint = fingerprintProposal(value.taskBreakdown.proposal);
+  assert.equal(validatePlanTaskBindings(value).valid, false);
+  assert.equal(validatePagePlanModel(value).valid, false);
+});
+
+test('pre-review CLI returns only a review binding and cannot act as a final proposal receipt', () => {
+  const script = new URL('../skills/breaking-down-requirement/scripts/validate-task-breakdown.js', import.meta.url);
+  const input = proposal(); delete input.estimateReview;
+  const preview = spawnSync(process.execPath, [script.pathname, '--prepare-estimate-review'], { input: JSON.stringify(input), encoding: 'utf8' });
+  assert.equal(preview.status, 0);
+  const data = JSON.parse(preview.stdout);
+  assert.equal(data.valid, true); assert.equal(data.reviewRequired, true);
+  assert.equal(data.estimateFingerprint, fingerprintEstimate(input));
+  assert.equal(data.proposalFingerprint, null);
+  const noEstimator = structuredClone(input); delete noEstimator.estimatorId;
+  const missing = spawnSync(process.execPath, [script.pathname, '--prepare-estimate-review'], { input: JSON.stringify(noEstimator), encoding: 'utf8' });
+  assert.equal(missing.status, 1); assert.equal(JSON.parse(missing.stdout).estimateFingerprint, null);
+  const final = spawnSync(process.execPath, [script.pathname], { input: JSON.stringify(input), encoding: 'utf8' });
+  assert.equal(final.status, 1); assert.equal(JSON.parse(final.stdout).proposalFingerprint, null);
+  const invalid = spawnSync(process.execPath, [script.pathname, '--skip-review'], { input: JSON.stringify(input), encoding: 'utf8' });
   assert.equal(invalid.status, 1);
 });

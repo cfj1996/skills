@@ -7,6 +7,96 @@ const canonical = value => Array.isArray(value) ? value.map(canonical) : object(
   ? Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])])) : value;
 const equal = (a, b) => JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
 const fingerprintProposal = proposal => createHash('sha256').update(JSON.stringify(canonical(proposal))).digest('hex');
+const ESTIMATE_CHECKS = ['scope', 'reuse', 'increment', 'shared', 'verification', 'risk'];
+const PART_TYPES = ['analysis', 'implementation', 'integration', 'verification', 'investigation'];
+const calculatedTasks = proposal => (Array.isArray(proposal?.tasks) ? proposal.tasks : [])
+  .filter(task => object(task) && task.estimate?.mode === 'CALCULATED');
+
+// The independent receipt cannot fingerprint itself. Human confirmation still
+// binds the complete proposal, including that receipt, via fingerprintProposal.
+function fingerprintEstimate(proposal) {
+  const { estimateReview, ...input } = proposal;
+  return fingerprintProposal(input);
+}
+
+function fingerprintTaskWork(task) {
+  return fingerprintProposal(Object.fromEntries(
+    ['project', 'deliveryUnitKey', 'featureRefs', 'scope', 'exclusions', 'acceptance', 'dependsOn']
+      .map(key => [key, task[key]]),
+  ));
+}
+
+function validateEstimate(task, check) {
+  const estimate = task.estimate || {};
+  check(Number.isSafeInteger(estimate.hours) && estimate.hours > 0, `${task.key}: final estimate must be a positive integer number of hours`);
+  check(['CALCULATED', 'RETAINED'].includes(estimate.mode), `${task.key}: estimate mode is required`);
+  check(texts(estimate.sharedRefs ?? [], false), `${task.key}: shared references must be unique work keys`);
+  const features = new Set(Array.isArray(task.featureRefs) ? task.featureRefs : []);
+  const retainsBudget = estimate.mode === 'RETAINED' || estimate.mode === 'CALCULATED' && estimate.coverage === 'INCREMENTAL';
+  check(estimate.sharedWork === undefined || retainsBudget && Array.isArray(estimate.sharedWork) && estimate.sharedWork.every(work =>
+    object(work) && text(work.key) && text(work.work) && texts(work.evidence)
+      && texts(work.featureRefs) && work.featureRefs.every(ref => features.has(ref)) && work.hours === undefined),
+  `${task.key}: retained shared work needs scoped readback evidence and cannot add hours`);
+  if (task.action === 'REUSE') check(estimate.mode === 'RETAINED', `${task.key}: REUSE retains readback hours without recalculation`);
+  if (estimate.mode === 'RETAINED') {
+    const previous = estimate.retainedFrom || {};
+    check(['REUSE', 'UPDATE'].includes(task.action), `${task.key}: new Tasks cannot retain a historical estimate`);
+    check(text(task.id) && previous.taskId === task.id && previous.beforeFingerprint === task.beforeFingerprint
+      && previous.hours === estimate.hours && previous.workFingerprint === fingerprintTaskWork(task)
+      && text(previous.evidence), `${task.key}: retained hours require matching Task, snapshot, unchanged work and readback evidence`);
+    return;
+  }
+  const parts = Array.isArray(estimate.parts) ? estimate.parts : [];
+  check(['FULL_TASK', 'INCREMENTAL'].includes(estimate.coverage), `${task.key}: calculated effort must declare full-Task or incremental coverage`);
+  let retainedHours = 0;
+  if (estimate.coverage === 'INCREMENTAL') {
+    const base = estimate.retainedBase || {};
+    check(task.action === 'UPDATE' && text(task.id) && base.taskId === task.id
+      && base.beforeFingerprint === task.beforeFingerprint && Number.isSafeInteger(base.hours) && base.hours > 0
+      && typeof base.workFingerprint === 'string' && /^[a-f\d]{64}$/i.test(base.workFingerprint)
+      && text(base.evidence), `${task.key}: incremental updates require the exact retained full-Task budget and old scope readback`);
+    if (Number.isSafeInteger(base.hours) && base.hours > 0) retainedHours = base.hours;
+  } else {
+    check(estimate.retainedBase === undefined, `${task.key}: full-Task estimates cannot add another historical budget`);
+  }
+  const validParts = parts.length > 0 && parts.every(part => object(part) && text(part.label) && units(part.hours) !== null);
+  check(validParts && units(estimate.normalHours) !== null, `${task.key}: positive normal workload and parts are required`);
+  if (validParts && units(estimate.normalHours) !== null) check(parts.reduce((sum, part) => sum + units(part.hours), 0n) === units(estimate.normalHours), `${task.key}: normal workload must equal parts total`);
+  check(estimate.factor === 0.8 && text(estimate.basis), `${task.key}: estimate policy validation failed`);
+  if (units(estimate.normalHours) !== null) check(estimate.hours === retainedHours + estimateHours(estimate.normalHours), `${task.key}: final estimate calculation is invalid`);
+  for (const part of parts) {
+    check(object(part) && PART_TYPES.includes(part.type) && text(part.work)
+      && texts(part.featureRefs) && part.featureRefs.every(ref => features.has(ref)),
+    `${task.key}: every cost must describe scoped incremental work; waiting time is not development effort`);
+    if (part?.sharedKey !== undefined) check(text(part.sharedKey), `${task.key}: shared work key must be nonempty`);
+  }
+  const analysis = estimate.analysis || {};
+  check(texts(analysis.scopeEvidence) && texts(analysis.baselineEvidence), `${task.key}: actual delivery scope and current code baseline evidence are required`);
+  check(Array.isArray(analysis.reuse) && analysis.reuse.length > 0 && analysis.reuse.every(item =>
+    object(item) && text(item.capability) && ['REUSE', 'ADAPT', 'NEW'].includes(item.mode)
+      && texts(item.evidence) && text(item.delta)), `${task.key}: evidenced reuse/adaptation/new-work analysis is required`);
+  check(texts(analysis.verification), `${task.key}: concrete verification work is required`);
+  check(['HIGH', 'MEDIUM', 'LOW'].includes(analysis.confidence), `${task.key}: estimate confidence is required`);
+  check(Array.isArray(analysis.risks) && analysis.risks.every(risk => object(risk)
+    && text(risk.description) && text(risk.handling) && typeof risk.blocking === 'boolean'), `${task.key}: explicit risk assumptions are required`);
+  check(!Array.isArray(analysis.risks) || !analysis.risks.some(risk => risk?.blocking === true), `${task.key}: unresolved material estimate risk blocks readiness`);
+}
+
+function validateEstimateReview(proposal, check) {
+  const tasks = calculatedTasks(proposal);
+  if (!tasks.length) return;
+  const review = proposal.estimateReview || {};
+  check(text(proposal.estimatorId) && text(review.reviewerId) && review.reviewerId !== proposal.estimatorId
+    && text(review.source), 'estimate review requires a distinct reviewer and real invocation evidence');
+  check(review.status === 'PASSED' && review.estimateFingerprint === fingerprintEstimate(proposal),
+    'estimate review must pass and bind the current unchanged estimate proposal');
+  check(texts(review.taskKeys) && equal([...review.taskKeys].sort(), tasks.map(task => task.key).sort()),
+    'estimate review must cover every calculated Task exactly once');
+  for (const key of ESTIMATE_CHECKS) {
+    const result = review.checks?.[key];
+    check(result?.status === 'PASS' && texts(result.evidence), `estimate review ${key} requires passing evidence`);
+  }
+}
 // Strip only paired Markdown wrappers; punctuation inside a key remains part of its identity.
 function hasTaskMarker(description, storyId, key) {
   if (typeof description !== 'string') return false;
@@ -38,7 +128,7 @@ function estimateHours(normalHours) {
   return Number((numerator * 2n + denominator) / (denominator * 2n));
 }
 
-function validateTaskBreakdown(proposal) {
+function validateTaskBreakdown(proposal, { requireEstimateReview = true } = {}) {
   const errors = [];
   const check = (ok, message) => { if (!ok) errors.push({ code: 'task-breakdown', message }); };
   if (!object(proposal)) return { valid: false, errors: [{ code: 'task-breakdown', message: 'proposal must be an object' }] };
@@ -70,13 +160,7 @@ function validateTaskBreakdown(proposal) {
     check(texts(task.featureRefs) && texts(task.acceptance) && texts(task.exclusions, false) && texts(task.dependsOn, false), `${task.key}: featureRefs, acceptance, exclusions and dependsOn must be valid arrays`);
     check(text(task.owner?.account) && text(task.owner?.evidence), `${task.key}: verified developer account is required`);
     const estimate = task.estimate || {};
-    const parts = Array.isArray(estimate.parts) ? estimate.parts : [];
-    const validParts = parts.length > 0 && parts.every(part => object(part) && text(part.label) && units(part.hours) !== null);
-    check(validParts && units(estimate.normalHours) !== null, `${task.key}: positive normal workload and parts are required`);
-    if (validParts && units(estimate.normalHours) !== null) check(parts.reduce((sum, part) => sum + units(part.hours), 0n) === units(estimate.normalHours), `${task.key}: normal workload must equal parts total`);
-    check(estimate.factor === 0.8 && text(estimate.basis), `${task.key}: estimate policy validation failed`);
-    check(Number.isSafeInteger(estimate.hours) && estimate.hours > 0, `${task.key}: final estimate must be a positive integer number of hours`);
-    if (units(estimate.normalHours) !== null) check(estimate.hours === estimateHours(estimate.normalHours), `${task.key}: final estimate calculation is invalid`);
+    validateEstimate(task, check);
     const payload = task.payload || {};
     const historicalDescription = Object.hasOwn(payload, 'description') &&
       (typeof payload.description === 'string' || payload.description === null);
@@ -100,6 +184,30 @@ function validateTaskBreakdown(proposal) {
   }
   // Invalid array inputs have already failed; do not iterate hostile shapes.
   for (const [key, task] of byKey) if (Array.isArray(task.dependsOn)) visit(key);
+  const shared = new Map();
+  const registerShared = (key, task) => {
+    if (!text(key)) return;
+    check(!shared.has(key), `${task.key}: shared work ${key} is charged more than once`);
+    shared.set(key, task.key);
+  };
+  for (const task of tasks.filter(object)) {
+    const estimate = task.estimate || {};
+    if (estimate.mode === 'CALCULATED') {
+      for (const part of Array.isArray(estimate.parts) ? estimate.parts : []) registerShared(part?.sharedKey, task);
+    }
+    if (estimate.mode === 'RETAINED' || estimate.mode === 'CALCULATED' && estimate.coverage === 'INCREMENTAL') {
+      for (const work of Array.isArray(estimate.sharedWork) ? estimate.sharedWork : []) registerShared(work?.key, task);
+    }
+  }
+  for (const task of tasks.filter(object)) {
+    for (const ref of Array.isArray(task.estimate?.sharedRefs) ? task.estimate.sharedRefs : []) {
+      const owner = shared.get(ref);
+      check(owner !== undefined && owner !== task.key && Array.isArray(task.dependsOn) && task.dependsOn.includes(owner),
+        `${task.key}: shared work reference ${ref} requires its owning prerequisite Task`);
+    }
+  }
+  if (calculatedTasks(proposal).length) check(text(proposal.estimatorId), 'estimator identity must be fixed before estimate review preparation');
+  if (requireEstimateReview) validateEstimateReview(proposal, check);
   return { valid: errors.length === 0, errors };
 }
 
@@ -165,7 +273,8 @@ function validatePlanTaskBindings(model, { implementationStage = false } = {}) {
   return result;
 }
 
-module.exports = { estimateHours, fingerprintProposal, validateTaskBreakdown, validateConfirmation, validateTaskReadbacks, validatePlanTaskBindings };
+module.exports = { estimateHours, fingerprintProposal, fingerprintEstimate, fingerprintTaskWork,
+  validateTaskBreakdown, validateConfirmation, validateTaskReadbacks, validatePlanTaskBindings };
 
 if (require.main === module) {
   let input = '';
@@ -173,9 +282,15 @@ if (require.main === module) {
   process.stdin.on('data', chunk => { input += chunk; });
   process.stdin.on('end', () => {
     try {
+      const args = process.argv.slice(2);
+      if (args.length > 1 || args.length === 1 && args[0] !== '--prepare-estimate-review') throw new Error('usage: validate-task-breakdown.js [--prepare-estimate-review]');
+      const prepare = args[0] === '--prepare-estimate-review';
       const proposal = JSON.parse(input);
-      const result = validateTaskBreakdown(proposal);
-      process.stdout.write(JSON.stringify({ ...result, proposalFingerprint: result.valid ? fingerprintProposal(proposal) : null }) + '\n');
+      const result = validateTaskBreakdown(proposal, { requireEstimateReview: !prepare });
+      process.stdout.write(JSON.stringify({ ...result,
+        ...(prepare ? { reviewRequired: calculatedTasks(proposal).length > 0,
+          estimateFingerprint: result.valid ? fingerprintEstimate(proposal) : null } : {}),
+        proposalFingerprint: result.valid && !prepare ? fingerprintProposal(proposal) : null }) + '\n');
       if (!result.valid) process.exitCode = 1;
     } catch (error) { process.stderr.write(error.message + '\n'); process.exitCode = 1; }
   });

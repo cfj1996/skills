@@ -20,6 +20,14 @@ filesystem, or network write operations.
   verified and confirmed actual test branch (`dev` or `develop`), unchanged
   from its upstream selection. Never normalize one alias to the other.
   Current-round diff/commits contain no unrelated work.
+- Apply [change consistency](../../../references/change-consistency.md): the
+  full pending delivery and latest delta have reviewed scope/basis, actual
+  behavior, impact and verification. STANDARD has a current draft covering
+  those facts before the first delivery write; an existing Wiki/link or a
+  same-page change cannot substitute for that check. NON_FUNCTIONAL skip
+  requires an accurate existing entry with no stale material claims. NO_WIKI
+  omits document operations only. MR descriptions carry verified work-item
+  links and available Wiki links, never future IDs or guessed associations.
 - For a Bug across repositories, pair all required definitions/reviews by
   canonical repository/root, origin and fixed branch, not array position.
   Require matching Bug identity, per-repository passing reviews, cross-repository

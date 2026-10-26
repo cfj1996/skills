@@ -17,6 +17,12 @@ first write. A separately changed Wiki patch uses its own new validation.
 For the proposed scoped operations, validate:
 
 1. Upstream submission is `SUBMITTED` and repository facts match.
+   Apply [change consistency](../../../references/change-consistency.md): the
+   current default-target diff has current reviewed scope, actual behavior,
+   impact/verification and applicable Wiki coverage. New behavioral changes
+   require refreshed affected review/submission evidence; a status-only patch
+   cannot repair stale documentation. Verify stage-specific conditions without
+   treating test-environment success as proof of another delivery environment.
 2. Source is exactly the original submitted `feature/*` or `fixbug/*` branch;
    target is exactly the verified default `master` (or actual default `main`);
    source/target SHAs and current-round commits are

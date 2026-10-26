@@ -9,13 +9,16 @@
 | Multiple linked or related Wiki candidates | Block rather than ask for an arbitrary URL or create another page. |
 | Reused target without `# 前端` | Append `# 前端` and a sequence `1` entry containing the resolved type-specific status. |
 | Existing `# 前端` sequences `1` and `3` | Append the new entry as sequence `4`; do not count sub-list numbers. |
-| Existing unique entry with the same source branch and a functional change | Keep its sequence, append the affected scope, and apply only the allowed type-specific status patch; a missing status blocks. |
-| Continue work after a prior MR/deployment with a functional change | Reuse the same Wiki/branch entry and append only the new affected scope to `影响范围`. |
-| Continue work is proven non-functional and has a verified owner page/current repository+branch entry | Return `SKIPPED_BY_POLICY` with `NON_FUNCTIONAL_CONTINUE`; retain the exact target/body readback for go-live and do not update the Wiki. |
+| Existing unique entry with the same source branch and a functional change | Keep its sequence; reconcile current content, impact and verification, plus the allowed type-specific status patch; a missing status blocks. |
+| Continue work after a prior MR/deployment with a functional change | Reuse the same Wiki/branch entry; correct superseded claims and cover cumulative behavior plus the new delta. |
+| Continue work is proven non-functional and the verified owner/current entry still accurately covers behavior, impact and verification | Return `SKIPPED_BY_POLICY` with `NON_FUNCTIONAL_CONTINUE`; retain the exact target/body readback for go-live and do not update the Wiki. |
+| A same-page manual edit changes a permission, default value or shared method | Refresh affected review/verification and current-entry content/impact; the existing page name is insufficient coverage. |
+| A nominal refactor leaves stale claims in the existing Wiki | Prepare a validated entry correction; do not skip because of the commit/file label. |
+| Wiki describes an extra behavior without approved scope evidence | Block scope/impact validation; documenting the behavior does not authorize it. |
 | Non-functional continuation has no historical page or no current repository+branch entry | Follow normal validated creation/append drafting; do not return a successful skip without a usable go-live target. |
 | Same-title page has the same repository and branch but no owner link | Block ownership resolution without writes or wider scans; do not combine different Bugs or create a second page by changing its title. |
-| Continue work changes functional behavior | Reuse the matching entry and append only the affected module/page to its `影响范围` list without creating a duplicate entry. |
-| A new functional round reuses a business entry currently marked `已合并` | Append the new affected scope and reset only that entry to `是否上线：未合并`. |
+| Continue work changes functional behavior | Reuse the matching entry and update content/impact/verification without creating a duplicate entry. |
+| A new functional round reuses a business entry currently marked `已合并` | Correct its current behavior/impact and reset only that entry to `是否上线：未合并`. |
 | A reused entry has a missing or non-current status | Block except for the evidenced minimal replacement of a tooling legacy `是否上线：无需上线` line. |
 | Continue impact classification is ambiguous | Block and emit no final body; never guess whether the Wiki needs an update. |
 | Tester or another canonical field cannot be resolved | Block and emit no final body; never render `待补充`. |

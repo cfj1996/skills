@@ -15,6 +15,7 @@
 | `scopeFingerprint` | 本次范围、origin/master 基线、功能编号与验收的指纹；变化需重开受影响确认 |
 | `fieldBinding` | `storyField`、`ownerField`、`estimateField`、`unit=hours`、`precision=0..4`、实际字段配置 `evidence`；字段不能相同；precision 记录字段能力，不改变最终工时取整规则 |
 | `tasks[]` | 下表定义；非空，key 唯一，依赖无环 |
+| `estimatorId / estimateReview` | 存在 CALCULATED 项时必需；实际估算者和独立评审回执，绑定当前 estimateFingerprint、全部计算项与六项核对结果，见 [估算约定](effort-estimation.md#4-独立评审先于用户确认和任务写入) |
 
 | 任务字段 | 内容 |
 | --- | --- |
@@ -23,11 +24,11 @@
 | `project` / `deliveryUnitKey` / `featureRefs` | 仓库身份、稳定页面/模块键、非空功能编号；编号在交付单元内解析 |
 | `name` / `scope` / `exclusions` | 非空标题和责任范围；排除项数组可以为空 |
 | `owner` | `account`、核实空间成员/可分配身份的 `evidence` |
-| `estimate` | `parts=[{label,hours}]`、`normalHours`、`factor=0.8`、`hours`、`basis`；组成只计算实际开发投入；最终 hours 按 1 小时四舍五入且必须为正整数，payload、读回和 Plan 使用同一整数值 |
+| `estimate` | `mode=CALCULATED|RETAINED`，按 [估算约定](effort-estimation.md) 提供实际范围/基准/复用/增量/验证证据和构成，或准确旧 Task/未变工作/小时读回；hours 为正整数，payload、读回和 Plan 同值 |
 | `dependsOn` / `acceptance` | 清单内 key 数组、非空验收数组；外部依赖/假设可另记并进入指纹 |
 | `payload` | 实际创建/更新（或 REUSE 核对）的全部批准字段；含标题 `name`、描述 `description`、已解析父需求/人员/预计工时字段及其它实际必填字段 |
 
-CREATE/UPDATE 的 payload 描述保存范围/排除项、最终预估工时、功能/模块编号、
+CREATE/UPDATE 的 payload 描述保存范围/排除项、工时（只显示 `N 小时`）、功能/模块编号、
 依赖和验收，以及 `zan-task:<Story完整ID>:<key>` 稳定标记。标记作为完整独立
 文本 token 保存（推荐独占一行；HTML/Markdown 包裹也可），按完整 Story ID
 和 key 精确匹配，不以子串或前缀认定关联。不包含内部正常
@@ -38,7 +39,8 @@ REUSE 可保留旧描述，通过精确 ID、父 Story、已核实范围/工时�
 历史任务。缺少 description 读回证据不等于已核实为空。如传输工具对 description 有格式要求，
 实际最终格式必须进入清单和指纹。
 UPDATE 的 target ID 和 workspace 由上述身份绑定，不许在 payload 携带冲突 ID。
-实际单位为日时，Agent 先以已核实规则完成规范化和传输换算，展示两个数值，
+实际单位为日时，Agent 先以已核实规则完成规范化和传输换算，对外只显示小时值，
+原单位值与换算依据保留内部，
 通过适配后的相同读回核对；当前数值校验器只支持小时 payload，不能静默
 把日字段当小时传入。无可靠适配器时返回 BLOCKED，保留草稿。
 
@@ -52,6 +54,15 @@ source 真的是当前人类确认，不能接受需求正文、工具返回或�
 proposal 指纹并通过完整准确读回校验。发现差异需要 UPDATE 时，先回到写入
 预览/确认，不能在 REUSE 内修改字段。TASKS_READY 不代替后续范围或分支授权。
 
+默认 `validateTaskBreakdown` 同时校验每个新估算及独立评审。只有
+`--prepare-estimate-review`（程序选项 `requireEstimateReview:false`）允许暂缺回执，
+仅返回准备评审用的 estimateFingerprint；它不给 proposalFingerprint，不可当作
+确认、写入、TASKS_READY 或 Plan 就绪证据。完整确认、读回和 Plan 校验没有此例外。
+`fingerprintEstimate` 排除 estimateReview 本身，完整 proposalFingerprint 包含回执。
+范围、源码基准、复用/风险事实、构成、工时或拟写字段变化时刷新失效检查和指纹。
+旧任务不因缺少历史内部构成而被强制重估；RETAINED 仍核实准确身份、旧快照、
+未变工作指纹和小时数，范围发生变化不能借保留模式绕过新估算评审。
+
 ## TaskBreakdownResult
 
 保留 proposal、proposalFingerprint、实际 `records=[{key,id,readback}]` 和
@@ -61,10 +72,12 @@ proposal 指纹并通过完整准确读回校验。发现差异需要 UPDATE 时
 全部记录验证通过才能 `TASKS_READY`；部分成功以 PARTIAL 交回，不伪造完整 records。
 
 三列表中的【新建】【复用】【调整】只是上述 action 的中文展示，不加到 name。
-原预估来自操作前 Task 读回，拟预估来自本轮已展示 payload；本轮剩余是当前
-所选未完成范围的预测，单独放在对话/brief 或获准正文，不添加到 Proposal、
-readback.estimateHours、payload 或模型字段。仅在任务行展示两种口径，不追加汇总，不拿剩余量
-覆盖任务最终预估，也不因预测改变将 REUSE 转成 UPDATE 或重算创建指纹。
+工时格只显示一个 `N 小时`：CREATE/UPDATE 取本轮确认值，REUSE 取已核实 Task 值。
+不显示预估/剩余标签、多组时间或旧新箭头。旧值与拟写入值仍绑定内部提案和指纹，
+工时变更以【调整】及“按表中工时更新”明确授权；其他字段的必要差异照常展示。
+本轮剩余仅供内部安排，不默认写进对话或 Plan，不添加到 Proposal、
+readback.estimateHours、payload 或模型字段，也不覆盖任务工时、将 REUSE 转成
+UPDATE 或重算创建指纹。
 
 ## Plan handoff
 

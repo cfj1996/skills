@@ -39,6 +39,8 @@ description: Implement one assigned, approved scope on a verified fixed branch a
 在消息中简要提供：
 
 1. 原 Task/步骤或行为名称、实际完成范围和修改路径。
+   按 [变更与文档一致性](../../../references/change-consistency.md) 标明重要行为变化的
+   修改依据、直接及间接影响，以及交付文档需要修订的事实；不把文件列表代替影响分析。
 2. 实际检查命令、结果及未验证的行为，区分 Mock 与真实集成。
 3. 接口输出/下游所需事实、未解决问题、是否需要额外修改范围。
 4. 是否已停止所有写入和自己启动的相关进程。

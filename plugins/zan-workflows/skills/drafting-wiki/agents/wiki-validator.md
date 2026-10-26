@@ -9,7 +9,8 @@ reasoning_effort: medium
 
 Act as an isolated, read-only validator for one proposed `ValidatedWikiDraft`.
 Inspect only the supplied target plan, TAPD/hierarchy readbacks, normalized
-facts, cited read-only sources, calculation, preservation patch, and proposed
+facts, current approved scope and reviewed diff/behavior/impact/verification
+evidence, cited read-only sources, calculation, preservation patch, and proposed
 rendered Markdown. Do not inspect outside systems or call any tool that reads
 or changes TAPD, a Wiki, Git, an MR, source files, deployments, or local state.
 
@@ -63,11 +64,11 @@ Validate these invariants in order:
 4. For `REUSE_EXISTING`, the current child body/hash is present and placement
    matches its visible `# 前端`: a missing or empty section creates sequence
    `1`; a distinct entry uses the greatest canonical top-level sequence plus
-   one; one repository+branch match receives an impact-scope patch and no new sequence. For a
+   one; one repository+branch match receives a current-entry patch and no new sequence. For a
    create plan, `before_content_hash=NEW_PAGE` and the complete body begins with
    `# 前端` and sequence `1`. The monthly parent never receives the entry body.
    Under `CONTINUE`, one matching source-branch entry receives the current
-   affected-scope append; a business entry also resets `已合并` to `未合并`
+   affected content/impact/verification correction; a business entry also resets `已合并` to `未合并`
    when the new current-round commits are not in the verified remote default ref (`origin/master` or `origin/main`), while a
    tooling entry preserves `当前版本` or applies only the evidenced channel
    update/legacy-line replacement allowed by `wiki-template.md`.
@@ -77,8 +78,8 @@ Validate these invariants in order:
    conflicting statuses are invalid,
    and a new duplicate entry is invalid. A non-functional continuation is
    skipped before this validator only with a verified owner page/current entry
-   and retained target/body readback; otherwise validate its normal creation
-   or append plan.
+   and retained target/body readback whose material claims remain accurate;
+   otherwise validate its normal creation, append or current-entry correction plan.
 5. A successful new entry contains every canonical field from
    `references/wiki-template.md`, including `项目名称`, the exact Jenkins Job
    link, and exactly one valid type-specific status: `是否上线：未合并` for a
@@ -96,8 +97,15 @@ Validate these invariants in order:
    claim that the change is already merged. An existing status value is not
    silently reset.
 6. A reused body is preserved byte-for-byte outside the recorded minimal patch.
-   Historical content is not deleted, reordered, normalized, or silently
-   reattributed. A create plan has a complete initial child body and no invented
+   Apply [change consistency](../../../references/change-consistency.md): every
+   material reviewed behavior and impact must map to accurate `内容`/`影响范围`
+   and actual `验证结果`, with `交付条件` only when needed. Same-page changes
+   still need coverage. Correct superseded current claims in selected entries
+   while retaining necessary history; a Wiki statement never proves scope
+   approval or resolves an unverified code concern. Missing diff/scope/impact
+   evidence or stale verification blocks validation. Unrelated historical
+   content is not deleted, reordered, normalized, or reattributed.
+   A create plan has a complete initial child body and no invented
    existing-page preservation claim.
 7. The proposed result and validator activity are read-only: its declared
    effects are `NONE`, no write action is proposed, and no local ledger or

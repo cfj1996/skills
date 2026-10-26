@@ -14,11 +14,16 @@ target-location, Wiki-ID, TAPD-comment, writeback, merge, or release narration.
 - 代码分支名：{effective_wiki_branch_name}
 - 影响范围：
   1. {影响范围}
+- 验证结果：{已验证行为、结果及未覆盖项}
 - 测试人员：{测试人员}
 {项目状态行}
 ```
 
 ## Preview boundary
+
+有实际交付限制时在验证结果后增加 `- 交付条件：…`，说明具体条件、依据和未完成项；
+无此类条件时省略。按 [变更与文档一致性](../../../references/change-consistency.md)
+从最终已评审变更生成上述内容，不按接口等具体领域设置额外必填栏目。
 
 The rules below govern the final validated body. For an earlier execution
 checklist, use the distinct template-preview boundary below; never submit that
@@ -100,10 +105,17 @@ preview as a validated body.
   project.
 - `开发人员` comes from the reconciled work definition, TAPD developer, or
   reviewed change and is used in both required places. Conflicts block.
-- `内容` summarizes the resolved TAPD work and current reviewed change.
+- `内容` summarizes the resolved TAPD work and current reviewed change, including
+  added, changed or removed behavior; existing current claims must be corrected
+  when superseded by an approved continuation.
 - `代码分支名` is the one verified original `feature/*` or `fixbug/*` source
   branch. A missing, conflicting, or `merge/*` value blocks.
-- `影响范围` lists resolved current-round scopes in order. Missing scope blocks.
+- `影响范围` covers the cumulative current behavior and newly affected paths,
+  shared capabilities and consumers. Missing material impact blocks; a page name
+  already listed does not cover every later behavior change on that page.
+- `验证结果` states the actual relevant verification and remaining gaps, without
+  turning a queued build or undocumented assumption into a pass. `交付条件` is
+  included only for an actual condition, with evidence and readiness stated.
 - `测试人员` comes from the TAPD tester field or its dynamically resolved custom
   field. Never use `reporter` as an implicit substitute; missing tester blocks.
 - `项目状态行` contains exactly one type-specific field:
@@ -135,10 +147,13 @@ preview as a validated body.
   An unresolved project type blocks; never guess.
 - For `CONTINUE`, classify the current-round change before patching. If it is
   `NON_FUNCTIONAL` and the verified owner page already contains this repository/
-  branch entry, skip the body write and retain its exact readback. With no page
+  branch entry whose material claims remain accurate, skip the body write and
+  retain its exact readback. Stale or incomplete claims require correction.
+  With no page
   or current entry, prepare the normal creation/append body. If it is `FUNCTIONAL_IMPACT`, the
-  new affected module/page must be appended to the matching entry's
-  `影响范围` list; do not duplicate an identical existing item. A business
+  matching entry's content, impact and verification must be reconciled against
+  the full reviewed delivery and latest delta; revise outdated claims and add
+  missing behavior/impact without duplicating identical items. A business
   entry already marked `已合并` must also return to `未合并` when this new
   current round is not contained in the verified remote default ref (`origin/master` or `origin/main`). A tooling entry preserves
   its valid `当前版本` unless a newer release changes the channel under the
@@ -208,16 +223,18 @@ For `REUSE_EXISTING`, operate only on the current child body read from TAPD:
   `max(existing canonical top-level sequences) + 1` within that section and
   append the canonical entry before the next level-one section.
 - If exactly one entry under `# 前端` contains the original source branch,
-  preserve its sequence. For a `FUNCTIONAL_IMPACT` continuation, append the
-  affected module/page as the next numbered item under that entry's existing
-  `影响范围` field. For a business project, the same minimal patch also changes
+  preserve its sequence. For a `FUNCTIONAL_IMPACT` continuation, update the
+  current entry's `内容`, `影响范围`, `验证结果` and any actual `交付条件`;
+  correct superseded claims and retain necessary history. Do not append only
+  the module/page name. A stale non-functional entry follows this correction
+  path as well. For a business project, the same minimal patch also changes
   `是否上线：已合并` to `是否上线：未合并` when the new current-round commits
   are not contained in the verified remote default ref (`origin/master` or `origin/main`); an existing `未合并` is preserved. A
   tooling project follows the `当前版本` rule above: preserve a valid value,
   update it only under the release-evidence rule above, or replace exactly one legacy
   `是否上线：无需上线` line when the release channel is evidenced. A missing
   status or any other non-current value blocks. For a `NON_FUNCTIONAL`
-  continuation with this verified existing entry, produce a policy skip and no
+  continuation with this verified and still-accurate existing entry, produce a policy skip and no
   patch while retaining the exact target/body readback for go-live.
 - Multiple matching entries, duplicate existing sequences,
   duplicate/conflicting status fields (including both tooling field names),
@@ -226,4 +243,5 @@ For `REUSE_EXISTING`, operate only on the current child body read from TAPD:
 Keep every reused character unchanged outside the calculated patch. Never
 replace an existing child with a freshly generated page, renumber historical
 entries, or silently change a prior entry's branch, person, content, or merge
-status.
+status. Content corrections explicitly declared in the current-entry patch are
+allowed; protect all unrelated entries and facts. No whole-page regeneration.

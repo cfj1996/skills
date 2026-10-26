@@ -22,6 +22,7 @@ Bugs or Stories, or drop a required project to close early.
 
 Read [contracts.md](references/contracts.md),
 [development-rules.md](references/development-rules.md) and
+[变更与文档一致性](../../references/change-consistency.md), plus the
 [tool-routing policy](../../references/tool-routing.md) before editing.
 For Bugs also load [status and repair owner](references/bug-repair-owner.md)
 and [repair records](references/bug-repair-record.md). Load
@@ -67,7 +68,12 @@ For formal requirement Task/Plan work, apply the
 dependencies, acceptance and Plan `tapdTaskKey` links. Check current readbacks;
 stale scope/owner/hours or unmapped steps return to task preparation. Execute
 only selected Tasks on the original branch. A completed step does not authorize
-a Task status write. Show only final estimated hours.
+a Task status write. Show only one `N 小时` value. New/revised estimates must
+carry the current independent review under the
+[effort rules](../breaking-down-requirement/references/effort-estimation.md);
+unchanged historical Task hours use their verified retained binding. New scope
+or a needed total-effort change returns to affected Task assessment/review and
+confirmation. Internal remaining-work changes alone never update TAPD effort.
 
 Bug work does not acquire requirement-only Task/Plan gates. Run the following
 once per Bug before any repository's source edits, using the complete approved
@@ -144,6 +150,12 @@ resource-limited checks as passed.
 Compare the final diff with the starting baseline and approved scope. Exclude
 unrelated paths; check removed, moved or disconnected logic against authorized
 behavior changes or a reachable equivalent replacement.
+Reconcile the full pending delivery diff and the delta since the last reviewed
+revision, including manual edits and conflict resolutions. Retain each material
+behavior's basis, code evidence, direct/indirect impact and verification in
+Change/Verification/Review. Necessary technical work may support the approved
+goal; an extra behavior needs its own scope basis. Record documentation changes
+needed by later delivery, without requiring a Wiki or writing it in IMPLEMENT.
 For delegated work, the lead reconciles actual task/path changes and verification
 coverage before review. Worker self-checks are evidence, not independent review.
 Use one whole-project review where it covers multiple tasks; parallel read-only

@@ -15,7 +15,8 @@
 | Current entry | sequence, Jenkins Job name/URL, selected build/release parameter names and values (only already-evidenced selections required under `SKIP`), project name, project category/service type, repository, developer, description, branch, scope, tester, business merge status or tooling current-version channel and release evidence |
 | Work mode | `INITIAL|CONTINUE`, impact classification, and incremental-scope evidence when continuing |
 | Wiki decision | `UPDATE|SKIP_NON_FUNCTIONAL` and normalized reason |
-| Placement | For `VALIDATED`, `NEW_FRONTEND_SECTION|APPEND_ENTRY|APPEND_IMPACT_SCOPE`, `# 前端` evidence, matching-entry evidence, and sequence calculation; for a policy skip, the skip decision evidence |
+| Placement | For `VALIDATED`, `NEW_FRONTEND_SECTION|APPEND_ENTRY|UPDATE_ENTRY` (legacy `APPEND_IMPACT_SCOPE` only for a genuinely append-only patch), `# 前端` evidence, matching-entry evidence, and sequence calculation; for a policy skip, the skip decision evidence |
+| Coverage | actual reviewed behavior/basis/impact/verification with exact diff and current scope evidence, matched to content/impact/verification/conditional delivery fields; stale claims to correct under [shared rules](../../../references/change-consistency.md) |
 | Preservation | For `VALIDATED`, `NEW_PAGE` or original body/hash, insertion point, expected minimal patch or initial body, resulting body, and preservation result; for a policy skip, no patch |
 | Validation | `VALIDATION_PASSED|VALIDATION_FAILED|NOT_RUN` and normalized reason |
 | Output | rendered Markdown for `VALIDATED`, no body plus skip reason for `SKIPPED_BY_POLICY`, otherwise a blocker |
@@ -43,8 +44,9 @@
   conflicting hierarchy evidence blocks creation rather than producing a
   duplicate Wiki.
 - `CONTINUE` reuses the prior matching child/branch entry. A functional
-  continuation appends only the affected scope; a proven non-functional
-  continuation with a verified owner page/current entry returns `SKIPPED_BY_POLICY`. It never
+  continuation updates current content, affected scope and verification;
+  a proven non-functional continuation with a verified owner page/current entry
+  whose material claims remain complete and accurate returns `SKIPPED_BY_POLICY`. It never
   creates a duplicate entry solely because the prior MR was merged.
 - `REUSE_EXISTING` requires the exact current target body and content hash.
   The helper preview's `beforeBodySha256` is SHA-256 over the exact UTF-8
@@ -79,10 +81,15 @@
   A missing page or current entry takes the normal validated creation/append
   path; uncertain or conflicting evidence blocks. Never skip discovery because
   the diff is non-functional or defer the missing target to going-live.
-  This policy covers changes that do not alter functional behavior, such as
-  refactoring, logging, test-only, or build-only changes.
+  This policy requires unchanged behavior/impact/verification conclusions and
+  delivery conditions. Refactoring, logging, test-only or build-only labels
+  alone never establish that; stale documentation takes the correction path.
 - `FUNCTIONAL_IMPACT` continuation reuses the matching existing entry and
-  appends the new affected module/page to that entry's `影响范围` list. A
+  updates `内容`, `影响范围` and `验证结果`, with `交付条件` only when material.
+  Reconcile cumulative delivered behavior and the latest delta; correct
+  superseded claims, preserve unaffected history and do not skip a new behavior
+  merely because its page/module is already listed. A stale entry in a
+  non-functional continuation also needs a validated correction. A
   business entry changes `已合并` back to `未合并` when the new current-round
   commits are not in the verified remote default ref (`origin/master` or `origin/main`); a tooling entry preserves `当前版本`
   unless a newer release changes the channel under the verified-readback or
@@ -95,7 +102,7 @@
   an existing empty `# 前端` also uses sequence `1`; otherwise it uses the
   greatest existing canonical top-level entry sequence plus one. A missing
   section is appended as `# 前端` with sequence `1`. A unique entry with the
-  same source branch gets an impact-scope patch and no new sequence. Duplicate
+  same source branch gets an entry-content patch and no new sequence. Duplicate
   sequences or ambiguous matches block.
 - Every new business entry initializes `是否上线：未合并`. Tooling/library
   entries instead use `当前版本：canary` for `canary` or
@@ -114,8 +121,10 @@
   待发布 with its actual channel.
   Exactly one legacy tooling `是否上线：无需上线` line may be replaced with
   the evidenced `当前版本` line in the declared minimal patch. Missing,
-  conflicting or other non-current values block. Only the declared scope
-  append, required business reset, and evidenced tooling status patch may change.
+  conflicting or other non-current values block. Only the declared current-entry
+  content/impact/verification/conditional delivery correction, necessary history
+  note, required business reset, and evidenced tooling status patch may change.
+  No other project's entry, identity, person or unrelated content may change.
 - `VALIDATED` requires passing validation and a non-empty copyable Markdown
   body. `BLOCKED` requires a concise blocker and no rendered final body.
 

@@ -54,6 +54,13 @@ contract and its blockers remain binding. Check in order:
    Check the relevant behavior verification against the reviewed revision;
    do not rely solely on the implementer's preservation claim or checks from
    before a later change. Keep inspection scoped to the affected behavior.
+   Apply [change consistency](../../../references/change-consistency.md) to the
+   full pending delivery and current-round delta, including manual changes.
+   Independently check the basis of each material behavior, direct/indirect
+   impact, affected consumers and actual verification. Necessary technical
+   adjustments may support the approved goal; unexplained extra behavior cannot.
+   Check the proposed change summary/documentation needs against the diff; do
+   not require future Wiki writes or accept an implementation summary as proof.
 3. Pre-existing changes are not attributed to the current Bug.
 4. Relevant verification is present and truthful; failures are not hidden.
    Apply [local verification budgets](../../../references/local-verification.md):

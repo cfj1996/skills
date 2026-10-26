@@ -28,6 +28,7 @@ not a new persisted schema or a queue of unrelated work items.
 | TAPD status | item type and `WRITE_ACTIVE|NO_CHANGE|SKIPPED_ALREADY_WAITING_TEST|NOT_APPLICABLE_NON_BUG`; current status/owner, verified repairOwner account/workspace/source/member evidence, combined status+owner target/payload/purpose, authorization source, validation/write/readback only for a Bug `WRITE_ACTIVE` |
 | Baseline | before/after status, changed paths, unrelated paths, scope comparison |
 | Change | concise summary and exact diff reference available in the current execution |
+| Change consistency | per material behavior: approved basis, actual added/changed/removed behavior and diff/call-path evidence, direct/indirect impact, verification/gaps and documentation correction needed; full pending-delivery baseline and last-reviewed delta, including manual edits, under [shared rules](../../../references/change-consistency.md) |
 | Verification | each relevant command, exit status, concise result, and any blocker |
 | Schedule (only when requested) | optional `scheduleRecommendation`: remaining effort, owner capacity/source, dependencies, proposed dates or conditional workday window, assumptions/risks and `writeState=NOT_WRITTEN`; grants no date/status write authority |
 | Review | `REVIEW_PASSED|REVIEW_FAILED|NOT_RUN` and normalized reason |
@@ -50,6 +51,14 @@ not a new persisted schema or a queue of unrelated work items.
   checks. Bug work has no requirement-only Task/Plan gates.
 - Verification follows concrete affected risks, including relevant failure paths,
   compatibility and preserved behavior. Scheduling is optional and request-driven.
+- Formal Task handoffs retain current independent estimate-review bindings or
+  verified unchanged historical hours under [effort estimation](../../breaking-down-requirement/references/effort-estimation.md).
+  Scope/total-effort changes reopen only affected assessment and confirmation;
+  internal remaining-work predictions never replace the Task value. Completed
+  code or budget deviation alone neither authorizes effort writes nor proves
+  an estimate was reasonable. User-requested retrospectives reuse actual
+  change/impact/verification evidence, without creating a ledger or judging
+  work-hour truthfulness from patch size.
 - `REVIEWED` requires the actual repository fingerprint to match the prepared
   definition and the actual current branch to equal the fixed branch.
 - `CREATE` uses only the definition's verified base ref/SHA; missing or changed
@@ -62,6 +71,11 @@ not a new persisted schema or a queue of unrelated work items.
   baseline.
 - The final changed paths must fit the approved scope. Pre-existing unrelated
   changes remain unrelated and are never attributed to this work.
+- Path membership alone does not prove behavioral scope. Review the shared
+  change-consistency facts against current requirements and the actual diff;
+  preserve still-required behavior and include affected consumers. Refresh only
+  checks invalidated by subsequent changes. Existing Wiki/repair records and
+  prior review success cannot cover an unseen continuation delta.
 - For requirement work, follow [需求任务关联](../../developing-requirement/references/task-linked-delivery.md).
   Formal Task/Plan work reuses the selected Tasks' verified parent Story, project/fixed branch and Plan
   steps from `proposal`/`taskBreakdown`/`records` and `tasks[].tapdTaskKey`.

@@ -13,6 +13,11 @@ Preferred lead model profile: `CRITICAL`。可选模型时使用
 [验收场景](references/acceptance-scenarios.md)。不在入口复制下游写入流程。
 读取或写入外部系统时沿用 [工具路由](../../references/tool-routing.md)。
 
+首次修复、测试反馈和后续人工修改统一遵循
+[变更与文档一致性](../../references/change-consistency.md)：核对修改依据、完整待交付
+行为与本轮增量、实际影响和验证。SUBMIT 时让原 Wiki 的内容和影响范围覆盖最新事实，
+不因 Bug 已待测试或同模块已列出而跳过；IMPLEMENT 保留事实供后续提测，不提前写 Wiki。
+
 ## 1. 明确本轮范围
 
 接受一个 Bug URL 或有序 URL 列表，以及各仓库的固定项目和修复分支约束。

@@ -20,6 +20,7 @@ complete `SubmissionPlan` (visible for standalone confirmation or material chang
 | Deployment | `BUILD_SUBMITTED|DEPLOYED|SKIPPED_BY_INTENT|FAILED|UNKNOWN|NOT_ATTEMPTED`, Jenkins job/environment/ref/version/channel/purpose and trigger/readback evidence when applicable |
 | Shared Wiki | `sharedWikiPlan`, `wikiOwner` (workspace/type/ID), owner/Task relationship readback, one target per Story/Bug, repository+branch entry identities, complete combined body/hash, all comment targets and included project gates; same final page ID in every participating result |
 | Wiki | `WRITTEN|SKIPPED_BY_POLICY|BLOCKED|NOT_ATTEMPTED`, auto-resolved target plan when written or retained for `going-live`, hierarchy evidence, create/update authorizations and readbacks when written, actual final child ID/URL and source-branch identity when available, business merge-status or tooling current-version/channel readback, and final body when applicable |
+| Change consistency | current reviewed behavior/basis/impact/verification and full delivery delta under [shared rules](../../../references/change-consistency.md); STANDARD draft/readback coverage of content, impact and verification, scoped corrections or evidenced unchanged result; exact TAPD and available Wiki links for MR descriptions |
 | TAPD | exact status action, waiting-test owner and source (`te` or `reporter`) for Bug transitions, owner write/readback result, exact `Bug|Story|Task` Wiki-link result when applicable, duplicate/conflict evidence, and write/readback results |
 | Test version | `WRITTEN|SKIPPED_ALREADY_WAITING_TEST|BLOCKED|NOT_ATTEMPTED`, structured payload and readback when written |
 | Validation | mapped results for each pre-write operation and final post-write validation |
@@ -126,6 +127,7 @@ never rerun business implementation or invent a missing READY/REVIEWED handoff.
   build submission, including for canary packages, never completed deployment,
   publication, actual checkout SHA or an invented package version.
 - `STANDARD` requires either a complete in-memory `ValidatedWikiDraft` with
+  current change/impact/document coverage, checked before any delivery write,
   `terminal_state=VALIDATED`, its full rendered Markdown and calculated minimal
   patch or new-page body, an auto-resolved
   `REUSE_EXISTING|CREATE_CHILD|CREATE_MONTH_AND_CHILD` target plan, exact
@@ -159,6 +161,10 @@ never rerun business implementation or invent a missing READY/REVIEWED handoff.
 - `NO_WIKI` requires `SKIPPED_BY_POLICY`; every Wiki and Wiki-comment operation
   is omitted. It still requires Git delivery, deployment resolution, and
   applicable TAPD registration/readbacks.
+- A Wiki update or valid link does not prove scope or impact correctness. Both
+  remain separately reviewed, including manual and continuation changes. Fix
+  stale content in the matching entry; do not merely append an already-listed
+  page name. NO_WIKI exempts only document operations, not these code checks.
 - A `STANDARD` `SKIPPED_BY_POLICY` result is allowed only for a proven
   non-functional `CONTINUE` with a verified existing owner page/current entries
   and exact retained readback; it omits Wiki and Wiki-comment writes while still

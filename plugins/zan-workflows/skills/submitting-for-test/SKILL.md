@@ -28,6 +28,7 @@ Execute exactly one profile:
   test registration; never load or invoke Wiki capability.
 
 Read [contracts.md](references/contracts.md),
+[change consistency](../../references/change-consistency.md),
 [submission-rules.md](references/submission-rules.md),
 [deployment-and-confirmation.md](references/deployment-and-confirmation.md), plus the shared
 [tool-routing policy](../../references/tool-routing.md) before writing.
@@ -165,6 +166,9 @@ requires a refreshed confirmation. Never rebuild on the test target or use
 1. For each repository row, re-read repository, original source branch/SHA,
    confirmed test-target ref/SHA, current diff and commits. Verify they match
    that row's reviewed change and contain no unrelated paths.
+   Match the full pending delivery and continuation delta to the approved
+   behavior, impact and verification facts. Stale evidence reopens affected
+   checks before any delivery write, including developer edits on the same page.
 2. Resolve `deployment_mode` per repository and, for `DEPLOY`, resolve its exact Jenkins Job,
    test environment, release channel, parameters/version identity, and purpose
    through workspace project knowledge and release-safety rules.
@@ -179,8 +183,12 @@ requires a refreshed confirmation. Never rebuild on the test target or use
    do not start an independent Wiki search in this skill.
 4. Build one consolidated `SubmissionPlan` containing each
    repository's Git/target/deployment selection, applicable shared Wiki/comment
-   actions, and one final TAPD registration for the Bug. Existing per-project
-   handoffs retain their original structure; no new workflow ledger is needed.
+   actions, and one final TAPD registration for the Bug.
+   MR descriptions include accurate work-item links, actual change/impact and
+   any already-verified Wiki link under the shared change-consistency rules.
+   A first submission with no page yet uses the work-item link for later
+   discovery; do not invent a Wiki URL or mutate an existing MR without authority.
+   Existing per-project handoffs retain their original structure; no new workflow ledger is needed.
    Preview registration to automatically resolve actual state labels,
    transitions, required-field values and native/custom test-version mapping.
    For a Bug, show `TAPD 状态：待测试（提测交付完成后流转）` under 合并与测试环境,

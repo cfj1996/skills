@@ -73,5 +73,10 @@ Zan 合规只运行项目声明的命令。命令不存在、无法执行、输�
 - `unresolvedDiscussions` 必须明确为 `false` 才通过。
 - `zanStatus` 使用上表四种状态；只有 `adopted` / `not-adopted` 可继续，
   且 `adopted` 还要求 `zanMust = pass`。
+- `changeReview` 和当前只读事实 `currentChange` 遵循
+  [变更与文档一致性](../../../references/change-consistency.md)；绑定 source/target SHA、
+  实际范围文档/当前 Wiki 条目指纹，并包含有证据的 scope/impact/documentation 结论。
+  这项对所有模式适用，省略、unknown、fail 或过期绑定都不能放行。明确文档豁免仅
+  免除文档要求，不免除范围与影响核对。
 
-省略字段仍使用脚本的原有默认值；调用方必须先核实项目门禁，不能用默认值替代未知证据。
+其余省略字段沿用脚本默认值；调用方必须先核实项目门禁，不能用默认值替代未知证据。

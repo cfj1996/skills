@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 
 import { StdioMcpClient } from '../../../scripts/mcp-client.mjs';
-import { wikiEntry } from '../../../scripts/wiki-entry.mjs';
+import { assertWikiEntryUpdate, wikiEntry } from '../../../scripts/wiki-entry.mjs';
 import { repositoryKey } from '../../../scripts/workflow-runtime.mjs';
 export { StdioMcpClient } from '../../../scripts/mcp-client.mjs';
 const DEFAULT_ROOT_WIKI_ID = '1150372234001008260';
@@ -20,7 +20,7 @@ export function parseArgs(argv) {
     '--creator', '--comment-author', '--body-file', '--wiki-title',
     '--month', '--root-wiki-id', '--expect-target', '--expected-month-id',
     '--expected-wiki-id', '--expected-body-sha256', '--mode', '--entry-heading', '--entry-repo-url',
-    '--expected-owner-type', '--expected-owner-id', '--execute', '--json',
+    '--expected-owner-type', '--expected-owner-id', '--entry-updates', '--execute', '--json',
   ]);
   for (let i = 0; i < argv.length; i++) {
     const key = argv[i];
@@ -81,7 +81,13 @@ export function parseArgs(argv) {
     throw new Error('link 模式必须指定 --expected-wiki-id，且不能提供 --body-file');
   }
   if (values['--mode'] === 'update' && !values['--expected-wiki-id']) throw new Error('update 模式必须指定 --expected-wiki-id');
+  let entryUpdates;
+  if (values['--entry-updates']) {
+    try { entryUpdates = JSON.parse(values['--entry-updates']); }
+    catch { throw new Error('entry-updates 必须是条目数组 JSON'); }
+  }
   validateSelectors({ entryHeading: values['--entry-heading'], entryRepoUrl: values['--entry-repo-url'],
+    sourceBranch: values['--source-branch'], entryUpdates,
     expectedOwnerType: values['--expected-owner-type'], expectedOwnerId: values['--expected-owner-id'] });
   return {
     workspaceId: Number(values['--workspace-id']),
@@ -100,6 +106,7 @@ export function parseArgs(argv) {
     expectedBodySha256: values['--expected-body-sha256']?.toLowerCase(),
     mode: values['--mode'] || 'ensure',
     entryHeading: values['--entry-heading'], entryRepoUrl: values['--entry-repo-url'],
+    entryUpdates,
     expectedOwnerType: values['--expected-owner-type'], expectedOwnerId: values['--expected-owner-id'],
     execute: Boolean(values['--execute']),
     json: Boolean(values['--json']),
@@ -321,6 +328,18 @@ function branchEntryCount(body, sourceBranch, selector) {
 function validateSelectors(input) {
   if (input.entryHeading && !input.entryRepoUrl) throw new Error('项目条目标题必须同时提供仓库');
   if (input.entryRepoUrl) repositoryKey(input.entryRepoUrl);
+  if (input.entryUpdates !== undefined) {
+    if (!input.entryRepoUrl || !Array.isArray(input.entryUpdates) || !input.entryUpdates.length
+        || input.entryUpdates.some(item => !item || typeof item !== 'object'
+          || !/^(feature|fixbug)\/[^\s]+$/.test(item.sourceBranch || '') || !item.entryRepoUrl)) {
+      throw new Error('entryUpdates 必须包含准确仓库和原分支，且主条目必须有仓库');
+    }
+    const keys = input.entryUpdates.map(item => `${repositoryKey(item.entryRepoUrl)}\n${item.sourceBranch}`);
+    if (new Set(keys).size !== keys.length
+        || !keys.includes(`${repositoryKey(input.entryRepoUrl)}\n${input.sourceBranch}`)) {
+      throw new Error('entryUpdates 必须覆盖当前条目且不能重复');
+    }
+  }
   if ((input.expectedOwnerType || input.expectedOwnerId) &&
       (!['stories', 'tasks', 'bug'].includes(input.expectedOwnerType) || !/^\d+$/.test(String(input.expectedOwnerId || '')))) {
     throw new Error('Wiki 归属必须成对提供准确的类型和 ID');
@@ -510,6 +529,15 @@ export async function ensureTestWiki(call, input, now = new Date()) {
   if (child && typeof beforeBody !== 'string') throw new Error('已有 Wiki 缺少可验证的 Markdown 正文');
   const beforeBodySha256 = child ? contentHash(beforeBody) : null;
   const wikiOperation = child ? (approvedBody !== undefined && approvedBody !== beforeBody ? 'UPDATE' : 'NONE') : 'CREATE';
+  if (wikiOperation === 'UPDATE' && entryOperation === 'REUSE_ENTRY' && !input.entryRepoUrl
+      && /^[1-9]\d*[.、]\s*\S/m.test(beforeBody)) {
+    throw new Error('更新规范 Wiki 条目必须提供 entryRepoUrl，不能仅凭分支修改整页');
+  }
+  if (wikiOperation === 'UPDATE' && entryOperation === 'REUSE_ENTRY' && input.entryRepoUrl) {
+    assertWikiEntryUpdate(beforeBody, approvedBody, (input.entryUpdates || [input]).map(item => ({
+      entryHeading: item.entryHeading, sourceBranch: item.sourceBranch, originUrl: item.entryRepoUrl,
+    })));
+  }
   const linkTargets = mode === 'update' ? [] : mode === 'link' ? [current]
     : [owner, ...(owner === current ? [] : [current])];
   const commentOperations = linkTargets.map(work => ({ entryType: work.entryType, entryId: work.entryId,

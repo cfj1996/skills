@@ -490,3 +490,17 @@ all delivered items to that page and finish registration. Same-owner Wiki
 writes are serial; later plans use the actual resulting body hash. Repeated
 calls do not duplicate the page/comments. An old CREATE_CHILD plan cannot be
 executed after the common owner already links a page.
+
+For a canonical REUSE_ENTRY update, `entryRepoUrl` is required. The helper
+allows corrections inside the selected existing entry and rejects changes to
+other entries or surrounding text. A confirmed multi-project update may pass
+`entryUpdates` (`--entry-updates` JSON array), listing each existing entry's
+`entryRepoUrl`, `sourceBranch` and optional `entryHeading`, including the primary
+entry. Complete every included project's delivery gates before the one write.
+The full body hash still guards write/readback; `wiki-entry.mjs`'s
+`wikiReviewHash` is only for scoped review freshness, not write authorization.
+
+Managed MR review calls `review-policy.mjs evaluate-merge` with `changeReview`
+and freshly collected `currentChange` under [change consistency](change-consistency.md).
+Omitting these new inputs fails closed; migrate callers instead of treating an
+old code-only pass as a complete review. No new local evidence files are needed.

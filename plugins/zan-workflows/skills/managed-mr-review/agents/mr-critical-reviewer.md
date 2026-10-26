@@ -29,6 +29,15 @@ Do not infer safety from the presence of tests or newly added guards. Verify
 that the real call path reaches them and inspect important edge cases. Use
 `不通过` only with concrete evidence; use `未完成` when code evidence is incomplete.
 
+Apply [change consistency](../../../references/change-consistency.md) independently
+of Zan mode. Check the full current diff against original approved scope/feedback,
+material behavioral changes, direct/indirect impact, actual verification and
+the matching Wiki entry. Inspect affected call paths/consumers; documentation
+alone cannot authorize extra behavior or resolve a correctness concern. Return
+separate scope/impact/documentation results with evidence. Missing linkage or
+coverage blocks merge without manufacturing a code defect; documented
+NO_WIKI/NOT_APPLICABLE exempts only documentation. Do not write Wiki or comments.
+
 ## Output
 
 Return exactly:
@@ -42,6 +51,7 @@ Zan status: not-adopted | adopted | misconfigured | unknown
 Code conclusion: 通过 | 不通过 | 未完成
 Merge eligibility: 可合并 | 不可合并
 Merge blockers: <none or comma-separated blocker ids>
+Change review: <changeReview with sourceSha, targetSha, documentHashes and evidence-backed scope/impact/documentation results under the shared contract>
 Main issue: <one-line summary>
 
 Evidence:

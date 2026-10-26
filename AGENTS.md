@@ -68,6 +68,10 @@ use in-memory task/field/member fixtures and perform no external writes.
 They also verify that execution briefs cannot bypass formal
 Plan Task readiness, owner readbacks or step bindings. The Python suite covers
 implementation-only Bug routing and conditional submission preparation.
+The same task-breakdown suite covers scope/reuse/increment evidence, independent
+estimate-review freshness, shared-cost deduplication, read-only estimate previews,
+retained historical hours and metadata-only updates. Review receipts and source
+facts are simulated; no real Task or review is created by these tests.
 
 For the approved pending-merge Wiki patch, shared-page entry isolation,
 permission handoff, readback failure and workflow-session write barriers, run
@@ -108,6 +112,11 @@ process-group memory, cancellation, bounded output, output-channel failure and d
 They perform no external calls or writes. The complete Node suite includes them.
 The helper's scope and budgets are documented in
 `plugins/zan-workflows/references/local-verification.md`.
+
+For actual-change scope/impact/documentation merge gates, revision freshness,
+same-page continuation corrections and shared Wiki entry preservation, run
+`node --test plugins/zan-workflows/tests/change-consistency.test.mjs plugins/zan-workflows/tests/shared-test-wiki.test.mjs`.
+These checks use in-memory evidence and simulated TAPD responses, with no external writes.
 
 ## Coding Style & Naming Conventions
 

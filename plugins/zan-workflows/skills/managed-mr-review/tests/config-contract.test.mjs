@@ -11,6 +11,12 @@ const knowledgeRoot = process.env.PROJECT_KNOWLEDGE_ROOT
   : null;
 
 const read = (file) => readFile(file, 'utf8');
+const currentChange = { sourceSha: 'a'.repeat(40), targetSha: 'b'.repeat(40), documentHashes: {} };
+const reviewBinding = { currentChange, changeReview: { ...currentChange,
+  scope: { status: 'pass', evidence: ['维护范围与当前 diff 一致'] },
+  impact: { status: 'pass', evidence: ['已检查实际影响及验证'] },
+  documentation: { status: 'not-required', exemption: 'NOT_APPLICABLE', evidence: ['非提测维护'] },
+} };
 
 const readIfPresent = async (file) => {
   try {
@@ -135,6 +141,7 @@ test('valid declared adoption enables Zan-enhanced review', () => {
 
 test('missing pipeline is informational unless the project requires it', () => {
   const ordinary = evaluateMergeReadiness({
+    ...reviewBinding,
     codeReview: 'pass',
     safety: 'pass',
     mergeability: 'mergeable',
@@ -145,6 +152,7 @@ test('missing pipeline is informational unless the project requires it', () => {
   assert.deepEqual(ordinary, { mergeAllowed: true, blockers: [] });
 
   const required = evaluateMergeReadiness({
+    ...reviewBinding,
     codeReview: 'pass',
     safety: 'pass',
     mergeability: 'mergeable',
@@ -157,6 +165,7 @@ test('missing pipeline is informational unless the project requires it', () => {
 
 test('Zan governance and code findings remain independent merge blockers', () => {
   const result = evaluateMergeReadiness({
+    ...reviewBinding,
     codeReview: 'pass',
     safety: 'pass',
     mergeability: 'mergeable',
@@ -166,6 +175,7 @@ test('Zan governance and code findings remain independent merge blockers', () =>
 });
 
 const passingReview = {
+  ...reviewBinding,
   codeReview: 'pass',
   safety: 'pass',
   mergeability: 'mergeable',

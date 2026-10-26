@@ -63,6 +63,15 @@ When the submitted change or delivery dependencies involve a tooling package,
 read [tooling-latest.md](references/tooling-latest.md) before preparing the
 complete checklist. It owns package/consumer ordering and final latest checks.
 GitLab operations use `gitlab-mcp`; Wiki operations use `tapd-mcp`.
+
+Before DELIVER, apply [change consistency](../../references/change-consistency.md)
+to the current full default-target diff, submitted scope and applicable Wiki.
+Refresh only invalidated reviews/verification and stage-specific conditions;
+unsubmitted behavioral changes return to the affected review/submission steps.
+A status-only Wiki patch cannot repair missing scope/impact documentation.
+Include verified work-item and existing Wiki links in the authorized default-target
+MR description. NO_WIKI retains its original read/write exemption. This check
+does not turn CLEANUP into another development or Wiki workflow.
 Confirmed local cleanup uses only ordinary local Git CLI commands described
 below.
 

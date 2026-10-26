@@ -319,3 +319,59 @@ test('appending another project cannot replace the page with only its own entry'
   });
   assert.equal(f.writes().length, 0); assert.equal(f.wikis.get(wikiId).markdown_description, bodyA);
 });
+
+test('continuation revises same-page content, impact and verification without touching sibling entries', async () => {
+  const f = fixture();
+  const before = `${bodyA.replace('- 影响范围：', '- 内容：原查询行为\n- 影响范围：')}\n${entry(2, repoB, branchA)}\n# 后端\n保留其他团队说明\n`;
+  f.putWiki(before); f.link('stories', story); f.link('tasks', taskA);
+  const plan = await ensureTestWiki(f.call, input());
+  const after = before.replace('内容：原查询行为', '内容：限制当前门店查询并保留空列表提示')
+    .replace('1. 保留当前项目范围', '1. 当前页面及共用查询方法\n- 验证结果：门店隔离、空列表已验证');
+  await withBody(after, async bodyFile => {
+    const result = await ensureTestWiki(f.call, { ...input(), ...binding(plan), bodyFile });
+    assert.equal(result.wikiState, 'UPDATED'); assert.equal(result.wikiId, wikiId);
+    assert.equal(result.bodySha256, contentHash(after));
+  });
+  assert.equal(f.wikis.get(wikiId).markdown_description, after);
+  assert.deepEqual(f.writes().map(c => c.name), ['update_wiki']);
+});
+
+test('shared continuation refuses unselected-entry changes and accepts an explicitly bound batch', async () => {
+  const before = `${bodyA}\n${entry(2, repoB, branchA)}\n${entry(3, 'https://git.example.com/team/other.git', branchB)}`;
+  const after = before.replaceAll('保留当前项目范围', '新的查询行为和影响');
+  const f = fixture(); f.putWiki(before); f.link('stories', story); f.link('tasks', taskA);
+  const plan = await ensureTestWiki(f.call, input());
+  const entryUpdates = [{ entryRepoUrl: repoA, sourceBranch: branchA }, { entryRepoUrl: repoB, sourceBranch: branchA }];
+  await withBody(after, async bodyFile => {
+    await assert.rejects(ensureTestWiki(f.call, { ...input(), ...binding(plan), bodyFile }), /保留其他/);
+    await assert.rejects(ensureTestWiki(f.call, { ...input(), ...binding(plan), bodyFile, entryUpdates }), /保留其他/);
+    assert.equal(f.writes().length, 0);
+  });
+  const selectedAfter = before.replace(bodyA, bodyA.replace('保留当前项目范围', '当前门店查询'))
+    .replace(entry(2, repoB, branchA), entry(2, repoB, branchA).replace('保留当前项目范围', '共用筛选方法'));
+  await withBody(selectedAfter, async bodyFile => {
+    await assert.rejects(ensureTestWiki(f.call, { ...input(), ...binding(plan), bodyFile,
+      entryUpdates: [entryUpdates[1]] }), /覆盖当前条目/);
+    await assert.rejects(ensureTestWiki(f.call, { ...input(), ...binding(plan), bodyFile,
+      entryUpdates: [entryUpdates[0], entryUpdates[0]] }), /不能重复/);
+    const result = await ensureTestWiki(f.call, { ...input(), ...binding(plan), bodyFile, entryUpdates });
+    assert.equal(result.wikiState, 'UPDATED'); assert.equal(f.writes().length, 1);
+    assert.equal(f.wikis.get(wikiId).markdown_description, selectedAfter);
+  });
+});
+
+test('canonical continuation cannot bypass repository selection and entryUpdates CLI validation', async () => {
+  const f = fixture(); f.putWiki(); f.link('stories', story);
+  const plan = await ensureTestWiki(f.call, input());
+  await withBody(bodyA.replace('保留当前项目范围', '修订当前行为'), async bodyFile => {
+    await assert.rejects(ensureTestWiki(f.call, { ...input(), ...binding(plan), entryRepoUrl: undefined, bodyFile }), /entryRepoUrl/);
+    assert.equal(f.writes().length, 0);
+  });
+  const argv = ['--workspace-id', String(workspaceId), '--entry-type', 'tasks', '--entry-id', taskA,
+    '--source-branch', branchA, '--entry-repo-url', repoA];
+  const entryUpdates = [{ entryRepoUrl: repoA, sourceBranch: branchA }];
+  assert.deepEqual(parseArgs([...argv, '--entry-updates', JSON.stringify(entryUpdates)]).entryUpdates, entryUpdates);
+  for (const value of ['null', '{}', '[]', 'not-json']) {
+    assert.throws(() => parseArgs([...argv, '--entry-updates', value]), /entryUpdates|entry-updates/);
+  }
+});

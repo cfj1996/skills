@@ -49,11 +49,13 @@ For selected TAPD Tasks, place a three-column `序号 | 标题 | 工时` table b
 use stable `#F01`/`#F02` display indexes, distinct from detail `#01` and model
 feature IDs. Preserve actual Task key/ID and Plan-step bindings internally;
 the display indexes neither alter the model nor require new Tasks/estimates.
-Prefix titles with the current operation 【新建】/【复用】/【调整】. Distinguish
-the Task's original/proposed full estimate from evidence-based remaining work
-in the same hours cell. Show only the Task list, with no totals, subtotals or
-missing-value counts. Follow the shared checklist's unknown-value rules; predictions do
-not overwrite Task estimates, add model fields or trigger date scheduling.
+Prefix titles with the current operation 【新建】/【复用】/【调整】. Display only
+one `N 小时` per hours cell, without estimate/remaining labels, multiple values
+or before/after arrows. CREATE/UPDATE uses the confirmed final Task value;
+REUSE uses its verified readback. Keep old values and remaining predictions
+internal. Show only the Task list, with no totals, subtotals or missing-value
+counts. Follow the shared checklist's unknown-value rules; predictions do not
+overwrite Task estimates, add model fields or trigger date scheduling.
 The checklist summarizes the same Plan content; it does not create a second
 detail artifact. Long scope/approach/acceptance/decision cells use “详见下方 #01”
 with a useful summary. Below the table, use only `### #01`, `### #02` headings,
@@ -270,13 +272,17 @@ in-app Browser 打开；本地文件才启动临时 loopback 服务。使用运�
 TAPD 需求交接复用 `breaking-down-requirement` 的
 [任务与 Plan 契约](../breaking-down-requirement/references/contracts.md)。
 `SCOPE_REVIEW` 只输出稳定模块/功能编号和拆分依据，不创建任务。
+需要 Task 工时评估时，同一范围交接提供实际责任/排除项、准确源码基准、已核实的
+复用能力及适配/新增差异、必要验证和具体风险，按
+[增量工时规则](../breaking-down-requirement/references/effort-estimation.md) 交任务模块
+估算并独立评审。不能按页面数或整个需求名称预填工时，不要求开发前就有未来 MR。
 需要新建任务时交给该模块确认并执行，工具统一指向共享
 [TAPD 任务创建路由](../../references/tool-routing.md#tapd-任务创建) 的
 `create_task`/`create_tasks`；本技能只消费其结果，不直接创建或补建任务。
 `PLAN_WRITE` 内部接收 `TaskBreakdownResult`：每个 Task 有真实 ID、经核实人员、
 内部估算数据、最终预计工时、依赖及验收，并经过准确读回。对话、确认和
-Plan 正文仅展示对外最终任务预估及有依据的本轮剩余预测，不展示计算系数、
-内部原始值、公式或折算前后对比；两类工时按共享清单规范分开，不替换模型中的任务预估。
+Plan 正文的工时只展示一个 `N 小时`，不加预估/剩余标签，不展示多组时间、
+计算系数、内部原始值、公式或折算前后对比。内部剩余预测不替换模型中的任务工时。
 以一个页面/模块一份 Plan，同一 Plan 可包含多个 Task；实施步骤用
 `tapdTaskKey` 归属一个 Task。不要把步骤编号 `T-*` 当成 TAPD Task ID。
 
@@ -286,11 +292,13 @@ Plan 正文仅展示对外最终任务预估及有依据的本轮剩余预测，
 `taskBreakdown`，由现有校验器调用任务校验
 验证真实 ID 读回、人员/工时、项目/模块归属和功能覆盖；字段不在 JSON
 台账持久化。Markdown 用关联表和每步归属表达同一事实。
-TAPD 模型进入可实施及后续状态时，缺少就绪任务会被校验器拒绝。
+TAPD 模型进入可实施及后续状态时，缺少就绪任务会被校验器拒绝；新估算的独立评审
+缺失或过期同样不能用 Plan 保存、用户确认或 Task 写入成功绕过。
 
 Plan 提供任务顺序、已确认工时、依赖与验收，不要求开发起止日期。仅用户
 明确要求排期时才读取 [实施排期推荐](../implementing-work/references/implementation-schedule.md)，
-结合剩余工作量和人员容量展示；未明确要求写入时保留在对话中。没有排期
+内部结合剩余工作量和人员容量计算日期，对外任务工时仍只显示一个 `N 小时`；
+未明确要求写入时仅展示推荐日期，不写外部状态。没有排期
 日期不阻塞 Plan 或任务创建。
 
 单独编写非 TAPD Plan 无需任务写入。对 TAPD 请求，仅请求 Plan 或尚无任务创建确认时，

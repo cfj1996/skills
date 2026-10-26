@@ -1,6 +1,6 @@
 ---
 name: managed-mr-review
-description: Use when the user asks to find, review, or remotely merge open GitLab MRs for governed company repositories, using ordinary review for projects not adopted into Zan and additional Zan conformance gates only for adopted projects.
+description: Use when the user asks to find, review, or remotely merge open GitLab MRs for governed company repositories, checking implementation scope, impact and linked test Wiki alongside ordinary review, with additional Zan gates only for adopted projects.
 ---
 
 # 管辖项目 MR 审核
@@ -52,6 +52,8 @@ description: Use when the user asks to find, review, or remotely merge open GitL
 
 - `代码结论`：`通过`、`不通过`、`未完成`，只由 diff、调用链、运行/测试证据和可复现问题决定。
 - `合并资格`：`可合并`、`不可合并`，由代码结论、安全、mergeability、项目明确要求的 pipeline/approval/discussion 门禁，以及适用时的 Zan 门禁共同决定。
+- 范围、影响与文档一致性也是独立合并条件，按下文统一计算；文档漏记本身不改写
+  代码结论。确认代码缺陷才判代码不通过，关键正确性证据不足才判未完成。
 - `pipeline = none` 只是“未观察到 pipeline”。除非项目或 GitLab 规则明确要求 pipeline，否则不能单独阻断。
 - 后端/YApi 契约不可见时，只在它确实导致关键正确性无法判断时将代码结论标为 `未完成`；不得把所有接口改动一律暂缓。
 
@@ -142,6 +144,26 @@ description: Use when the user asks to find, review, or remotely merge open GitL
 - 公共缺口与读取时间。
 
 每个 MR 再生成绑定 HEAD SHA 的 review packet，包含 diff、changed files、提交历史、pipeline、discussion、approval 和 mergeability。Reviewer 优先消费 packet，不重复加载 workspace 规则、项目路由、公共配置和无差异的标准资源。知识中的实现线索必须在该 MR HEAD 的源码核验；版本未知、范围不明或未命中不能证明代码缺陷或功能不存在。Hub 不可用本身不阻断审核，有等价证据时继续；关键代码证据仍不足时按现有规则标记 `未完成`。
+
+### 需求范围、影响和 Wiki 核对
+
+对 ordinary 和 zan-enhanced 都应用 [变更与文档一致性](../../references/change-consistency.md)。
+主代理只读获取 MR 描述/讨论中的准确 TAPD/Wiki 链接，经 TAPD 核实工作项、Task 父需求、
+Wiki 归属及当前仓库/原分支条目；无直接链接时沿准确工作项详情/评论追溯已有页。
+缺失/冲突报告具体缺口，不按相似标题/分支名猜测，不在 Review 中新建或修订 Wiki。
+同 MR 多工作项逐项核对；共享 Wiki 只评审当前及实际相关条目。
+
+packet 增加已确认范围/反馈来源、当前完整 diff、重要行为变化及影响/验证、适用 Wiki
+正文与条目标识/指纹、文档适用性和缺口。普通和高风险 reviewer 都独立返回
+`changeReview` 的 scope、impact、documentation 及具体 evidence，不能以 Wiki 声明
+替代范围批准，不能以目录/行数小推断无影响。已批准的必要技术调整允许有明确理由。
+缺少 Wiki 不等于不适用；明确 NO_WIKI 或非提测维护才可凭依据豁免文档检查。
+
+主代理用当前 source/target SHA 和所需范围文档/条目的指纹形成 `currentChange`，
+将其与 reviewer 的 `changeReview` 及既有检查传给
+`scripts/review-policy.mjs evaluate-merge`。缺项、fail、unknown 或版本变化均阻止
+可合并结论；在现有报告中列 `change-scope`、`change-impact`、`change-documentation`
+及对应 unknown/stale 阻断。评审完成后补文档只重新核对相关覆盖，不能解除其他阻断。
 
 管辖配置、Adoption、标准原文、分支 SHA 和 GitLab 实时门禁仍从现有权威来源精确读取；`KnowledgeContext` 不替代这些检查。缺少知识时向统一入口补查，不要求 reviewer 重跑全部 preflight。
 
@@ -258,6 +280,9 @@ description: Use when the user asks to find, review, or remotely merge open GitL
 
 - **安全二次校验**：源分支不能是 `develop`，且提交历史中不能包含 `develop` 的合并记录。
 - 最新 HEAD SHA 必须与审核时记录的 SHA 一致；如果变了，停止合并该 MR 并标记为 `暂缓：审核后有新提交，需重新审核`。
+- 重新读取目标 SHA、范围依据和相关 Wiki 条目，更新 `currentChange` 并再次执行
+  evaluate-merge；绑定变化先核对并刷新受影响检查。整页的无关项目/业务合并状态
+  变化不自动使代码评审失效，写入防覆盖仍按整页指纹处理。
 - 目标分支仍必须是 `master` 或 `main`。
 - 状态仍必须是 open。
 - 结论必须是 `通过`。

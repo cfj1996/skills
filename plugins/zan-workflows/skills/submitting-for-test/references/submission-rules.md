@@ -73,6 +73,12 @@ to one owner Story/Bug page across projects, branches and child Tasks. One
 shared body/target is planned for a batch; project plans cannot silently split
 it into Task-titled pages. Preserve separate repository/branch entries.
 
+Apply [change consistency](../../../references/change-consistency.md) before
+delivery writes: the final reviewed behavior, impact and verification must be
+covered by the draft. Continuations revise stale current-entry content instead
+of only appending module names. NON_FUNCTIONAL may skip only when the retained
+entry remains materially accurate; NO_WIKI still preserves scope/impact checks.
+
 Give current work handoffs—not a user-supplied Wiki URL—to
 `zan-workflows:drafting-wiki`. Require `terminal_state=VALIDATED` and one target
 plan, or `terminal_state=SKIPPED_BY_POLICY` with

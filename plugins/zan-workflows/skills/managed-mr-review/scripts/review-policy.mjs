@@ -1,4 +1,5 @@
 import { fileURLToPath } from 'node:url';
+import { evaluateChangeConsistency } from '../../../scripts/change-consistency.mjs';
 
 const DOCUMENT_STATES = new Set(['missing', 'present', 'valid', 'invalid', 'unreadable', 'unknown']);
 
@@ -86,6 +87,8 @@ export function evaluateMergeReadiness({
   approval = 'not-required',
   zanStatus = 'not-adopted',
   zanMust = 'not-applicable',
+  changeReview,
+  currentChange,
 } = {}) {
   const blockers = [];
 
@@ -105,6 +108,7 @@ export function evaluateMergeReadiness({
   if (!['approved', 'not-required'].includes(approval)) blockers.push('approval');
   if (!['adopted', 'not-adopted'].includes(zanStatus)) blockers.push('zan-governance');
   if (zanStatus === 'adopted' && zanMust !== 'pass') blockers.push('zan-must');
+  blockers.push(...evaluateChangeConsistency(changeReview, currentChange).blockers);
 
   return {
     mergeAllowed: blockers.length === 0,
