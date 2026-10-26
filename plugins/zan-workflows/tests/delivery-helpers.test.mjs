@@ -1,8 +1,10 @@
+import { fixtureMergeReviewedBranch as mergeReviewedBranch } from './helpers/mock-safety-fixture.mjs';
+import { fixtureRunJenkinsRelease as runJenkinsRelease } from './helpers/mock-safety-fixture.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Readable } from 'node:stream';
-import { mergeReviewedBranch } from '../scripts/merge-reviewed-branch.mjs';
-import { checkReleaseSource, runJenkinsRelease } from '../scripts/run-jenkins-release.mjs';
+import { mergeReviewedBranch as originalMergeReviewedBranch } from '../scripts/merge-reviewed-branch.mjs';
+import { checkReleaseSource, runJenkinsRelease as originalRunJenkinsRelease } from '../scripts/run-jenkins-release.mjs';
 import { createJenkinsReader } from '../scripts/jenkins-readonly.mjs';
 import { pollState, readCliPlan, repositoryKey, toolData } from '../scripts/workflow-runtime.mjs';
 

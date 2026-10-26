@@ -35,6 +35,15 @@ technical adjustment is not automatically out of scope. Only an evidenced
 NO_WIKI/NOT_APPLICABLE may exempt documentation; NO_WIKI does not waive other
 required documentation. Never repair documentation yourself.
 
+Apply [Mock production gates](../../../references/mock-development.md) independently
+of Zan adoption and ordinary pipeline state. Check the full source/target diff,
+reachable runtime imports, same Plan/brief Mock inventory, stable IDs/paths and
+actual real replacement, exit and build-exclusion evidence. Disabled switches,
+retired labels or absent fields do not prove no Mock. Isolated repository-only
+development fixtures may retain their markers with verified exclusion. Report
+missing/current-source evidence as `mock-safety`, not as a Zan exception; the lead
+must rerun the shared source/content checker before any approval or merge.
+
 ## Review Priorities
 
 Apply [the shared review checklist](../references/review-checklist.md): cover

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "deliveryUnit": {
     "id": "UNIT-001",
     "kind": "page",
@@ -114,5 +114,22 @@
       "locator": "#login-form"
     }
   ],
-  "reviewBatches": []
+  "reviewBatches": [],
+  "externalDependencies": [],
+  "mockModules": [],
+  "dependencyReview": {
+    "status": "reviewed",
+    "evidenceRefs": [
+      "E-001"
+    ]
+  },
+  "executionScope": {
+    "stage": "implementation",
+    "featureRefs": [
+      "F-001"
+    ],
+    "taskRefs": [
+      "T-001"
+    ]
+  }
 }

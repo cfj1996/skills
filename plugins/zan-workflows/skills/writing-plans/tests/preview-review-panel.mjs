@@ -13,6 +13,9 @@ const watchedFiles = [
   "tests/fixtures/panel-preview.html",
   "tests/fixtures/review-session.json",
   "tests/fixtures/module-review-session.json",
+  "tests/review-panel-browser.assertions.js",
+  "tests/module-review-browser.assertions.js",
+  "tests/review-wake-browser.assertions.js",
 ].map((path) => resolve(skillRoot, path));
 
 const contentTypes = {

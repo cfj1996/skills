@@ -30,12 +30,25 @@ not a new persisted schema or a queue of unrelated work items.
 | Change | concise summary and exact diff reference available in the current execution |
 | Change consistency | per material behavior: approved basis, actual added/changed/removed behavior and diff/call-path evidence, direct/indirect impact, verification/gaps and documentation correction needed; full pending-delivery baseline and last-reviewed delta, including manual edits, under [shared rules](../../../references/change-consistency.md) |
 | Verification | each relevant command, exit status, concise result, and any blocker |
+| External data and Mock | same Plan/brief external dependency records and selected stage/steps; source evidence, stage-specific blockers and stable Mock inventory/paths/scenarios/real-call boundary; current source/diff fingerprints, Mock and real verification limits, and actual retirement evidence when applicable |
 | Schedule (only when requested) | optional `scheduleRecommendation`: remaining effort, owner capacity/source, dependencies, proposed dates or conditional workday window, assumptions/risks and `writeState=NOT_WRITTEN`; grants no date/status write authority |
 | Review | `REVIEW_PASSED|REVIEW_FAILED|NOT_RUN` and normalized reason |
 | Bug repair record | Bug only: exact item/comment account, matching record authorization, created/reused comment IDs and bodies/readbacks for the current round, introduction evidence or explicit unknowns, and actual repair/verification result; Story/Task is not applicable |
 | Terminal | `REVIEWED|BLOCKED` and blocker when applicable |
 
 ## Invariants
+
+- Business approval, dependency readiness and operation authorization are
+  independent. Apply the shared external-data/Mock standards; `questions=[]`
+  does not prove external dependencies ready. A Mock-only result covers only
+  its approved steps, never future integration or complete Story acceptance.
+  No automatic Task/Plan/branch recreation occurs on contract arrival.
+- Mock test delivery needs current human authorization of the exact inventory,
+  source content, test target/environment, purpose and selected writes before
+  the first delivery mutation. Production cannot carry Mock implementations,
+  fixture/handler/runtime or enablement paths; retired labels and disabled
+  switches do not replace source/artifact proof. This handoff carries evidence,
+  not a new state file or delivery permission.
 
 - [多任务实施](parallel-execution.md) governs dependency batches, unique write
   ownership, shared operations and stopped-writer checks. Delegation is an

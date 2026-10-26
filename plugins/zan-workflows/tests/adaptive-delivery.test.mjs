@@ -1,3 +1,6 @@
+import { fixtureRunJenkinsRelease as runJenkinsRelease } from './helpers/mock-safety-fixture.mjs';
+import { fixtureRegisterTestSubmission as registerTestSubmission } from './helpers/mock-safety-fixture.mjs';
+import { FixtureWorkflowSession as WorkflowSession } from './helpers/mock-safety-fixture.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { mkdtemp, rm, mkdir, symlink } from 'node:fs/promises';
@@ -6,11 +9,11 @@ import { join } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { McpClientPool } from '../scripts/mcp-client.mjs';
-import { WorkflowSession } from '../scripts/workflow-session.mjs';
-import { registerTestSubmission } from '../scripts/register-test-submission.mjs';
+import { WorkflowSession as originalWorkflowSession } from '../scripts/workflow-session.mjs';
+import { registerTestSubmission as originalRegisterTestSubmission } from '../scripts/register-test-submission.mjs';
 import { resolveBugWorkflow, resolveVersionField } from '../scripts/tapd-mappings.mjs';
 import { collectLocalOccupancy, parseOpenFiles, readCodexTasks, readProcessFiles } from '../scripts/collect-local-occupancy.mjs';
-import { releaseRequiredTools, runJenkinsRelease } from '../scripts/run-jenkins-release.mjs';
+import { releaseRequiredTools, runJenkinsRelease as originalRunJenkinsRelease } from '../scripts/run-jenkins-release.mjs';
 import { adaptJenkinsInput, parseNpmToolsPublication } from '../scripts/jenkins-job-adapters.mjs';
 import { createJenkinsReader } from '../scripts/jenkins-readonly.mjs';
 
@@ -252,7 +255,7 @@ function jenkins({ forbidden = false, packageJob = false, modifyIdentity, badPip
     job: async () => modifyIdentity?.() || { fullName: base.jobName, url: base.jobUrl, type: 'pipeline', buildable: true },
     queueIdentity: () => ({ id: 9 }), queue: async () => ({ executable: { number: 10 } }),
     build: async () => ({ queueId: 9, building: false, result: 'SUCCESS', url: base.jobUrl + '10/', actions: [
-      { parameters: Object.entries(params).map(([name, value]) => ({ name, value })) },
+      { parameters: Object.entries(params).map(([name, value]) => ({ name, value: name === 'RELEASE_TYPE' && log.includes('release:canary') ? 'release:canary' : value })) },
       { remoteUrls: [base.sourceRepository], lastBuiltRevision: { SHA1: sha } },
       ...(packageJob ? [{ remoteUrls: [base.pipelineSource.repositoryUrl], lastBuiltRevision: { SHA1: badPipeline ? sha : pipelineSha } }] : []),
     ] }), console: async () => log };
@@ -385,14 +388,14 @@ test('metadata mode still rejects an actual build from the wrong source revision
   assert.equal(fake.calls.some(row => row.name === 'jenkins_get_job_config'), false);
 });
 
-test('npm-tools computes ref and channel from verified pipeline source then reads actual published versions', async () => {
-  const fake = jenkins({ packageJob: true, forbidden: true });
-  const plan = await runJenkinsRelease(fake.call, fake.reader, fake.base, fake.io);
+test('npm-tools computes canary ref/channel from verified pipeline source and reads actual published versions', async () => {
+  const fake = jenkins({ packageJob: true, forbidden: true, log: successLog('release:canary', '1.2.3-canary.1') });
+  const plan = await runJenkinsRelease(fake.call, fake.reader, { ...fake.base, releaseChannel: 'canary', releaseRef: 'develop' }, fake.io);
   assert.equal(plan.versionStrategy, 'PIPELINE_COMPUTED'); assert.equal(plan.refParameter, null);
-  assert.deepEqual(plan.params, { PROJECT_NAME: 'demo', RELEASE_TYPE: 'release:prod' });
+  assert.deepEqual(plan.params, { PROJECT_NAME: 'demo', RELEASE_TYPE: 'release:canary' });
   const result = await runJenkinsRelease(fake.call, fake.reader, { ...plan, execute: true, confirmed: true }, fake.io);
   assert.equal(result.state, 'RELEASED'); assert.equal(result.version, null); assert.equal(result.versionIdentity, sha);
-  assert.deepEqual(result.publishedPackages, [{ name: '@demo/core', version: '1.2.3' }]);
+  assert.deepEqual(result.publishedPackages, [{ name: '@demo/core', version: '1.2.3-canary.1' }]);
 });
 
 test('computed releases cannot widen a package request to project scope or guess a different source branch', async () => {
@@ -408,8 +411,8 @@ test('pipeline drift blocks before trigger and the wrong actual pipeline SHA can
   await assert.rejects(runJenkinsRelease(fake.call, fake.reader, { ...plan, execute: true, confirmed: true },
     { ...fake.io, readPipeline: async () => npmBody + '\nchanged' }), /规则已变化/);
   assert.equal(fake.calls.some(row => row.name === 'jenkins_trigger_build'), false);
-  const wrong = jenkins({ packageJob: true, badPipeline: true });
-  const wrongPlan = await runJenkinsRelease(wrong.call, wrong.reader, wrong.base, wrong.io);
+  const wrong = jenkins({ packageJob: true, badPipeline: true, log: successLog('release:canary', '1.2.3-canary.1') });
+  const wrongPlan = await runJenkinsRelease(wrong.call, wrong.reader, { ...wrong.base, releaseChannel: 'canary', releaseRef: 'develop' }, wrong.io);
   await assert.rejects(runJenkinsRelease(wrong.call, wrong.reader, { ...wrongPlan, execute: true, confirmed: true }, wrong.io), /实际流水线源码/);
 });
 

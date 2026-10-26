@@ -227,6 +227,86 @@ UPDATED_PENDING_MERGE，已有准确批准的待合并正文返回 ALREADY_PENDI
 成对限定准确项目条目；旧的单条目调用保持兼容。它仍要求已确认完整正文和
 原正文指纹，且不读取或写入评论/工作项。
 
+## External dependencies and Mock safety
+
+Apply [external dependencies](external-data-dependencies.md) and [Mock rules](mock-development.md)
+using the same Plan/brief records. Before any selected delivery mutation, run the read-only
+`scripts/mock-safety.mjs` gate, including standalone helpers, daily builds and team MR review.
+NO_WIKI, SKIP, already-waiting registration or Git containment do not waive it.
+
+The helper accepts one JSON request on stdin; do not persist a workflow input/output file.
+`action=inspect` reads the exact repository/origin, base SHA, current source, complete pending
+diff, untracked files and declared runtime/activation paths. Bind `repositoryPath`,
+`sourceRepository`, `baseSha`, `inspectedPaths`, `runtimePaths`, `mockBindingPaths` to the
+actual project. Its zero-write snapshot proves inspected revision/content, not semantic
+absence of every possible Mock: current import/build/activation review evidence remains
+mandatory, and unexplained explicit marker declarations block.
+
+Carry the result with schemaVersion=1, source identity/SHA, scope/content fingerprints,
+paths, evidenceRefs and the original mockModules as `mockSafety` or all `mockSafeties`.
+An explicit evidenced empty inventory is valid; absent/unknown is not. `action=check`
+consumes the safety collection and an exact context (operation, environmentKind,
+targetEnvironment, verified sourceRepository/sourceSha, applicable branch/Job/purpose),
+freshly reads evidence and fails closed. The helper is the authoritative input contract.
+
+Active Mock requires `testAuthorization`: ALLOW, actual human confirmation source,
+scope/inventory fingerprints, approved source SHA, exact test environment/branch/Job,
+purpose and selected operations (git-delivery, test-deploy, test-wiki, test-registration).
+The producer must verify that confirmation really came from the human; confirmed=true
+is insufficient. Reuse only unchanged exact authority. Proved equivalent content and
+containment may mechanically derive new commit/merge identities; content, inventory,
+target or purpose changes reopen affected confirmation.
+
+Merge/release bind to independently verified live source refs; input rows cannot replace
+those SHAs. Shared Wiki/registration require original requiredRepositories and actual
+Git delivery receipts covering every repository/source/test target, not self-reported
+mockRepositories. Preserve unrelated changes without attributing them to this work.
+
+For the standalone Wiki CLI, pass `--mock-safeties` (inspection object array),
+`--required-repositories` (original repository URL string array), and
+`--git-delivery-receipts` (verified Git receipt object array) as JSON arguments,
+along with the exact `--target-branch`, `--target-environment` and `--purpose`.
+Optional `--mock-repositories` cross-checks identities; it cannot replace receipts.
+
+Production checks source exit/build exclusion before default-branch writes. Retained
+isolated development artifacts need actual configuration/content-bound evidence; retired
+status or disabled switches are insufficient. Before official Jenkins trigger, bind
+preDeployMockGate to the exact readable pipeline configuration and a supported unavoidable
+artifact-check-before-publish path. Metadata-only or unsupported control flow blocks until
+a verified adapter exists. Never fabricate a future artifact: verify the exact resulting
+source/Job/queue/build/artifact-bound MOCK_PRODUCTION_GATE receipt after the build. The
+pipeline itself must stop publication on check failure; post-build checking cannot undo
+an already published artifact. Follow the helper's supported pipeline grammar, not an
+invented boolean pass or a literal keyword match.
+
+Jenkins execution also binds `environmentBinding` to the actual Job/parameter hashes,
+environment and channel. Its mapping must be locatable in the freshly read config XML
+or project-policy file, with source hash and evidence; a Job name or test/canary label
+alone cannot prove a test target. Any verified production signal takes precedence.
+Production `preDeployMockGate.checkerEvidence` binds the invoked checker script path,
+repository/revision/content hash and review evidence; a command string merely present
+in XML is insufficient. The supported relative checker command must use the same
+repository and exact release SHA; old-revision or external checker evidence requires
+an explicit pinned-checkout adapter and is otherwise rejected before trigger.
+The currently supported inline grammar is one unconditional stage: deleteDir clears
+the CI workspace, explicit GitSCM checkout binds the exact repository and immutable
+release SHA, and one shell runs the fixed checker-integrity check, `checkCommand`,
+then `deployStep`, joined with ` && `. Optional `buildCommand` comes before integrity
+verification, so build-time replacement cannot change the reviewed checker unnoticed.
+The fixed segment is `sha256sum -- <scriptPath> | grep -Fx -- "<contentHash>  <scriptPath>"`
+(two spaces between hash and path), derived from checkerEvidence with no extra input
+field. The CI agent needs `sha256sum` and `grep`; missing tools or a changed file stop
+the shell before checking or deploying. A branch name or implicit checkout cannot prove execution identity.
+Each field is one command; shell control
+operators inside either command, conditional/parallel/SCM or other unsupported Groovy
+paths block before trigger. Add a verified adapter before using more complex pipelines.
+Read the script from the actual direct `flow-definition/definition` element with
+class `org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition`; XML comments and
+unrelated script nodes cannot substitute for an inline definition. The checker
+command is exactly `node|python3|sh|bash <scriptPath>`, without interpreter options,
+wrappers or extra arguments. A path token in `echo`, `cat` or `node --check` does
+not execute the reviewed checker and must block before triggering Jenkins.
+
 ## Jenkins deployment and package release
 
 `resolve-jenkins-job.mjs` (or session `job` PLAN) resolves an already routed

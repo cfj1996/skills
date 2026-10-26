@@ -16,7 +16,7 @@ test('module contract sanitizes unknown fields and validates the tree before mou
   const input = session();
   input.cards[0].module.privatePath = '/not-allowed';
   const state = createReviewState(input);
-  assert.equal(state.schemaVersion, 2);
+  assert.equal(state.schemaVersion, 3);
   assert.equal(state.cards.length, 3);
   assert.equal(Object.hasOwn(state.cards[0].module, 'privatePath'), false);
   for (const parent of ['M-003', 'missing']) {
@@ -80,6 +80,7 @@ test('submitted rounds are immutable; subsequent changes reject stale results an
   const stale = reduceReviewState(second, { type: 'APPLY_RESULT', ...snapshot, results: [] });
   assert.equal(stale.lastError.code, 'stale-result');
   const omitted = session(); omitted.sessionId = 'omit'; omitted.cards.pop();
+  omitted.externalDependencies = []; omitted.executionScope.featureRefs.pop();
   assert.throws(() => mergeReviewSession(createReviewState(session()), omitted), error => error.code === 'missing-module-update');
 });
 

@@ -49,7 +49,7 @@ class RequirementDevelopmentFlowTests(unittest.TestCase):
 
     def test_checklist_is_shared_and_not_separate_scope_or_branch_approval(self):
         self.assertIn("../../references/execution-checklist.md", SKILL)
-        self.assertIn("| 项目 | 分支 | 交付范围 | 实施方案 | 验收标准 | 待决事项 |", SKILL)
+        self.assertIn("| 项目 | 分支 | 交付范围 | 实施方案 | 验收标准 | 需求待确认 |", SKILL)
         self.assertIn("#01", SKILL)
         self.assertIn("是否按以上确定清单执行？", SKILL)
         self.assertIn("不另问一轮范围或分支", SKILL)
@@ -63,7 +63,7 @@ class RequirementDevelopmentFlowTests(unittest.TestCase):
         self.assertIn("requirement-readiness-checklist.md", SKILL)
         for gate in ["REQUIREMENT_BLOCKER", "IMPLEMENTATION_BLOCKER", "NON_BLOCKING"]:
             self.assertIn(gate, checklist)
-        for field in ["项目/模块", "类别", "检查项", "状态", "当前证据", "责任方", "影响", "门禁", "建议动作"]:
+        for field in ["需求待确认", "外部数据与依赖", "内部实施依据", "本轮阶段与授权", "责任方", "解除条件", "executionScope"]:
             self.assertIn(field, checklist)
         for count in ["requirement_blocker_count=0", "implementation_blocker_count=0"]:
             self.assertIn(count, SKILL)
@@ -110,7 +110,7 @@ class RequirementDevelopmentFlowTests(unittest.TestCase):
         template = re.search(r"```markdown\n(.*?)\n```", template_section, re.S).group(1)
         ordered = ["## 确定清单", "**执行项目名称：**", "**关联需求：**", "**本轮交付：**",
                    "### TAPD 任务", "| 序号 | 标题 | 工时 |", "### 执行内容",
-                   "| 项目 | 分支 | 交付范围 | 实施方案 | 验收标准 | 待决事项 |",
+                   "| 项目 | 分支 | 交付范围 | 实施方案 | 验收标准 | 需求待确认 |",
                    "### 本轮写入事项", "### 合并与测试环境", "**合并到测试分支：**",
                    "**是否需要提测 Wiki：**", "**部署测试环境：**", "### 提测 Wiki 模板预览",
                    "是否按以上确定清单执行？"]

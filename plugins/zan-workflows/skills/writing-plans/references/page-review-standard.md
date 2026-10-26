@@ -8,10 +8,10 @@ Plan 写入。正式 TAPD Plan 必须满足 `TASKS_READY` 和任务关联要求�
 
 Bug、小需求和大需求的清单统一遵守
 [六列展示规则](../../../references/execution-checklist.md)：
-`项目 | 分支 | 交付范围 | 实施方案 | 验收标准 | 待决事项`。
+`项目 | 分支 | 交付范围 | 实施方案 | 验收标准 | 需求待确认`。
 确认前标题为确定清单，当前完整内容获确认后才称执行清单；实质变化后重回
 确定阶段展示完整内容。顶部执行项目名称支持多个，合并/部署按项目说明，
-同一 Bug/Story 的 Wiki 选择和多项目模板统一展示，不维护两份清单或新增模型字段。
+同一 Bug/Story 的 Wiki 选择和多项目模板统一展示，不维护两份清单，展示索引不添加业务模型字段。
 本轮 Task 在执行内容前用“序号、标题、工时”三列表展示，标题保留真实链接，
 后文只用 `#F01` 等任务阅读序号关联。`#01` 仍用于详情，Plan 的 `F-001`、
 任务 key/ID 和 `tapdTaskKey` 保持原含义；不为排版添加运行时字段或补估时。
@@ -23,12 +23,12 @@ Bug、小需求和大需求的清单统一遵守
 “详见下方 #01”。表下详情标题只用 `### #01`、`### #02`，编号全清单递增、
 跨项目不重置，同一详情可复用，短内容不编号。数字说明内可关联已有 Plan
 的准确章节或行号；不再重复“实施方案/验收标准/验证安排/分支安排”分组。
-待决事项保留阻塞数量、关键问题及决定人，选项/推荐/影响在数字说明展开；
-Agent 能查证的先查证。无业务/实施未决时写“无”，不把执行确认计为待决项。
-待决项按共享定义记录需求不完整、流程不闭环、接口/字段和外部条件缺口，
-说明影响、责任方、补齐条件和阻塞阶段。区分真实缺失与尚未核实，不记录
-授权 Key 值。实际外部责任及解除条件写入既有问题/影响/建议或 blocker 文本，
-`questions.owner` 仍限 `user|agent`，不扩展字段白名单。
+“需求待确认”仅保存范围、业务含义、行为、角色规则、流程反馈和验收语义等业务决定。
+接口机器字段、类型/枚举映射、契约来源、API Key 配置、环境、账号访问及外部服务条件
+进入独立“外部数据与依赖”模块；代码落点和组件证据仍进入实施依据。
+Agent 能查证的先查证；业务已确认不代表依赖就绪，依赖未就绪也不自动重开业务结论。
+外部记录同时保留已知事实和缺口，说明来源、环境、责任方、补齐条件和受影响阶段，
+不记录凭据值。清单和面板消费同一 Plan 事实，不另建依赖台账。
 
 首次确认前没有 Plan 时，在表下或已有面板展示拟写正文或 brief，不虚构链接、
 不提前写 Plan、不另建临时清单详情文档。不为提供链接创建正式 Plan 或 Task。
@@ -106,7 +106,7 @@ Bug 的该区块末尾另列 TAPD 目标：完整提测为待测试（交付完�
 
 以功能模块为评审对象，页面也是一个模块。一个内聚模块可包含子模块；只有职责、输入输出与验收能够独立说清时才拆分。列、按钮或接口不因技术上独立就自动成为模块。模块树保留完整范围，后续轮次默认突出本次新增、修改、删除、重开和未决项。
 
-ReviewSession 只接受 `schemaVersion=2`。卡片的 `id` 是模块稳定编号；`module.parentId` 引用同一完整清单中的 `card.id`，顶层为 `null`，不得悬空、自引用或形成环。`module.revision` 是正整数；同一编号的业务内容、实现方案或相关证据改变时递增，编号不重排、不复用。`change.kind` 中的 `added/modified/unchanged` 与 `change.summary` 是轮次描述，其单独变化不要求递增 revision 或重开；进入或退出 `removed` 会改变业务范围，须递增并重开。
+新建 ReviewSession 使用 `schemaVersion=3`；旧 `schemaVersion=2` 可读取评审，但缺少外部审查信息时保持 `unreviewed`，不能据旧就绪标记直接进入实施。卡片的 `id` 是模块稳定编号；`module.parentId` 引用同一完整清单中的 `card.id`，顶层为 `null`，不得悬空、自引用或形成环。`module.revision` 是正整数；同一编号的业务内容、实现方案或相关证据改变时递增，编号不重排、不复用。`change.kind` 中的 `added/modified/unchanged` 与 `change.summary` 是轮次描述，其单独变化不要求递增 revision 或重开；进入或退出 `removed` 会改变业务范围，须递增并重开。
 
 每张卡片包含以下 `module` 契约，字段以运行时白名单校验：
 
@@ -117,7 +117,7 @@ ReviewSession 只接受 `schemaVersion=2`。卡片的 `id` 是模块稳定编号
 | `inputs`、`outputs` | 非空字符串数组，说明触发条件、所需数据和可观察结果 |
 | `rules` | 非空字符串数组，说明正常、边界与异常行为 |
 | `scenarios` | 验收例子数组，每项为 `{ id, given, when, then }`，例子编号在模块内唯一 |
-| `questions` | 待确认数组，每项为 `{ id, question, impact, owner, recommendation }`；`owner` 为 `user` 或 `agent`，仅保存尚未解决事项，问题解决后从此集合移除并记录结论，无问题时为空数组 |
+| `questions` | 需求待确认数组，仅含尚未解决的业务决定；每项为 `{ id, question, impact, owner, recommendation }`；`owner` 为 `user` 或 `agent`，接口/字段契约、凭据配置和环境缺口不得混入；业务问题解决后从此集合移除并记录结论，无问题时为空数组 |
 | `change` | `{ kind, summary }`；`kind` 为 `added/modified/removed/unchanged`，`summary` 说明本次变化 |
 | `revision` | 模块内容版本，正整数 |
 
@@ -127,11 +127,11 @@ ReviewSession 只接受 `schemaVersion=2`。卡片的 `id` 是模块稳定编号
 问题。建议说明对范围、风险或返工的影响；已解决决定保留结论和必要理由，
 不重复放入 questions。无需增加问题依赖字段或让用户再填一份决策表。
 
-需求结论 `conclusion` 与 `implementationPlan.status` 独立：允许“需求已确认 · 实现方案待补充”。只有需求范围或行为本身无法决定时使用需求“阻塞”，技术证据不全不能强制改变用户结论。新增模块保持“未评审”。模块职责、父子边界、输入输出、规则、验收例子或需要用户决定的行为问题改变时，才重置需求结论为“未评审”；只改变技术证据、`implementationPlan` 或 `owner=agent` 的查证问题时保留需求结论，并展示技术变更待复核。用户补充需求不等于确认 Agent 的方案。
+需求结论 `conclusion` 与 `implementationPlan.status` 独立：允许“需求已确认 · 实现方案待补充”。只有需求范围或行为本身无法决定时使用需求“阻塞”，技术证据不全不能强制改变用户结论。新增模块保持“未评审”。模块职责、父子边界、输入输出、规则、验收例子或业务待确认问题（无论 owner 为 user 还是 agent）改变时，才重置需求结论为“未评审”；只改变技术证据、`implementationPlan` 或外部依赖时保留需求结论，并展示技术变更待复核。用户补充需求不等于确认 Agent 的方案。
 
 ## Agent 后台检查与实现依据
 
-下列技术维度是 Agent 后台检查清单，不要求逐维度生成卡片：页面定义、URL、路由与参数、UI 布局、组件与功能实现方案、功能点与业务规则、交互状态、API 设计、Mock 设计、权限与安全、路由、会话及跨页面状态、验收步骤和证据。适用检查融入模块的行为、待确认问题或折叠实现依据，不重复要求用户确认同一个业务行为。
+下列技术维度是 Agent 后台检查清单，不要求逐维度生成卡片：页面定义、URL、路由与参数、UI 布局、组件与功能实现方案、功能点与业务规则、交互状态、API 设计、Mock 设计、权限与安全、路由、会话及跨页面状态、验收步骤和证据。适用检查分别融入业务行为、需求待确认、外部数据与依赖或折叠实施依据，不重复要求用户确认同一个业务行为。
 
 按 [API 契约阶段](api-contract-stages.md) 建立消费需求清单，拆分消费事实到 API 需求一致的具体消费点。页面内容区、应用壳层、路由守卫、权限入口、跨页面状态和会话级能力分别判断；这个事实粒度不改变用户看到的模块卡粒度。每个消费需求记录判断和证据；每个关联接口记录能力归属、运行时范围、正式来源搜索证据和本次交付关系。
 
@@ -163,7 +163,7 @@ acceptanceFocus 同时说明观察行为的入口、预期结果和验证局限�
 运行时只接受 canonical `ReviewSession`。会话字段为
 `schemaVersion`、`sessionId`、`deliveryUnitKey`、`deliveryUnitKind`、`deliveryUnitName`、
 `artifactRuleFingerprint`、`artifactRuleResolution`、`reviewRound`、`planFingerprint`、
-`submissionVersion`、`mode`、`currentCardIndex`、`viewScope` 和 `cards`。
+`submissionVersion`、`mode`、`currentCardIndex`、`viewScope`、`cards`，以及下文四个外部数据字段。
 卡片包含 `id`、`module`、`dimension`、`links`、`sourceEvidence`、`reviewGoal`、`design`、
 `regionAndComponents`、`interactionStates`、`relatedApis`、`mockScenarios`、
 `acceptanceCriteria`、`implementationPlan`、`conclusion`、`userNote`、`reviewResult`、
@@ -180,7 +180,7 @@ acceptanceFocus 同时说明观察行为的入口、预期结果和验证局限�
 旧 `resumeSubmission` 或确认请求。其他规则身份变化须重新读取证据并重新挂载，
 不能借此接口修改已正式规则或回退候选。具体步骤见运行协议。
 
-Plan 与面板使用同一模块结构和稳定编号。Agent 语义读取 Markdown 后构造临时规范化模型，禁止脚本解析 Markdown。PagePlan 只接受 `schemaVersion=3`，`features[].module` 使用相同模块契约，`features[].reviewConclusion` 独立记录需求结论；非评审阶段执行实现准备度门禁。
+Plan 与面板使用同一模块结构和稳定编号。Agent 语义读取 Markdown 后构造临时规范化模型，禁止脚本解析 Markdown。新建 PagePlan 使用 `schemaVersion=4`；旧 `schemaVersion=3` 可读取评审，但实施前须明确补齐外部审查及本轮范围，`features[].module` 使用相同模块契约，`features[].reviewConclusion` 独立记录需求结论；非评审阶段执行实现准备度门禁。
 
 Agent 在现有内容上检查独立接手能力：没有规划聊天历史的执行者，能否从
 所选任务、Plan 与证据理解要做什么、不能改变什么、为什么作关键选择以及
@@ -194,7 +194,56 @@ Agent 在现有内容上检查独立接手能力：没有规划聊天历史的�
 后续实质变化展示受影响差异并按原门禁维护，完成时记录真实验证结果、
 未验证项和遗留问题；摘要链接随内容位置核对，不另维护清单详情副本。
 
-阶段 Plan 可以保存已确认需求、待修改需求和未决问题。`implementationPlan.status=blocked` 必须记录 `blockers`，不能据此制造实施承诺或把交付单元设为可实施；`ready` 方案原样保留一句话摘要、四块实施内容和证据引用。`validate-page-plan.js` 校验模块层级、版本、行为例子、需求结论、实现准备度及引用，不再把需求已确认误判为实施已就绪。`questions` 均表示尚未解决事项；适用模块的 `questions` 必须为空，且需求确认、实现 ready 及其他证据门禁均通过，才能进入可实施及其后续状态。问题即使有建议也不算解决；阶段 Plan 仍可保存这些问题。
+阶段 Plan 可以保存已确认需求、待修改需求和未决问题。`implementationPlan.status=blocked` 必须记录 `blockers`，不能据此制造实施承诺或把交付单元设为可实施；`ready` 方案原样保留一句话摘要、四块实施内容和证据引用。`validate-page-plan.js` 校验模块层级、版本、行为例子、需求结论、实现准备度及引用，不再把需求已确认误判为实施已就绪。`questions` 仅表示尚未解决业务问题；本轮选定适用模块的 `questions` 必须为空，且需求确认、实现 ready、当前阶段外部依赖和其他证据门禁均通过，才能进入可实施及其后续状态。问题即使有建议也不算解决；阶段 Plan 仍可保存这些问题。
+
+## 外部数据、Mock 与本轮范围模型
+
+PagePlan v4 与 ReviewSession v3 共用以下顶层字段。记录只保存一份；面板按关联模块展示，
+API 契约正文保留在正式来源，`sourceRefs`/`evidenceRefs` 引用它。页面依赖 `dependencies`
+仍使用原页面对接状态，不能用它表达凭据或服务环境。
+
+| 字段 | 规范 |
+| --- | --- |
+| `externalDependencies` | 数组；每项有唯一 `EXT-*` 的 `id`、`kind`、`summary`、`facts[]`、`sourceRefs[]`、`environment`、`status`、`owner`、`completionCondition`、`blockingStages[]`、`featureRefs[]`、`taskRefs[]`、`acceptanceRefs[]`、`evidenceRefs[]` |
+| `dependencyReview` | `{ status: unreviewed|reviewed, evidenceRefs: [] }`；`reviewed` 必须有本轮查证证据，空集合不等于已审查 |
+| `executionScope` | `{ stage, featureRefs: [], taskRefs: [] }`；选择本轮阶段、功能及步骤，不删除未选的未来事实 |
+| `mockModules` | 明确的 Mock 规范记录，字段见下表；不能用卡片 `mockScenarios` 摘要代替 |
+
+`kind` 仅为 `api-contract / field-contract / credential-config / environment / account-permission / external-service`。
+`status` 仅为 `unverified / missing / ready / not-applicable`；`ready` 要有已确认 facts，
+`ready` 与 `not-applicable` 都必须有来源及可解析证据。`unverified` 不等于已证实缺失；
+未就绪记录必须列明实际受影响阶段和可核验补齐条件，不能靠建议清零。
+
+`stage` 与 `blockingStages` 使用 `ui-mock / implementation / integration / acceptance / test-delivery / production`。
+只对与本轮 `featureRefs`、所选 `taskRefs` 相关且当前阶段适用的记录计算阻塞。
+契约已确认但测试凭据未就绪时，可按证据编写适配代码，而真实调用验收保持阻塞。
+仅批准 UI/Mock 时可保留未来真实契约缺口；不能把模块 API need 从 unknown/required
+伪改为 none。真实接入仍要求正式机器事实；required API 为“正式契约缺失”时不能通过。
+
+| Mock 字段 | 规范 |
+| --- | --- |
+| `id`、`marker` | 唯一 `MOCK-*` 编号；固定 `marker=MOCK_ONLY` |
+| `status`、`mode` | `active / retired`；实现方式为 `function-data / http-contract / managed-draft` |
+| `featureRefs[]`、`taskRefs[]`、`paths[]` | 准确功能/步骤和仓库相对实现路径；必须能识别全部数据、handler、替换入口及启动依赖 |
+| `scenarios[]`、`activation`、`realRequestBoundary` | 可复现场景、显式开启/关闭方式、仍调用真实服务的边界 |
+| `exitCondition`、`verificationLimits[]` | 真实替换条件及 Mock 不能证明的验收 |
+| `authorizationEvidenceRefs[]` | 引用 kind=human-confirmation 的真实人类 Mock 范围依据；主流程核实原文，不能自行以 bool 代替 |
+| `exitEvidenceRefs[]` | `active` 可空；`retired` 必须引用真实替换、移除/构建排除及退出验证依据 |
+
+所有编号引用必须能解析，步骤及验收必须属于关联功能。`paths` 不得为绝对路径或含 `..`。
+仅设置 `stage=ui-mock` 不授予实施权限：每个选定功能必须有匹配的 active MOCK_ONLY
+记录、有效批准依据及本轮可实施方案。未知机器事实仅允许功能数据 Mock；HTTP/Draft
+Mock 必须具备可验证契约。关闭开关不等于 retired；retired 也不证明生产制品已清理。
+
+测试环境批准、生产源码/制品检查由独立交付门禁处理，不能由 Plan 字段或面板保存放行。
+接口补齐后更新同一记录；仅技术事实变化保留业务结论，重开受影响实施评审和保存确认。
+已批准真实接入且无实质变化时复用授权；原范围仅 Mock 而新增接入/交付时补充准确确认。
+详见共享[外部数据规则](../../../references/external-data-dependencies.md)和
+[跨项目 Mock 规范](../../../references/mock-development.md)。
+
+外部数据字段经过 normalize、草稿、提交、恢复及保存读回完整传递。恢复内容必须与
+当前事实逐项相同；新字段不能被旧白名单静默丢弃。旧数据先保留可读性，再查证补齐，
+不为迁移重建 Task、Plan 或分支，也不从未知事实推导外部 ready。
 
 ## 轮次与确认
 

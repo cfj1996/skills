@@ -28,6 +28,9 @@
 | `DEPLOY` for a tooling library with unresolved required `RELEASE_TYPE` | Block; the `SKIP` exception must not weaken deployment validation. |
 | Only a branch parameter is evidenced under `SKIP` | Omit that parameter and the empty `?` suffix; retain the original source branch in its dedicated field. |
 | Jenkins Job name or URL cannot be resolved from evidence | Block and emit no final body; never substitute a repository name, alias, or guessed URL. |
+| Create or append an entry covering `instant-apps/web/live-app` | Keep the main test Job and include one evidenced `front-jzan` associated Job link in the same entry; no extra test build or deployment inputs. |
+| Reuse a live-app entry missing `front-jzan`, including a non-functional continuation | Add only the required associated Job line with its evidenced URL; preserve the heading, sequence, repository/branch and unrelated entries. A complete existing link is reused without duplication. |
+| Only another `instant-apps` app is in scope | Do not add `front-jzan` solely because the repository matches. |
 | The project is a business project at test submission | Render `是否上线：未合并`. |
 | Tooling/library project has a verified canary publication | Render `当前版本：canary`; omit `是否上线`. |
 | Tooling/library project has a verified official publication | Render `当前版本：latest`; omit `是否上线`. |

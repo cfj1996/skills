@@ -84,10 +84,19 @@ HTTPS iframe 地址直接作为顶层原型打开。无法顶层打开时，仅�
 Badge 区分状态，右侧展示当前详情。列表点击与上一个/下一个共用唯一当前索引；
 结论使用互斥按钮组，不使用下拉选择。
 
-会话只接受 `schemaVersion=2` 的模块卡。左侧按
+新会话使用 `schemaVersion=3`，旧 v2 仅可读取评审；未补齐外部审查时不能推导可实施。左侧按
 模块与子模块展示，父模块由 `module.parentId` 关联；同一模块的技术维度不重复成卡。
-右侧第一屏展示职责与范围、输入输出、行为规则、验收例子、待确认问题和本次变更。
-每个问题显示影响、责任方及建议，需求结论独立操作。
+右侧第一屏展示职责与范围、输入输出、行为规则、验收例子、需求待确认和本次变更。
+每个业务问题显示影响、责任方及建议，需求结论独立操作。
+外部数据与依赖单独显示来源、环境、状态、影响阶段和补齐条件；Mock 显示 MOCK_ONLY、
+实现路径、场景、真实请求边界、退出条件、未验证项及禁止上线限制。顶层事实按 featureRefs
+关联，不为两个页面复制同一依赖。接口/字段契约、Key 配置和环境不混入需求问题。
+
+`externalDependencies`、`mockModules`、`dependencyReview`、`executionScope` 必须随同当前
+会话 normalize、update、草稿、submission、恢复和 Plan 保存完整传递。外部事实改变时使用
+新 sessionId 及受影响模块递增 revision，保留原业务结论，重开相关实施依据和保存确认；
+旧快照与当前外部事实不相同，不能恢复旧提交或确认。字段详见页面评审规范。
+面板保存仅批准 Plan 更新，不批准含 Mock 的测试部署，更不能允许 Mock 上线。
 
 `SCOPE_REVIEW` 无正式目录规则时，以
 `artifactRuleResolution.status=unresolved-candidate, source=candidate` 挂载。
@@ -286,7 +295,7 @@ Agent 才能写入适用 Agent 文件，读回验证并计算正式规则指纹�
    传入刚重新读取后计算的指纹。只有返回 `mode === "confirmed"` 且无 `lastError`
    才能按用户确认的范围写入 Plan。该调用只消费一次内部许可，不会自行写文件。
 4. “已确认，待保存”与“已保存”分开显示。运行 `validate-page-plan.js` 对拟写内容
-   的规范化模型（只接受 `schemaVersion=3`）进行校验；阶段 Plan
+   的规范化模型（新建使用 `schemaVersion=4`，旧 v3 仅可读取评审）进行校验；阶段 Plan
    允许包含未决问题和 blocked 实现，不能将其标成可实施。通过后用 Agent 文件工具
    写入同一 Plan，再读回核对实际内容并计算保存后的指纹。
 5. 读回一致后在同一页面调用下列 API 并核对保存状态。调用只记录本轮保存凭据，
@@ -322,14 +331,14 @@ window.__PAGE_DELIVERY_REVIEW__.markPlanSaved({
    单独变化不要求递增版本或重开；进入或退出 removed 改变业务范围，须递增并重开。
    删除用 `change.kind=removed` 的模块保留说明供本轮评审，不从完整清单静默消失。
 3. 展示新增、修改、删除和影响范围，补查相关证据。新增项保持“未评审”。模块职责、
-   父子边界、输入输出、行为规则、验收例子或需要用户决定的行为问题变化时，
+   父子边界、输入输出、行为规则、验收例子或业务待确认问题（无论 owner 为 user 还是 agent）变化时，
    保留旧结论到 `reviewResult.previousConclusion`，设置 `reopened=true`，重置
    需求结论为“未评审”；实现 blocked 不自动变成需求“阻塞”。只改变技术证据、
-   `implementationPlan` 或 `owner=agent` 查证问题时保留需求结论，设置
+   `implementationPlan` 或外部依赖事实时保留需求结论，设置
    `evidenceChanged=true` 展示技术变更待复核。无关模块保留编号、版本、结论与备注。
 4. 未提交时保持当前 `reviewRound`；已提交、回填、确认或保存后补充，进入
    `reviewRound + 1`，原提交不可变。构造包含完整模块清单的 `nextSession`，使用
-   新的 `sessionId`、`schemaVersion=2`、输入态及归零的提交版本，指纹来自当前
+   新的 `sessionId`、`schemaVersion=3`、输入态及归零的提交版本，指纹来自当前
    真实 Plan 和规则。当前已保存时使用保存后的 Plan 指纹。
 5. 调用正式同步 API，不能修改内部 state 或用旧快照覆盖用户输入：
 

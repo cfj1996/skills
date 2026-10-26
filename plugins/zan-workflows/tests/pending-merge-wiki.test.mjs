@@ -1,9 +1,12 @@
+import { fixtureMarkPendingMergeWiki as markPendingMergeWiki } from './helpers/mock-safety-fixture.mjs';
+import { fixtureEnsureTestWiki as ensureTestWiki } from './helpers/mock-safety-fixture.mjs';
+import { FixtureWorkflowSession as WorkflowSession } from './helpers/mock-safety-fixture.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { markPendingMergeWiki, pendingWikiPatch } from '../scripts/pending-merge-wiki.mjs';
-import { WorkflowSession } from '../scripts/workflow-session.mjs';
+import { markPendingMergeWiki as originalMarkPendingMergeWiki, pendingWikiPatch } from '../scripts/pending-merge-wiki.mjs';
+import { WorkflowSession as originalWorkflowSession } from '../scripts/workflow-session.mjs';
 import { sha256 } from '../scripts/workflow-runtime.mjs';
-import { ensureTestWiki } from '../skills/submitting-for-test/scripts/ensure-test-wiki.mjs';
+import { ensureTestWiki as originalEnsureTestWiki } from '../skills/submitting-for-test/scripts/ensure-test-wiki.mjs';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

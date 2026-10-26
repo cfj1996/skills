@@ -14,7 +14,7 @@
 
 “需求已确认 · 实现方案待补充 · 评审记录已保存”是有效组合。保存阶段记录不把未决事项变成可实施工作，不改变交付单元的评审阶段；需求“阻塞”只用于行为或范围无法决定，不能由技术缺口自动推导。`confirmPlan` 不等于保存，`markPlanSaved` 仅在 Agent 写入和读回成功后调用。
 
-适用模块的 `questions` 代表尚未解决事项；进入可实施及后续状态前必须清空已解决问题，并确认没有遗留问题、需求已确认、实现方案 ready。只有建议或处理计划不表示问题已经解决；阶段评审记录仍可保存问题和带明确 blockers 的 blocked 方案。
+本轮选定适用模块的 `questions` 仅代表尚未解决业务决定；进入可实施及后续状态前须清空已解决问题、需求已确认、实现方案 ready，并通过本轮阶段外部依赖门禁。只有建议或处理计划不表示问题已经解决；阶段评审记录仍可保存问题和带明确 blockers 的 blocked 方案。
 
 ## 功能状态
 
@@ -30,6 +30,18 @@
 
 `不涉及 / 路由契约待确认 / 待目标页面实现 / 占位页可达 / 页面对接中 / 已对接 / 已验收`。
 
+## 外部数据与 Mock
+
+外部数据事实使用 `unverified / missing / ready / not-applicable`，独立于业务结论及页面对接状态。
+外部审查为 `unreviewed / reviewed`；旧模型没有记录时只能是 unreviewed。
+本轮阶段 `ui-mock / implementation / integration / acceptance / test-delivery / production`
+按 `executionScope` 的功能/步骤选择依赖，未选后续步骤仍保留原缺口。
+“业务已确认、UI/Mock 可实施、真实联调待就绪”是有效组合，不能报告整页完成率。
+
+Mock 使用唯一 `MOCK-*` 标识和 `MOCK_ONLY`，状态 `active / retired`。
+active 表示模拟实现仍存在；关开关不算移除。retired 须有退出证据，但不替代源码和生产制品核验。
+含 Mock 的测试交付必须有明确本次范围/环境授权；生产禁止携带 Mock，Plan/面板 bool 无法豁免。
+
 ## 验收状态
 
 `未验证 / 部分通过 / 已通过 / 验收阻塞`。
@@ -42,3 +54,5 @@
 
 `calculate-progress.js` 接收当前 PagePlan 规范化模型；评审统计读取
 `features[].reviewConclusion`，功能状态统计独立读取 `features[].status`。
+
+外部依赖与 Mock 另按各自状态计数，外部审查单独显示 reviewed/unreviewed，不折算为整体完成率。

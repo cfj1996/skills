@@ -5,6 +5,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { clientFor } from './mcp-client.mjs';
 import { configuredJenkinsReader } from './jenkins-readonly.mjs';
+import { checkMockSafetySet, mockSafetyPreview, checkDeliveryEnvironment, checkPreDeployMockGate, verifyMockCheckerEvidence, verifyProductionMockArtifact } from './mock-safety.mjs';
 import { adaptJenkinsInput, parseNpmToolsPublication } from './jenkins-job-adapters.mjs';
 import { pollState, progressToStderr, readCliPlan, readTool, repositoryKey, requireText, sha256, stableJson, toolData, validateWait } from './workflow-runtime.mjs';
 
@@ -184,7 +185,7 @@ export async function runJenkinsRelease(call, reader, input, io = {}) {
       (input.parameterDefinitionsHash && input.parameterDefinitionsHash !== parameterDefinitionsHash)) {
     throw new Error('Job 配置或参数定义已变化，需要更新清单');
   }
-  if (!input.execute) return { ...input, instance: args.instance, execute: false, confirmed: false, state: 'AWAITING_CONFIRMATION',
+  if (!input.execute) return { ...input, ...mockSafetyPreview(input, input.releaseChannel === 'official' || input.targetEnvironment === 'production'), instance: args.instance, execute: false, confirmed: false, state: 'AWAITING_CONFIRMATION',
     jobConfigHash, jobBindingHash, jobBindingMode, parameterDefinitionsHash, writes: 0 };
   if (jobBindingMode === 'READABLE_METADATA' && input.jobBindingMode !== jobBindingMode) {
     throw new Error('Job 元数据核验方式尚未纳入已确认清单');
@@ -193,11 +194,25 @@ export async function runJenkinsRelease(call, reader, input, io = {}) {
   if (input.jobAdapter === 'npm-tools-v1') await (io.checkSource || checkReleaseSource)({
     sourceRepository: input.pipelineSource.repositoryUrl, releaseRef: input.pipelineSource.ref, expectedSha: input.pipelineSource.expectedSha,
   });
+  const actualEnvironment = await checkDeliveryEnvironment(input, { jobBindingHash, parameterDefinitionsHash, config: config?.config }, io);
+  const production = actualEnvironment === 'production' || input.releaseChannel === 'official' || /(?:^|[\W_])(?:prod|production|live)(?:$|[\W_])|线上|正式/i.test(input.targetEnvironment);
+  if (!production && /(?:^|[\W_])(?:prod|production)(?:$|[\W_])|线上|正式/i.test(input.jobName + ' ' + input.jobUrl)) {
+    throw new Error('测试环境声明与生产 Jenkins Job 标识冲突，不能绕过生产 Mock 门禁');
+  }
+  if (production && completionMode === 'TRIGGER_ACCEPTED') throw new Error('已核实的生产环境不能采用测试提交即返回策略');
+  const mockSafetyReceipts = await checkMockSafetySet(input, { operation: production ? 'production-release' : 'test-deploy', purpose: input.purpose,
+    environmentKind: production ? 'production' : 'test', targetEnvironment: input.targetEnvironment, jobUrl: input.jobUrl,
+    sourceRepository: input.sourceRepository, sourceSha: input.expectedSha, requireCommitted: true }, io);
+  if (production) {
+    checkPreDeployMockGate(input, jobBindingHash, config?.config);
+    await verifyMockCheckerEvidence(input.preDeployMockGate, io);
+  }
   const result = { state: 'UNKNOWN', targetProject: input.targetProject, releaseTarget: input.releaseTarget,
     releaseKind: input.releaseKind, instance: args.instance, sourceRepository: input.sourceRepository,
     jobName: input.jobName, jobUrl: input.jobUrl, releaseRef: input.releaseRef, version: input.version,
     releaseChannel: input.releaseChannel, targetEnvironment: input.targetEnvironment,
     expectedSha: input.expectedSha, queueId: null, buildNumber: null, sourceVerified: false, writes: 0 };
+  result.mockSafetyReceipts = mockSafetyReceipts;
   result.jobBindingMode = jobBindingMode;
   result.jobAdapter = input.jobAdapter;
   result.versionStrategy = input.versionStrategy || 'EXPLICIT';
@@ -243,6 +258,11 @@ export async function runJenkinsRelease(call, reader, input, io = {}) {
     phase = 'VERIFY_SOURCE';
     verifyBuild(build, input, result.queueId);
     result.sourceVerified = true;
+    if (production) {
+      phase = 'VERIFY_MOCK_ARTIFACT';
+      if (!reader.console) throw new Error('正式构建缺少当前制品 Mock 门禁回执读取能力');
+      result.mockArtifactReceipt = verifyProductionMockArtifact(await reader.console(result.buildNumber), input, result.queueId, result.buildNumber);
+    }
     if (input.jobAdapter === 'npm-tools-v1') {
       phase = 'VERIFY_PUBLICATION';
       if (!reader.console) throw new Error('计算版本的 Job 缺少本次构建发布摘要读取能力');

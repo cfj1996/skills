@@ -55,8 +55,8 @@ export class WorkflowSession {
       switch (request.action) {
         case 'merge': result = await mergeReviewedBranch(call('gitlab-mcp'), input, this.io); break;
         case 'release': result = await runJenkinsRelease(call('jenkins-mcp'), this.reader(input), input, this.io); break;
-        case 'registration': result = await registerTestSubmission(call('tapd-mcp'), input); break;
-        case 'wiki': result = await ensureTestWiki(call('tapd-mcp'), input); break;
+        case 'registration': result = await registerTestSubmission(call('tapd-mcp'), input, this.io); break;
+        case 'wiki': result = await ensureTestWiki(call('tapd-mcp'), input, new Date(), this.io); break;
         case 'closeout': result = await checkLocalCloseout(input, this.io); break;
         case 'job': result = await resolveJenkinsJob(call('jenkins-mcp'), input); break;
       }
@@ -64,8 +64,9 @@ export class WorkflowSession {
         this.pendingMerges.set(`${result.projectId}:${result.mrIid}`, result.resumePlan);
         if (execute && input.pendingWiki) {
           try {
-            result.pendingWiki = await markPendingMergeWiki(call('gitlab-mcp'), call('tapd-mcp'), input.pendingWiki,
-              result, { execute: true, confirmed: input.confirmed });
+            result.pendingWiki = await markPendingMergeWiki(call('gitlab-mcp'), call('tapd-mcp'), { ...input.pendingWiki,
+              mockSafety: input.mockSafety, mockSafeties: input.mockSafeties, mockRepositories: input.mockRepositories },
+              result, { execute: true, confirmed: input.confirmed, io: this.io });
           } catch (error) {
             this.executionBlocked = true;
             result.pendingWiki = error.result || { state: 'BLOCKED', writes: 0, error: error.message };

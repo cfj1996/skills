@@ -625,6 +625,7 @@ test("confirm plan requires the final non-empty result", () => {
 test("active-card submission and empty results stay out of confirmable result mode", () => {
   const emptyRound = createReviewState({
     ...session,
+    executionScope: { ...session.executionScope, featureRefs: ["resolved"], taskRefs: [] },
     cards: [approvedCard({ id: "resolved", conclusion: "已确认" })],
   });
   const blockedSubmit = reduceReviewState(emptyRound, { type: "SUBMIT" });
@@ -653,6 +654,10 @@ test("draft restore requires matching fresh metadata and clamps only valid edita
     planFingerprint: state.planFingerprint,
     artifactRuleFingerprint: state.artifactRuleFingerprint,
     artifactRuleResolution: state.artifactRuleResolution,
+    externalDependencies: state.externalDependencies,
+    mockModules: state.mockModules,
+    dependencyReview: state.dependencyReview,
+    executionScope: state.executionScope,
     savedAt,
     currentCardIndex: 999,
     cards: [{ id: "REV-002", conclusion: "阻塞", userNote: "可恢复" }],
@@ -1137,8 +1142,9 @@ test("view scopes retain confirmed cards and mark changed evidence with its prev
     approvedCard({ id: "changed", conclusion: "已确认", evidenceChanged: true }),
     approvedCard({ id: "open", conclusion: "待修改" }),
   ];
-  const round = createReviewState({ ...session, cards, reviewRound: 2, viewScope: "round" });
-  const all = createReviewState({ ...session, cards, reviewRound: 2, viewScope: "all" });
+  const executionScope = { ...session.executionScope, featureRefs: cards.map(card => card.id), taskRefs: [] };
+  const round = createReviewState({ ...session, executionScope, cards, reviewRound: 2, viewScope: "round" });
+  const all = createReviewState({ ...session, executionScope, cards, reviewRound: 2, viewScope: "all" });
 
   assert.deepEqual(round.cards.map((card) => card.id), ["changed", "open"]);
   assert.equal(round.cards[0].reviewResult.previousConclusion, "已确认");

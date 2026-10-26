@@ -118,6 +118,20 @@ same-page continuation corrections and shared Wiki entry preservation, run
 `node --test plugins/zan-workflows/tests/change-consistency.test.mjs plugins/zan-workflows/tests/shared-test-wiki.test.mjs`.
 These checks use in-memory evidence and simulated TAPD responses, with no external writes.
 
+For external dependency phases, legacy Plan/Session migration, local Mock approval,
+shared-record rendering and snapshot freshness, run
+`node --test plugins/zan-workflows/skills/writing-plans/tests/external-data-state.test.mjs`.
+For Mock inventory/source binding, explicit test authorization, production exclusion and
+Jenkins pre-deploy gates, run
+`node --test plugins/zan-workflows/tests/mock-safety.test.mjs`.
+These tests use disposable local Git fixtures and simulated remote responses; they do
+not call company APIs, deploy, publish or modify real TAPD items. The complete Node suites
+include them. Team MR tests also cover the same mandatory Mock gate without a Zan exemption.
+The Mock suite also checks actual inline XML definitions, direct checker execution
+before a production trigger and runtime checker integrity after build-time replacement.
+`ensure-test-wiki.test.mjs` covers standalone CLI receipt
+arguments through real local source inspection and simulated TAPD writes.
+
 ## Coding Style & Naming Conventions
 
 Write skill docs in concise Markdown with clear `#`/`##` headings, short rule lists, and fenced command examples. Preserve the existing mix of English headings and Chinese workflow detail where the skill already uses it. Name new skill folders with lowercase kebab-case, keep the entry file exactly `SKILL.md`, and use descriptive agent filenames such as `collector.md` or `reviewer.md`.

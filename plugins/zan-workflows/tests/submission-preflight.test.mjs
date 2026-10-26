@@ -1,8 +1,10 @@
+import { fixtureRegisterTestSubmission as registerTestSubmission } from './helpers/mock-safety-fixture.mjs';
+import { FixtureWorkflowSession as WorkflowSession } from './helpers/mock-safety-fixture.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { apiData, registerTestSubmission } from '../scripts/register-test-submission.mjs';
+import { apiData, registerTestSubmission as originalRegisterTestSubmission } from '../scripts/register-test-submission.mjs';
 import { resolveJenkinsJob } from '../scripts/resolve-jenkins-job.mjs';
-import { WorkflowSession } from '../scripts/workflow-session.mjs';
+import { WorkflowSession as originalWorkflowSession } from '../scripts/workflow-session.mjs';
 
 const response = value => ({ content: [{ type: 'text', text: JSON.stringify(value) }] });
 const id = '123450001';

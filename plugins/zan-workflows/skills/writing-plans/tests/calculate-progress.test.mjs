@@ -109,6 +109,9 @@ test("returns a stable empty metrics structure for a missing model", () => {
     },
     apis: {},
     dependencies: {},
+    externalDependencies: {},
+    mockModules: {},
+    dependencyReview: "unreviewed",
     acceptances: {},
     draftOperationCount: 0,
   });

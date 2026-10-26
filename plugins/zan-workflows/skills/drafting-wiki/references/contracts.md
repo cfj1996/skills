@@ -12,7 +12,7 @@
 | Conflicts | competing values, sources, criticality |
 | Deployment context | Resolved `DEPLOY|SKIP`; a standalone Wiki-only request uses `SKIP` for parameter requirements. |
 | Shared ownership | owner Story/Bug type/ID/workspace, Task parent readback, ownership discovery evidence, included repository/branch entries, one target/body and all owner/Task comment targets; see [shared-test-wiki.md](../../../references/shared-test-wiki.md) |
-| Current entry | sequence, Jenkins Job name/URL, selected build/release parameter names and values (only already-evidenced selections required under `SKIP`), project name, project category/service type, repository, developer, description, branch, scope, tester, business merge status or tooling current-version channel and release evidence |
+| Current entry | sequence, Jenkins Job name/URL, applicable Wiki-only supplemental Job names/URLs, selected build/release parameter names and values (only already-evidenced selections required under `SKIP`), project name, project category/service type, repository, developer, description, branch, scope, tester, business merge status or tooling current-version channel and release evidence |
 | Work mode | `INITIAL|CONTINUE`, impact classification, and incremental-scope evidence when continuing |
 | Wiki decision | `UPDATE|SKIP_NON_FUNCTIONAL` and normalized reason |
 | Placement | For `VALIDATED`, `NEW_FRONTEND_SECTION|APPEND_ENTRY|UPDATE_ENTRY` (legacy `APPEND_IMPACT_SCOPE` only for a genuinely append-only patch), `# 前端` evidence, matching-entry evidence, and sequence calculation; for a policy skip, the skip decision evidence |
@@ -84,6 +84,9 @@
   This policy requires unchanged behavior/impact/verification conclusions and
   delivery conditions. Refactoring, logging, test-only or build-only labels
   alone never establish that; stale documentation takes the correction path.
+  Required supplemental Wiki Jobs follow `wiki-template.md`; a missing link
+  makes the entry incomplete and requires a minimal correction instead of a skip.
+  These Wiki-only links never add test builds or deployment requirements.
 - `FUNCTIONAL_IMPACT` continuation reuses the matching existing entry and
   updates `内容`, `影响范围` and `验证结果`, with `交付条件` only when material.
   Reconcile cumulative delivered behavior and the latest delta; correct
@@ -122,7 +125,8 @@
   Exactly one legacy tooling `是否上线：无需上线` line may be replaced with
   the evidenced `当前版本` line in the declared minimal patch. Missing,
   conflicting or other non-current values block. Only the declared current-entry
-  content/impact/verification/conditional delivery correction, necessary history
+  content/impact/verification/conditional delivery correction, required supplemental
+  Wiki Job line, necessary history
   note, required business reset, and evidenced tooling status patch may change.
   No other project's entry, identity, person or unrelated content may change.
 - `VALIDATED` requires passing validation and a non-empty copyable Markdown

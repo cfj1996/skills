@@ -42,6 +42,28 @@ description: Use when the user asks to find, review, or remotely merge open GitL
 项目规则、CI 和实际 diff 决定专项检查；公司项目可用知识库补充上下文。
 知识库未登记或不可用本身不阻断普通审核；适用标准或关键代码证据缺失仍须如实报告。
 
+## Mock 生产门禁（所有项目适用）
+
+遵守 [跨项目 Mock 规范](../../references/mock-development.md)。该门禁独立于 Zan
+Adoption：未接入 Zan、没有 Query Contract、没有 TAPD/Wiki 或普通 CI 通过均不豁免。
+只读审核可以继续；没有当前完整源码/差异清查证据时，不得给出可合并结论或执行
+approve/merge。用户要求跳过代码审核也不能跳过 Mock 禁令。
+
+主代理读取当前 MR source/target SHA 和完整 diff，核实准确仓库、目标分支及操作
+目的；只读准备对应源码并运行共享 [Mock 安全检查](../../scripts/mock-safety.mjs)。
+复用同一 Plan/brief 的 `mockModules`，清查完整待交付范围、项目运行入口和 Mock
+绑定，而非仅检查新增文件。`currentChange` 附 `sourceRepository`、`targetBranch`、
+`purpose` 和当前清查的 `scopeFingerprint`；清查 `baseSha` 必须等于当前 target SHA。
+与 `mockSafety` 或单项 `mockSafeties` 一起传入下文 evaluate-merge，不能用 `mock=pass`、
+空列表、旧回执或 `confirmed=true` 代替检查。当前没有可核实源码时保留明确缺口。
+
+`evaluate-merge` 及导出的 `evaluateMergeReadiness` 都异步调用统一 `checkMockSafetySet`，
+重新核实来源版本/内容、完整范围和实际配置证据；必须等待实际返回，不把 Promise
+或手填“通过”当成结果。生产范围仍有 Mock、退役只改标签/关开关、或隔离依据不足，
+均返回 `mock-safety` 阻断及具体原因。仓库中已证明隔离的开发 fixture 可保留其
+MOCK-* / MOCK_ONLY 标识；源码检查不冒充未来制品检查，正式发布仍走 Jenkins
+先检后发和当次制品门禁。本技能当前只处理 master/main；测试授权不能放行生产。
+
 ## 审核模式与结论模型
 
 先按项目及实际受影响的采用范围执行 Adoption preflight，再决定审核模式。使用本技能的
@@ -66,6 +88,8 @@ monorepo 按继承规则和 Adoption 范围分类；同仓库无关子项目的�
 - `合并资格`：`可合并`、`不可合并`，由代码结论、安全、mergeability、项目明确要求的 pipeline/approval/discussion 门禁，以及适用时的 Zan 门禁共同决定。
 - 范围、影响与文档一致性也是独立合并条件，按下文统一计算；文档漏记本身不改写
   代码结论。确认代码缺陷才判代码不通过，关键正确性证据不足才判未完成。
+- Mock 当前源码、退出及构建隔离是独立强制合并条件；缺证时保持代码结论独立，
+  阻断合并。确认 Mock 将进入生产运行链路时给出具体缺陷依据。
 - `pipeline = none` 只是“未观察到 pipeline”。除非项目或 GitLab 规则明确要求 pipeline，否则不能单独阻断。
 - 后端/YApi 契约不可见时，只在它确实导致关键正确性无法判断时将代码结论标为 `未完成`；不得把所有接口改动一律暂缓。
 
@@ -191,7 +215,8 @@ packet 增加修改依据/已确认反馈来源、当前完整 diff、重要行�
 
 主代理用当前 source/target SHA 和所需范围文档/条目的指纹形成 `currentChange`，
 将其与 reviewer 的 `changeReview` 及既有检查传给
-`scripts/review-policy.mjs evaluate-merge`。缺项、fail、unknown 或版本变化均阻止
+`scripts/review-policy.mjs evaluate-merge`，同时携带上述当前完整 Mock 清查绑定。
+该命令会真实运行异步统一检查，不只评估 JSON 中的状态。缺项、fail、unknown 或版本变化均阻止
 可合并结论；在现有报告中列 `change-scope`、`change-impact`、`change-documentation`
 及对应 unknown/stale 阻断。评审完成后补文档只重新核对相关覆盖，不能解除其他阻断。
 
@@ -315,19 +340,23 @@ preflight。MR 改变这些文件或涉及新的子项目时补充分类；根�
 - 重新读取目标 SHA、范围依据和适用文档条目，更新 `currentChange` 并再次执行
   evaluate-merge；绑定变化先核对并刷新受影响检查。整页的无关项目/业务合并状态
   变化不自动使代码评审失效，写入防覆盖仍按整页指纹处理。
+- 每次 approve 与 merge 前刷新同一准确 source/target 和 Mock 清查；`mock-safety`
+  非通过或源码/目标/范围变化时停止相应写入。旧“审核通过”不代替当前统一门禁。
 - 目标分支仍必须是 `master` 或 `main`。
 - 状态仍必须是 open。
 - 结论必须是 `通过`。
 - mergeability 不能显示 conflict / cannot merge。
 - 工具可见的 unresolved discussion 或 failed pipeline 如果会阻断合并，不能合并。
-- `not-adopted` 不要求 Zan 矩阵或 Zan 命令；普通审核门禁通过即可进入合并。
+- `not-adopted` 不要求 Zan 矩阵或 Zan 命令；仍须通过 Mock 生产门禁及全部普通审核条件。
 - `adopted` 的 Zan 合规矩阵不得存在 `MUST fail/unknown`、无效 Exception 或缺少已声明命令证据。
 - `misconfigured/unknown` 的代码结论保持有效，但治理状态阻断合并，直到配置或读取状态恢复。
 
 合并动作优先使用 GitLab MCP：
 
-1. 如可用，先调用 approve/review 通过接口。
-2. 再调用 merge 接口，传入当前 SHA（工具支持时）、`auto_merge: true`（需要等待 pipeline 时）、`should_remove_source_branch: false`。
+1. 如可用，在最新统一门禁通过后调用 approve/review 通过接口。
+2. 等待必需 pipeline 后，重新读取 source/target 和当前差异/Mock 证据并通过统一门禁，
+   再调用 merge 接口，传入当前 SHA（工具支持时）、`auto_merge: false`、
+   `should_remove_source_branch: false`。不安排脱离当前检查版本的延迟自动合并。
 3. 以 GitLab 返回的 `state: merged`、`merged_at`、`merge_commit_sha` 作为成功证据。
 
 如果 GitLab MCP 不可用或合并接口失败，不要声称已合并；在合并结果表中写明阻塞原因。只有用户明确允许等效 GitLab API fallback 时，才用 REST 合并。

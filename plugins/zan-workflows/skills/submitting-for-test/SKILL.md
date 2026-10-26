@@ -5,6 +5,29 @@ description: Use for 直接提测 after implementation or developer inspection; 
 
 # Submit for Test
 
+## Mock test-delivery gate
+
+Before any selected commit/push/MR/merge, build, Wiki/comment or TAPD registration,
+apply [Mock development](../../references/mock-development.md) and the unified
+[Mock safety helper](../../scripts/mock-safety.mjs). Carry a freshly verified complete
+Mock inventory for every required repository, including explicit evidenced no-Mock
+results; absent/unknown is not none. Bind current source/diff contents and exact target.
+
+Active Mock is local-only by default. The full checklist must explicitly show each
+MOCK-* / MOCK_ONLY scope, paths/scenarios, remaining real calls, test branch/environment,
+validation limits, purpose, exit conditions and the allowed selected writes. Actual human
+approval of that content permits those test operations only. Ordinary development,
+直接提测, confirmed=true, or default DEPLOY does not include Mock permission. Reuse
+matching full-checklist authority without another prompt; inventory/content/target or
+purpose changes reopen affected authorization. Apply this gate even for NO_WIKI, SKIP,
+CONTAINMENT_ONLY, already-waiting registration, standalone helpers and workflow sessions.
+
+Record 含 Mock and real acceptance gaps in the Wiki/current test result; do not claim
+whole-requirement or real-chain acceptance. Production/default-branch delivery is
+forbidden while the selected production scope carries Mock implementations or lacks
+verified source/artifact exclusion. A test approval can never authorize production.
+
+
 Preferred lead model profile: `CRITICAL`. Read the shared
 [model-routing policy](../../references/model-routing.md) when model selection
 or delegation is available; model availability never weakens write gates.

@@ -58,7 +58,9 @@ invent a value or render a placeholder.
    conditions, not file type or diff size. Stale or missing material claims
    require correction even during a nominal refactor. Classification alone does not skip target discovery. A non-functional
    continuation may skip body writes only after step 2 verifies an existing
-   owner page and the current repository/original-branch entry.
+   owner page and the current repository/original-branch entry. Entry completeness
+   includes applicable [supplemental Wiki Jobs](references/wiki-template.md#instant-apps-live-app-关联-job);
+   a missing required link takes the minimal correction path, even for `NON_FUNCTIONAL`.
 2. Reuse a current complete discovery handoff, or call
    [ensure-test-wiki.mjs](../submitting-for-test/scripts/ensure-test-wiki.mjs)
    once without `--execute` to obtain the target, existing body/hash and
@@ -98,7 +100,9 @@ invent a value or render a placeholder.
    Job name and URL, selected build/release parameter names and values verified against
    Jenkins definitions, project name, project category/service type, package
    classification, developer, tester, description, scope, and original source
-   branch from current read-only evidence. Retain conflicts and block
+   branch from current read-only evidence. Resolve applicable supplemental Wiki
+   Jobs separately under `wiki-template.md`; they do not expand the test-build
+   list or require deployment parameters or build receipts. Retain conflicts and block
    unresolved required fields. Under `SKIP` (including a standalone Wiki-only
    request), use only existing parameter evidence and omit unknown selections;
    do not query Jenkins parameters/builds or ask for deployment-only inputs.

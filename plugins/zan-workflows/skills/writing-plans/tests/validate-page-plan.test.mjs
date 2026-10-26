@@ -53,8 +53,8 @@ test("accepts a normalized model with reciprocal links", () => {
 });
 
 test("rejects retired and unsupported Plan schema versions", () => {
-  for (const schemaVersion of [1, 2, 4, undefined]) {
-    assert.match(errorMessages(validatePagePlanModel({ ...validModel, schemaVersion })), /schemaVersion must be 3/);
+  for (const schemaVersion of [1, 2, 5, undefined]) {
+    assert.match(errorMessages(validatePagePlanModel({ ...validModel, schemaVersion })), /schemaVersion must be 4/);
   }
 });
 
@@ -152,6 +152,7 @@ test("accepts inherited API dependencies without inventing implementation tasks"
   ];
   model.apis[0].taskRefs = [];
   model.tasks = [];
+  model.executionScope.taskRefs = [];
   assert.equal(validatePagePlanModel(model).valid, true);
 });
 
@@ -235,6 +236,7 @@ test("accumulates structural errors for primitive collection items and non-array
 test("accepts prototype-named IDs through Map indexes", () => {
   const model = structuredClone(validModel);
   model.evidence[0].id = "__proto__";
+  model.dependencyReview.evidenceRefs = ["__proto__"];
   model.features[0].apiDecisionEvidenceRefs = ["__proto__"];
   model.features[0].implementationPlan.evidenceIds = ["__proto__"];
   model.apis[0].formalSourceEvidenceRefs = ["__proto__"];
@@ -505,8 +507,8 @@ test("saves unknown API requirements with explicit gaps while preserving declare
   feature.apiNeed = "unknown";
   feature.apiDecisionEvidenceRefs = [];
   markImplementationBlocked(feature);
-  assert.match(errorMessages(validatePagePlanModel(model)), /unknown requires a module question or non-empty apiEvidenceGap/);
-  feature.module.questions = [{ id: "Q-001", question: "错误反馈是否需要补充接口字段？", impact: "无法确定错误文案来源", owner: "agent", recommendation: "先读取正式契约与已有消费代码" }];
+  assert.match(errorMessages(validatePagePlanModel(model)), /unknown requires an external dependency or non-empty apiEvidenceGap/);
+  model.externalDependencies = [{ id: "EXT-001", kind: "field-contract", summary: "错误文案字段来源", facts: [], sourceRefs: [], environment: "test", status: "unverified", owner: "Agent 查证", completionCondition: "核实正式契约", blockingStages: ["implementation", "integration"], featureRefs: ["F-001"], taskRefs: [], acceptanceRefs: [], evidenceRefs: [] }];
   assert.deepEqual(validatePagePlanModel(model), { valid: true, errors: [] });
   feature.module.questions = [];
   feature.apiEvidenceGap = "尚未获得 API 契约访问权限，无法确认错误文案字段";
@@ -534,7 +536,7 @@ test("unresolved API needs cannot be marked ready for development even when the 
   model.deliveryUnit.status = "评审中";
   assert.equal(validatePagePlanModel(model).valid, true);
   model.schemaVersion = 2;
-  assert.match(errorMessages(validatePagePlanModel(model)), /schemaVersion must be 3/);
+  assert.match(errorMessages(validatePagePlanModel(model)), /schemaVersion must be 4/);
 });
 
 test("one module may combine API consumption and inherited dependencies without weakening traceability", () => {

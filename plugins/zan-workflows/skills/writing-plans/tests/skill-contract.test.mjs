@@ -366,9 +366,10 @@ test("module review schema and normalized Plan preserve hierarchy, revisions, an
     read("skills/reviewing-page-delivery/assets/page-delivery-plan-template.md"),
     read("skills/reviewing-page-delivery/references/status-model.md"),
   ]);
-  assert.match(standard, /ReviewSession.*schemaVersion=2/s);
+  assert.match(standard, /ReviewSession.*schemaVersion=3/s);
+  assert.match(standard, /旧.*schemaVersion=2.*可读取评审/s);
   assert.doesNotMatch(standard, /仍接受旧|兼容旧版|schemaVersion=1/);
-  assert.match(standard, /schemaVersion=3.*features\[\]\.module.*features\[\]\.reviewConclusion/s);
+  assert.match(standard, /schemaVersion=4.*features\[\]\.module.*features\[\]\.reviewConclusion/s);
   assert.match(standard, /阶段.*blocked.*保存|阶段 Plan 仍可保存/s);
   assert.match(standard, /questions.*必须为空.*才能进入可实施/s);
   assert.match(standard, /阶段 Plan 仍可保存这些问题/);
@@ -376,7 +377,7 @@ test("module review schema and normalized Plan preserve hierarchy, revisions, an
     assert.match(standard, new RegExp(field));
   }
   assert.match(standard, /不得悬空、自引用或形成环/);
-  assert.match(template, /需求结论与实现准备度分别保存/);
+  assert.match(template, /需求结论、外部依赖就绪及本轮执行授权分别判断/);
   assert.match(status, /需求已确认 · 实现方案待补充 · 评审记录已保存/);
 });
 
@@ -390,7 +391,8 @@ test("dialogue additions use the session update API without losing input or revi
   assert.match(additions, /保留未变化模块的最新意见和现场位置/);
   assert.match(additions, /遗漏旧模块|不从完整清单静默消失/);
   assert.doesNotMatch(additions, /没有增量更新 API/);
-  assert.match(additions, /implementationPlan.*owner=agent.*保留需求结论/s);
+  assert.match(additions, /implementationPlan.*外部依赖事实.*保留需求结论/s);
+  assert.match(additions, /业务待确认问题.*owner 为 user 还是 agent.*重置/s);
   assert.match(additions, /技术变更待复核/);
   assert.match(additions, /added\/modified\/unchanged.*单独变化不要求递增版本或重开/s);
   assert.match(additions, /进入或退出 removed.*递增并重开/s);
@@ -467,7 +469,7 @@ test("plan template keeps stable human-readable sections and prohibits unsafe de
   const template = await read("skills/reviewing-page-delivery/assets/page-delivery-plan-template.md");
   for (const section of [
     "模块范围与本次变更", "页面定义", "路由与参数", "功能模块与行为契约", "组件与功能实现方案", "UI 与交互状态",
-    "API 与 Mock", "权限与安全", "页面依赖", "实施任务", "验收步骤与证据", "评审批次",
+    "外部数据与依赖", "API 契约关联", "Mock 标识与交付限制", "权限与安全", "页面依赖", "实施任务", "验收步骤与证据", "评审批次",
     "客观统计", "遗留问题",
   ]) assert.match(template, new RegExp(`^## .*${section}`, "m"));
   for (const required of [

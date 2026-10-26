@@ -136,8 +136,12 @@
         if (!response.ok) throw new Error(`ReviewSession 加载失败：${response.status}`);
         globalThis.reviewSession = await response.json();
         if (query.has("confirm")) {
+          const cards = globalThis.reviewSession.cards.slice(0, 1);
           globalThis.reviewSession = { ...globalThis.reviewSession, sessionId: "trusted-browser-confirmation", reviewRound: 1,
-            viewScope: "all", cards: globalThis.reviewSession.cards.slice(0, 1) };
+            viewScope: "all", cards,
+            externalDependencies: [], mockModules: [],
+            dependencyReview: { status: "reviewed", evidenceRefs: cards[0].sourceEvidence.map(item => item.id) },
+            executionScope: { stage: "implementation", featureRefs: cards.map(card => card.id), taskRefs: [] } };
         }
         if (query.has("assert")) {
           localStorage.removeItem(`page-delivery-review:v1:${globalThis.reviewSession.deliveryUnitKey}`);
@@ -151,6 +155,8 @@
           let result;
           if (query.has("wake")) {
             result = await globalThis.runReviewWakeBrowserAssertions();
+          } else if (query.has("module")) {
+            result = await globalThis.runModuleReviewBrowserAssertions();
           } else {
             const moduleResult = await globalThis.runModuleReviewBrowserAssertions();
             const response = await fetch("./review-session.json", { cache: "no-store" });
@@ -175,6 +181,7 @@
 
       mountPreview().catch((error) => {
         const message = document.createElement("pre");
+        message.setAttribute("data-browser-assertions", "failed");
         message.textContent = error.stack || error.message;
         document.body.append(message);
       });

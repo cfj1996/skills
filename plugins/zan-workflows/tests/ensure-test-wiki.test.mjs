@@ -1,12 +1,15 @@
+import { fixtureEnsureTestWiki as ensureTestWiki } from './helpers/mock-safety-fixture.mjs';
 import assert from 'node:assert/strict';
-import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import {
-  chinaDate, contentHash, ensureTestWiki, parseArgs, records, StdioMcpClient, totalCount,
+  chinaDate, contentHash, ensureTestWiki as originalEnsureTestWiki, parseArgs, records, StdioMcpClient, totalCount,
   wikiIdsFromComments,
 } from '../skills/submitting-for-test/scripts/ensure-test-wiki.mjs';
+import { inspectMockSource } from '../scripts/mock-safety.mjs';
 
 const workspaceId = 50372234;
 const entryId = '1150372234001080829';
@@ -129,6 +132,89 @@ test('parses the TAPD wrapper and recognizes Wiki links in comments', () => {
         '--source-branch', branch])),
     { workspaceId, entryType: 'stories', entryId },
   );
+});
+
+async function withCliDelivery(run) {
+  const repositoryPath = await mkdtemp(join(tmpdir(), 'zan-wiki-cli-source-'));
+  const sourceRepository = 'https://git.example.test/team/wiki-cli.git';
+  const git = (...args) => execFileSync('git', ['-c', 'core.hooksPath=/dev/null', ...args], {
+    cwd: repositoryPath, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+  }).trim();
+  try {
+    git('init', '-q', '--initial-branch=feature/wiki-cli');
+    git('config', 'user.name', 'Fixture'); git('config', 'user.email', 'fixture@example.test');
+    git('remote', 'add', 'origin', sourceRepository);
+    await mkdir(join(repositoryPath, 'src'));
+    await writeFile(join(repositoryPath, 'package.json'), '{}\n');
+    await writeFile(join(repositoryPath, 'src/app.js'), 'export const value = 1;\n');
+    git('add', '.'); git('commit', '-qm', 'fixture source');
+    const sourceSha = git('rev-parse', 'HEAD');
+    const inspection = { repositoryPath, sourceRepository, baseSha: sourceSha, inspectedPaths: ['.'],
+      mockBindingPaths: ['package.json'], runtimePaths: ['src'] };
+    const safety = { ...inspection, ...await inspectMockSource(inspection), schemaVersion: 1,
+      evidenceRefs: ['fixture: current source/imports/activation reviewed; no Mock'], mockModules: [] };
+    const requiredRepositories = [sourceRepository];
+    const gitDeliveryReceipts = [{ state: 'MERGED', containment: true, originUrl: sourceRepository,
+      sourceSha, deliveredSha: sourceSha, targetBranch: 'develop' }];
+    const argv = [
+      '--workspace-id', String(workspaceId), '--entry-type', 'stories', '--entry-id', entryId,
+      '--source-branch', branch, '--mode', 'link', '--expected-wiki-id', childId,
+      '--expect-target', 'REUSE_EXISTING', '--expected-month-id', monthId,
+      '--expected-body-sha256', contentHash(originalBody), '--wiki-title', title, '--creator', 'Alice',
+      '--target-environment', 'test', '--target-branch', 'develop', '--purpose', 'Link the delivered test Wiki',
+      '--mock-safeties', JSON.stringify([safety]), '--required-repositories', JSON.stringify(requiredRepositories),
+      '--git-delivery-receipts', JSON.stringify(gitDeliveryReceipts), '--execute',
+    ];
+    return await run({ argv, requiredRepositories, gitDeliveryReceipts, repositoryPath });
+  } finally { await rm(repositoryPath, { recursive: true, force: true }); }
+}
+
+test('standalone CLI forwards Git receipts through the real Mock gate before linking the Wiki', async () => {
+  await withCliDelivery(async ({ argv, requiredRepositories, gitDeliveryReceipts }) => {
+    const parsed = parseArgs(argv);
+    assert.deepEqual(parsed.requiredRepositories, requiredRepositories);
+    assert.deepEqual(parsed.gitDeliveryReceipts, gitDeliveryReceipts);
+    const fake = makeFake({ childExists: true });
+    // Exercise the production helper directly: the legacy wrapper must not
+    // supply the very delivery fields this CLI regression needs to verify.
+    const result = await originalEnsureTestWiki(fake.call, parsed);
+    assert.equal(result.state, 'LINKED');
+    assert.equal(result.writes, 1);
+    assert.deepEqual(writes(fake).map(call => call.name), ['create_comments']);
+  });
+});
+
+test('standalone CLI rejects missing, incomplete and stale delivery evidence before writing', async () => {
+  await withCliDelivery(async ({ argv, gitDeliveryReceipts, requiredRepositories, repositoryPath }) => {
+    const without = key => argv.filter((value, index) => value !== key && argv[index - 1] !== key);
+    const replace = (key, value) => argv.map((part, index) => argv[index - 1] === key ? JSON.stringify(value) : part);
+    const failures = [
+      [without('--required-repositories'), /全部真实 Git 交付回执/],
+      [without('--git-delivery-receipts'), /全部真实 Git 交付回执/],
+      [replace('--required-repositories', [...requiredRepositories, 'https://git.example.test/team/other.git']), /覆盖完整本轮仓库范围/],
+      [replace('--git-delivery-receipts', [{ ...gitDeliveryReceipts[0], deliveredSha: '' }]), /未验证准确源码包含关系/],
+    ];
+    for (const [input, message] of failures) {
+      const fake = makeFake({ childExists: true });
+      await assert.rejects(originalEnsureTestWiki(fake.call, parseArgs(input)), message);
+      assert.deepEqual(writes(fake), []);
+    }
+    await writeFile(join(repositoryPath, 'src/app.js'), 'export const value = 2;\n');
+    const fake = makeFake({ childExists: true });
+    await assert.rejects(originalEnsureTestWiki(fake.call, parseArgs(argv)), /Mock 清查已过期/);
+    assert.deepEqual(writes(fake), []);
+  });
+});
+
+test('CLI delivery JSON options reject malformed JSON and wrong item shapes with the option name', () => {
+  const argv = ['--workspace-id', String(workspaceId), '--entry-type', 'stories', '--entry-id', entryId, '--source-branch', branch];
+  for (const key of ['--mock-safeties', '--mock-repositories', '--git-delivery-receipts', '--required-repositories']) {
+    for (const value of ['[', 'null', '{}', '[null]']) {
+      assert.throws(() => parseArgs([...argv, key, value]), error => error.message.includes(key) && /JSON 数组/.test(error.message));
+    }
+  }
+  assert.throws(() => parseArgs([...argv, '--required-repositories', '[""]']), /required-repositories.*非空字符串/);
+  assert.throws(() => parseArgs([...argv, '--git-delivery-receipts', '["receipt"]']), /git-delivery-receipts.*对象/);
 });
 
 test('uses a linked Wiki in three reads without listing or writing', async () => {

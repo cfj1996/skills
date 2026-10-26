@@ -1,6 +1,7 @@
+import { fixtureRegisterTestSubmission as registerTestSubmission } from './helpers/mock-safety-fixture.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { registerTestSubmission } from '../scripts/register-test-submission.mjs';
+import { registerTestSubmission as originalRegisterTestSubmission } from '../scripts/register-test-submission.mjs';
 import { checkLocalCloseout, parseWorktrees } from '../scripts/check-local-closeout.mjs';
 
 const id = '1150372234001000001';

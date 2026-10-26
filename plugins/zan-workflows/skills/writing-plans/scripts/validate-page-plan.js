@@ -10,6 +10,7 @@ const API_NEEDS = Object.freeze(["required", "none", "unknown"]);
 const API_DELIVERY_RELATIONS = Object.freeze(["直接消费", "继承依赖", "契约变更"]);
 const REVIEW_CONCLUSIONS = Object.freeze(["未评审", "已确认", "待修改", "阻塞", "不适用"]);
 const IMPLEMENTATION_STAGES = new Set(["可实施", "开发中", "待对接", "待验收", "已交付"]);
+const { normalizeExternalData } = require('./inject-review-panel.js');
 
 const COLLECTIONS = [
   "features",
@@ -307,7 +308,7 @@ function validatePagePlanModel(model) {
     return { valid: false, errors: [{ code: "input-normalized-object", message: "input requires a normalized object" }] };
   }
 
-  addError(errors, model.schemaVersion === 3, "schema-version", "schemaVersion must be 3");
+  addError(errors, [3, 4].includes(model.schemaVersion), "schema-version", "schemaVersion must be 4 (legacy 3 is readable for review)");
   const implementationStage = IMPLEMENTATION_STAGES.has(model.deliveryUnit?.status);
   addError(errors, isNormalizedObject(model.deliveryUnit), "delivery-unit-object", "deliveryUnit requires a normalized object");
   if (isNormalizedObject(model.deliveryUnit)) {
@@ -330,6 +331,60 @@ function validatePagePlanModel(model) {
     indexes[collectionName] = indexById(itemsByCollection[collectionName], collectionName, errors);
   }
 
+  let externalData = null;
+  try {
+    externalData = normalizeExternalData(model, {
+      legacy: model.schemaVersion === 3,
+      featureIds: new Set(indexes.features.keys()), taskIds: new Set(indexes.tasks.keys()),
+      acceptanceIds: new Set(indexes.acceptances.keys()), evidenceIds: new Set(indexes.evidence.keys()),
+      authorizationIds: new Set(itemsByCollection.evidence.filter(item => item?.kind === "human-confirmation").map(item => item.id)),
+    });
+  } catch (error) {
+    addError(errors, false, "external-data-invalid", error.message);
+  }
+  if (externalData) {
+    const scope = externalData.executionScope;
+    for (const taskId of scope.taskRefs) {
+      addError(errors, indexes.tasks.get(taskId)?.featureRefs?.some(id => scope.featureRefs.includes(id)), "execution-scope-task", `${taskId} is outside selected features`);
+    }
+    for (const item of [...externalData.externalDependencies, ...externalData.mockModules]) {
+      for (const taskId of item.taskRefs) {
+        addError(errors, indexes.tasks.get(taskId)?.featureRefs?.some(id => item.featureRefs.includes(id)), "external-data-task-scope", `${item.id} task ${taskId} is outside associated features`);
+      }
+      for (const acceptanceId of item.acceptanceRefs || []) {
+        addError(errors, indexes.acceptances.get(acceptanceId)?.featureRefs?.some(id => item.featureRefs.includes(id)), "external-data-acceptance-scope", `${item.id} acceptance ${acceptanceId} is outside associated features`);
+      }
+    }
+    for (const mock of externalData.mockModules.filter(item => item.status === "active" && item.mode !== "function-data")) {
+      addError(errors, mock.featureRefs.every(id => {
+        const feature = indexes.features.get(id);
+        return feature?.apiNeed === "required" && feature.apiRefs?.length > 0 && feature.apiRefs.every(apiId => indexes.apis.get(apiId)?.status !== "正式契约缺失");
+      }), "mock-contract-unconfirmed", `${mock.id} HTTP/Draft Mock requires confirmed contract facts; use function-data while machine facts are unknown`);
+    }
+  }
+  if (implementationStage) {
+    addError(errors, externalData?.dependencyReview.status === "reviewed", "external-data-unreviewed", "Implementation requires an explicit current external dependency and Mock review; legacy absence is not ready");
+    if (externalData) {
+      const { executionScope: scope, mockModules, externalDependencies } = externalData;
+      const inScope = item => item.featureRefs.some(id => scope.featureRefs.includes(id)) &&
+        (!scope.taskRefs.length || !item.taskRefs.length || item.taskRefs.some(id => scope.taskRefs.includes(id)));
+      for (const dependency of externalDependencies.filter(inScope)) {
+        addError(errors, !dependency.blockingStages.includes(scope.stage) || ["ready", "not-applicable"].includes(dependency.status),
+          "external-dependency-blocked", `${dependency.id} blocks selected ${scope.stage} steps: ${dependency.completionCondition}`);
+      }
+      if (scope.stage === "ui-mock") {
+        for (const featureId of scope.featureRefs) {
+          addError(errors, mockModules.some(item => item.status === "active" && item.marker === "MOCK_ONLY" && item.featureRefs.includes(featureId) &&
+            item.authorizationEvidenceRefs.length > 0 && (!scope.taskRefs.length || !item.taskRefs.length || item.taskRefs.some(id => scope.taskRefs.includes(id)))),
+          "ui-mock-authorization-required", `${featureId} ui-mock execution requires its explicitly approved active MOCK_ONLY implementation`);
+        }
+      }
+      if (scope.stage === "production") {
+        addError(errors, !mockModules.some(item => item.status === "active" && inScope(item)), "production-mock-forbidden", "Active MOCK_ONLY modules cannot enter production; switching them off is insufficient");
+      }
+    }
+  }
+
   addError(errors, itemsByCollection.features.length > 0, "module-features-required", "features requires at least one reviewed module");
   const nestedIds = { scenarios: new Set(), questions: new Set() };
 
@@ -338,11 +393,16 @@ function validatePagePlanModel(model) {
     validateStatus(errors, `features ${feature.id}`, feature.status, STATUS_MODEL.feature);
     validateModule(feature, indexes, nestedIds, errors);
     const applicable = feature.reviewConclusion !== "不适用";
-    validateFeatureImplementationPlan(feature, indexes.evidence, errors, implementationStage && applicable);
-    if (implementationStage && applicable) {
+    const selected = externalData?.executionScope.featureRefs.includes(feature.id) ?? true;
+    const uiMock = externalData?.executionScope.stage === "ui-mock" && selected;
+    validateFeatureImplementationPlan(feature, indexes.evidence, errors, implementationStage && applicable && selected);
+    if (implementationStage && applicable && selected) {
       addError(errors, feature.reviewConclusion === "已确认", "feature-review-not-confirmed", `features ${feature.id} reviewConclusion must be 已确认 for an implementation-stage delivery unit`);
-      addError(errors, feature.apiNeed !== "unknown", "feature-api-need-unresolved", `features ${feature.id} apiNeed must be resolved for an implementation-stage delivery unit`);
+      addError(errors, uiMock || feature.apiNeed !== "unknown", "feature-api-need-unresolved", `features ${feature.id} apiNeed must be resolved for an implementation-stage delivery unit`);
       addError(errors, Array.isArray(feature.module?.questions) && feature.module.questions.length === 0, "feature-module-questions-unresolved", `features ${feature.id} module.questions must be resolved for an implementation-stage delivery unit`);
+      if (!uiMock && feature.apiNeed === "required") {
+        addError(errors, feature.apiRefs?.every(id => indexes.apis.get(id)?.status !== "正式契约缺失"), "api-contract-blocked", `features ${feature.id} required API contract is missing for selected real integration work`);
+      }
     }
     addError(
       errors,
@@ -359,9 +419,9 @@ function validatePagePlanModel(model) {
     if (feature.apiNeed === "unknown") {
       addError(
         errors,
-        (Array.isArray(feature.module?.questions) && feature.module.questions.length > 0) || hasText(feature.apiEvidenceGap),
+        hasText(feature.apiEvidenceGap) || externalData?.externalDependencies.some(item => item.featureRefs.includes(feature.id) && ["api-contract", "field-contract"].includes(item.kind) && ["unverified", "missing"].includes(item.status)),
         "feature-api-need-unknown-gap",
-        `features ${feature.id} apiNeed unknown requires a module question or non-empty apiEvidenceGap`,
+        `features ${feature.id} apiNeed unknown requires an external dependency or non-empty apiEvidenceGap`,
       );
       addError(errors, Array.isArray(feature.apiRefs), "feature-unknown-api-refs", `features ${feature.id} with apiNeed unknown must declare an apiRefs array, which may be empty`);
     }
@@ -376,7 +436,7 @@ function validatePagePlanModel(model) {
     if (feature.apiNeed === "required") {
       addError(
         errors,
-        Array.isArray(feature.apiRefs) && feature.apiRefs.length > 0,
+        Array.isArray(feature.apiRefs) && (feature.apiRefs.length > 0 || (uiMock && externalData?.externalDependencies.some(item => item.featureRefs.includes(feature.id) && item.kind === "api-contract"))),
         "feature-required-api-refs",
         `features ${feature.id} with apiNeed required must declare apiRefs`,
       );

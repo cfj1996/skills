@@ -7,6 +7,20 @@ reasoning_effort: high
 
 # Submission Validator
 
+## Mock authorization is mandatory
+
+For every repository require current source/diff-bound Mock inspection, not an absent
+list interpreted as none. Apply the unified scripts/mock-safety.mjs gate before the
+first delivery write and validate the same evidence at each bound operation. Active
+Mock needs actual human approval of the exact MOCK-* inventory, paths/scenarios,
+real-call boundaries, purpose, test branch/environment and selected operations.
+Ordinary development/direct-submission permission, default DEPLOY or confirmed=true
+alone is insufficient. Matching explicit authority is reusable; stale content, inventory,
+target or purpose blocks. NO_WIKI, SKIP and zero-write Git containment do not authorize
+later Mock Wiki/TAPD writes. Wiki/results must identify 含 Mock and real acceptance gaps.
+Reject production/default-branch delivery with active Mock or unverified exit/exclusion.
+
+
 Act as an isolated read-only validator. Inspect only the proposed current
 operation, upstream public handoffs, displayed facts, authorization, payload,
 and supplied readbacks. Do not call Git, GitLab, TAPD, Wiki, release, shell,

@@ -1,5 +1,21 @@
 # Full Jenkins release flow
 
+## Mock gate before triggering
+
+Apply [Mock development and release gates](../../../references/mock-development.md)
+and scripts/mock-safety.mjs before any trigger. Require current source/diff and complete
+inventory for the exact ref/repository. Canary/test deployments containing Mock need
+explicit current human permission for that inventory, test environment/Job, purpose and
+operations; normal release approval/default test selections alone do not supply it.
+
+Official releases prohibit Mock in the production scope/artifact/runtime. Source exit
+and build-exclusion evidence precede trigger; verify the exact Job/config contains an
+artifact check before deploy/publish and fails closed. Bind its actual result to the
+exact resulting build/SHA/artifact before release success. Missing effective Jenkins
+gates block triggering; never claim future artifacts inspected. Disabled switches,
+retired labels or query-contract release-check alone cannot satisfy the prohibition.
+
+
 Use for production/official releases, every tooling/package publication (including
 canary), and deployments owned by a confirmed submission or go-live bundle.
 Reuse that bundle's unchanged confirmation and exact source evidence.

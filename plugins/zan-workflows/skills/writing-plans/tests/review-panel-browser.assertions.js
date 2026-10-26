@@ -30,6 +30,12 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
     }
     return card;
   };
+  // Narrow synthetic scenarios must also explicitly bind their dependency audit
+  // and execution scope to the cards they actually contain (ReviewSession v3).
+  const scopeForCards = (cards) => ({
+    dependencyReview: { status: "reviewed", evidenceRefs: [...new Set(cards.flatMap(card => card.sourceEvidence.map(item => item.id)))] },
+    executionScope: { stage: "implementation", featureRefs: cards.map(card => card.id), taskRefs: [...new Set(cards.flatMap(card => card.links?.tasks || []))] },
+  });
   const consoleEvents = [];
   const consoleMethods = ["debug", "log", "info", "warn", "error"];
   const originalConsole = Object.fromEntries(consoleMethods.map((method) => [method, console[method]]));
@@ -89,6 +95,10 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
       planFingerprint: globalThis.reviewSession.planFingerprint,
       artifactRuleFingerprint: globalThis.reviewSession.artifactRuleFingerprint,
       artifactRuleResolution: globalThis.reviewSession.artifactRuleResolution,
+      externalDependencies: structuredClone(globalThis.reviewSession.externalDependencies),
+      mockModules: structuredClone(globalThis.reviewSession.mockModules),
+      dependencyReview: structuredClone(globalThis.reviewSession.dependencyReview),
+      executionScope: structuredClone(globalThis.reviewSession.executionScope),
       currentCardIndex: 2,
       collapsed: true,
       panelPosition: { x: 111, y: 123 },
@@ -159,7 +169,10 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
     const persistedDraft = JSON.parse(localStorage.getItem(storageKey));
     check(persistedDraft.currentCardIndex === 1, "draft should persist the current input card index");
     check(persistedDraft.sessionId === "session-1" && persistedDraft.reviewRound === 2 && persistedDraft.planFingerprint === "sha256:fixture" && persistedDraft.artifactRuleFingerprint === "sha256:rule-fixture" && Number.isFinite(persistedDraft.savedAt), "draft should persist matching metadata and a saved timestamp");
-    check(!JSON.stringify(persistedDraft).includes("evidence") && !JSON.stringify(persistedDraft).includes("results"), "draft must exclude evidence and results");
+    check(persistedDraft.cards.every(card => !Object.hasOwn(card, "sourceEvidence") && !Object.hasOwn(card, "reviewResult")) && !Object.hasOwn(persistedDraft, "results"), "editable draft cards must exclude source-evidence payloads and review results");
+    for (const field of ["externalDependencies", "mockModules", "dependencyReview", "executionScope"]) {
+      check(JSON.stringify(persistedDraft[field]) === JSON.stringify(saved[field]), `draft must preserve canonical ${field}, including dependency evidence references`);
+    }
     check(saved?.collapsed === true, "collapse state should be persisted");
     check(Number.isFinite(saved?.panelWidth) && ["left", "right", "floating"].includes(saved?.dockSide), "panel width and dock side should be exposed in runtime state");
     check(saved?.panelPosition?.x >= 0 && saved?.panelPosition?.y >= 0, "drag position should stay inside the viewport");
@@ -279,6 +292,7 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
       ...globalThis.reviewSession,
       cards: [canonicalCard({ id: "resolved", conclusion: "已确认" })],
     };
+    Object.assign(allResolvedSession, scopeForCards(allResolvedSession.cards));
     globalThis.PageDeliveryReviewPanel.mountReviewPanel(allResolvedSession);
     check(Boolean(panel()?.querySelector("[data-review-empty]")), "an empty active round should render an explicit empty state");
     check(!panel()?.querySelector("[data-review-context]")?.textContent.includes("1/0"), "empty round header must not display 1/0");
@@ -305,6 +319,7 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
       cards: [canonicalCard({ id: "tainted-resolution-card" })],
     };
     const taintedStorageKey = `page-delivery-review:v1:${taintedResolutionSession.deliveryUnitKey}`;
+    Object.assign(taintedResolutionSession, scopeForCards(taintedResolutionSession.cards));
     const canonicalResolution = {
       status: "resolved",
       source: "agents",
@@ -358,6 +373,7 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
       },
       cards: [canonicalCard({ id: "unresolved-rule-card", conclusion: "阻塞" })],
     };
+    Object.assign(unresolvedSession, scopeForCards(unresolvedSession.cards));
     globalThis.PageDeliveryReviewPanel.mountReviewPanel(unresolvedSession);
     const unresolvedApi = globalThis.__PAGE_DELIVERY_REVIEW__;
     const scopeHost = document.querySelector("[data-page-delivery-review-host]");
@@ -435,6 +451,7 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
         sourceEvidence: [{ id: "frame-evidence-source", kind: "prototype", label: "frame target", frameSelector: "[data-review-evidence-frame]", selector: "#frame-target" }],
       })],
     };
+    Object.assign(frameEvidenceSession, scopeForCards(frameEvidenceSession.cards));
     globalThis.PageDeliveryReviewPanel.mountReviewPanel(frameEvidenceSession);
     const frameRect = frame.getBoundingClientRect();
     const targetRect = frame.contentDocument.querySelector("#frame-target").getBoundingClientRect();
@@ -453,6 +470,7 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
         sourceEvidence: [{ id: "bad-evidence-source", kind: "prototype", label: "bad selector", selector: "[" }],
       })],
     };
+    Object.assign(unavailableEvidenceSession, scopeForCards(unavailableEvidenceSession.cards));
     globalThis.PageDeliveryReviewPanel.mountReviewPanel(unavailableEvidenceSession);
     click(panel()?.querySelector('[data-action="highlight-evidence"]'));
     check(panel()?.querySelector("[data-review-evidence-status]")?.textContent.includes("无法定位"), "invalid evidence selectors should show a visible unavailable message");
@@ -464,6 +482,7 @@ globalThis.runPageDeliveryBrowserAssertions = async function runPageDeliveryBrow
       reviewRound: 1,
       cards: [canonicalCard({ id: "conflict-card" })],
     };
+    Object.assign(conflictSession, scopeForCards(conflictSession.cards));
     globalThis.PageDeliveryReviewPanel.mountReviewPanel(conflictSession);
     click(panel()?.querySelector('[data-action="submit"]'));
     const conflictSubmission = globalThis.__PAGE_DELIVERY_REVIEW__.exportSubmission();

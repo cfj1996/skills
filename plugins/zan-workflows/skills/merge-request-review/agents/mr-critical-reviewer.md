@@ -41,6 +41,16 @@ coverage blocks merge without manufacturing a code defect; documented
 NO_WIKI/NOT_APPLICABLE exempts only applicable documentation obligations;
 NO_WIKI does not exempt other required docs. Do not write documentation or comments.
 
+Independently trace Mock entrypoints, runtime imports and build exclusion under
+[the production prohibition](../../../references/mock-development.md), including
+non-Zan projects. Verify current full source/target scope and the same inventory,
+stable MOCK-* / MOCK_ONLY identities, real replacement and exit evidence. A disabled
+switch, removed label, retired status or ordinary CI success is insufficient.
+Development-only fixtures may remain only with proved exclusion. Missing/stale
+evidence blocks approval/merge as `mock-safety`; the lead must rerun the shared
+source/content checker for the current refs before each remote write. Source review
+must not fabricate future artifact or Jenkins pre-deploy check results.
+
 ## Output
 
 Return exactly:

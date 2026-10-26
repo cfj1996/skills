@@ -38,7 +38,7 @@ checklist and must not ask a separate dialogue scope-confirmation question.
 
 When handing scope or a Plan to an execution workflow, use the shared
 [six-column checklist](../../references/execution-checklist.md):
-`项目 | 分支 | 交付范围 | 实施方案 | 验收标准 | 待决事项`.
+`项目 | 分支 | 交付范围 | 实施方案 | 验收标准 | 需求待确认`.
 Before approval its visible title is 确定清单; only confirmed current content
 is called 执行清单. The overview lists all actual execution projects, item,
 links and goal. Merge/deployment choices are per project; the Story/Bug has
@@ -188,7 +188,11 @@ and Plan 内容指纹. 正式评审首次按功能模块与子模块全量整理
 每个功能点至少包含职责与边界、输入、输出、行为规则、验收例子、代码落点或缺口、来源证据和本次变更。
 功能清单必须能回答“改哪个项目、为什么改、现有 `origin/master` 已有什么、还要增加什么、明确不改什么”。
 
-正式评审会话只使用 `schemaVersion=2` 的模块卡。每张卡按“职责与范围 → 输入输出 → 行为规则与验收例子 → 待确认问题 → 本次变更”组织，内部实现默认折叠。只有职责、输入输出与验收能够独立说明时才拆子模块；布局、API、权限等技术维度是 Agent 后台检查清单，不再按维度或 API 消费点强制拆卡。
+新建正式评审会话使用 `schemaVersion=3`；旧 v2 可读取并按新审查要求迁移，不将缺失依赖审查
+默认为就绪。每张卡按“职责与范围 → 输入输出 → 行为规则与验收例子 → 需求待确认
+→ 本次变更”组织，内部实现默认折叠。顶层“外部数据与依赖”和 Mock 范围记录
+一次，按功能引用显示。只有职责、输入输出与验收能够独立说明时才拆子模块；
+不按 API、权限或布局维度强制拆卡。
 
 Agent 根据 [API 契约阶段](references/api-contract-stages.md) 只为本次新增或改变的网络消费建立需求清单。纯布局、文案、交互重排或已批准的 Mock 状态，可复用现有数据绑定证据并标记“无新增契约”；不要依次遍历 YApi、OpenAPI、Query Contract 和 Swagger 来证明一个未请求的后端改动。真实数据必须新增字段时，再开展正式来源搜索；未查清的事实进入该消费点的实现阻塞项，不扩展整个 UI 范围。Treat 能力归属、运行时范围 and 本次交付关系 as separate facts; never assign an API to a page or module.
 
@@ -200,6 +204,21 @@ Agent 根据 [API 契约阶段](references/api-contract-stages.md) 只为本次�
 For formal module cards, build the canonical `implementationPlan` from applicable 项目规范、依赖、现有源码、PRD、原型和 API 证据. Use the compact four-block contract in [产物规则与评审卡规范](references/page-review-standard.md). 实现证据不足时设 `implementationPlan.status=blocked` 并说明缺口；需求 `conclusion` 独立，允许需求“已确认”同时实现方案待补充，不自动把需求改为“阻塞”。需要用户决定的行为问题和 Agent 能自行查证的技术问题分别标明责任方。简短摘要语义核对同样的行为、证据和阻塞，不构造四块对象或调用正式 Plan 校验器。
 
 For a formal review, keep the page state only as “评审中” or “阻塞” while reviewing and use [状态模型](references/status-model.md) for evidence gates and objective counts. 不得生成 Draft OpenAPI；不得报告单一页面完成百分比。简短摘要直接报告范围和验证事实，不创建页面状态模型。
+
+## 外部依赖与 Mock 交接
+
+按 [外部依赖规范](../../references/external-data-dependencies.md)在同一 Plan/brief
+维护正式来源、已确认事实、环境、缺口、补齐条件及关联步骤/验收；正式模型
+采用 `externalDependencies`、`dependencyReview` 和 `executionScope`，字段及兼容
+规则见 [评审规范](references/page-review-standard.md)。`module.questions` 仅保留
+业务待决定问题，外部查证项不重复放入该集合；内部组件/代码落点仍在实施依据。
+补齐技术事实保留业务结论，但刷新受影响实施/保存确认与验证，不沿用旧快照。
+
+所有 Mock 按 [跨项目规范](../../references/mock-development.md)登记 `mockModules`，
+关联稳定 `MOCK-*` 和 `MOCK_ONLY`、真实实现位置、场景、切换/重置、真实调用
+边界、验证局限及退出证据。ui-mock 仅在准确范围明确获准且其前置条件就绪时
+可执行；真实接入的未来缺口保留。默认仅本地，含 Mock 到测试环境必须另在同一
+完整清单明确展示并获确认；生产制品及运行链路禁止 Mock，不能靠开关关闭放行。
 
 ## 评审模式选择
 
@@ -215,8 +234,9 @@ For a formal review, keep the page state only as “评审中” or “阻塞”
 
 在对话中给出受影响项目与基准 ref、范围、功能点、排除项、实现摘要和中文分支动作；
 完整 `origin/master` SHA 留在内部精确校验与授权绑定中，按需披露。
-内部完成适用的需求确认前检查清单，对外统一在六列表格的待决事项
-与编号备注汇总缺口、影响、责任方、补齐条件和阻塞范围，不重复附长检查表。
+内部完成适用的需求确认前检查清单，六列“需求待确认”只汇总业务决定；外部
+契约/字段/配置/环境事实与缺口在“外部数据与依赖”展示，内部技术缺口在实施依据。
+长内容使用同一 Plan/编号备注，不再另建一张重复的检查台账。
 不需要正式 Plan 时，保留相同检查与真实阻塞计数，确认后返回范围和 brief。
 需要正式 Plan 的 `STANDALONE` 由用户确认该摘要后进入“开发分支与 Plan”；
 `DEFER_TO_ORCHESTRATOR` 不单独提问，把摘要交给需求开发清单统一确认。两者都无需打开
@@ -381,7 +401,7 @@ again just because `PLAN_WRITE` begins. A new location, new module or material
 content change requires a fresh preview and confirmation. `PANEL` still uses
 its trusted `confirmPlan` and saved-plan receipt protocol.
 
-Use the human-readable [页面交付 Plan 模板](assets/page-delivery-plan-template.md) only after both the project location rule and this update are confirmed. 按模块原样保存需求、验收例子、`reviewConclusion`、实现方案、未决事项与本轮变更。需求已确认但实现 `blocked` 时允许阶段保存，明确缺口且不得标为可实施；`ready` 方案仍须保留一句话摘要、四块实施内容与证据。规范化校验模型只使用 `schemaVersion=3`；适用模块仍有未解决 `questions` 时不能进入可实施。Markdown 中不嵌入 JSON。保持同一模块一份 Plan、稳定编号与明确双向关联。用户确认只表示允许写入，Agent 写入并读回核对后调用 `markPlanSaved`，面板才显示“已保存”。
+Use the human-readable [页面交付 Plan 模板](assets/page-delivery-plan-template.md) only after both the project location rule and this update are confirmed. 按模块原样保存需求、验收例子、`reviewConclusion`、实现方案、未决事项与本轮变更。需求已确认但实现 `blocked` 时允许阶段保存，明确缺口且不得标为可实施；`ready` 方案仍须保留一句话摘要、四块实施内容与证据。新建规范化 Plan 使用 `schemaVersion=4`，旧 v3 可读取并按新审查要求迁移，缺依赖审查信息不默认为就绪；业务 `questions`、本轮阶段必需外部依赖和内部实施依据都须满足门禁才能实施。Markdown 中不嵌入 JSON。保持同一模块一份 Plan、稳定编号与明确双向关联。用户确认只表示允许写入，Agent 写入并读回核对后调用 `markPlanSaved`，面板才显示“已保存”。
 
 ## 输出契约与交接
 

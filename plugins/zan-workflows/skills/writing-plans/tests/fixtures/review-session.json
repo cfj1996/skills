@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "sessionId": "session-1",
   "deliveryUnitKey": "sample/login",
   "deliveryUnitKind": "page",
@@ -258,5 +258,26 @@
         "revision": 1
       }
     }
-  ]
+  ],
+  "externalDependencies": [],
+  "mockModules": [],
+  "dependencyReview": {
+    "status": "reviewed",
+    "evidenceRefs": [
+      "E-001"
+    ]
+  },
+  "executionScope": {
+    "stage": "implementation",
+    "featureRefs": [
+      "REV-001",
+      "REV-002",
+      "REV-003",
+      "REV-004"
+    ],
+    "taskRefs": [
+      "T-001",
+      "T-002"
+    ]
+  }
 }

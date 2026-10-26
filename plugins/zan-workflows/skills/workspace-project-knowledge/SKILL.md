@@ -361,6 +361,10 @@ Workflow:
    link must block when the URL cannot be evidenced; it must not derive one.
 4. If a project is not listed in `jenkins_jobs`, say it is not listed in the workspace index; do not guess a `front-*-test` name.
 5. For public libraries and tooling packages, check whether they map to the shared `npm-tools-test` job.
+6. For Wiki consumers, apply the scoped supplemental Job rules in
+   [wiki-template.md](../drafting-wiki/references/wiki-template.md#instant-apps-live-app-关联-job).
+   Resolve those links separately; Wiki-only Jobs do not change `jenkins_jobs`
+   or expand the selected test-environment build list.
 
 Output:
 

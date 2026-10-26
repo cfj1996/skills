@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "sessionId": "module-preview-session",
   "deliveryUnitKey": "sample/login-modules",
   "deliveryUnitKind": "page",
@@ -163,15 +163,7 @@
             "then": "显示错误原因并允许重试"
           }
         ],
-        "questions": [
-          {
-            "id": "Q-003",
-            "question": "接口有哪些可区分的登录失败原因？",
-            "impact": "影响具体错误提示，不影响确认失败可重试的需求",
-            "owner": "agent",
-            "recommendation": "查证正式错误码，在此之前保留统一错误提示方案"
-          }
-        ],
+        "questions": [],
         "change": {
           "kind": "added",
           "summary": "新增服务端错误的反馈约定"
@@ -203,5 +195,47 @@
       "conclusion": "未评审",
       "userNote": ""
     }
-  ]
+  ],
+  "externalDependencies": [
+    {
+      "id": "EXT-001",
+      "kind": "field-contract",
+      "summary": "登录错误码及消息映射",
+      "facts": [],
+      "sourceRefs": [],
+      "environment": "test",
+      "status": "unverified",
+      "owner": "Agent 查证；后端责任方待核实",
+      "completionCondition": "核实正式接口错误码与消息映射",
+      "blockingStages": [
+        "implementation",
+        "integration",
+        "acceptance"
+      ],
+      "featureRefs": [
+        "M-003"
+      ],
+      "taskRefs": [],
+      "acceptanceRefs": [],
+      "evidenceRefs": [
+        "E-003"
+      ]
+    }
+  ],
+  "mockModules": [],
+  "dependencyReview": {
+    "status": "reviewed",
+    "evidenceRefs": [
+      "E-001"
+    ]
+  },
+  "executionScope": {
+    "stage": "implementation",
+    "featureRefs": [
+      "M-001",
+      "M-002",
+      "M-003"
+    ],
+    "taskRefs": []
+  }
 }

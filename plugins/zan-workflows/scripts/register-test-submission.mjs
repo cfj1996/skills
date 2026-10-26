@@ -2,6 +2,7 @@
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { clientFor } from './mcp-client.mjs';
+import { checkMockSafetySet, mockSafetyPreview } from './mock-safety.mjs';
 import { assertTransitionFields, resolveBugWorkflow, resolveVersionField } from './tapd-mappings.mjs';
 import { readCliPlan, sha256, stableJson, requireText } from './workflow-runtime.mjs';
 
@@ -63,7 +64,7 @@ function checkPrerequisites(input) {
   }
 }
 
-export async function registerTestSubmission(call, input) {
+export async function registerTestSubmission(call, input, io = {}) {
   if (!Number.isSafeInteger(input.workspaceId) || input.workspaceId < 1 || !/^\d+$/.test(input.entryId || '') ||
       !['bug', 'stories', 'tasks'].includes(input.entryType) || !['INITIAL', 'CONTINUE'].includes(input.workMode) ||
       !['WAITING_TEST', 'NONE'].includes(input.statusAction) || !['WRITE', 'NONE'].includes(input.versionAction)) {
@@ -86,6 +87,8 @@ export async function registerTestSubmission(call, input) {
   if (input.execute) {
     if (input.confirmed !== true) throw new Error('缺少当前登记清单确认');
     checkPrerequisites(input);
+    await checkMockSafetySet(input, { operation: 'test-registration', purpose: input.purpose, environmentKind: 'test',
+      targetEnvironment: input.targetEnvironment || 'test', targetBranch: input.targetBranch, requireCommitted: true }, io);
     if (input.statusAction === 'WAITING_TEST' && (!input.metadataHashes?.statusMap || !input.metadataHashes?.transitions)) {
       throw new Error('执行缺少已确认的工作流指纹');
     }
@@ -171,7 +174,7 @@ export async function registerTestSubmission(call, input) {
   const state = input.statusAction === 'NONE' && input.versionAction === 'NONE' ? 'NOT_APPLICABLE'
     : skipContinue ? 'SKIPPED_ALREADY_WAITING_TEST'
     : !statusWrite && !versionWrite ? 'ALREADY_REGISTERED' : 'AWAITING_CONFIRMATION';
-  const plan = { ...input, execute: false, confirmed: false, state, metadataHashes, metadata,
+  const plan = { ...input, ...mockSafetyPreview(input), execute: false, confirmed: false, state, metadataHashes, metadata,
     expectedStatus: before.status, expectedVersion: currentVersion,
     ...(statusWrite ? { expectedAssignee: assigneeFields(before), assigneeSource } : {}), payload, writes: 0 };
   if (!input.execute) return plan;

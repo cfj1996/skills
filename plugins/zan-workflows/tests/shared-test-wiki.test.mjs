@@ -1,10 +1,12 @@
+import { fixtureEnsureTestWiki as ensureTestWiki } from './helpers/mock-safety-fixture.mjs';
+import { FixtureWorkflowSession as WorkflowSession } from './helpers/mock-safety-fixture.mjs';
 import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { ensureTestWiki, contentHash, parseArgs } from '../skills/submitting-for-test/scripts/ensure-test-wiki.mjs';
-import { WorkflowSession } from '../scripts/workflow-session.mjs';
+import { ensureTestWiki as originalEnsureTestWiki, contentHash, parseArgs } from '../skills/submitting-for-test/scripts/ensure-test-wiki.mjs';
+import { WorkflowSession as originalWorkflowSession } from '../scripts/workflow-session.mjs';
 
 const workspaceId = 50372234, story = '100', taskA = '101', taskB = '102', bug = '200';
 const monthId = '300', wikiId = '400', branchA = 'feature/alice.story', branchB = 'feature/bob.story';

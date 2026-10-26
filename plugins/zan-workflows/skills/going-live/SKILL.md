@@ -5,6 +5,26 @@ description: Use when submitted TAPD changes must merge original fixed branches 
 
 # Go Live
 
+## Mock production prohibition
+
+Before any default-branch MR/create/merge or official release, apply
+[Mock production gates](../../references/mock-development.md) and the unified
+[safety helper](../../scripts/mock-safety.mjs) to all selected repositories. Test-environment
+Mock authorization never transfers to production. Inspect current full source/diff and
+mockModules; active production-scope Mock or unknown/partial retirement evidence blocks.
+Retiring requires actual real replacement, reference/entry cleanup and verified build
+exclusion; changing a tag/status or disabling a switch is insufficient.
+
+Source preflight precedes master/main writes. A future build artifact is not required
+before it exists and must never be fabricated: before Jenkins release, verify the exact
+Job/config has an effective artifact inspection before deploy/publish with failure
+blocking; after the build, require that build/SHA/artifact-bound gate result before
+claiming release success. If no effective gate can be proven, stop before trigger.
+Production artifacts/runtime may not contain Mock modules, fixture/handler/runtime or
+enablement paths. Isolated repository-only development tests may remain only with
+proved exclusion. Query Contract release-check or @api-mock status does not prove this.
+
+
 Preferred lead model profile: `CRITICAL`. Read the shared
 [model-routing policy](../../references/model-routing.md) when model selection
 or delegation is available; model availability never weakens merge gates.

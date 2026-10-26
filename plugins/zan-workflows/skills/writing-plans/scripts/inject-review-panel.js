@@ -14,6 +14,9 @@
   const LINK_FIELDS = ["features", "apis", "uiStates", "dependencies", "tasks", "evidence"];
   const USER_CONCLUSIONS = new Set(["未评审", "已确认", "待修改", "阻塞", "不适用"]);
   const REVIEW_CONCLUSIONS = [...USER_CONCLUSIONS];
+  const EXECUTION_STAGES = Object.freeze(["ui-mock", "implementation", "integration", "acceptance", "test-delivery", "production"]);
+  const EXTERNAL_DEPENDENCY_KINDS = Object.freeze(["api-contract", "field-contract", "credential-config", "environment", "account-permission", "external-service"]);
+  const EXTERNAL_DEPENDENCY_STATUSES = Object.freeze(["unverified", "missing", "ready", "not-applicable"]);
   const DOCK_SIDES = new Set(["left", "right", "floating"]);
   const SNAP_THRESHOLD = 48;
   const PANEL_WIDTH_LIMITS = Object.freeze({ default: 960, min: 720, max: 1280, viewportGap: 16 });
@@ -121,8 +124,8 @@
     if (!isNormalizedObject(session) || !Array.isArray(session.cards) || !isNonEmptyString(session.sessionId)) {
       throw createCodedError(TypeError, "invalid-review-session", "ReviewSession must include a sessionId and cards array");
     }
-    if (session.schemaVersion !== 2) {
-      throw createCodedError(TypeError, "invalid-review-schema-version", "ReviewSession schemaVersion must be 2");
+    if (![2, 3].includes(session.schemaVersion)) {
+      throw createCodedError(TypeError, "invalid-review-schema-version", "ReviewSession schemaVersion must be 3 (legacy 2 is readable for review)");
     }
     if (!isDeliveryUnitKey(session.deliveryUnitKey)) {
       throw createCodedError(TypeError, "invalid-delivery-unit-key", "ReviewSession deliveryUnitKey must be a safe relative key");
@@ -166,6 +169,13 @@
     });
     visit(null);
     cards = ordered;
+    const externalData = normalizeExternalData(session, {
+      legacy: session.schemaVersion === 2,
+      featureIds: new Set(cards.flatMap(card => [card.id, ...card.links.features])),
+      taskIds: new Set(cards.flatMap(card => card.links.tasks)),
+      evidenceIds: new Set(cards.flatMap(card => [...card.sourceEvidence.map(item => item.id), ...card.links.evidence])),
+      authorizationIds: new Set(cards.flatMap(card => card.sourceEvidence.filter(item => item.kind === "human-confirmation").map(item => item.id))),
+    });
     return {
       schemaVersion: session.schemaVersion,
       sessionId: session.sessionId,
@@ -181,7 +191,77 @@
       currentCardIndex: 0,
       viewScope: session.viewScope,
       cards,
+      ...externalData,
     };
+  }
+
+  // Shared with the Plan validator so browser snapshots and saved models use one contract.
+  function normalizeExternalData(value, { legacy = false, featureIds, taskIds, acceptanceIds, evidenceIds, authorizationIds } = {}) {
+    const fail = (message) => { throw createCodedError(TypeError, "invalid-external-data", message); };
+    const text = (item, field) => { if (!isNonEmptyString(item?.[field])) fail(`${field} requires non-empty text`); return item[field]; };
+    const strings = (item, field, required = false) => {
+      if (!isStringArray(item?.[field]) || (required && item[field].length === 0) || item[field].some(entry => !isNonEmptyString(entry))) fail(`${field} requires ${required ? "non-empty " : ""}text array`);
+      if (new Set(item[field]).size !== item[field].length) fail(`${field} must not repeat references`);
+      return [...item[field]];
+    };
+    const refs = (item, field, available, required = false) => {
+      const result = strings(item, field, required);
+      if (available && result.some(id => !available.has(id))) fail(`${field} references missing id`);
+      return result;
+    };
+    const noSecrets = (item) => {
+      if (Object.keys(item).some(key => /^(apiKey|token|secret|password|authorization|credentialValue)$/i.test(key))) fail("Store credential configuration references, never secret values");
+    };
+    const legacyMissing = legacy && value.externalDependencies === undefined && value.mockModules === undefined && value.dependencyReview === undefined && value.executionScope === undefined;
+    if (legacyMissing) return {
+      externalDependencies: [], mockModules: [],
+      dependencyReview: { status: "unreviewed", evidenceRefs: [] },
+      executionScope: { stage: "implementation", featureRefs: [...(featureIds || [])], taskRefs: [] },
+    };
+    if (!Array.isArray(value.externalDependencies) || !Array.isArray(value.mockModules)) fail("externalDependencies and mockModules require explicit arrays");
+    const ids = new Set();
+    const externalDependencies = value.externalDependencies.map(item => {
+      if (!isNormalizedObject(item)) fail("externalDependencies item requires an object");
+      noSecrets(item);
+      const id = text(item, "id");
+      if (!/^EXT-[A-Za-z0-9-]+$/.test(id) || ids.has(id)) fail("External dependency requires a unique EXT-* id");
+      ids.add(id);
+      if (!EXTERNAL_DEPENDENCY_KINDS.includes(item.kind) || !EXTERNAL_DEPENDENCY_STATUSES.includes(item.status)) fail(`${id} has unsupported kind or status`);
+      const blockingStages = strings(item, "blockingStages");
+      if (blockingStages.some(stage => !EXECUTION_STAGES.includes(stage))) fail(`${id} has unsupported blocking stage`);
+      if (["unverified", "missing"].includes(item.status) && blockingStages.length === 0) fail(`${id} unresolved dependency must name its affected stages`);
+      return { id, kind: item.kind, summary: text(item, "summary"), facts: strings(item, "facts", item.status === "ready"),
+        sourceRefs: strings(item, "sourceRefs", ["ready", "not-applicable"].includes(item.status)), environment: text(item, "environment"),
+        status: item.status, owner: text(item, "owner"), completionCondition: text(item, "completionCondition"), blockingStages,
+        featureRefs: refs(item, "featureRefs", featureIds, true), taskRefs: refs(item, "taskRefs", taskIds), acceptanceRefs: refs(item, "acceptanceRefs", acceptanceIds),
+        evidenceRefs: refs(item, "evidenceRefs", evidenceIds, ["ready", "not-applicable"].includes(item.status)) };
+    });
+    const mockModules = value.mockModules.map(item => {
+      if (!isNormalizedObject(item)) fail("mockModules item requires an object");
+      noSecrets(item);
+      const id = text(item, "id");
+      if (!/^MOCK-[A-Za-z0-9-]+$/.test(id) || ids.has(id) || item.marker !== "MOCK_ONLY") fail("Mock module requires a unique MOCK-* id and MOCK_ONLY marker");
+      ids.add(id);
+      if (!["active", "retired"].includes(item.status) || !["function-data", "http-contract", "managed-draft"].includes(item.mode)) fail(`${id} has unsupported status or mode`);
+      const paths = strings(item, "paths", true);
+      if (paths.some(path => /^(?:[\\/]|[A-Za-z]:)/.test(path) || path.split(/[\\/]/).includes(".."))) fail(`${id} paths must be repository-relative`);
+      return { id, marker: "MOCK_ONLY", status: item.status, mode: item.mode, paths,
+        featureRefs: refs(item, "featureRefs", featureIds, true), taskRefs: refs(item, "taskRefs", taskIds), scenarios: strings(item, "scenarios", true),
+        activation: text(item, "activation"), realRequestBoundary: text(item, "realRequestBoundary"), exitCondition: text(item, "exitCondition"),
+        verificationLimits: strings(item, "verificationLimits", true), authorizationEvidenceRefs: refs(item, "authorizationEvidenceRefs", authorizationIds || evidenceIds, item.status === "active"),
+        exitEvidenceRefs: refs(item, "exitEvidenceRefs", evidenceIds, item.status === "retired") };
+    });
+    const review = value.dependencyReview;
+    if (!isNormalizedObject(review) || !["unreviewed", "reviewed"].includes(review.status)) fail("dependencyReview must explicitly be unreviewed or reviewed");
+    const dependencyReview = { status: review.status, evidenceRefs: refs(review, "evidenceRefs", evidenceIds, review.status === "reviewed") };
+    const scope = value.executionScope;
+    if (!isNormalizedObject(scope) || !EXECUTION_STAGES.includes(scope.stage)) fail("executionScope requires an explicit supported stage");
+    const executionScope = { stage: scope.stage, featureRefs: refs(scope, "featureRefs", featureIds, true), taskRefs: refs(scope, "taskRefs", taskIds) };
+    return { externalDependencies, mockModules, dependencyReview, executionScope };
+  }
+
+  function externalDataSnapshot(value) {
+    return deepClone(Object.fromEntries(["externalDependencies", "mockModules", "dependencyReview", "executionScope"].map(field => [field, value[field]])));
   }
 
   function normalizeReviewCard(card) {
@@ -377,7 +457,43 @@
 
   function requirementContent(card) {
     const { revision, questions, change, ...module } = card.module;
-    return JSON.stringify({ ...module, removed: change.kind === "removed", questions: questions.filter(question => question.owner === "user") });
+    // Both user-owned decisions and agent-owned business clarification now belong here.
+    // Technical and external facts have their own records and cannot hide a business change.
+    return JSON.stringify({ ...module, removed: change.kind === "removed", questions });
+  }
+
+  function externalContentForCard(state, card) {
+    const ids = new Set([card.id, ...card.links.features]);
+    const relevant = item => item.featureRefs.some(id => ids.has(id));
+    const externalDependencies = state.externalDependencies.filter(relevant);
+    const mockModules = state.mockModules.filter(relevant);
+    const taskIds = new Set([
+      ...card.links.tasks,
+      ...externalDependencies.flatMap(item => item.taskRefs),
+      ...mockModules.flatMap(item => item.taskRefs),
+    ]);
+    const scope = state.executionScope;
+    const selectedTasks = (scope.taskRefs.length
+      ? scope.taskRefs.filter(id => taskIds.has(id))
+      : [...taskIds]).sort();
+    const selected = scope.featureRefs.some(id => ids.has(id)) &&
+      (!scope.taskRefs.length || !taskIds.size || selectedTasks.length > 0);
+    const evidenceIds = new Set([
+      ...card.sourceEvidence.map(item => item.id), ...card.links.evidence,
+      ...externalDependencies.flatMap(item => item.evidenceRefs),
+      ...mockModules.flatMap(item => [...item.authorizationEvidenceRefs, ...item.exitEvidenceRefs]),
+    ]);
+    const reviewEvidence = state.dependencyReview.evidenceRefs.filter(id => evidenceIds.has(id)).sort();
+    return JSON.stringify({
+      externalDependencies,
+      mockModules,
+      // A session-level scope or audit may include unrelated modules. Compare only
+      // its effective contribution to this card, never every selected feature/task.
+      dependencyReview: selected || reviewEvidence.length
+        ? { status: state.dependencyReview.status, evidenceRefs: reviewEvidence }
+        : null,
+      executionScope: selected ? { selected: true, stage: scope.stage, taskRefs: selectedTasks } : { selected: false },
+    });
   }
 
   function mergeReviewSession(state, nextSession) {
@@ -391,7 +507,7 @@
       next.artifactRuleResolution.status === "resolved" &&
       next.artifactRuleFingerprint !== state.artifactRuleFingerprint &&
       ["reviewing", "result"].includes(state.mode) && state.lastSubmission && next.viewScope === "all";
-    if (next.schemaVersion !== 2 || state.schemaVersion !== 2 || next.sessionId === state.sessionId ||
+    if (![2, 3].includes(next.schemaVersion) || ![2, 3].includes(state.schemaVersion) || next.sessionId === state.sessionId ||
       next.deliveryUnitKey !== state.deliveryUnitKey || next.planFingerprint !== (state.savedPlanFingerprint || state.planFingerprint) ||
       (ruleChanged && !resolvesCandidate) ||
       next.reviewRound !== state.reviewRound + (state.mode === "input" ? 0 : 1)) {
@@ -406,7 +522,8 @@
     next.cards = next.cards.map(card => {
       const old = oldById.get(card.id);
       if (!old) return { ...card, conclusion: "未评审", userNote: "", reopened: false };
-      const changed = moduleContent(old) !== moduleContent(card);
+      const externalChanged = externalContentForCard(state, old) !== externalContentForCard(next, card);
+      const changed = moduleContent(old) !== moduleContent(card) || externalChanged;
       if (card.module.revision < old.module.revision) {
         throw createCodedError(TypeError, "module-revision-required", "Module revisions cannot move backwards");
       }
@@ -576,14 +693,14 @@
       snapshot.planFingerprint !== state.planFingerprint || snapshot.artifactRuleFingerprint !== state.artifactRuleFingerprint ||
       JSON.stringify(canonicalizeArtifactRuleResolution(snapshot.artifactRuleResolution)) !== JSON.stringify(state.artifactRuleResolution) ||
       !isNonEmptyString(snapshot.submissionId) || !Number.isSafeInteger(snapshot.submissionVersion) || snapshot.submissionVersion < 1 ||
-      !Array.isArray(snapshot.cards)) throw createCodedError(TypeError, "invalid-submission-restore", "Only the matching exported submission can be restored");
+      !Array.isArray(snapshot.cards) || JSON.stringify(externalDataSnapshot(snapshot)) !== JSON.stringify(externalDataSnapshot(state))) throw createCodedError(TypeError, "invalid-submission-restore", "Only the matching exported submission including external dependencies and Mock scope can be restored");
     const cards = snapshot.cards.map(normalizeReviewCard);
     if (JSON.stringify(cards) !== JSON.stringify(state.cards)) {
       throw createCodedError(TypeError, "invalid-submission-restore", "Restored submission must match the current review content and opinions");
     }
     const lastSubmission = deepFreeze({ sessionId: state.sessionId, submissionId: snapshot.submissionId,
       submissionVersion: snapshot.submissionVersion, planFingerprint: state.planFingerprint,
-      artifactRuleFingerprint: state.artifactRuleFingerprint, artifactRuleResolution: deepClone(state.artifactRuleResolution), cards });
+      artifactRuleFingerprint: state.artifactRuleFingerprint, artifactRuleResolution: deepClone(state.artifactRuleResolution), cards, ...externalDataSnapshot(state) });
     return { ...state, mode: "reviewing", submissionVersion: snapshot.submissionVersion, lastSubmission, lastError: null };
   }
 
@@ -660,6 +777,7 @@
       planFingerprint: state.planFingerprint,
       artifactRuleFingerprint: state.artifactRuleFingerprint,
       artifactRuleResolution: state.artifactRuleResolution,
+      ...externalDataSnapshot(state),
       savedAt: Date.now(),
       cards: state.cards.map(({ id, conclusion, userNote }) => ({ id, conclusion, userNote })),
       currentCardIndex: state.currentCardIndex,
@@ -1032,6 +1150,10 @@
           ...(typeof card.userNote === "string" ? { userNote: card.userNote } : {}),
         }))
       : [];
+    let externalData = {};
+    if (["externalDependencies", "mockModules", "dependencyReview", "executionScope"].some(field => Object.hasOwn(draft, field))) {
+      try { externalData = normalizeExternalData(draft); } catch { return null; }
+    }
     return {
       ...(isNonEmptyString(draft.deliveryUnitKey) ? { deliveryUnitKey: draft.deliveryUnitKey } : {}),
       ...(isNonEmptyString(draft.sessionId) ? { sessionId: draft.sessionId } : {}),
@@ -1043,6 +1165,7 @@
       ...(artifactRuleResolution ? { artifactRuleResolution } : {}),
       ...(Number.isFinite(draft.savedAt) ? { savedAt: draft.savedAt } : {}),
       cards,
+      ...externalData,
       ...(Number.isInteger(draft.currentCardIndex) ? { currentCardIndex: draft.currentCardIndex } : {}),
       ...(draft.collapsed === true ? { collapsed: true } : {}),
       ...(Number.isFinite(draft.panelWidth) ? { panelWidth: draft.panelWidth } : {}),
@@ -1142,6 +1265,9 @@
       draft.reviewRound === state.reviewRound &&
       draft.planFingerprint === state.planFingerprint &&
       draft.artifactRuleFingerprint === state.artifactRuleFingerprint &&
+      (draft.externalDependencies === undefined
+        ? state.dependencyReview.status === "unreviewed"
+        : JSON.stringify(externalDataSnapshot(draft)) === JSON.stringify(externalDataSnapshot(state))) &&
       draftArtifactRuleResolution?.status === state.artifactRuleResolution.status &&
       draftArtifactRuleResolution?.source === state.artifactRuleResolution.source
     );
@@ -1593,7 +1719,7 @@
         return `<button type="button" data-action="select-conclusion" data-value="${value}" role="radio" aria-checked="${value === card.conclusion}" aria-pressed="${value === card.conclusion}"${disabled}>${value}</button>`;
       })
       .join("")}</div></div>`;
-    const moduleBody = moduleMarkup(card);
+    const moduleBody = moduleMarkup(card, state);
     const cardMarkup = `<article data-review-card data-card-id="${escape(card.id)}"><div data-review-card-header><h2 data-review-card-title>${escape(card.module?.name || card.id)}</h2>${readinessMarkup(card)}${statusBadgeMarkup(card.conclusion)}</div>${moduleBody}${conclusionGroup}<label>评审备注<textarea data-field="userNote"${disabled}>${escape(card.userNote || "")}</textarea></label></article>`;
     const cardList = reviewListMarkup(state.cards, state.currentCardIndex, "card", state.allCards);
     const footer = `<footer data-review-footer><div data-review-navigation><button type="button" data-action="previous"${disabled || state.currentCardIndex === 0 ? " disabled" : ""}>上一个</button><button type="button" data-action="next"${disabled || lastCard ? " disabled" : ""}>下一个</button></div><div data-review-actions><button type="button" data-action="highlight-evidence"${disabled}>查看证据</button>${lastCard ? `<button type="button" data-action="submit"${disabled}>统一提交评审</button>` : ""}</div></footer>`;
@@ -1639,13 +1765,24 @@
     return `<span data-review-readiness="${status}">${status === "ready" ? "实现方案已就绪" : "实现方案待补充"}</span>`;
   }
 
-  function moduleMarkup(card) {
+  function externalDataMarkup(state, card) {
+    const stages = { "ui-mock": "本地 UI／Mock", implementation: "编码", integration: "真实联调", acceptance: "验收", "test-delivery": "测试交付", production: "生产交付" };
+    const statuses = { unverified: "尚未核实", missing: "未就绪", ready: "已就绪", "not-applicable": "不适用", active: "使用中", retired: "已退役" };
+    const ids = new Set([card.id, ...card.links.features]);
+    const dependencies = state.externalDependencies.filter(item => item.featureRefs.some(id => ids.has(id)));
+    const mocks = state.mockModules.filter(item => item.featureRefs.some(id => ids.has(id)));
+    const row = item => `<div data-external-dependency data-dependency-id="${escapeHtml(item.id)}"><p><strong>${escapeHtml(item.id)} · ${escapeHtml(item.summary)}</strong> · ${escapeHtml(statuses[item.status])}</p>${listMarkup(item.facts)}<p>来源：${escapeHtml(item.sourceRefs.join("；") || "尚未核实")}；环境：${escapeHtml(item.environment)}</p><p>影响阶段：${escapeHtml(item.blockingStages.map(stage => stages[stage]).join("、") || "无阻塞")}；责任方：${escapeHtml(item.owner)}</p><p>补齐条件：${escapeHtml(item.completionCondition)}</p></div>`;
+    const mock = item => `<div data-mock-module data-mock-id="${escapeHtml(item.id)}"><p><strong>MOCK_ONLY · ${escapeHtml(item.id)}</strong> · ${escapeHtml(statuses[item.status])} · 禁止上线</p><p>实现位置：${escapeHtml(item.paths.join("、"))}</p><p>开启：${escapeHtml(item.activation)}；真实请求边界：${escapeHtml(item.realRequestBoundary)}</p>${listMarkup(item.scenarios)}<p>退出条件：${escapeHtml(item.exitCondition)}</p>${listMarkup(item.verificationLimits)}<p>测试环境交付必须另核对准确范围与明确授权；本面板保存不授予交付权限。</p></div>`;
+    return `<section data-module-section data-external-data><h3>外部数据与依赖</h3><p>依赖审查：${state.dependencyReview.status === "reviewed" ? "本轮已审查" : "待查证（不表示就绪）"}；本轮阶段：${escapeHtml(stages[state.executionScope.stage])}</p>${dependencies.length ? dependencies.map(row).join("") : "<p>无已登记依赖；是否适用以本轮审查证据为准。</p>"}${mocks.length ? `<h3>Mock 标识与边界</h3>${mocks.map(mock).join("")}` : ""}</section>`;
+  }
+
+  function moduleMarkup(card, state) {
     const m = card.module;
     const changes = { added: "新增", modified: "修改", removed: "移除", unchanged: "保留" };
     const section = (title, values) => `<section data-module-section><h3>${title}</h3>${listMarkup(values)}</section>`;
     const scenarios = m.scenarios.map(item => `<div data-module-scenario><p><b>给定</b>${escapeHtml(item.given)}</p><p><b>当</b>${escapeHtml(item.when)}</p><p><b>则</b>${escapeHtml(item.then)}</p></div>`).join("");
     const questions = m.questions.length ? m.questions.map(item => `<div data-module-question><p><strong>${escapeHtml(item.question)}</strong></p><p>影响：${escapeHtml(item.impact)}</p><p>${item.owner === "agent" ? "Agent 查证" : "需要你决定"}：${escapeHtml(item.recommendation)}</p></div>`).join("") : "<p>暂无待确认问题</p>";
-    return `<div data-module-content><section data-module-section><h3>职责与范围</h3><p>${escapeHtml(m.purpose)}</p></section><section data-module-section data-module-change><h3>本次${changes[m.change.kind]}</h3><p>${escapeHtml(m.change.summary)}</p></section><div data-module-io>${section("输入", m.inputs)}${section("输出", m.outputs)}</div>${section("行为规则", m.rules)}<section data-module-section><h3>验收例子</h3>${scenarios}</section><section data-module-section><h3>待确认问题</h3>${questions}</section><details data-module-technical data-review-implementation-evidence><summary>内部实现与依据 · ${card.implementationPlan.status === "ready" ? "已就绪" : "待补充"}</summary><div>${implementationPlanMarkup(card)}<div data-card-fields>${cardFieldsMarkup(card)}</div></div></details></div>`;
+    return `<div data-module-content><section data-module-section><h3>职责与范围</h3><p>${escapeHtml(m.purpose)}</p></section><section data-module-section data-module-change><h3>本次${changes[m.change.kind]}</h3><p>${escapeHtml(m.change.summary)}</p></section><div data-module-io>${section("输入", m.inputs)}${section("输出", m.outputs)}</div>${section("行为规则", m.rules)}<section data-module-section><h3>验收例子</h3>${scenarios}</section><section data-module-section><h3>需求待确认</h3>${questions}</section>${externalDataMarkup(state, card)}<details data-module-technical data-review-implementation-evidence><summary>内部实现与依据 · ${card.implementationPlan.status === "ready" ? "已就绪" : "待补充"}</summary><div>${implementationPlanMarkup(card)}<div data-card-fields>${cardFieldsMarkup(card)}</div></div></details></div>`;
   }
 
   function implementationPlanMarkup(card) {
@@ -1781,6 +1918,7 @@
       planFingerprint: state.planFingerprint,
       artifactRuleFingerprint: state.artifactRuleFingerprint,
       artifactRuleResolution: deepClone(state.artifactRuleResolution),
+      ...externalDataSnapshot(state),
       cards: state.cards.map(deepClone),
     });
 
@@ -2054,7 +2192,7 @@
     return (
       state &&
       typeof state === "object" &&
-      state.schemaVersion === 2 &&
+      [2, 3].includes(state.schemaVersion) &&
       ["input", "reviewing", "result", "confirmed"].includes(state.mode) &&
       isReviewableArtifactRuleResolution(
         canonicalizeArtifactRuleResolution(state.artifactRuleResolution),
@@ -2196,5 +2334,9 @@
     mountReviewPanel,
     mergeReviewSession,
     normalizeModule,
+    normalizeExternalData,
+    EXECUTION_STAGES,
+    EXTERNAL_DEPENDENCY_KINDS,
+    EXTERNAL_DEPENDENCY_STATUSES,
   };
 });

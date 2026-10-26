@@ -1,7 +1,9 @@
+import { fixtureMergeReviewedBranch as mergeReviewedBranch } from './helpers/mock-safety-fixture.mjs';
+import { FixtureWorkflowSession as WorkflowSession } from './helpers/mock-safety-fixture.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mergeRequiredTools, mergeReviewedBranch } from '../scripts/merge-reviewed-branch.mjs';
-import { WorkflowSession } from '../scripts/workflow-session.mjs';
+import { mergeRequiredTools, mergeReviewedBranch as originalMergeReviewedBranch } from '../scripts/merge-reviewed-branch.mjs';
+import { WorkflowSession as originalWorkflowSession } from '../scripts/workflow-session.mjs';
 
 const sourceSha = 'a'.repeat(40), targetSha = 'b'.repeat(40), advancedSha = 'c'.repeat(40);
 const originUrl = 'git@git.example.test:team/demo.git';

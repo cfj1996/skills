@@ -44,7 +44,7 @@ class WikiTargetOwnershipTests(unittest.TestCase):
         self.assertIn("不向用户索要 Wiki URL", FIXING)
         self.assertIn("缺少用户提供的 Wiki URL 不阻塞预检", FIXING_CONTRACT)
         self.assertRegex(FIXING, r"明确需要(?:提测)?\s*Wiki[^\n]*`STANDARD`")
-        self.assertIn("Wiki 链接不能进入“待决事项”", FIXING)
+        self.assertIn("Wiki 链接不能进入“需求待确认”", FIXING)
 
     def test_drafter_resolves_existing_before_planning_creation(self):
         linked = DRAFTING.index("comments once")

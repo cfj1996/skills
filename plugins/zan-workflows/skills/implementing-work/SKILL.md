@@ -55,6 +55,16 @@ overlapping pre-existing edits block; preserve unrelated changes.
 Work directly on the fixed branch. Do not create a temporary branch/worktree,
 move implementation elsewhere, or stash/reset unrelated work.
 
+Apply [external dependencies](../../references/external-data-dependencies.md)
+and [Mock development](../../references/mock-development.md). Keep business
+questions separate from contract/configuration/environment facts and internal
+implementation evidence. Validate the approved current steps and stage, not
+future integration prerequisites unrelated to those steps. Preserve future
+blockers and never describe a partial UI/Mock result as the whole Story done.
+Every Mock has a stable `MOCK-*`/`MOCK_ONLY` identity, paths, scenarios, real-call
+boundary, reset/switch and exit conditions in the same Plan/brief. Unknown
+contracts permit only approved feature-data fixtures, never invented HTTP facts.
+
 ## 2. Check scope, task links and Bug records
 
 Reuse the approved `implementationBrief`, Bug investigation summary or formal
@@ -191,3 +201,12 @@ per-repository progress without labelling partial results `REVIEWED`. On resume,
 verify existing comments and completed source/review evidence, then only finish
 missing or invalidated work. Add no report file or runtime ledger.
 Do not commit, push, submit, merge, publish, or write a Wiki in this skill.
+
+On contract arrival, resume the original branch/Task/Plan and refresh only
+affected contract bindings, code/manual changes, verification and review. Pure
+technical fact completion preserves business approval; new integration outside
+the old Mock-only authorization or material behavior/operation changes require
+the complete current checklist and affected approval. Active Mock is local-only
+by default. Carry the current Mock inventory, dependency evidence and real
+verification limits to delivery; ordinary implementation approval grants no
+Mock test-delivery authority and no production authority.

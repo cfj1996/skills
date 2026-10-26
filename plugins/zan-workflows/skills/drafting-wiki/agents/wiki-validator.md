@@ -51,7 +51,13 @@ Validate these invariants in order:
    only already-evidenced parameters may be shown, with no parameter/build
    queries or deployment-only input requests. Permit only exact read-only Job
    metadata lookup when its canonical URL is absent. Job name/URL and other canonical fields
-   remain required. Never append these display
+   remain required. Apply the `instant-apps/web/live-app` supplemental Job rule
+   in `wiki-template.md`: require one evidenced `front-jzan` link inside the same
+   repository/branch entry, preserving its main Job heading and sequence. Do not
+   require this link for unrelated apps or create another entry for it. A missing
+   required link invalidates a non-functional completeness/skip claim. This
+   Wiki-only Job requires no deployment parameters, build receipts or test build.
+   Never append these display
    parameters to the actual Job URL. The
    red service marker is exactly `更新服务` for a business project and exactly
    `工具服务-无需上线` for a tooling/library project. No person was guessed or copied

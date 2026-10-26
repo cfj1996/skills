@@ -25,6 +25,12 @@ target-location, Wiki-ID, TAPD-comment, writeback, merge, or release narration.
 无此类条件时省略。按 [变更与文档一致性](../../../references/change-consistency.md)
 从最终已评审变更生成上述内容，不按接口等具体领域设置额外必填栏目。
 
+本次明确批准含 Mock 的测试交付时，`内容` 标注“含 Mock”及准确 MOCK-* 功能范围，
+`验证结果` 区分模拟/契约/真实联调，`交付条件` 说明真实验收缺口、目标测试环境、
+退出条件和“禁止生产发布”。未获精确 Mock 测试授权不得通过写 Wiki 发起交付。
+正式接口续接后按事实修订同一条目的过期 Mock 描述，不能仅删标识或直接改成
+真实通过；其他项目的内容和历史归属保持不变。
+
 The rules below govern the final validated body. For an earlier execution
 checklist, use the distinct template-preview boundary below; never submit that
 preview as a validated body.
@@ -43,7 +49,7 @@ preview as a validated body.
   不为填完模板提前调用正式提测流程或定位/创建月份页。
 - 功能内容先展示已确认的拟修复/开发行为。尚未发生的实际修复、验证、构建
   和发布结果写 `〈执行后按实际结果补充〉`，明确它们不是已通过事实。
-  这些计划待填项不是“待决事项”；必要的身份、接口或目标缺口仍按影响阶段
+  这些计划待填项不是“需求待确认”；必要的身份、接口或目标缺口在外部数据与依赖按影响阶段
   列入原清单，不能靠模板占位符清除真实阻塞。
 - 此预览不返回 `VALIDATED`，不产生目标/body hash，模板本身不授予写权限；
   含未核实字段的结构不能传给写入脚本、评论或当成可提测结果。
@@ -62,7 +68,8 @@ preview as a validated body.
 - `序号` is calculated from the resolved child Wiki under `# 前端`; a new child
   starts at `1`. It is never supplied as an unexplained placeholder.
 - `Jenkins Job 名称` is the exact Job name from the workspace knowledge
-  `jenkins_jobs` index. It must not be replaced with a repository name, service
+  `jenkins_jobs` index. Supplemental Wiki Jobs use the explicit rules below,
+  independently of that test-build mapping. It must not be replaced with a repository name, service
   alias, or a guessed display name. For the rendered link text only, hide
   environment tokens such as `test` and `master` and their adjoining separator
   (for example, `front-vantix-system-test` displays as `front-vantix-system`).
@@ -171,6 +178,22 @@ All branch matching below means that pair. Different repositories may use the
 same branch name; different branches in one repository have separate entries.
 A new multi-project body starts at sequence 1 and numbers each further entry
 sequentially under the same `# 前端`, with all required fields per entry.
+
+## instant-apps live-app 关联 Job
+
+本次范围包含 `instant-apps/web/live-app` 时，Wiki 在该仓库/原分支的同一条目内
+补充一行 `- 关联 Job：[front-jzan]({已核实的 front-jzan Job 地址})`。
+保留原主 Job 标题、序号、项目归属、分支及状态字段；不为关联 Job 创建第二个条目。
+仅涉及 `instant-apps` 其他应用时不自动添加。
+
+- 新建、追加条目和复用更新均适用；已有关联链接时复用，不重复添加。已有条目
+  缺少该行时做最小补丁，即使本轮为 `NON_FUNCTIONAL` 也不能直接跳过缺项。
+- 名称固定为 `front-jzan`；地址复用当前条目中已核实的准确 URL，或从知识库/
+  精确只读 Job 元数据查询取得。无法核实地址时阻塞 Wiki 正文，不拼接 URL。
+- `front-jzan` 仅用于 Wiki 记录，不加入测试环境构建清单，也不要求它的构建回执。
+  测试构建继续使用 `front-instant-apps-test`；写 Wiki 不触发 `front-jzan`，
+  不查询其构建参数、构建状态，不要求部署选项，也不将其他 Job 的参数复制给它。
+- 预览展示该关联行；地址尚未核实时使用预览占位规则，正式正文必须替换为准确链接。
 
 ## Wiki target resolution
 

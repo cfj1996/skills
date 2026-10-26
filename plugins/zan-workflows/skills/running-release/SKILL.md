@@ -33,6 +33,17 @@ go-live retain their terminal-result/source verification.
 
 ## Daily project build
 
+Every build first applies [Mock gates](../../references/mock-development.md).
+Resolve current source and the project's Mock bindings/inventory using the same
+read-only [safety helper](../../scripts/mock-safety.mjs); missing evidence cannot
+be treated as no Mock. This is source/authorization preflight, not a deployment.
+With Mock present, show its stable IDs, actual scope/paths, remaining real calls,
+test environment/branch/Job, purpose and limits and require explicit human test
+permission before trigger. The compact build confirmation may cover this once;
+normal build requests/defaults alone do not. Changed content/inventory/target
+requires refreshed scope authorization. Do not bypass the gate by calling MCP
+directly. An unclear or production/publishing effect routes to the full flow.
+
 Use the connected Jenkins MCP directly. Do not start `workflow-session.mjs`,
 create a release `PLAN`/fingerprints, or invoke `run-jenkins-release.mjs` for this
 flow. Do not load full-release/scripted-delivery guidance just to run a daily build.
@@ -40,7 +51,8 @@ flow. Do not load full-release/scripted-delivery guidance just to run a daily bu
 1. Resolve the project, exact Jenkins instance, Job/URL and source repository once
    through `workspace-project-knowledge`; reuse valid current context. Query only
    a missing mapping or URL. For an exact project/Job lookup, skip source scans,
-   Graphify queries and unrelated project contexts. Use an evidenced dev/test
+   Graphify queries and unrelated project contexts; inspect the exact source/Mock
+   bindings required by the preceding mandatory gate. Use an evidenced dev/test
    default only when it selects one unambiguous target; never guess `develop`/`dev`
    or derive a Job URL from a naming pattern.
 2. Read live Job parameter definitions once and resolve the exact requested ref

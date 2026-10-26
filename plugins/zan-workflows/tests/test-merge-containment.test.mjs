@@ -1,11 +1,13 @@
+import { fixtureMergeReviewedBranch as mergeReviewedBranch } from './helpers/mock-safety-fixture.mjs';
+import { FixtureWorkflowSession as WorkflowSession } from './helpers/mock-safety-fixture.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { inspectTargetContainment, mergeRequiredTools, mergeReviewedBranch } from '../scripts/merge-reviewed-branch.mjs';
-import { WorkflowSession } from '../scripts/workflow-session.mjs';
+import { inspectTargetContainment, mergeRequiredTools, mergeReviewedBranch as originalMergeReviewedBranch } from '../scripts/merge-reviewed-branch.mjs';
+import { WorkflowSession as originalWorkflowSession } from '../scripts/workflow-session.mjs';
 
 const sourceSha = 'a'.repeat(40), targetSha = 'b'.repeat(40), changedSha = 'c'.repeat(40);
 const originUrl = 'https://git.example.test/team/demo.git';

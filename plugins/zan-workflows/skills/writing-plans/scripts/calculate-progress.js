@@ -41,6 +41,9 @@ function calculateObjectiveMetrics(model = {}) {
     },
     apis: countByStatus(model.apis),
     dependencies: countByStatus(model.dependencies),
+    externalDependencies: countByStatus(model.externalDependencies),
+    mockModules: countByStatus(model.mockModules),
+    dependencyReview: model.dependencyReview?.status || "unreviewed",
     acceptances: countByStatus(model.acceptances),
     draftOperationCount: (model.draftOperations || []).length,
   };

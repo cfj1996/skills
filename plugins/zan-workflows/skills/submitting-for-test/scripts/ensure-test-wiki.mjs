@@ -8,6 +8,7 @@ import { resolve } from 'node:path';
 import { StdioMcpClient } from '../../../scripts/mcp-client.mjs';
 import { assertWikiEntryUpdate, wikiEntry } from '../../../scripts/wiki-entry.mjs';
 import { repositoryKey } from '../../../scripts/workflow-runtime.mjs';
+import { checkMockSafetySet, mockSafetyPreview } from '../../../scripts/mock-safety.mjs';
 export { StdioMcpClient } from '../../../scripts/mcp-client.mjs';
 const DEFAULT_ROOT_WIKI_ID = '1150372234001008260';
 const DEFAULT_WORKSPACE_ID = 50372234;
@@ -20,7 +21,8 @@ export function parseArgs(argv) {
     '--creator', '--comment-author', '--body-file', '--wiki-title',
     '--month', '--root-wiki-id', '--expect-target', '--expected-month-id',
     '--expected-wiki-id', '--expected-body-sha256', '--mode', '--entry-heading', '--entry-repo-url',
-    '--expected-owner-type', '--expected-owner-id', '--entry-updates', '--execute', '--json',
+    '--expected-owner-type', '--expected-owner-id', '--entry-updates', '--mock-safeties', '--mock-repositories',
+    '--required-repositories', '--git-delivery-receipts', '--target-environment', '--target-branch', '--purpose', '--execute', '--json',
   ]);
   for (let i = 0; i < argv.length; i++) {
     const key = argv[i];
@@ -86,6 +88,18 @@ export function parseArgs(argv) {
     try { entryUpdates = JSON.parse(values['--entry-updates']); }
     catch { throw new Error('entry-updates 必须是条目数组 JSON'); }
   }
+  const jsonArray = (key, itemValid, itemLabel) => {
+    if (values[key] === undefined) return undefined;
+    let result;
+    try { result = JSON.parse(values[key]); } catch { throw new Error(`${key} 必须是${itemLabel} JSON 数组`); }
+    if (!Array.isArray(result) || !result.every(itemValid)) throw new Error(`${key} 必须是${itemLabel} JSON 数组`);
+    return result;
+  };
+  const objectItem = item => item !== null && typeof item === 'object' && !Array.isArray(item);
+  const mockSafeties = jsonArray('--mock-safeties', objectItem, '对象');
+  const mockRepositories = jsonArray('--mock-repositories', objectItem, '对象');
+  const requiredRepositories = jsonArray('--required-repositories', item => typeof item === 'string' && item.trim().length > 0, '非空字符串');
+  const gitDeliveryReceipts = jsonArray('--git-delivery-receipts', objectItem, '对象');
   validateSelectors({ entryHeading: values['--entry-heading'], entryRepoUrl: values['--entry-repo-url'],
     sourceBranch: values['--source-branch'], entryUpdates,
     expectedOwnerType: values['--expected-owner-type'], expectedOwnerId: values['--expected-owner-id'] });
@@ -108,6 +122,8 @@ export function parseArgs(argv) {
     entryHeading: values['--entry-heading'], entryRepoUrl: values['--entry-repo-url'],
     entryUpdates,
     expectedOwnerType: values['--expected-owner-type'], expectedOwnerId: values['--expected-owner-id'],
+    mockSafeties, mockRepositories, requiredRepositories, gitDeliveryReceipts,
+    targetEnvironment: values['--target-environment'], targetBranch: values['--target-branch'], purpose: values['--purpose'],
     execute: Boolean(values['--execute']),
     json: Boolean(values['--json']),
   };
@@ -423,7 +439,7 @@ async function createAndReadWiki(call, workspaceId, options, parentId, onCreated
   return wiki;
 }
 
-export async function ensureTestWiki(call, input, now = new Date()) {
+export async function ensureTestWiki(call, input, now = new Date(), io = {}) {
   const { workspaceId, entryType, entryId, sourceBranch, execute } = input;
   const mode = input.mode || 'ensure';
   if (!['ensure', 'link', 'update'].includes(mode)) throw new Error('mode 只能是 ensure、link 或 update');
@@ -563,7 +579,7 @@ export async function ensureTestWiki(call, input, now = new Date()) {
     comment: mode === 'update' ? null : child ? commentBody(workspaceId, child.id) : '创建后用实际 Wiki ID 生成链接',
   };
   if (!execute) return {
-    ...plan, state: entryOperation === 'APPEND_ENTRY' ? 'PLANNED_APPEND_ENTRY'
+    ...plan, ...mockSafetyPreview(input), state: entryOperation === 'APPEND_ENTRY' ? 'PLANNED_APPEND_ENTRY'
       : mode === 'update' && wikiOperation === 'NONE' ? 'UNCHANGED'
       : wikiOperation === 'UPDATE' ? 'PLANNED_UPDATE'
       : child ? (noWrite ? 'ALREADY_LINKED' : 'PLANNED_LINK')
@@ -593,6 +609,11 @@ export async function ensureTestWiki(call, input, now = new Date()) {
     monthWikiId: plan.monthWikiId, wikiState: child ? 'UNCHANGED' : 'NOT_CREATED',
     commentState: mode === 'update' ? 'SKIPPED' : commentOperation === 'NONE' ? 'ALREADY_LINKED' : 'NOT_LINKED', writes: 0,
   };
+  const productionWiki = ['master', 'main'].includes(input.targetBranch) || input.targetEnvironment === 'production' ||
+    (input.gitDeliveryReceipts || input.prerequisites?.gitReceipts || []).some(row => ['master', 'main'].includes(row.targetBranch));
+  if (!noWrite) await checkMockSafetySet(input, { operation: productionWiki ? 'production-wiki' : 'test-wiki', purpose: input.purpose,
+    environmentKind: productionWiki ? 'production' : 'test',
+    targetEnvironment: productionWiki ? 'production' : (input.targetEnvironment || 'test'), targetBranch: input.targetBranch, requireCommitted: true }, io);
   let phase;
   try {
     let parent = monthWiki;

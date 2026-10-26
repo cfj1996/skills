@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import { evaluateChangeConsistency } from '../../../scripts/change-consistency.mjs';
+import { checkMockSafetySet } from '../../../scripts/mock-safety.mjs';
 
 const DOCUMENT_STATES = new Set(['missing', 'present', 'valid', 'invalid', 'unreadable', 'unknown']);
 const ADOPTION_SCOPES = new Set(['applicable', 'not-applicable', 'unknown']);
@@ -98,7 +99,8 @@ export function classifyAdoption({
   };
 }
 
-export function evaluateMergeReadiness({
+export async function evaluateMergeReadiness(input = {}, io = {}) {
+  const {
   codeReview = 'incomplete',
   safety = 'unknown',
   mergeability = 'unknown',
@@ -110,8 +112,9 @@ export function evaluateMergeReadiness({
   zanMust = 'not-applicable',
   changeReview,
   currentChange,
-} = {}) {
+  } = input;
   const blockers = [];
+  let mockSafetyError;
 
   if (codeReview === 'blocker') blockers.push('code');
   else if (codeReview !== 'pass') blockers.push('code-review-incomplete');
@@ -131,13 +134,45 @@ export function evaluateMergeReadiness({
   if (zanStatus === 'adopted' && zanMust !== 'pass') blockers.push('zan-must');
   blockers.push(...evaluateChangeConsistency(changeReview, currentChange).blockers);
 
+  // This gate is independent of Zan adoption and applies before approval as
+  // well as merge. JSON pass flags/old receipts cannot replace a fresh run of
+  // the shared source/content checker. currentChange comes from the current
+  // verified MR head, target and full diff, not from mockRepositories.
+  try {
+    if (!currentChange || !/^[a-f\d]{40}(?:[a-f\d]{24})?$/i.test(currentChange.targetSha || '') ||
+        !/^[a-f\d]{40}(?:[a-f\d]{24})?$/i.test(currentChange.sourceSha || '') ||
+        typeof currentChange.sourceRepository !== 'string' || !currentChange.sourceRepository.trim() ||
+        !['master', 'main', 'dev', 'develop'].includes(currentChange.targetBranch) ||
+        typeof currentChange.purpose !== 'string' || !currentChange.purpose.trim() ||
+        !/^[a-f\d]{64}$/i.test(currentChange.scopeFingerprint || '')) {
+      throw new Error('Mock 门禁缺少当前 MR 目标、完整差异指纹和准确操作目的');
+    }
+    const safeties = input.mockSafeties || (input.mockSafety ? [input.mockSafety] : []);
+    if (safeties.length !== 1 || safeties[0]?.baseSha !== currentChange.targetSha ||
+        safeties[0]?.scopeFingerprint !== currentChange.scopeFingerprint) {
+      throw new Error('Mock 清查必须覆盖当前 MR source/target 的完整差异，不能替换目标基准或范围');
+    }
+    const production = ['master', 'main'].includes(currentChange.targetBranch);
+    await checkMockSafetySet(input, {
+      operation: 'git-delivery', environmentKind: production ? 'production' : 'test',
+      sourceRepository: currentChange.sourceRepository, sourceSha: currentChange.sourceSha,
+      targetBranch: currentChange.targetBranch,
+      targetEnvironment: production ? 'production' : currentChange.targetEnvironment,
+      purpose: currentChange.purpose, requireCommitted: true,
+    }, io);
+  } catch (error) {
+    blockers.push('mock-safety');
+    mockSafetyError = error.message;
+  }
+
   return {
     mergeAllowed: blockers.length === 0,
     blockers,
+    ...(mockSafetyError ? { mockSafetyError } : {}),
   };
 }
 
-function runCli() {
+async function runCli() {
   const [command, payload = '{}'] = process.argv.slice(2);
   const input = JSON.parse(payload);
   if (command === 'classify-adoption') {
@@ -145,12 +180,12 @@ function runCli() {
     return;
   }
   if (command === 'evaluate-merge') {
-    process.stdout.write(`${JSON.stringify(evaluateMergeReadiness(input), null, 2)}\n`);
+    process.stdout.write(`${JSON.stringify(await evaluateMergeReadiness(input), null, 2)}\n`);
     return;
   }
   throw new Error('usage: review-policy.mjs <classify-adoption|evaluate-merge> <json>');
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  runCli();
+  runCli().catch(error => { process.stderr.write(error.message + '\n'); process.exitCode = 1; });
 }

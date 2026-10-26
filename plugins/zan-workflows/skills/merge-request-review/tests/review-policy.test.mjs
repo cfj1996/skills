@@ -1,16 +1,21 @@
 import assert from 'node:assert/strict';
-import { readFile, mkdtemp, rm } from 'node:fs/promises';
+import { readFile, mkdtemp, rm, mkdir, writeFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import test from 'node:test';
-import { classifyAdoption, evaluateMergeReadiness } from '../scripts/review-policy.mjs';
+import { classifyAdoption, evaluateMergeReadiness as evaluateActualMergeReadiness } from '../scripts/review-policy.mjs';
+import { inspectMockSource, mockInventoryFingerprint } from '../../../scripts/mock-safety.mjs';
+import { noMockFixture, fixtureMockIo } from '../../../tests/helpers/mock-safety-fixture.mjs';
 
 const skillRoot = resolve(dirname(new URL(import.meta.url).pathname), '..');
 
 const read = (file) => readFile(file, 'utf8');
-const currentChange = { sourceSha: 'a'.repeat(40), targetSha: 'b'.repeat(40), documentHashes: {} };
-const reviewBinding = { currentChange, changeReview: { ...currentChange,
+const currentChange = { sourceSha: 'a'.repeat(40), targetSha: 'b'.repeat(40), documentHashes: {},
+  sourceRepository: 'https://git.example.test/team/demo.git', targetBranch: 'main',
+  purpose: 'Review and merge this exact MR', scopeFingerprint: noMockFixture().scopeFingerprint };
+const evaluateMergeReadiness = input => evaluateActualMergeReadiness(input, fixtureMockIo);
+const reviewBinding = { currentChange, mockSafety: noMockFixture({ sourceRepository: currentChange.sourceRepository, sourceSha: currentChange.sourceSha }), changeReview: { ...currentChange,
   scope: { status: 'pass', evidence: ['维护范围与当前 diff 一致'] },
   impact: { status: 'pass', evidence: ['已检查实际影响及验证'] },
   documentation: { status: 'not-required', exemption: 'NOT_APPLICABLE', evidence: ['非提测维护'] },
@@ -26,10 +31,30 @@ test('renamed CLI reviews an ordinary project without central config or a projec
       env: { ...process.env, PROJECT_KNOWLEDGE_ROOT: resolve(workspace, 'unregistered-knowledge') },
       encoding: 'utf8',
     }));
+    const git = args => execFileSync('git', args, { cwd: workspace, encoding: 'utf8' }).trim();
+    git(['init', '-q', '--initial-branch=feature/test']);
+    git(['config', 'user.name', 'Fixture']);
+    git(['config', 'user.email', 'fixture@example.test']);
+    git(['remote', 'add', 'origin', currentChange.sourceRepository]);
+    await mkdir(resolve(workspace, 'src'));
+    await writeFile(resolve(workspace, 'package.json'), '{}\n');
+    await writeFile(resolve(workspace, 'src/app.js'), 'export const value = 1;\n');
+    git(['add', '.']); git(['commit', '-qm', 'base']);
+    const baseSha = git(['rev-parse', 'HEAD']);
+    await writeFile(resolve(workspace, 'src/app.js'), 'export const value = 2;\n');
+    git(['add', '.']); git(['commit', '-qm', 'change']);
+    const sourceSha = git(['rev-parse', 'HEAD']);
+    const inspectionInput = { repositoryPath: workspace, sourceRepository: currentChange.sourceRepository,
+      baseSha, inspectedPaths: ['.'], mockBindingPaths: ['package.json'], runtimePaths: ['src'] };
+    const snapshot = await inspectMockSource(inspectionInput);
+    const mockSafety = { ...inspectionInput, ...snapshot, schemaVersion: 1, sourceSha,
+      mockModules: [], evidenceRefs: ['fixture: complete MR source, imports and activation reviewed; no Mock'] };
+    const actualChange = { ...currentChange, sourceSha, targetSha: baseSha, scopeFingerprint: snapshot.scopeFingerprint };
     const mode = run('classify-adoption', { agentDocument: 'missing', adoptionDocument: 'missing' });
     assert.equal(mode.reviewMode, 'ordinary');
     assert.deepEqual(run('evaluate-merge', {
-      ...reviewBinding,
+      ...reviewBinding, currentChange: actualChange, mockSafety,
+      changeReview: { ...reviewBinding.changeReview, sourceSha, targetSha: baseSha },
       codeReview: 'pass', safety: 'pass', mergeability: 'mergeable',
       pipeline: 'none', pipelineRequired: false, approval: 'not-required',
       unresolvedDiscussions: false, zanStatus: mode.zanStatus,
@@ -75,7 +100,7 @@ test('declared but broken Zan adoption keeps code review alive and blocks only g
   assert.match(fixture, /codeConclusionIndependent: true/);
 });
 
-test('valid declared adoption enables Zan-enhanced review', () => {
+test('valid declared adoption enables Zan-enhanced review', async () => {
   const mode = classifyAdoption({
     agentDocument: 'present',
     adoptionDocument: 'valid',
@@ -90,7 +115,7 @@ test('valid declared adoption enables Zan-enhanced review', () => {
   });
 });
 
-test('admin-only adoption does not gate an excluded CLI change with verified scope evidence', () => {
+test('admin-only adoption does not gate an excluded CLI change with verified scope evidence', async () => {
   const mode = classifyAdoption({
     agentDocument: 'present',
     adoptionDocument: 'valid',
@@ -108,25 +133,25 @@ test('admin-only adoption does not gate an excluded CLI change with verified sco
   const gates = { ...reviewBinding, codeReview: 'pass', safety: 'pass',
     mergeability: 'mergeable', pipeline: 'success', pipelineRequired: true,
     approval: 'not-required', unresolvedDiscussions: false, zanStatus: mode.zanStatus };
-  assert.deepEqual(evaluateMergeReadiness(gates), { mergeAllowed: true, blockers: [] });
-  assert.deepEqual(evaluateMergeReadiness({ ...gates, safety: 'unknown', pipeline: 'failed' }), {
+  assert.deepEqual(await evaluateMergeReadiness(gates), { mergeAllowed: true, blockers: [] });
+  assert.deepEqual(await evaluateMergeReadiness({ ...gates, safety: 'unknown', pipeline: 'failed' }), {
     mergeAllowed: false, blockers: ['safety', 'pipeline-failed'],
   });
 });
 
-test('unknown adoption scope cannot inherit a valid root adoption or bypass governance', () => {
+test('unknown adoption scope cannot inherit a valid root adoption or bypass governance', async () => {
   const mode = classifyAdoption({
     agentDocument: 'present', adoptionDocument: 'valid', adoptionDeclared: true,
     adoptionScope: 'unknown',
   });
   assert.equal(mode.zanStatus, 'unknown');
   assert.equal(mode.governanceBlocksMerge, true);
-  assert.deepEqual(evaluateMergeReadiness({ ...reviewBinding,
+  assert.deepEqual(await evaluateMergeReadiness({ ...reviewBinding,
     codeReview: 'pass', safety: 'pass', mergeability: 'mergeable', zanStatus: mode.zanStatus,
   }), { mergeAllowed: false, blockers: ['zan-governance'] });
 });
 
-test('an exclusion without concrete scope evidence remains unknown', () => {
+test('an exclusion without concrete scope evidence remains unknown', async () => {
   for (const scopeEvidence of [undefined, null, [], [''], ['  '], 'outside', [null], ['scope checked', 1]]) {
     const mode = classifyAdoption({
       agentDocument: 'present', adoptionDocument: 'valid', adoptionDeclared: true,
@@ -137,7 +162,7 @@ test('an exclusion without concrete scope evidence remains unknown', () => {
   }
 });
 
-test('verified exclusions isolate unrelated broken configuration while applicable failures still block', () => {
+test('verified exclusions isolate unrelated broken configuration while applicable failures still block', async () => {
   const facts = { agentDocument: 'present', adoptionDocument: 'invalid', adoptionDeclared: true };
   assert.equal(classifyAdoption({ ...facts, adoptionScope: 'applicable' }).zanStatus, 'misconfigured');
   assert.equal(classifyAdoption(facts).zanStatus, 'misconfigured');
@@ -146,7 +171,7 @@ test('verified exclusions isolate unrelated broken configuration while applicabl
   }).zanStatus, 'not-adopted');
 });
 
-test('scope values are validated and omitted scope preserves existing classification', () => {
+test('scope values are validated and omitted scope preserves existing classification', async () => {
   const facts = { agentDocument: 'present', adoptionDocument: 'valid', adoptionDeclared: true };
   assert.deepEqual(classifyAdoption(facts), classifyAdoption({ ...facts, adoptionScope: 'applicable' }));
   for (const adoptionScope of [null, false, '', 'outside', [], {}]) {
@@ -154,7 +179,7 @@ test('scope values are validated and omitted scope preserves existing classifica
   }
 });
 
-test('classify-adoption CLI preserves root file facts while applying a verified exclusion', () => {
+test('classify-adoption CLI preserves root file facts while applying a verified exclusion', async () => {
   const input = { agentDocument: 'present', adoptionDocument: 'valid', adoptionDeclared: true,
     adoptionScope: 'not-applicable', scopeEvidence: ['Root adoption covers apps/admin; verified change affects packages/cli only'] };
   const mode = JSON.parse(execFileSync(process.execPath, [
@@ -164,8 +189,8 @@ test('classify-adoption CLI preserves root file facts while applying a verified 
   assert.equal(mode.zanMatrixRequired, false);
 });
 
-test('missing pipeline is informational unless the project requires it', () => {
-  const ordinary = evaluateMergeReadiness({
+test('missing pipeline is informational unless the project requires it', async () => {
+  const ordinary = await evaluateMergeReadiness({
     ...reviewBinding,
     codeReview: 'pass',
     safety: 'pass',
@@ -176,7 +201,7 @@ test('missing pipeline is informational unless the project requires it', () => {
   });
   assert.deepEqual(ordinary, { mergeAllowed: true, blockers: [] });
 
-  const required = evaluateMergeReadiness({
+  const required = await evaluateMergeReadiness({
     ...reviewBinding,
     codeReview: 'pass',
     safety: 'pass',
@@ -188,8 +213,8 @@ test('missing pipeline is informational unless the project requires it', () => {
   assert.deepEqual(required, { mergeAllowed: false, blockers: ['pipeline-missing'] });
 });
 
-test('Zan governance and code findings remain independent merge blockers', () => {
-  const result = evaluateMergeReadiness({
+test('Zan governance and code findings remain independent merge blockers', async () => {
+  const result = await evaluateMergeReadiness({
     ...reviewBinding,
     codeReview: 'pass',
     safety: 'pass',
@@ -206,47 +231,47 @@ const passingReview = {
   mergeability: 'mergeable',
 };
 
-test('ordinary review binds Issue and required migration docs without a TAPD Wiki', () => {
+test('ordinary review binds Issue and required migration docs without a TAPD Wiki', async () => {
   const documentHashes = { 'gitlab:issues/17': 'c'.repeat(64), 'repo:MIGRATION.md': 'd'.repeat(64) };
   const changeReview = { ...reviewBinding.changeReview, documentHashes,
     documentation: { status: 'pass', evidence: ['Issue #17 and MIGRATION.md cover the public API change'] },
   };
   const currentChange = { ...reviewBinding.currentChange, documentHashes };
-  assert.deepEqual(evaluateMergeReadiness({ ...passingReview, changeReview, currentChange }), {
+  assert.deepEqual(await evaluateMergeReadiness({ ...passingReview, changeReview, currentChange }), {
     mergeAllowed: true, blockers: [],
   });
   const changedDocs = { ...currentChange, documentHashes: { ...documentHashes, 'repo:MIGRATION.md': 'e'.repeat(64) } };
-  assert.deepEqual(evaluateMergeReadiness({ ...passingReview, changeReview, currentChange: changedDocs }), {
+  assert.deepEqual(await evaluateMergeReadiness({ ...passingReview, changeReview, currentChange: changedDocs }), {
     mergeAllowed: false, blockers: ['change-documentation-stale'],
   });
 });
 
-test('required delivery documentation still blocks when missing or outdated in ordinary mode', () => {
+test('required delivery documentation still blocks when missing or outdated in ordinary mode', async () => {
   for (const [status, blocker] of [['unknown', 'change-documentation-unknown'], ['fail', 'change-documentation']]) {
     const changeReview = { ...reviewBinding.changeReview,
       documentation: { status, evidence: ['Project delivery requires a test Wiki; current behavior is not covered'] },
     };
-    assert.deepEqual(evaluateMergeReadiness({ ...passingReview, zanStatus: 'not-adopted', changeReview }), {
+    assert.deepEqual(await evaluateMergeReadiness({ ...passingReview, zanStatus: 'not-adopted', changeReview }), {
       mergeAllowed: false, blockers: [blocker],
     });
   }
 });
 
-test('merge readiness accepts evidenced ordinary and adopted success paths', () => {
+test('merge readiness accepts evidenced ordinary and adopted success paths', async () => {
   for (const evidence of [
     {},
     { pipeline: 'pending', pipelineRequired: false, approval: 'not-required' },
     { pipeline: 'success', pipelineRequired: true, approval: 'approved' },
     { zanStatus: 'adopted', zanMust: 'pass', approval: 'approved' },
   ]) {
-    assert.deepEqual(evaluateMergeReadiness({ ...passingReview, ...evidence }), {
+    assert.deepEqual(await evaluateMergeReadiness({ ...passingReview, ...evidence }), {
       mergeAllowed: true,
       blockers: [],
     });
   }
 });
 
-test('required pipelines accept only success and retain existing blocker reasons', () => {
+test('required pipelines accept only success and retain existing blocker reasons', async () => {
   for (const [pipeline, reason] of [
     ['none', 'pipeline-missing'],
     ['pending', 'pipeline-pending'],
@@ -254,25 +279,25 @@ test('required pipelines accept only success and retain existing blocker reasons
     ...['running', 'manual', 'canceled', 'skipped', 'unknown', '', null, true, {}]
       .map((state) => [state, 'pipeline-not-success']),
   ]) {
-    assert.deepEqual(evaluateMergeReadiness({
+    assert.deepEqual(await evaluateMergeReadiness({
       ...passingReview, pipeline, pipelineRequired: true,
     }), { mergeAllowed: false, blockers: [reason] }, JSON.stringify(pipeline));
   }
 });
 
-test('optional pipelines still reject failures and unrecognized or null states', () => {
+test('optional pipelines still reject failures and unrecognized or null states', async () => {
   for (const [pipeline, reason] of [
     ['failed', 'pipeline-failed'],
     ...['running', 'manual', 'canceled', 'skipped', 'unknown', '', null, true, {}]
       .map((state) => [state, 'pipeline-unknown']),
   ]) {
-    assert.deepEqual(evaluateMergeReadiness({
+    assert.deepEqual(await evaluateMergeReadiness({
       ...passingReview, pipeline, pipelineRequired: false,
     }), { mergeAllowed: false, blockers: [reason] }, JSON.stringify(pipeline));
   }
 });
 
-test('review and merge gates reject unsupported and null states', () => {
+test('review and merge gates reject unsupported and null states', async () => {
   for (const [field, reason] of [
     ['codeReview', 'code-review-incomplete'],
     ['safety', 'safety'],
@@ -281,13 +306,13 @@ test('review and merge gates reject unsupported and null states', () => {
     ['zanStatus', 'zan-governance'],
   ]) {
     for (const state of ['unknown', 'unexpected-success', '', null, true, {}]) {
-      assert.deepEqual(evaluateMergeReadiness({ ...passingReview, [field]: state }), {
+      assert.deepEqual(await evaluateMergeReadiness({ ...passingReview, [field]: state }), {
         mergeAllowed: false,
         blockers: [reason],
       }, `${field}=${JSON.stringify(state)}`);
     }
   }
-  assert.deepEqual(evaluateMergeReadiness({
+  assert.deepEqual(await evaluateMergeReadiness({
     ...passingReview,
     codeReview: 'blocker',
     approval: 'required-missing',
@@ -295,23 +320,108 @@ test('review and merge gates reject unsupported and null states', () => {
   }), { mergeAllowed: false, blockers: ['code', 'approval', 'zan-governance'] });
 });
 
-test('adopted projects require explicit Zan MUST success', () => {
+test('adopted projects require explicit Zan MUST success', async () => {
   for (const zanMust of ['fail', 'unknown', 'not-applicable', '', null, true, {}]) {
-    assert.deepEqual(evaluateMergeReadiness({
+    assert.deepEqual(await evaluateMergeReadiness({
       ...passingReview, zanStatus: 'adopted', zanMust,
     }), { mergeAllowed: false, blockers: ['zan-must'] }, JSON.stringify(zanMust));
   }
 });
 
-test('unknown gate requirements and discussion states cannot bypass merge checks', () => {
+test('unknown gate requirements and discussion states cannot bypass merge checks', async () => {
   for (const state of [null, 'false', '', 0, {}]) {
-    assert.deepEqual(evaluateMergeReadiness({ ...passingReview, pipelineRequired: state }), {
+    assert.deepEqual(await evaluateMergeReadiness({ ...passingReview, pipelineRequired: state }), {
       mergeAllowed: false,
       blockers: ['pipeline-requirement-unknown'],
     }, `pipelineRequired=${JSON.stringify(state)}`);
-    assert.deepEqual(evaluateMergeReadiness({ ...passingReview, unresolvedDiscussions: state }), {
+    assert.deepEqual(await evaluateMergeReadiness({ ...passingReview, unresolvedDiscussions: state }), {
       mergeAllowed: false,
       blockers: ['unresolved-discussions'],
     }, `unresolvedDiscussions=${JSON.stringify(state)}`);
   }
+});
+
+const mockModule = () => ({ id: 'MOCK-list', marker: 'MOCK_ONLY', status: 'active',
+  featureRefs: ['F-list'], taskRefs: [], paths: ['src/list.mock.ts'], mode: 'function-data',
+  scenarios: ['success', 'empty'], activation: 'explicit local fixture provider',
+  realRequestBoundary: 'list only; save is not called', exitCondition: 'replace with verified real query',
+  verificationLimits: ['real query and permissions remain unverified'], authorizationEvidenceRefs: ['human: local Mock scope'],
+  exitEvidenceRefs: [] });
+const mockInput = (branch = 'main') => ({ ...passingReview,
+  currentChange: { ...currentChange, targetBranch: branch, targetEnvironment: 'qa-list', purpose: 'Review and merge this exact MR' },
+  mockSafety: { ...reviewBinding.mockSafety, mockModules: [mockModule()] },
+});
+
+test('ordinary review cannot infer no Mock from missing inspection or accept a pass flag', async () => {
+  for (const patch of [{ mockSafety: undefined }, { mockSafety: true }, { mockSafety: { state: 'VERIFIED' } },
+    { mockSafety: { ...reviewBinding.mockSafety, mockModules: undefined } }]) {
+    const result = await evaluateMergeReadiness({ ...passingReview, ...patch });
+    assert.equal(result.mergeAllowed, false);
+    assert.ok(result.blockers.includes('mock-safety'));
+  }
+});
+
+test('MR Mock inspection binds the current target and complete diff rather than a caller-selected base', async () => {
+  for (const currentPatch of [{ targetSha: 'd'.repeat(40) }, { scopeFingerprint: 'e'.repeat(64) },
+    { sourceRepository: undefined }, { sourceSha: undefined }, { targetBranch: 'release-next' }, { purpose: '' }]) {
+    const result = await evaluateMergeReadiness({ ...passingReview,
+      currentChange: { ...currentChange, ...currentPatch } });
+    assert.equal(result.mergeAllowed, false);
+    assert.ok(result.blockers.includes('mock-safety'));
+  }
+});
+
+test('caller repository rows cannot override the authoritative MR head', async () => {
+  const result = await evaluateMergeReadiness({ ...passingReview,
+    mockRepositories: [{ sourceRepository: currentChange.sourceRepository, sourceSha: 'd'.repeat(40) }] });
+  assert.equal(result.mergeAllowed, false);
+  assert.match(result.mockSafetyError, /冲突/);
+});
+
+test('production Mock prohibition applies to non-adopted projects and ordinary pipeline success', async () => {
+  const result = await evaluateMergeReadiness({ ...mockInput(), zanStatus: 'not-adopted',
+    pipeline: 'success', pipelineRequired: true, approval: 'approved' });
+  assert.equal(result.mergeAllowed, false);
+  assert.ok(result.blockers.includes('mock-safety'));
+  assert.match(result.mockSafetyError, /生产范围仍有 Mock/);
+});
+
+test('retired labels and disabled activation do not prove source exit', async () => {
+  const input = mockInput();
+  input.mockSafety.mockModules[0] = { ...mockModule(), status: 'retired', activation: 'disabled',
+    exitEvidenceRefs: ['review: removed from runtime imports'] };
+  const result = await evaluateMergeReadiness(input);
+  assert.equal(result.mergeAllowed, false);
+  assert.match(result.mockSafetyError, /源码退出|隔离证据/);
+});
+
+test('isolated development fixtures may remain at source merge with current config and exit evidence', async () => {
+  const input = mockInput();
+  input.mockSafety.mockModules[0] = { ...mockModule(), status: 'retired',
+    exitEvidenceRefs: ['review: real implementation replaced business imports'] };
+  const snapshot = await fixtureMockIo.inspectMockSource(input.mockSafety);
+  input.mockSafety.productionSourceEvidence = { scopeFingerprint: input.mockSafety.scopeFingerprint,
+    evidenceRefs: ['review: runtime imports and build exclusion inspected'], configPaths: ['package.json'],
+    configurationFingerprints: { 'package.json': snapshot.fileFingerprints['package.json'] },
+    remainingRuntimeMockPaths: [] };
+  assert.deepEqual(await evaluateMergeReadiness(input), { mergeAllowed: true, blockers: [] });
+});
+
+test('test-target Mock requires exact human scope authorization and cannot inherit ordinary merge approval', async () => {
+  const input = mockInput('dev');
+  const missing = await evaluateMergeReadiness(input);
+  assert.equal(missing.mergeAllowed, false);
+  assert.match(missing.mockSafetyError, /明确确认/);
+  input.mockSafety.testAuthorization = { decision: 'ALLOW', source: 'human: displayed full Mock test checklist confirmed',
+    sourceSha: input.mockSafety.sourceSha, scopeFingerprint: input.mockSafety.scopeFingerprint,
+    inventoryFingerprint: mockInventoryFingerprint(input.mockSafety), targetBranch: 'dev', targetEnvironment: 'qa-list',
+    purpose: input.currentChange.purpose, operations: ['git-delivery'] };
+  assert.deepEqual(await evaluateMergeReadiness(input), { mergeAllowed: true, blockers: [] });
+  for (const patch of [{ targetEnvironment: 'qa-other' }, { purpose: 'Different test purpose' }]) {
+    const result = await evaluateMergeReadiness({ ...input, currentChange: { ...input.currentChange, ...patch } });
+    assert.equal(result.mergeAllowed, false);
+    assert.match(result.mockSafetyError, /明确确认/);
+  }
+  const production = await evaluateMergeReadiness({ ...input, currentChange: { ...input.currentChange, targetBranch: 'main' } });
+  assert.equal(production.mergeAllowed, false, 'test permission cannot authorize production');
 });

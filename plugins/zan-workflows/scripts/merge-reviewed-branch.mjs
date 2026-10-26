@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { clientFor } from './mcp-client.mjs';
 import { verifyMergeApprovals } from './gitlab-approvals.mjs';
+import { checkMockSafetySet, mockSafetyPreview } from './mock-safety.mjs';
 import { pollState, progressToStderr, readCliPlan, readTool, repositoryKey, requireText, toolData, validateWait } from './workflow-runtime.mjs';
 
 const run = promisify(execFile);
@@ -219,16 +220,20 @@ export async function mergeReviewedBranch(call, input, io = {}) {
     const receipt = await testTargetReceipt(plan, target.commit.id, io);
     if (receipt) return receipt;
   }
+  const mockContext = { operation: 'git-delivery', purpose: input.purpose, environmentKind: ['master', 'main'].includes(input.targetBranch) ? 'production' : 'test',
+    targetEnvironment: ['master', 'main'].includes(input.targetBranch) ? 'production' : (input.targetEnvironment || 'test'),
+    targetBranch: input.targetBranch, sourceRepository: input.originUrl, sourceSha: plan.sourceSha, requireCommitted: true };
+  const mockSafetyReceipts = input.execute && mode !== 'VERIFY_ONLY' ? await checkMockSafetySet(input, mockContext, io) : null;
   if (!mr) requireText(input.title, '新 MR 标题');
   if (!input.execute && mode !== 'VERIFY_ONLY') return {
-    ...plan, execute: false, confirmed: false, state: 'AWAITING_CONFIRMATION',
+    ...plan, ...mockSafetyPreview(input, ['master', 'main'].includes(input.targetBranch)), execute: false, confirmed: false, state: 'AWAITING_CONFIRMATION',
     mrIid: mr ? String(mr.iid) : null, mrUrl: mr?.web_url || null,
     operation: mode === 'MANUAL' ? (mr ? 'REUSE_FOR_MANUAL_MERGE' : 'CREATE_FOR_MANUAL_MERGE')
       : mr ? 'REUSE_AND_MERGE' : 'CREATE_AND_MERGE', writes: 0,
   };
   const result = { state: 'BLOCKED', projectId: input.projectId, repositoryPath: input.repositoryPath,
     originUrl: input.originUrl, sourceBranch: input.sourceBranch,
-    targetBranch: input.targetBranch, sourceSha: plan.sourceSha, mrIid: mr ? String(mr.iid) : null,
+    mockSafetyReceipts, targetBranch: input.targetBranch, sourceSha: plan.sourceSha, mrIid: mr ? String(mr.iid) : null,
     mrUrl: mr?.web_url || null, mergeReadback: false, containment: false, writes: 0 };
   let phase = 'CREATE_MR';
   try {
@@ -269,6 +274,7 @@ export async function mergeReviewedBranch(call, input, io = {}) {
       if (readiness.state !== 'READY') throw new Error(readiness.error || '合并前 MR 条件已变化');
       result.approvalEvidence = approvals;
       await (io.checkRepository || checkRepository)(input);
+      await checkMockSafetySet(input, mockContext, io);
       phase = 'MERGE_MR';
       try {
         await requestMerge(call, { ...mrArgs, sha: plan.sourceSha, auto_merge: false,

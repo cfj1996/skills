@@ -1,6 +1,7 @@
 import { readTool, repositoryKey, requireText, sha256 } from './workflow-runtime.mjs';
 import { records } from '../skills/submitting-for-test/scripts/ensure-test-wiki.mjs';
 import { wikiEntry } from './wiki-entry.mjs';
+import { checkMockSafetySet } from './mock-safety.mjs';
 
 const HASH = /^[a-f\d]{64}$/;
 
@@ -53,7 +54,7 @@ async function wikiById(call, plan) {
   return wiki;
 }
 
-export async function markPendingMergeWiki(gitlab, tapd, plan, mergeResult, { execute = false, confirmed = false } = {}) {
+export async function markPendingMergeWiki(gitlab, tapd, plan, mergeResult, { execute = false, confirmed = false, io = {} } = {}) {
   validatePendingWikiPlan(plan, mergeResult);
   if (plan.profile === 'NO_WIKI') return { state: 'SKIPPED_NO_WIKI', writes: 0 };
   if (plan.serviceType === 'TOOLING') return { state: 'SKIPPED_TOOL_PROJECT', writes: 0 };
@@ -84,6 +85,9 @@ export async function markPendingMergeWiki(gitlab, tapd, plan, mergeResult, { ex
     wikiId: String(plan.wikiId), wikiUrl: `https://www.tapd.cn/${plan.workspaceId}/markdown_wikis/show/#${plan.wikiId}`,
     beforeBodySha256: beforeHash, afterBodySha256: afterHash, mrUrl: mergeResult.mrUrl, writes: 0 };
   if (!execute || patch.body === beforeBody) return result;
+  await checkMockSafetySet(plan, { operation: 'production-wiki', purpose: plan.purpose || '记录已确认上线 MR 的待人工合并状态',
+    environmentKind: 'production', targetEnvironment: 'production', targetBranch: mergeResult.targetBranch,
+    sourceRepository: mergeResult.originUrl, sourceSha: mergeResult.sourceSha, requireCommitted: true }, io);
   try {
     const updated = await readTool(tapd, 'update_wiki', { workspace_id: Number(plan.workspaceId),
       options: { id: plan.wikiId, markdown_description: patch.body } });
