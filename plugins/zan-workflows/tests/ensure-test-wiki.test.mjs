@@ -158,10 +158,10 @@ async function withCliDelivery(run) {
       sourceSha, deliveredSha: sourceSha, targetBranch: 'develop' }];
     const argv = [
       '--workspace-id', String(workspaceId), '--entry-type', 'stories', '--entry-id', entryId,
-      '--source-branch', branch, '--mode', 'link', '--expected-wiki-id', childId,
+      '--source-branch', branch, '--mode', 'ensure', '--expected-wiki-id', childId,
       '--expect-target', 'REUSE_EXISTING', '--expected-month-id', monthId,
       '--expected-body-sha256', contentHash(originalBody), '--wiki-title', title, '--creator', 'Alice',
-      '--target-environment', 'test', '--target-branch', 'develop', '--purpose', 'Link the delivered test Wiki',
+      '--target-environment', 'test', '--target-branch', 'develop', '--purpose', 'Record the current test delivery Wiki',
       '--mock-safeties', JSON.stringify([safety]), '--required-repositories', JSON.stringify(requiredRepositories),
       '--git-delivery-receipts', JSON.stringify(gitDeliveryReceipts), '--execute',
     ];
@@ -169,12 +169,12 @@ async function withCliDelivery(run) {
   } finally { await rm(repositoryPath, { recursive: true, force: true }); }
 }
 
-test('standalone CLI forwards Git receipts through the real Mock gate before linking the Wiki', async () => {
+test('standalone CLI forwards Git receipts through the real Mock gate for test delivery', async () => {
   await withCliDelivery(async ({ argv, requiredRepositories, gitDeliveryReceipts }) => {
     const parsed = parseArgs(argv);
     assert.deepEqual(parsed.requiredRepositories, requiredRepositories);
     assert.deepEqual(parsed.gitDeliveryReceipts, gitDeliveryReceipts);
-    const fake = makeFake({ childExists: true });
+    const fake = makeFake({ childExists: true, description: `提测wiki：[${url}](${url})` });
     // Exercise the production helper directly: the legacy wrapper must not
     // supply the very delivery fields this CLI regression needs to verify.
     const result = await originalEnsureTestWiki(fake.call, parsed);
@@ -195,12 +195,12 @@ test('standalone CLI rejects missing, incomplete and stale delivery evidence bef
       [replace('--git-delivery-receipts', [{ ...gitDeliveryReceipts[0], deliveredSha: '' }]), /未验证准确源码包含关系/],
     ];
     for (const [input, message] of failures) {
-      const fake = makeFake({ childExists: true });
+      const fake = makeFake({ childExists: true, description: `提测wiki：[${url}](${url})` });
       await assert.rejects(originalEnsureTestWiki(fake.call, parseArgs(input)), message);
       assert.deepEqual(writes(fake), []);
     }
     await writeFile(join(repositoryPath, 'src/app.js'), 'export const value = 2;\n');
-    const fake = makeFake({ childExists: true });
+    const fake = makeFake({ childExists: true, description: `提测wiki：[${url}](${url})` });
     await assert.rejects(originalEnsureTestWiki(fake.call, parseArgs(argv)), /Mock 清查已过期/);
     assert.deepEqual(writes(fake), []);
   });
@@ -458,7 +458,9 @@ test('a shared item Wiki may append a new approved branch entry', async () => {
 
 test('comment-only mode does not create, update or rediscover Wiki pages', async () => {
   const fake = makeFake({ childExists: true });
-  const result = await ensureTestWiki(fake.call, { ...existingInput(undefined), mode: 'link' });
+  // Use the real helper without the delivery fixture: a link-only backfill
+  // needs its bound Wiki/comment facts, not an unrelated source inventory.
+  const result = await originalEnsureTestWiki(fake.call, { ...existingInput(undefined), mode: 'link' });
   assert.equal(result.wikiState, 'UNCHANGED');
   assert.equal(result.commentState, 'LINKED');
   assert.deepEqual(fake.calls.map(call => call.name), [

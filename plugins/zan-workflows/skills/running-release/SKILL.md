@@ -44,50 +44,36 @@ normal build requests/defaults alone do not. Changed content/inventory/target
 requires refreshed scope authorization. Do not bypass the gate by calling MCP
 directly. An unclear or production/publishing effect routes to the full flow.
 
-Use the connected Jenkins MCP directly. Do not start `workflow-session.mjs`,
-create a release `PLAN`/fingerprints, or invoke `run-jenkins-release.mjs` for this
-flow. Do not load full-release/scripted-delivery guidance just to run a daily build.
+Use the existing [run-jenkins-release.mjs](../../scripts/run-jenkins-release.mjs)
+script for a compact PLAN/EXECUTE. Apply [fixed parameters](../../references/frozen-jenkins-parameters.md)
+for all builds; do not create a workflow-session or load Wiki/TAPD merely for a daily build.
+The helper owns the single trigger and exact queue/build checks through Jenkins MCP.
+No build flow requires Job XML. Official releases use the actual project checker and
+reviewed publishing integration under [Mock gates](../../references/mock-development.md);
+missing project integration is a concrete release gap, not a config-permission error.
 
-1. Resolve the project, exact Jenkins instance, Job/URL and source repository once
-   through `workspace-project-knowledge`; reuse valid current context. Query only
-   a missing mapping or URL. For an exact project/Job lookup, skip source scans,
-   Graphify queries and unrelated project contexts; inspect the exact source/Mock
-   bindings required by the preceding mandatory gate. Use an evidenced dev/test
-   default only when it selects one unambiguous target; never guess `develop`/`dev`
-   or derive a Job URL from a naming pattern.
-2. Read live Job parameter definitions once and resolve the exact requested ref
-   to its current remote SHA once. These independent reads may run together.
-   Bind the real ref parameter and allowed values; use other defaults only within
-   the authorized build scope. Honour an explicit commit/tag and do not substitute
-   the local branch, another ref, an official channel or a package publication.
-   Refresh source evidence if it changed or a confirmation delay made it stale.
-   When there is no version parameter, the SHA is the build identity; do not ask
-   the user to invent a version or a package channel for an ordinary project build.
-3. Briefly state the project, dev/test environment, Job, ref/SHA and relevant
-   parameters. Reuse the user's current build instruction or unchanged prior
-   confirmation when it satisfies workspace authorization requirements. Defaults
-   and readbacks are evidence, not permission: if the rules require confirmation
-   of resolved fields, ask once using this compact summary. Do not demand a second
-   confirmation or a full release checklist for an unchanged authorized build.
-4. Call `jenkins_trigger_build` exactly once with the selected instance, exact Job
-   and resolved parameters. Keep the returned queue ID/URL and follow that queue
-   to its exact build number. Track that build with bounded backoff (at most 30
-   seconds per wait, default total deadline 30 minutes), reporting state changes
-   only. Do not infer the build from `lastBuild`, the largest/recent build number,
-   the queue disappearing, or a different successful build.
-5. Verify the exact build's terminal result, queue/Job identity, submitted parameters
-   and target repository's actual SCM SHA against the resolved SHA. Use supported
-   MCP fields first. If queue executable, queueId, parameters or SCM actions are
-   omitted, use the existing GET-only `configuredJenkinsReader` in
-   [jenkins-readonly.mjs](../../scripts/jenkins-readonly.mjs), restricted to the same
-   instance, returned queue and exact Job/build. Compare the reader's `instanceUrl`
-   with the selected MCP instance before reading; a default-instance mismatch
-   must stop rather than silently query another server. A bounded read-only wait can use
-   `pollState` from [workflow-runtime.mjs](../../scripts/workflow-runtime.mjs);
-   it must not trigger or restart a workflow session. Do not read helper source
-   routinely or repeatedly fetch rules, Job definitions, refs or full logs while
-   waiting. Missing or mismatched evidence is `UNKNOWN`/`BLOCKED`, never verified
-   success. Build changes lists and other repositories' SHAs are not SCM proof.
+1. Resolve the exact registered project/subproject, Job/URL and source repository through
+   workspace-project-knowledge. Load project-knowledge's jenkins-build-contracts.json and
+   select one exact environment profile; missing/unavailable/ambiguous records block.
+   Parameter maintenance is a separate explicit sync script, never a deployment fallback.
+2. Read the fixed parameter definitions and allowed values locally. Resolve the requested
+   Git ref to its actual remote SHA, bind ref/version fields, and use the frozen resolver
+   to fill every supported default explicitly. Validate actual submitted values against
+   fixed environment/release conditions; do not query Jenkins parameter definitions or
+   extract them from XML. Preserve explicit project/ref/channel choices.
+3. Prepare the helper's read-only PLAN with actual parameters, contract/profile/value
+   hashes and exact source identity. Briefly display project, test environment, profile,
+   Job, ref/SHA and relevant parameters. Reuse a matching explicit user build instruction;
+   where confirmation is required, obtain it once for the concrete plan. Mock testing
+   still needs explicit approval of its exact inventory/target, not generic build intent.
+4. Execute that plan once. The helper re-reads the local contract and mutable source/Job
+   identity, rejects changed facts, triggers once, follows only the returned queue and
+   verifies its exact build. It must make zero parameter-definition calls. Ordinary daily
+   builds wait for terminal result/source; a test-submission bundle may use its existing
+   TRIGGER_ACCEPTED policy. Never infer success from lastBuild or another build.
+5. Retain exact result/source evidence; a local parameter snapshot does not prove a build
+   succeeded or a production artifact is safe. Missing or mismatched evidence blocks;
+   correct parameter maintenance separately instead of automatically retrying a trigger.
 
 Return project/environment, Job/build link, ref/actual SHA and success/failure.
 On failure, cancellation, timeout or an unknown trigger result, report the exact

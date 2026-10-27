@@ -7,6 +7,12 @@ description: Use when submitted TAPD changes must merge original fixed branches 
 
 ## Mock production prohibition
 
+Build parameters and exact channel/environment profiles use the centrally maintained
+[fixed Jenkins contract](../../references/frozen-jenkins-parameters.md), including
+actual-value constraints. Never discover or refresh parameter definitions during a
+deployment. Missing profiles block; live source, Job identity and project-script/
+artifact proof remain separate mandatory checks. No Jenkins XML read is required.
+
 Before any default-branch MR/create/merge or official release, apply
 [Mock production gates](../../references/mock-development.md) and the unified
 [safety helper](../../scripts/mock-safety.mjs) to all selected repositories. Test-environment
@@ -16,10 +22,15 @@ Retiring requires actual real replacement, reference/entry cleanup and verified 
 exclusion; changing a tag/status or disabling a switch is insufficient.
 
 Source preflight precedes master/main writes. A future build artifact is not required
-before it exists and must never be fabricated: before Jenkins release, verify the exact
-Job/config has an effective artifact inspection before deploy/publish with failure
-blocking; after the build, require that build/SHA/artifact-bound gate result before
-claiming release success. If no effective gate can be proven, stop before trigger.
+before it exists and must never be fabricated. Before official Jenkins release, use
+[project-mock-gate.mjs](../../scripts/project-mock-gate.mjs) to verify and run the actual
+project source checker from the exact Git snapshot, and review the versioned real
+publishing entry proving artifact inspection runs before publish/deploy and a failure
+stops publication. After the build, require that build/SHA/Job and checker/config/artifact-
+bound result before claiming release success. No configuration XML or inline pipeline
+shape is required. Missing project scripts or release integration stop before trigger
+and are reported as those concrete gaps; this update does not install checks into
+business projects or change Jenkins configuration.
 Production artifacts/runtime may not contain Mock modules, fixture/handler/runtime or
 enablement paths. Isolated repository-only development tests may remain only with
 proved exclusion. Query Contract release-check or @api-mock status does not prove this.

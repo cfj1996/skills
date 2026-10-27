@@ -351,6 +351,13 @@ Workflow:
 
 1. Route the project with Function 1.
 2. Read `jenkins_jobs` and, when present, `jenkins_job_urls` from the centralized `${project_knowledge_root}/data/workspace/project-relations.yaml`, falling back to `references/project-relations.yaml`.
+   For build/deployment consumers, resolve the exact Job/instance/URL, complete parameter
+   definitions/defaults/choices and environment profile from
+   `${project_knowledge_root}/data/workspace/jenkins-build-contracts.json` under
+   [fixed parameter rules](../../references/frozen-jenkins-parameters.md). The frozen
+   resolver checks actual submitted values, not just labels. Missing/unavailable records
+   or ambiguous profiles block deployment until the separate maintenance sync succeeds;
+   do not query Jenkins parameters, parse them from XML or auto-refresh at execution.
 3. When an indexed URL is absent, use the read-only
    [Job resolver](../../scripts/resolve-jenkins-job.mjs) or session `job` PLAN
    action: query the selected instance and exact Job name, restricted to its

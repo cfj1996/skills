@@ -91,8 +91,12 @@ Wiki 保留已验证的当前版本，无历史证据则显示“待发布”。
 场景、切换/重置、真实调用边界与退出条件；接口未知时只做功能数据场景，不猜
 HTTP契约。Mock默认仅本地，普通开发/直接提测不自动授权含Mock测试交付；完整
 清单必须明确展示准确范围/源码内容/测试目标/用途/操作并获人类确认。生产禁止
-Mock模块、数据、handler、runtime及启用入口，源码退出、制品排除和Jenkins先检
-后发门禁都须有证据，关闭开关或release-check通过不能替代。
+Mock模块、数据、handler、runtime及启用入口，源码退出、制品排除和项目发布
+脚本先检后发都须有证据，关闭开关或release-check通过不能替代。正式发布不要求
+读取Jenkins XML：受审项目脚本实际执行源码和发布前制品检查，失败停止发包/部署，
+结果绑定准确源码、Job/构建和脚本/配置/制品指纹。可复制
+[项目检查模板](assets/project-mock-check/check-mock.mjs)接入已有发布入口；
+本插件更新不会自动给业务项目安装检查或修改Jenkins配置，缺接入须准确说明。
 
 正式新建模型使用 PagePlan v4 / ReviewSession v3，同一Plan承载外部依赖和Mock，
 面板/清单/实施/交付引用同一事实。旧Plan/会话可读取，缺失审查信息保持未核实，
@@ -239,3 +243,12 @@ codex plugin add zan-workflows@cfj-skills --json
 插件问题提交到[本仓库 Issues](https://github.com/cfj1996/skills/issues)，项目映射与
 知识问题提交到[project-knowledge](http://git.jubaozan.cn/chenfangjie/project-knowledge/issues)。
 提供最小复现和脱敏错误，不附 token、密码或客户数据。
+
+## Jenkins 参数维护与部署
+
+已接入项目的完整构建参数、默认值、choices和环境profile固定在project-knowledge的
+`data/workspace/jenkins-build-contracts.json`，人工策略在`sources/jenkins-build-policies.json`。
+独立运行`npm run jenkins:sync-build-contracts -- --instance ops`维护；采集只读Jenkins。
+部署不再查询Jenkins参数配置，不做隐式在线刷新；使用
+[离线解析与执行脚本](references/frozen-jenkins-parameters.md)校验实际参数、显式填充默认值，
+固定环境/平台/发布类型不可被覆盖。缺失Job或未核实profile在构建前阻断。

@@ -5,33 +5,16 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { inspectMockSource, checkMockSafety, checkMockSafetySet, mockInventoryFingerprint,
-  checkDeliveryEnvironment, checkPreDeployMockGate, verifyMockCheckerEvidence, verifyProductionMockArtifact } from '../scripts/mock-safety.mjs';
+  verifyProductionMockArtifact } from '../scripts/mock-safety.mjs';
 import { mergeReviewedBranch } from '../scripts/merge-reviewed-branch.mjs';
-import { runJenkinsRelease } from '../scripts/run-jenkins-release.mjs';
 import { registerTestSubmission } from '../scripts/register-test-submission.mjs';
 import { WorkflowSession } from '../scripts/workflow-session.mjs';
-import { noMockFixture, fixtureMockIo } from './helpers/mock-safety-fixture.mjs';
+import { noMockFixture, fixtureMockIo, projectMockFixture, projectSourceReceipt } from './helpers/mock-safety-fixture.mjs';
 import { sha256 } from '../scripts/workflow-runtime.mjs';
 
 const sourceSha = 'a'.repeat(40), targetSha = 'b'.repeat(40);
 const originUrl = 'https://git.example.test/team/demo.git';
 const jobUrl = 'https://ci.example.test/job/demo-test/';
-const canonicalPipeline = (command, { revision = sourceSha, repository = originUrl, clean = true, checkout = true,
-  buildCommand, checkerHash = sha256(checkerBody) } = {}) =>
-  "<flow-definition><definition class=\"org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition\"><script>pipeline { agent any stages { stage('Guarded deploy') { steps { " +
-  (clean ? 'deleteDir(); ' : '') + (checkout ? "checkout([$class: 'GitSCM', branches: [[name: '" + revision + "']], userRemoteConfigs: [[url: '" + repository + "']]]); " : '') +
-  "sh '" + [...(buildCommand ? [buildCommand] : []),
-    `sha256sum -- scripts/check-mock.mjs | grep -Fx -- "${checkerHash}  scripts/check-mock.mjs"`, command]
-    .join(' && ').replaceAll('&', '&amp;') + "' } } } }</script></definition></flow-definition>";
-const checkerBody = '// MOCK_PRODUCTION_GATE: fixture of independently reviewed artifact checker\n';
-const checkerEvidence = () => ({ repositoryPath: '/fixture/demo', sourceRepository: originUrl, sourceSha,
-  scriptPath: 'scripts/check-mock.mjs', contentHash: sha256(checkerBody), evidenceRefs: ['E-checker-source-and-responsibility-review'] });
-const productionGate = (xml, checkCommand = 'node scripts/check-mock.mjs') => ({
-  state: 'VERIFIED', jobBindingHash: sha256(xml), pipelineContentHash: sha256(xml), sourceSha, jobUrl,
-  checkCommand, deployStep: 'deploy-production', evidenceRefs: ['E-current-pipeline'], failClosed: true, beforeDeploy: true,
-  checkerEvidence: checkerEvidence(), artifactMarker: 'MOCK_PRODUCTION_GATE',
-});
-const productionInput = gate => ({ expectedSha: sourceSha, sourceRepository: originUrl, jobUrl, preDeployMockGate: gate });
 const context = () => ({ environmentKind: 'test', operation: 'git-delivery', purpose: 'deliver reviewed code', targetEnvironment: 'test', targetBranch: 'develop',
   sourceRepository: originUrl, sourceSha });
 const active = () => ({ id: 'MOCK-list', marker: 'MOCK_ONLY', status: 'active', featureRefs: ['F-list'], taskRefs: [],
@@ -92,22 +75,17 @@ test('multi-repository gates reject missing or duplicate repository coverage', a
     { sourceRepository: originUrl, sourceSha }, { sourceRepository: originUrl, sourceSha } ] }, context(), fixtureMockIo), /全部本轮交付仓库|已核实的交付源码|仓库清单/);
 });
 
-test('production needs current Job-bound pre-deploy guard and build-bound final artifact receipt', () => {
-  const pipeline = canonicalPipeline('node scripts/check-mock.mjs && deploy after check');
-  const jobHash = sha256(pipeline);
-  const input = { expectedSha: sourceSha, sourceRepository: originUrl, jobUrl };
-  assert.throws(() => checkPreDeployMockGate(input, 'job-hash'), /制品 Mock 检查门禁/);
-  input.preDeployMockGate = { state: 'VERIFIED', jobBindingHash: jobHash, pipelineContentHash: jobHash, sourceSha, jobUrl,
-    checkCommand: 'node scripts/check-mock.mjs', deployStep: 'deploy after check', evidenceRefs: ['E-current-pipeline'],
-    failClosed: true, beforeDeploy: true, checkerEvidence: checkerEvidence(), artifactMarker: 'MOCK_PRODUCTION_GATE' };
-  assert.equal(checkPreDeployMockGate(input, jobHash, pipeline), input.preDeployMockGate);
-  assert.throws(() => checkPreDeployMockGate(input, jobHash), /实际流水线代码/);
-  assert.throws(() => checkPreDeployMockGate(input, 'changed-job-hash'), /制品 Mock 检查门禁/);
-  const receipt = { state: 'PASSED', sourceSha, jobUrl, queueId: 9, buildNumber: 3,
-    artifactFingerprint: sha256('artifact'), beforeDeploy: true, runtimeEnabled: false, remainingMockPaths: [] };
+test('production artifact receipts bind the executed project checker and exact resulting build', () => {
+  const projectMockGate = projectMockFixture({ sourceRepository: originUrl, expectedSha: sourceSha });
+  const projectMockSourceReceipt = projectSourceReceipt(projectMockGate);
+  const input = { expectedSha: sourceSha, sourceRepository: originUrl, jobUrl, projectMockGate, projectMockSourceReceipt };
+  const receipt = { ...projectMockSourceReceipt, phase: 'artifact', jobUrl, queueId: 9, buildNumber: 3,
+    artifactFingerprint: sha256('artifact'), beforeDeploy: true };
   assert.equal(verifyProductionMockArtifact('MOCK_PRODUCTION_GATE ' + JSON.stringify(receipt), input, 9, 3).state, 'PASSED');
-  for (const change of [{ queueId: 8 }, { sourceSha: targetSha }, { remainingMockPaths: ['fixture.json'] }, { runtimeEnabled: true }, { beforeDeploy: false }]) {
-    assert.throws(() => verifyProductionMockArtifact('MOCK_PRODUCTION_GATE ' + JSON.stringify({ ...receipt, ...change }), input, 9, 3), /未通过或回执/);
+  for (const change of [{ queueId: 8 }, { sourceSha: targetSha }, { remainingMockPaths: ['fixture.json'] },
+    { runtimeEnabled: true }, { beforeDeploy: false }, { checkerHash: sha256('other checker') },
+    { configHash: sha256('other policy') }, { sourceFingerprint: sha256('different source') }]) {
+    assert.throws(() => verifyProductionMockArtifact('MOCK_PRODUCTION_GATE ' + JSON.stringify({ ...receipt, ...change }), input, 9, 3), /未通过|回执/);
   }
 });
 
@@ -211,125 +189,6 @@ test('retired isolated fixtures keep stable markers, but need current content-bo
   await assert.rejects(checkMockSafety(input, context(), { ...fixtureMockIo, inspectMockSource: inspect }), /源码退出/);
 });
 
-test('conditional, commented, parallel or uncalled pipeline checks cannot authorize production trigger', () => {
-  const bodies = [
-    "pipeline { agent any stages { stage('Mock check') { when { expression { false } } steps { sh 'check' } } stage('Deploy') { steps { sh 'deploy' } } } }",
-    "// sh 'check'\npipeline { agent any stages { stage('Deploy') { steps { sh 'deploy' } } } }",
-    "def checkMock() { sh 'check' }\npipeline { agent any stages { stage('Deploy') { steps { sh 'deploy' } } } }",
-    "pipeline { agent any stages { parallel { stage('Mock') { steps { sh 'check' } } stage('Deploy') { steps { sh 'deploy' } } } } }",
-  ];
-  for (const body of bodies) {
-    const xml = '<flow-definition><definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition"><script>' + body + '</script></definition></flow-definition>';
-    const hash = sha256(xml);
-    assert.throws(() => checkPreDeployMockGate({ expectedSha: sourceSha, sourceRepository: originUrl, jobUrl, preDeployMockGate: { state: 'VERIFIED',
-      sourceSha, jobUrl, jobBindingHash: hash, pipelineContentHash: hash, checkCommand: 'check', deployStep: 'deploy',
-      evidenceRefs: ['E-pipeline'], failClosed: true, beforeDeploy: true, checkerEvidence: checkerEvidence(), artifactMarker: 'MOCK_PRODUCTION_GATE' } }, hash, xml), /未完整匹配/);
-  }
-});
-
-test('the checker must be invoked directly rather than printed, inspected or passed to another program', async () => {
-  for (const command of ['echo scripts/check-mock.mjs', 'cat scripts/check-mock.mjs', 'node --check scripts/check-mock.mjs',
-    'node --help scripts/check-mock.mjs', 'node scripts/other.mjs scripts/check-mock.mjs',
-    'node scripts/check-mock.mjs --help', 'sh -n scripts/check-mock.mjs']) {
-    const xml = canonicalPipeline(command + ' && deploy-production'), gate = productionGate(xml, command);
-    assert.throws(() => checkPreDeployMockGate(productionInput(gate), sha256(xml), xml), /必须直接执行受审脚本/, command);
-    let sourceReads = 0;
-    await assert.rejects(verifyMockCheckerEvidence(gate, { readMockCheckerSource: async () => { sourceReads++; return checkerBody; } }), /必须直接执行受审脚本/, command);
-    assert.equal(sourceReads, 0, 'reject an ineffective invocation before accepting checker-source evidence');
-  }
-  for (const interpreter of ['node', 'python3', 'sh', 'bash']) {
-    const command = interpreter + ' scripts/check-mock.mjs', xml = canonicalPipeline(command + ' && deploy-production');
-    const gate = productionGate(xml, command);
-    assert.equal(checkPreDeployMockGate(productionInput(gate), sha256(xml), xml), gate);
-    assert.equal((await verifyMockCheckerEvidence(gate, { readMockCheckerSource: async () => checkerBody })).state, 'VERIFIED');
-  }
-});
-
-test('only the actual inline definition can supply a guarded production Pipeline', () => {
-  const inline = canonicalPipeline('node scripts/check-mock.mjs && deploy-production');
-  const script = inline.match(/<script>([\s\S]*)<\/script>/)[1];
-  const scm = '<definition class="org.jenkinsci.plugins.workflow.cps.CpsScmFlowDefinition"><scm class="hudson.plugins.git.GitSCM"/><scriptPath>Jenkinsfile</scriptPath></definition>';
-  const configs = [
-    `<flow-definition><!-- <script>${script}</script> -->${scm}</flow-definition>`,
-    `<flow-definition><properties><script>${script}</script></properties>${scm}</flow-definition>`,
-    `<flow-definition><description><![CDATA[<script>${script}</script>]]></description>${scm}</flow-definition>`,
-    inline.replace('class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition"', ''),
-    inline.replace('<definition ', '<definition reference="../other" '),
-    inline.replace('</definition>', '</definition><definition class="org.jenkinsci.plugins.workflow.cps.CpsScmFlowDefinition"/>'),
-    inline.replace('</script>', '</script><script>unguardedDeploy()</script>'),
-    inline.replace('</definition>', '</properties>'),
-    '<!DOCTYPE flow-definition [<!ENTITY guarded "ignored">]>' + inline,
-    inline.replace('<flow-definition>', '<flow-definition xmlns="unsupported">'),
-  ];
-  for (const xml of configs) {
-    const gate = productionGate(xml);
-    assert.throws(() => checkPreDeployMockGate(productionInput(gate), sha256(xml), xml), /实际 XML definition/, xml);
-  }
-  const cdata = inline.replace(/<script>[\s\S]*<\/script>/, `<script><![CDATA[${script.replaceAll('&amp;', '&')}]]></script>`);
-  for (const xml of [inline, '<?xml version="1.1" encoding="UTF-8"?>\n' + inline,
-    inline.replace('<definition ', '<!-- configuration note --><definition '), cdata,
-    inline.replaceAll('&amp;', '&#38;')]) {
-    const gate = productionGate(xml);
-    assert.equal(checkPreDeployMockGate(productionInput(gate), sha256(xml), xml), gate);
-  }
-});
-
-test('official standalone Jenkins release checks before trigger and verifies only its exact artifact receipt', async () => {
-  const calls = [];
-  let pipeline = canonicalPipeline('node scripts/check-mock.mjs && deploy-production');
-  const prodJob = 'https://ci.example.test/job/demo-prod/';
-  const input = { targetProject: 'demo', releaseTarget: 'demo', targetEnvironment: 'production', releaseKind: 'deployment',
-    releaseChannel: 'official', jobName: 'demo-prod', jobUrl: prodJob, releaseRef: sourceSha, expectedSha: sourceSha,
-    sourceRepository: originUrl, purpose: 'official deployment', params: { REF: sourceSha }, refParameter: 'REF', version: sourceSha,
-    jobBindingMode: 'CONFIG_XML', mockSafety: noMockFixture({ originUrl, sourceSha }) };
-  const call = async name => {
-    calls.push(name);
-    if (name === 'jenkins_get_job_parameters') return reply({ jobName: input.jobName, parameters: [{ name: 'REF' }] });
-    if (name === 'jenkins_get_job_config') return reply({ jobName: input.jobName, config: pipeline });
-    if (name === 'jenkins_list_instances') return reply([{ name: 'default', url: 'https://ci.example.test' }]);
-    if (name === 'jenkins_trigger_build') return reply({ jobName: input.jobName, queueUrl: 'https://ci.example.test/queue/item/9/' });
-    throw new Error(name);
-  };
-  const reader = { instanceUrl: 'https://ci.example.test', jobUrl: prodJob, queueIdentity: () => ({ id: 9 }),
-    queue: async () => ({ executable: { number: 3 } }),
-    build: async () => ({ queueId: 9, building: false, result: 'SUCCESS', url: prodJob + '3/', actions: [
-      { parameters: [{ name: 'REF', value: sourceSha }] }, { remoteUrls: [originUrl], lastBuiltRevision: { SHA1: sourceSha } } ] }),
-    console: async () => 'MOCK_PRODUCTION_GATE ' + JSON.stringify({ state: 'PASSED', sourceSha, jobUrl: prodJob,
-      queueId: 9, buildNumber: 3, artifactFingerprint: sha256('actual-production-artifact'), beforeDeploy: true,
-      runtimeEnabled: false, remainingMockPaths: [] }) };
-  const io = { ...fixtureMockIo, checkSource: async () => {}, readMockCheckerSource: async () => checkerBody };
-  const plan = await runJenkinsRelease(call, reader, input, io);
-  const mappingText = JSON.stringify({ jobUrl: prodJob, targetEnvironment: 'production', releaseChannel: 'official', environmentKind: 'production' });
-  const environmentBinding = { kind: 'project-policy', ...JSON.parse(mappingText), sourcePath: '/fixture/AGENTS.md', sourceHash: sha256(mappingText),
-    jobBindingHash: plan.jobBindingHash, parameterDefinitionsHash: plan.parameterDefinitionsHash, mappingText, evidenceRefs: ['E-project-environment-map'] };
-  await assert.rejects(runJenkinsRelease(call, reader, { ...plan, environmentBinding, execute: true, confirmed: true }, io), /制品 Mock 检查门禁/);
-  assert.equal(calls.includes('jenkins_trigger_build'), false);
-  const preDeployMockGate = { state: 'VERIFIED', jobBindingHash: plan.jobBindingHash, pipelineContentHash: sha256(pipeline),
-    sourceSha, jobUrl: prodJob, checkCommand: 'node scripts/check-mock.mjs', deployStep: 'deploy-production', evidenceRefs: ['E-real-config'],
-    failClosed: true, beforeDeploy: true, checkerEvidence: checkerEvidence(), artifactMarker: 'MOCK_PRODUCTION_GATE' };
-  const acceptedPipeline = pipeline;
-  const guardedScript = pipeline.match(/<script>([\s\S]*)<\/script>/)[1];
-  for (const scenario of [
-    { config: canonicalPipeline('echo scripts/check-mock.mjs && deploy-production'), command: 'echo scripts/check-mock.mjs', error: /必须直接执行受审脚本/ },
-    { config: canonicalPipeline('node --check scripts/check-mock.mjs && deploy-production'), command: 'node --check scripts/check-mock.mjs', error: /必须直接执行受审脚本/ },
-    { config: `<flow-definition><!-- <script>${guardedScript}</script> --><definition class="org.jenkinsci.plugins.workflow.cps.CpsScmFlowDefinition"><scriptPath>Jenkinsfile</scriptPath></definition></flow-definition>`,
-      command: 'node scripts/check-mock.mjs', error: /实际 XML definition/ },
-  ]) {
-    pipeline = scenario.config;
-    const rejectedPlan = await runJenkinsRelease(call, reader, input, io);
-    await assert.rejects(runJenkinsRelease(call, reader, { ...rejectedPlan, execute: true, confirmed: true,
-      environmentBinding: { ...environmentBinding, jobBindingHash: rejectedPlan.jobBindingHash, parameterDefinitionsHash: rejectedPlan.parameterDefinitionsHash },
-      preDeployMockGate: { ...preDeployMockGate, checkCommand: scenario.command,
-        jobBindingHash: rejectedPlan.jobBindingHash, pipelineContentHash: sha256(pipeline) } }, io), scenario.error);
-    assert.equal(calls.includes('jenkins_trigger_build'), false, 'unsafe configuration must be refused before any production trigger');
-  }
-  pipeline = acceptedPipeline;
-  const result = await runJenkinsRelease(call, reader, { ...plan, environmentBinding, preDeployMockGate, execute: true, confirmed: true }, io);
-  assert.equal(result.state, 'DEPLOYED');
-  assert.equal(result.mockArtifactReceipt.state, 'PASSED');
-  assert.equal(calls.filter(name => name === 'jenkins_trigger_build').length, 1);
-});
-
 test('legitimate feature-to-dev merge can inspect target tree without changing the fixed branch', async () => {
   const root = await mkdtemp(join(tmpdir(), 'zan-mock-target-'));
   const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
@@ -375,111 +234,5 @@ test('legitimate feature-to-dev merge can inspect target tree without changing t
     inspected.deliverySourceEvidence = { deliveredSha: bad, scopeFingerprint: badTarget.scopeFingerprint,
       contentFingerprint: badTarget.contentFingerprint, evidenceRefs: ['E-target-review'] };
     await assert.rejects(checkMockSafety(inspected, { ...context(), operation: 'test-deploy', jobUrl, sourceSha: bad, requireCommitted: true }), /标识未关联|未登记/);
-  } finally { await rm(root, { recursive: true, force: true }); }
-});
-
-test('actual environment mapping is independent of canary/test labels and stays bound to current Job and policy source', async () => {
-  const input = { jobUrl, targetEnvironment: 'test', releaseChannel: 'canary' };
-  const actual = { jobBindingHash: sha256('actual job identity'), parameterDefinitionsHash: sha256('actual params') };
-  await assert.rejects(checkDeliveryEnvironment(input, actual, fixtureMockIo), /目标环境证据/);
-  const mappingText = JSON.stringify({ ...input, environmentKind: 'production' });
-  const binding = { kind: 'project-policy', ...JSON.parse(mappingText), sourcePath: '/fixture/AGENTS.md', sourceHash: sha256(mappingText), mappingText,
-    ...actual, evidenceRefs: ['E-project-policy'] };
-  assert.equal(await checkDeliveryEnvironment({ ...input, environmentBinding: binding }, actual, fixtureMockIo), 'production');
-  await assert.rejects(checkDeliveryEnvironment({ ...input, environmentBinding: binding }, { ...actual, jobBindingHash: sha256('different job') }, fixtureMockIo), /目标环境证据/);
-  await assert.rejects(checkDeliveryEnvironment({ ...input, environmentBinding: binding }, actual, { readMockEnvironmentSource: async () => 'changed' }), /来源内容已变化/);
-});
-
-test('production checker command cannot swallow failures or use a different unreviewed checker', () => {
-  for (const command of ['check || true', 'check; true', '! check', 'check\ndeploy', '$(check)', 'check | cat']) {
-    const xml = canonicalPipeline(command + ' && deploy');
-    const hash = sha256(xml);
-    assert.throws(() => checkPreDeployMockGate({ expectedSha: sourceSha, sourceRepository: originUrl, jobUrl, preDeployMockGate: { state: 'VERIFIED',
-      sourceSha, jobUrl, jobBindingHash: hash, pipelineContentHash: hash, checkCommand: command, deployStep: 'deploy',
-      evidenceRefs: ['E-config'], checkerEvidence: checkerEvidence(), failClosed: true, beforeDeploy: true, artifactMarker: 'MOCK_PRODUCTION_GATE' } }, hash, xml));
-  }
-});
-
-test('production checker evidence must describe the exact script revision in the actual release checkout', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'zan-mock-checker-revision-'));
-  const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-  try {
-    git('init', '-b', 'feature/checker'); git('config', 'user.name', 'fixture'); git('config', 'user.email', 'fixture@example.test');
-    git('remote', 'add', 'origin', originUrl); await mkdir(join(root, 'scripts'));
-    const scriptPath = 'scripts/check-mock.mjs';
-    const checkedBody = '// MOCK_PRODUCTION_GATE: reviewed artifact inspection and fail-closed behavior\nexport const inspect = artifact => artifact.remainingMockPaths.length === 0;\n';
-    await writeFile(join(root, scriptPath), checkedBody); git('add', '.'); git('commit', '-m', 'reviewed checker');
-    const reviewedSha = git('rev-parse', 'HEAD');
-    const pipeline = canonicalPipeline('node scripts/check-mock.mjs && deploy-production', { revision: reviewedSha, checkerHash: sha256(checkedBody) });
-    const hash = sha256(pipeline);
-    const gate = { state: 'VERIFIED', jobBindingHash: hash, pipelineContentHash: hash, sourceSha: reviewedSha, jobUrl,
-      checkCommand: 'node scripts/check-mock.mjs', deployStep: 'deploy-production', evidenceRefs: ['E-current-config'],
-      failClosed: true, beforeDeploy: true, artifactMarker: 'MOCK_PRODUCTION_GATE', checkerEvidence: { repositoryPath: root,
-        sourceRepository: originUrl, sourceSha: reviewedSha, scriptPath, contentHash: sha256(checkedBody), evidenceRefs: ['E-reviewer-checked-exact-checker-code'] } };
-    const input = { sourceRepository: originUrl, expectedSha: reviewedSha, jobUrl, preDeployMockGate: gate };
-    assert.equal(checkPreDeployMockGate(input, hash, pipeline), gate);
-    assert.equal((await verifyMockCheckerEvidence(gate)).sourceSha, reviewedSha);
-    await writeFile(join(root, scriptPath), '// MOCK_PRODUCTION_GATE: now always accepts\nexport const inspect = () => true;\n');
-    git('add', '.'); git('commit', '-m', 'changed checker at same path'); const changedSha = git('rev-parse', 'HEAD');
-    const stale = { ...input, expectedSha: changedSha, preDeployMockGate: { ...gate, sourceSha: changedSha } };
-    assert.throws(() => checkPreDeployMockGate(stale, hash, pipeline), /本次实际发布仓库和源码 SHA/);
-    const wrongRepository = { ...input, preDeployMockGate: { ...gate, checkerEvidence: { ...gate.checkerEvidence,
-      sourceRepository: 'https://git.example.test/team/other-checker.git' } } };
-    assert.throws(() => checkPreDeployMockGate(wrongRepository, hash, pipeline), /本次实际发布仓库和源码 SHA/);
-    await assert.rejects(verifyMockCheckerEvidence({ ...gate, checkerEvidence: { ...gate.checkerEvidence, sourceSha: changedSha } }), /源码已变化/);
-  } finally { await rm(root, { recursive: true, force: true }); }
-});
-
-test('production pipeline cannot run a checker from an implicit, stale or dirty CI workspace', () => {
-  const command = 'node scripts/check-mock.mjs && deploy-production';
-  for (const options of [{ checkout: false }, { clean: false }, { revision: targetSha },
-    { revision: 'master' }, { repository: 'https://git.example.test/team/other.git' }]) {
-    const xml = canonicalPipeline(command, options), hash = sha256(xml);
-    const gate = { state: 'VERIFIED', jobBindingHash: hash, pipelineContentHash: hash, sourceSha, jobUrl,
-      checkCommand: 'node scripts/check-mock.mjs', deployStep: 'deploy-production', evidenceRefs: ['E-pipeline'],
-      failClosed: true, beforeDeploy: true, checkerEvidence: checkerEvidence(), artifactMarker: 'MOCK_PRODUCTION_GATE' };
-    assert.throws(() => checkPreDeployMockGate({ sourceRepository: originUrl, expectedSha: sourceSha, jobUrl, preDeployMockGate: gate }, hash, xml), /清空 CI 工作区/);
-  }
-  const xml = canonicalPipeline(command, { buildCommand: 'npm run build' }), hash = sha256(xml);
-  const gate = { state: 'VERIFIED', jobBindingHash: hash, pipelineContentHash: hash, sourceSha, jobUrl,
-    buildCommand: 'npm run build', checkCommand: 'node scripts/check-mock.mjs', deployStep: 'deploy-production', evidenceRefs: ['E-pipeline'],
-    failClosed: true, beforeDeploy: true, checkerEvidence: checkerEvidence(), artifactMarker: 'MOCK_PRODUCTION_GATE' };
-  assert.equal(checkPreDeployMockGate({ sourceRepository: originUrl, expectedSha: sourceSha, jobUrl, preDeployMockGate: gate }, hash, xml), gate);
-});
-
-test('runtime checker integrity stops deployment when a build replaces the reviewed script', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'zan-mock-checker-integrity-'));
-  const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-  const scriptPath = 'scripts/check-mock.mjs';
-  const checkedBody = '// MOCK_PRODUCTION_GATE\nthrow new Error("unsafe artifact");\n';
-  const replacement = '// MOCK_PRODUCTION_GATE\nprocess.exit(0);\n';
-  try {
-    git('init', '-b', 'feature/checker-integrity'); git('config', 'user.name', 'fixture'); git('config', 'user.email', 'fixture@example.test');
-    git('remote', 'add', 'origin', originUrl); await mkdir(join(root, 'scripts'));
-    await writeFile(join(root, scriptPath), checkedBody);
-    await writeFile(join(root, 'scripts/always-pass.mjs'), replacement);
-    git('add', '.'); git('commit', '-m', 'reviewed artifact checker');
-    const revision = git('rev-parse', 'HEAD'), contentHash = sha256(checkedBody);
-    const buildCommand = 'cp scripts/always-pass.mjs scripts/check-mock.mjs';
-    const xml = canonicalPipeline('node scripts/check-mock.mjs && touch deployed', { revision, buildCommand, checkerHash: contentHash });
-    const gate = { ...productionGate(xml), sourceSha: revision, buildCommand, deployStep: 'touch deployed',
-      checkerEvidence: { ...checkerEvidence(), repositoryPath: root, sourceSha: revision, contentHash } };
-    const input = { ...productionInput(gate), expectedSha: revision };
-    assert.equal(checkPreDeployMockGate(input, sha256(xml), xml), gate);
-    assert.equal((await verifyMockCheckerEvidence(gate)).contentHash, contentHash);
-    const integrity = `sha256sum -- ${scriptPath} | grep -Fx -- "${contentHash}  ${scriptPath}"`;
-    const unguarded = xml.replace(integrity.replaceAll('&', '&amp;') + ' &amp;&amp; ', '');
-    const staleHash = xml.replace(contentHash, 'e'.repeat(64));
-    for (const config of [unguarded, staleHash]) {
-      const changedGate = { ...gate, jobBindingHash: sha256(config), pipelineContentHash: sha256(config) };
-      assert.throws(() => checkPreDeployMockGate({ ...input, preDeployMockGate: changedGate }, sha256(config), config), /实际 SHA-256 内容/);
-    }
-    // Run only the disposable local shell, never Jenkins or a real deploy.
-    // The build really overwrites the checked file; the next hash check must
-    // fail before the now-always-successful replacement and deploy marker run.
-    const shell = [buildCommand, integrity, gate.checkCommand, gate.deployStep].join(' && ');
-    assert.throws(() => execFileSync('sh', ['-c', shell], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] }), error => error.status === 1);
-    assert.equal(await readFile(join(root, scriptPath), 'utf8'), replacement);
-    await assert.rejects(readFile(join(root, 'deployed')), { code: 'ENOENT' });
   } finally { await rm(root, { recursive: true, force: true }); }
 });

@@ -128,6 +128,16 @@ all owner/Task comment targets in the consolidated plan.
 
 ## Input gate
 
+All selected build parameters follow [fixed Jenkins contracts](../../references/frozen-jenkins-parameters.md).
+Read project-knowledge's complete local definitions/defaults/choices and exact environment
+profile in both preparation and execution; explicitly submit resolved defaults and reject
+actual values conflicting with fixed selectors. Missing/unavailable/ambiguous records block.
+Do not call Jenkins parameter-definition APIs or infer definitions from XML during this
+workflow. Changes require separate parameter maintenance, not an automatic live fallback.
+No Job XML read is needed. Apply current source/Mock-authorization checks for test
+delivery; official project-script/artifact checks belong to the actual official release
+stage and cannot be claimed complete by a test queue receipt.
+
 Require:
 
 - each definition `READY_FOR_HANDOFF`;
@@ -265,7 +275,8 @@ requires a refreshed confirmation. Never rebuild on the test target or use
    - `DEPLOY`: validate `JENKINS_TEST_DEPLOY` once, then run
      [run-jenkins-release.mjs](../../scripts/run-jenkins-release.mjs) once with
      the exact confirmed release plan, `completionMode=TRIGGER_ACCEPTED` and
-     Job/config fingerprints. It checks the delivered target ref/SHA before
+     Job-identity and frozen-parameter fingerprints, plus applicable project-check
+     evidence. It checks the delivered target ref/SHA before
      triggering through `jenkins-mcp` once. An accepted exact Job/queue URL/ID
      returns `BUILD_SUBMITTED` with submitted parameters. Do not wait for queue
      execution or build completion, fetch logs, or require `SUCCESS`/actual SCM

@@ -77,7 +77,8 @@ preview as a validated body.
   inside business names. Preserve the exact original Job name for lookup and
   evidence, and leave the full Job URL unchanged.
 - `Job 参数` contains the selected build/release parameter names and values
-  from current delivery facts, checked against Jenkins definitions. Render
+  from current delivery facts, checked against project-knowledge's fixed Jenkins
+  definitions and resolved environment profile, without online parameter discovery. Render
   `name=value` pairs joined by `&`, preserving their names, values, and order.
   Include target and release-type selections; omit branch parameters such as
   `branch` by default, since the original source branch has its own Wiki field.

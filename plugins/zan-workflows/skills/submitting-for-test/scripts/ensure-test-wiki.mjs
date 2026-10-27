@@ -611,7 +611,9 @@ export async function ensureTestWiki(call, input, now = new Date(), io = {}) {
   };
   const productionWiki = ['master', 'main'].includes(input.targetBranch) || input.targetEnvironment === 'production' ||
     (input.gitDeliveryReceipts || input.prerequisites?.gitReceipts || []).some(row => ['master', 'main'].includes(row.targetBranch));
-  if (!noWrite) await checkMockSafetySet(input, { operation: productionWiki ? 'production-wiki' : 'test-wiki', purpose: input.purpose,
+  // Linking an already verified Wiki changes only its exact item comment. It
+  // neither introduces a delivery nor claims a new Mock verification result.
+  if (!noWrite && mode !== 'link') await checkMockSafetySet(input, { operation: productionWiki ? 'production-wiki' : 'test-wiki', purpose: input.purpose,
     environmentKind: productionWiki ? 'production' : 'test',
     targetEnvironment: productionWiki ? 'production' : (input.targetEnvironment || 'test'), targetBranch: input.targetBranch, requireCommitted: true }, io);
   let phase;

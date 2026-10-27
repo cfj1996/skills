@@ -132,38 +132,80 @@ Mock 默认仅本地使用。普通“开发”“直接提测”和测试构建
    证明开发工件已隔离时拦截。
 2. **最终制品检查**：对准确构建版本的制品与运行入口验证，不得携带上述
    工件或可激活路径。只搜 `mock` 字符串不足以证明不存在 Mock。
-3. **先检查后发布**：正式 Jenkins 路径须在部署/上传/发包前执行并强制消费
-   制品检查结果。构建前可以核实该门禁配置和源码，不能伪造未来制品已通过；
-   不能证明失败会拦截实际发布时，不触发可能先发布后检查的任务。
+3. **先检查后发布**：项目的实际发布入口须在部署/上传/发包前执行制品
+   检查，检查非零退出时停止后续发布。构建前核实项目脚本、配置和接入
+   源码；构建后核对本次真实制品回执，不能提前声称未来制品已通过。
 
-当前内置 Jenkins 适配必须读取并绑定实际 `CONFIG_XML`，只接受受支持的
-`flow-definition > definition[class=org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition]`
-下唯一 `script` 的内联 Pipeline、单 stage；XML 注释、其他配置节点和 SCM
-定义不提供执行证据。先 `deleteDir()` 清理 CI 工作区，再显式 GitSCM
-checkout 本次准确仓库及不可变发布 SHA，随后唯一 `sh` 严格执行
-`检查器完整性校验 && checkCommand && deployStep`；可选 `buildCommand` 在该校验
-之前执行。完整性校验由 helper 按受审路径和指纹固定推导为：
+Mock 检查由项目脚本执行。可沿用已有的有效检查器，或将
+[项目检查模板](../assets/project-mock-check/check-mock.mjs)和
+[配置示例](../assets/project-mock-check/config.example.json)复制到项目后，按
+实际源码、产物、运行入口和 Mock 隔离方式补齐并评审。模板不依赖 Query
+Contract 或本机插件，不自动为业务项目安装脚本，也不修改 Jenkins Job。
+不能只复制空配置或检查 `mock` 字符串就声称已接入。
+
+模板配置须显式记录 `sourcePaths`、`artifactPaths`、`mockModuleIds`、
+`forbiddenPaths`、`forbiddenContent` 和 `runtimeRules`。各阶段受检根必须
+非空、存在并完整递归扫描，不提供任意排除目录；禁止路径是项目相对字面
+路径/目录，禁止内容是项目专属精确字符串，不把常见单词作为通用判据。
+运行配置规则按 `source|artifact` 阶段指定 JSON 路径和禁止保留的配置键；
+键即使值为 false 也可能保留重新开启机制，不能仅以默认关闭放行。
+导入链、生产入口、打包隔离和实际配置覆盖仍须项目评审，模板扫描不替代
+这些事实。归档格式不在模板适配范围，应检查打包前最终 staging，并证明
+实际上传/发包/部署使用同一内容；不能只扫描压缩文件的外壳。
+
+例如将文件纳入项目的 `scripts/check-mock.mjs` 和
+`scripts/mock-check.config.json` 后，将 `MOCK_CHECK_SOURCE_SHA` 设为已核实的
+准确提交 SHA，源码检查的直接调用是：
 
 ```sh
-sha256sum -- <scriptPath> | grep -Fx -- "<contentHash>  <scriptPath>"
+node scripts/check-mock.mjs --phase source --config scripts/mock-check.config.json --source-sha "$MOCK_CHECK_SOURCE_SHA"
 ```
 
-指纹与路径之间固定两个空格；CI 需要 `sha256sum` 和 `grep`，缺失或检查器被构建
-改写时均停止，不执行后续检查或部署。检查器同仓同 SHA 的证据不能
-代替实际 checkout，浮动分支、旧工作区、缺少清理或身份不符都在触发前阻断。
-普通 Job 元数据、自报 VERIFIED、可跳过的
-`if/when`、额外发布路径、并行或 SCM 间接流水线均不能放行；复杂流水线
-在触发前报告缺少受审查适配，不能先触发后观察。构建后还须核实与本次
-源码/Job/队列/构建及制品指纹绑定的唯一 `MOCK_PRODUCTION_GATE` 检查回执。
+项目真实 CI 发布入口在产物生成后、发布前执行：
+
+```sh
+node scripts/check-mock.mjs --phase artifact --config scripts/mock-check.config.json --source-sha "$MOCK_CHECK_SOURCE_SHA" --job-url "$JOB_URL" --build-number "$BUILD_NUMBER"
+```
+
+入口必须检查退出码，失败立即停止后续发布。命令示例本身不证明已接入；
+本地可执行源码/制品验证，发包或部署仍通过 Jenkins。制品阶段核对实际 Git
+HEAD、受检源码的完整文件集合和字节必须与准确提交一致，并核实 Job 和构建
+身份。构建改写源码、新增或删除受检文件时，在发布前失败停止；不能等发布
+结束后才发现指纹不符。回执的源码内容指纹还须与触发前源码检查一致。
+
+正式发布使用 [project-mock-gate.mjs](../scripts/project-mock-gate.mjs) 的
+`projectMockGate` 契约，详见[脚本交付规范](scripted-delivery.md)：
+
+- **源码阶段**：从准确 Git 提交导出临时快照，实际运行受审项目脚本的
+  `source` 检查；校验脚本、配置指纹和 `MOCK_SOURCE_GATE` 结果。失败、版本
+  不符或缺检查时，在 Jenkins 触发前停止；源码通过不表示制品已通过。
+- **发布接入**：核实项目发布入口的固定版本源码和内容指纹，证明制品检查
+  位于实际发布前、失败停止且没有绕过路径。接入可以位于已核实的 npm
+  lifecycle、项目发布脚本或固定版本 Jenkinsfile；须审查真实调用关系，不能
+  以自报布尔值、日志标识或命令文本中出现脚本名代替。评审的
+  `filesFingerprint` 绑定全部入口文件的路径和内容指纹；PLAN 返回的
+  `projectMockGateHash` 必须原样带入正式 EXECUTE。构建后检查器/配置的
+  实际字节仍须与准确 Git 版本一致。评审须证明检查后发布同一份 staging，
+  不得再修改内容、换包或走绕过路径；版本或接入变化后刷新受影响证据。
+- **制品阶段**：Jenkins 沿用项目现有发布入口，对本次准确制品和运行配置
+  执行 `artifact` 检查；非零退出必须阻止发布。成功后回读唯一
+  `MOCK_PRODUCTION_GATE`，核对准确源码 SHA、Job、构建号、脚本/配置与制品
+  指纹；其 `sourceFingerprint` 必须等于触发前实际源码检查回执的同名字段。
+  队列身份来自本次准确构建读回，不假定 Jenkins 提供 `QUEUE_ID`
+  环境变量。只有准确构建、源码和回执全部匹配才可报告发布成功。
+
+发布流程不要求读取 Jenkins XML，也不解析 Groovy 或限制流水线必须是内联
+单 stage。XML 读取权限不是 Mock 接入条件。项目尚无脚本、制品检查或有效
+发布接入时，准确报告所缺项目能力并停止正式发布；不能将其报成配置读取
+403，也不能因去掉 XML 校验而假定该项目已经具备检查能力。
 
 现有 `release-check` 是补充检查，不能替代以上门禁。任何“测试确认”均不
 授予生产豁免，测试环境可用或 Mock 验证成功也不能放行上线。
 
-当前受支持的相对路径检查器必须与本次发布仓库及准确源码 SHA 一致，并现场
-核实脚本内容指纹和职责评审证据；不能用旧版本的正确脚本为当前版本背书。
-检查命令仅支持 `node|python3|sh|bash` 后跟准确脚本相对路径的直接调用，不带
-解释器选项或额外参数。`echo`、`cat` 或 `node --check` 提到脚本路径不表示执行。
-外部检查器或额外 checkout 没有显式固定版本适配时，在触发前阻断。
+项目检查器、配置及发布接入证据均绑定准确仓库、不可变源码版本与内容指纹；
+不能用旧版本的正确脚本为当前版本背书。插件通过结构化参数直接启动项目
+检查器，不执行调用方拼接的 shell。配置、依赖和实际发布入口变化后刷新
+受影响评审，保留其他仍有效的业务确认。
 
 ## 替换、退役与续接
 

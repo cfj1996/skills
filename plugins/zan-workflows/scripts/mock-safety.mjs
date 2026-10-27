@@ -5,7 +5,6 @@ import { readFile, lstat, realpath } from 'node:fs/promises';
 import { resolve, relative, isAbsolute, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readCliPlan, repositoryKey, sha256, stableJson } from './workflow-runtime.mjs';
-import { readInlineJenkinsPipeline } from './jenkins-inline-pipeline.mjs';
 
 const run = promisify(execFile);
 const SHA = /^[a-f\d]{40}(?:[a-f\d]{24})?$/i;
@@ -131,7 +130,12 @@ async function verifyDeliveredSource(safety, revision, sourceSnapshot, io) {
   const target = await (io.inspectMockSource || inspectMockSource)({ ...safety, revisionSha: revision });
   if (target.sourceSha !== revision || target.inspectionKind !== 'revision' || target.scopeFingerprint !== evidence.scopeFingerprint ||
       target.contentFingerprint !== evidence.contentFingerprint) throw new Error('交付目标 revision 清查证据已过期或不一致');
-  const preserved = unique([...(sourceSnapshot.changedPaths || []), ...Object.keys(sourceSnapshot.fileFingerprints || {}).filter(path => covered(path, [...safety.mockBindingPaths, ...safety.mockModules.flatMap(module => module.paths)]))]);
+  const bindingRoots = [...safety.mockBindingPaths, ...safety.mockModules.flatMap(module => module.paths)];
+  // Include both trees: a newly added file under an approved directory changes
+  // that Mock/config scope even when it reuses an already registered module ID.
+  const preserved = unique([...(sourceSnapshot.changedPaths || []),
+    ...unique([...Object.keys(sourceSnapshot.fileFingerprints || {}), ...Object.keys(target.fileFingerprints || {})])
+      .filter(path => covered(path, bindingRoots))]);
   if (preserved.some(path => sourceSnapshot.fileFingerprints?.[path] !== target.fileFingerprints?.[path])) {
     throw new Error('目标分支改变了已批准源码或 Mock 启动配置；不能机械沿用原授权');
   }
@@ -163,7 +167,8 @@ function validateModules(safety, snapshot) {
   if (active.some(module => !(snapshot.markerBindings || []).some(binding => covered(binding.path, module.paths) && binding.moduleIds.includes(module.id)))) {
     throw new Error('活动 Mock 模块缺少实际源码/配置中的明确稳定标识');
   }
-  if ((snapshot.markerBindings || []).some(binding => !safety.mockModules.some(module => covered(binding.path, module.paths) && binding.moduleIds.includes(module.id)))) {
+  if ((snapshot.markerBindings || []).some(binding => !Array.isArray(binding.moduleIds) || !binding.moduleIds.length ||
+      binding.moduleIds.some(id => !safety.mockModules.some(module => module.id === id && covered(binding.path, module.paths))))) {
     throw new Error('源码 Mock 标识未关联登记的稳定模块 ID，不能仅按路径覆盖');
   }
   if (snapshot.markedPaths.some(path => !safety.mockModules.some(module => covered(path, module.paths)))) {
@@ -270,7 +275,7 @@ export async function checkMockSafetySet(input, context, io = {}) {
         throw new Error('Mock 门禁的 Git 交付回执未验证准确源码包含关系');
       }
       if (context.targetBranch && context.targetBranch !== receipt.targetBranch) throw new Error('Mock 门禁测试目标分支与交付回执冲突');
-      return { sourceRepository, sourceSha: receipt.deliveredSha };
+      return { sourceRepository, sourceSha: receipt.deliveredSha, targetBranch: receipt.targetBranch };
     });
     const requiredKeys = required.map(repositoryKey), receiptKeys = expected.map(row => repositoryKey(row.sourceRepository));
     if (new Set(requiredKeys).size !== requiredKeys.length || new Set(receiptKeys).size !== receiptKeys.length ||
@@ -292,35 +297,9 @@ export async function checkMockSafetySet(input, context, io = {}) {
   }
   return Promise.all(safeties.map(safety => {
     const row = expected.find(item => repositoryKey(item.sourceRepository) === repositoryKey(safety.sourceRepository));
-    return checkMockSafety(safety, { ...context, sourceRepository: row.sourceRepository, sourceSha: row.sourceSha }, io);
+    return checkMockSafety(safety, { ...context, sourceRepository: row.sourceRepository, sourceSha: row.sourceSha,
+      targetBranch: row.targetBranch || context.targetBranch }, io);
   }));
-}
-
-export async function checkDeliveryEnvironment(input, actual, io = {}) {
-  const binding = input.environmentBinding;
-  if (!binding || !['config-xml', 'project-policy'].includes(binding.kind) ||
-      !['test', 'production'].includes(binding.environmentKind) || binding.jobUrl !== input.jobUrl ||
-      binding.targetEnvironment !== input.targetEnvironment || binding.releaseChannel !== input.releaseChannel ||
-      binding.jobBindingHash !== actual.jobBindingHash || binding.parameterDefinitionsHash !== actual.parameterDefinitionsHash ||
-      !texts(binding.evidenceRefs) || !HASH.test(binding.sourceHash || '') || !text(binding.mappingText)) {
-    throw new Error('缺少实际 Job/参数与项目规则来源绑定的目标环境证据；test/canary 标签不能证明测试环境');
-  }
-  let source;
-  if (binding.kind === 'config-xml') {
-    source = actual.config;
-    if (typeof source !== 'string') throw new Error('目标环境声明要求读取实际 Job XML，元数据身份不能代替配置');
-  } else {
-    if (!text(binding.sourcePath)) throw new Error('项目环境映射缺少实际规范/配置来源路径');
-    source = await (io.readMockEnvironmentSource || (async value => readFile(value.sourcePath, 'utf8')))(binding);
-  }
-  if (typeof source !== 'string' || sha256(source) !== binding.sourceHash) throw new Error('目标环境映射来源内容已变化或不可核实');
-  const decoded = source.replace(/&quot;/g, '\"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
-  let mapping;
-  try { mapping = JSON.parse(binding.mappingText); } catch { throw new Error('目标环境映射必须为来源中可定位的明确 JSON 记录'); }
-  if (!decoded.includes(binding.mappingText) || mapping.jobUrl !== input.jobUrl ||
-      mapping.targetEnvironment !== input.targetEnvironment || mapping.releaseChannel !== input.releaseChannel ||
-      mapping.environmentKind !== binding.environmentKind) throw new Error('项目/Job来源没有本次准确环境和通道映射');
-  return binding.environmentKind;
 }
 
 export function mockSafetyPreview(input, production = false) {
@@ -335,100 +314,8 @@ export function mockSafetyPreview(input, production = false) {
       ...(production ? ['Verify source isolation and fail-closed artifact check before deployment'] : [])] };
 }
 
-// The configuration review is independent of future artifact results. Its
-// binding must be refreshed against the actual Jenkins config/metadata hash.
-export function checkPreDeployMockGate(input, jobBindingHash, actualConfig) {
-  const gate = input.preDeployMockGate;
-  if (!gate || gate.state !== 'VERIFIED' || gate.jobBindingHash !== jobBindingHash ||
-      gate.sourceSha !== input.expectedSha || gate.jobUrl !== input.jobUrl ||
-      !text(gate.checkCommand) || !text(gate.deployStep) || !texts(gate.evidenceRefs) ||
-      !gate.checkerEvidence || !texts(gate.checkerEvidence.evidenceRefs) || !HASH.test(gate.checkerEvidence.contentHash || '') ||
-      gate.failClosed !== true || gate.beforeDeploy !== true || gate.artifactMarker !== 'MOCK_PRODUCTION_GATE') {
-    throw new Error('正式发布缺少绑定当前 Jenkins 配置的制品 Mock 检查门禁；必须先检查、失败停止、再部署');
-  }
-  // The only supported shell shape executes a relative path from this
-  // release checkout. A different repository or revision would review code
-  // other than the checker Jenkins actually runs; pinned external checkouts
-  // require a separate adapter and cannot be inferred here.
-  if (!text(input.sourceRepository) || !text(gate.checkerEvidence.sourceRepository) ||
-      repositoryKey(gate.checkerEvidence.sourceRepository) !== repositoryKey(input.sourceRepository) ||
-      gate.checkerEvidence.sourceSha !== input.expectedSha) {
-    throw new Error('制品检查器必须绑定本次实际发布仓库和源码 SHA；不支持旧版本或未适配的外部检查器');
-  }
-  if (typeof actualConfig !== 'string' || sha256(actualConfig) !== jobBindingHash || gate.pipelineContentHash !== sha256(actualConfig)) {
-    throw new Error('正式发布必须读取并绑定实际流水线代码；Job 可读元数据和自报 VERIFIED 不能证明先检后发');
-  }
-  // This bounded adapter establishes execution identity before any build,
-  // check, or deployment. deleteDir discards stale CI workspace content and
-  // GitSCM must checkout this repository at the literal immutable release SHA.
-  // No implicit/default checkout, floating branch, skipped stage, custom Groovy,
-  // extra shell step, or external checker workspace is inferred as equivalent.
-  const code = readInlineJenkinsPipeline(actualConfig);
-  const canonical = /^\s*pipeline\s*\{\s*agent\s+any\s+stages\s*\{\s*stage\s*\(\s*'[^'\r\n]+'\s*\)\s*\{\s*steps\s*\{\s*deleteDir\s*\(\s*\)\s*;?\s*checkout\s*\(\s*\[\s*\$class\s*:\s*'GitSCM'\s*,\s*branches\s*:\s*\[\s*\[\s*name\s*:\s*'([a-f\d]{40}(?:[a-f\d]{24})?)'\s*\]\s*\]\s*,\s*userRemoteConfigs\s*:\s*\[\s*\[\s*url\s*:\s*'([^'\r\n]+)'\s*\]\s*\]\s*\]\s*\)\s*;?\s*sh\s*'([^'\r\n]+)'\s*;?\s*\}\s*\}\s*\}\s*\}\s*$/;
-  const match = code.match(canonical);
-  const commands = [...(gate.buildCommand ? [gate.buildCommand] : []), gate.checkCommand, gate.deployStep];
-  if (!match || match[1] !== input.expectedSha || repositoryKey(match[2]) !== repositoryKey(input.sourceRepository) ||
-      commands.some(command => !text(command) || /[;|&\n\r`$<>!#(){}'\"]/.test(command))) {
-    throw new Error('正式流水线未完整匹配受支持的先检后发模式：必须清空 CI 工作区、checkout 准确仓库和不可变 SHA，再顺序构建/检查/部署；不接受隐式 checkout、条件跳过或额外步骤');
-  }
-
-  validateCheckerInvocation(gate);
-  // A build can rewrite files after checkout. Verify the actual checker bytes
-  // immediately before execution, independently of Git's index or build output.
-  // This generated pipeline segment is fixed, not caller-supplied shell syntax.
-  const integrity = `sha256sum -- ${gate.checkerEvidence.scriptPath} | grep -Fx -- "${gate.checkerEvidence.contentHash}  ${gate.checkerEvidence.scriptPath}"`;
-  const guardedCommands = [...(gate.buildCommand ? [gate.buildCommand] : []), integrity, gate.checkCommand, gate.deployStep];
-  if (match[3] !== guardedCommands.join(' && ')) {
-    throw new Error('正式流水线未完整匹配受支持的先检后发模式：构建后、检查器执行前必须校验受审脚本的实际 SHA-256 内容；校验失败必须阻止部署');
-  }
-  return gate;
-}
-
-function validateCheckerInvocation(gate) {
-  const scriptPath = gate.checkerEvidence?.scriptPath;
-  const argv = typeof gate.checkCommand === 'string' ? gate.checkCommand.trim().split(/\s+/) : [];
-  // A script mentioned as echo/cat data, an interpreter flag, or another
-  // program's argument has not been executed. Additional invocation forms need
-  // their own reviewed adapter; do not infer them from a matching path token.
-  if (!relpath(scriptPath) || !scriptPath.includes('/') || !/^[A-Za-z0-9_./-]+$/.test(scriptPath) || scriptPath.startsWith('-') ||
-      argv.length !== 2 || !['node', 'python3', 'sh', 'bash'].includes(argv[0]) || argv[1] !== scriptPath) {
-    throw new Error('Mock 制品检查命令必须直接执行受审脚本：node/python3/sh/bash 加准确相对路径；不接受包装命令、解释器选项或额外参数');
-  }
-}
-
-export async function verifyMockCheckerEvidence(gate, io = {}) {
-  const evidence = gate.checkerEvidence;
-  if (!evidence || !text(evidence.repositoryPath) || !text(evidence.sourceRepository) || !SHA.test(evidence.sourceSha || '') ||
-      !relpath(evidence.scriptPath) || !evidence.scriptPath.includes('/') || !HASH.test(evidence.contentHash || '') ||
-      !texts(evidence.evidenceRefs)) {
-    throw new Error('Mock 制品检查命令缺少可追踪的实际检查器源码/职责评审绑定');
-  }
-  validateCheckerInvocation(gate);
-  const source = await (io.readMockCheckerSource || (async row => {
-    const [root, origin] = await Promise.all([git(row.repositoryPath, ['rev-parse', '--show-toplevel']), git(row.repositoryPath, ['remote', 'get-url', 'origin'])]);
-    if (await realpath(resolve(root.trim())) !== await realpath(resolve(row.repositoryPath)) ||
-        repositoryKey(origin.trim()) !== repositoryKey(row.sourceRepository)) throw new Error('制品检查器不属于已核实的源码仓库');
-    return git(row.repositoryPath, ['show', `${row.sourceSha}:${row.scriptPath}`]);
-  }))(evidence);
-  if (typeof source !== 'string' || sha256(source) !== evidence.contentHash || !source.includes('MOCK_PRODUCTION_GATE')) {
-    throw new Error('Mock 制品检查器源码已变化或缺少受评审的制品回执职责');
-  }
-  return { state: 'VERIFIED', sourceSha: evidence.sourceSha, scriptPath: evidence.scriptPath, contentHash: evidence.contentHash };
-}
-
-export function verifyProductionMockArtifact(log, input, queueId, buildNumber) {
-  const rows = String(log).split('\n').filter(line => line.startsWith('MOCK_PRODUCTION_GATE '));
-  if (rows.length !== 1) throw new Error('本次正式构建缺少唯一 Mock 制品检查回执');
-  let receipt;
-  try { receipt = JSON.parse(rows[0].slice('MOCK_PRODUCTION_GATE '.length)); } catch { throw new Error('Mock 制品检查回执不可识别'); }
-  if (receipt.state !== 'PASSED' || receipt.sourceSha !== input.expectedSha || receipt.jobUrl !== input.jobUrl ||
-      receipt.queueId !== queueId || receipt.buildNumber !== buildNumber || !HASH.test(receipt.artifactFingerprint || '') ||
-      receipt.beforeDeploy !== true || receipt.runtimeEnabled !== false ||
-      !Array.isArray(receipt.remainingMockPaths) || receipt.remainingMockPaths.length) {
-    throw new Error('Mock 制品检查未通过或回执与本次源码/Job/队列/构建不一致');
-  }
-  return receipt;
-}
+// Kept as a public compatibility export; production checks now use project scripts.
+export { verifyProjectMockArtifact as verifyProductionMockArtifact } from './project-mock-gate.mjs';
 
 async function main() {
   const input = await readCliPlan();

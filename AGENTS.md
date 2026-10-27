@@ -127,12 +127,24 @@ Jenkins pre-deploy gates, run
 These tests use disposable local Git fixtures and simulated remote responses; they do
 not call company APIs, deploy, publish or modify real TAPD items. The complete Node suites
 include them. Team MR tests also cover the same mandatory Mock gate without a Zan exemption.
-The Mock suite also checks actual inline XML definitions, direct checker execution
-before a production trigger and runtime checker integrity after build-time replacement.
+For project-owned source/artifact checks and release-entry integration without a
+Jenkins XML requirement, run
+`node --test plugins/zan-workflows/tests/project-mock-gate.test.mjs plugins/zan-workflows/tests/project-mock-check.test.mjs plugins/zan-workflows/tests/mock-source-boundaries.test.mjs`.
+These checks execute copied project scripts against disposable Git snapshots and
+final staging trees, reject stale script/configuration/review evidence, stop a
+simulated publication on check failure, and verify exact build-bound receipts.
 `ensure-test-wiki.test.mjs` covers standalone CLI receipt
 arguments through real local source inspection and simulated TAPD writes.
 
 ## Coding Style & Naming Conventions
+
+For frozen Jenkins parameter preparation and deployments that never query live
+parameter definitions, run
+`node --test plugins/zan-workflows/tests/frozen-jenkins-contracts.test.mjs plugins/zan-workflows/tests/delivery-helpers.test.mjs plugins/zan-workflows/tests/adaptive-delivery.test.mjs plugins/zan-workflows/tests/mock-safety.test.mjs`.
+These fixtures cover fixed environment/profile selectors, explicit defaults,
+registry/value drift, sensitive injection and Job/project identity without real
+Jenkins writes. The independent collector and its tests belong to project-knowledge;
+deployment tests must not call the maintenance sync or a live parameter endpoint.
 
 Write skill docs in concise Markdown with clear `#`/`##` headings, short rule lists, and fenced command examples. Preserve the existing mix of English headings and Chinese workflow detail where the skill already uses it. Name new skill folders with lowercase kebab-case, keep the entry file exactly `SKILL.md`, and use descriptive agent filenames such as `collector.md` or `reviewer.md`.
 

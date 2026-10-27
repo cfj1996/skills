@@ -182,7 +182,9 @@ function releaseFake({ status = 'SUCCESS', sha = sourceSha, queueId = 8, onCall,
       return onBuild ? onBuild(build) : build;
     },
   };
-  return { call, reader, calls, reads, io: clock() };
+  const localDefinitions = onCall?.('jenkins_get_job_parameters', { jobName: 'demo-test' }, { calls: [] });
+  const definitions = localDefinitions ? toolData(localDefinitions, 'fixture definitions') : { jobName: 'demo-test', parameters: [{ name: 'REF', type: 'string' }, { name: 'VERSION', type: 'string' }] };
+  return { call, reader, calls, reads, io: { ...clock(), frozenFixtureDefinitions: definitions } };
 }
 
 async function executeRelease(fake, changes = {}) {
@@ -337,7 +339,7 @@ test('SHA-only deployment identity cannot authorize an ordinary package release'
     for (const execute of [false, true]) {
       await assert.rejects(runJenkinsRelease(fake.call, fake.reader, { ...plan,
         releaseKind: 'package', releaseTarget: '@example/demo', versionStrategy, adapterHash: undefined,
-        execute, confirmed: execute }, fake.io), /包发布必须绑定实际版本参数/);
+        execute, confirmed: execute }, fake.io), /包发布必须绑定实际版本参数|实际参数值已变化/);
     }
   }
   assert.equal(fake.calls.some(call => call.name === 'jenkins_trigger_build'), false);
@@ -364,7 +366,7 @@ test('ordinary package versions cannot be SHA values or claim a computed contrac
   ]) {
     for (const execute of [false, true]) {
       await assert.rejects(runJenkinsRelease(fake.call, fake.reader, { ...plan, ...change,
-        adapterHash: undefined, execute, confirmed: execute }, fake.io), /包发布必须绑定实际版本参数/);
+        adapterHash: undefined, execute, confirmed: execute }, fake.io), /包发布必须绑定实际版本参数|实际参数值已变化/);
     }
   }
   assert.equal(fake.calls.some(call => call.name === 'jenkins_trigger_build'), false);
@@ -503,6 +505,6 @@ test('an actual canary package release reports its kind and cannot switch to lat
   assert.equal(result.releaseKind, 'package');
   assert.equal(result.version, '1.0.0-canary.1');
   assert.equal(result.versionStrategy, 'EXPLICIT');
-  await assert.rejects(runJenkinsRelease(fake.call, fake.reader, { ...input, params: { ...input.params, CHANNEL: 'latest' } }, fake.io), /不能使用 latest/);
+  await assert.rejects(runJenkinsRelease(fake.call, fake.reader, { ...input, params: { ...input.params, CHANNEL: 'latest' } }, fake.io), /不能使用 latest|固定环境参数/);
   assert.equal(fake.calls.filter(call => call.name === 'jenkins_trigger_build').length, 1);
 });

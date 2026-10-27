@@ -39,6 +39,13 @@ export function npmToolsContract(body, input) {
     pipelineBodyHash: sha256(body) };
 }
 
+export function jenkinsAdapterFingerprint(input) {
+  return sha256(stableJson({ adapter: input.jobAdapter, refParameter: input.refParameter || null,
+    versionParameter: input.versionParameter || null, channelParameter: input.channelParameter || null,
+    versionStrategy: input.versionStrategy || 'EXPLICIT', pipelineBodyHash: input.pipelineBodyHash || null,
+    releaseScope: input.releaseScope || null }));
+}
+
 export async function adaptJenkinsInput(definitions, input, io = {}) {
   const names = new Set((definitions.parameters || []).map(row => row.name));
   const inferred = input.releaseKind === 'package' && names.has('PROJECT_NAME') && names.has('RELEASE_TYPE')
@@ -69,9 +76,7 @@ export async function adaptJenkinsInput(definitions, input, io = {}) {
     // The displayed source SHA is an identity. It is not a predicted npm version.
     if (result.version !== input.expectedSha) throw new Error('此 Job 的计算版本计划使用源码 SHA 作为身份，实际包版本在构建后读回');
   }
-  const fingerprint = sha256(stableJson({ adapter, refParameter: result.refParameter || null,
-    channelParameter: result.channelParameter || null, versionStrategy: result.versionStrategy || 'EXPLICIT',
-    pipelineBodyHash: result.pipelineBodyHash || null, releaseScope: result.releaseScope || null }));
+  const fingerprint = jenkinsAdapterFingerprint(result);
   if (input.adapterHash && input.adapterHash !== fingerprint) throw new Error('Jenkins 参数/流水线适配规则已变化');
   return { ...result, adapterHash: fingerprint };
 }

@@ -44,7 +44,9 @@ Validate these invariants in order:
    displayed as `front-vantix-system` while its URL still ends with
    `/job/front-vantix-system-test/`. After the display name, the link text
    appends `?{Job 参数}` using selected build/release `name=value` pairs joined
-   by `&`, checked against Jenkins definitions. Omit branch parameters such as
+   by `&`, checked against project-knowledge's fixed Jenkins definitions and resolved
+   environment profile; never query live parameter definitions for Wiki/deployment.
+   Omit branch parameters such as
    `branch` by default. Omit `?` and its suffix when no displayable parameters
    remain. Under `DEPLOY`, unresolved required selections block. Under `SKIP`
    or a standalone Wiki-only request, absent deployment selections are valid;

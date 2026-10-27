@@ -259,7 +259,7 @@ function jenkins({ forbidden = false, packageJob = false, modifyIdentity, badPip
       { remoteUrls: [base.sourceRepository], lastBuiltRevision: { SHA1: sha } },
       ...(packageJob ? [{ remoteUrls: [base.pipelineSource.repositoryUrl], lastBuiltRevision: { SHA1: badPipeline ? sha : pipelineSha } }] : []),
     ] }), console: async () => log };
-  return { base, calls, call, reader, io: { checkSource: async () => {}, readPipeline: async () => npmBody } };
+  return { base, calls, call, reader, io: { checkSource: async () => {}, readPipeline: async () => npmBody, frozenFixtureDefinitions: { jobName: base.jobName, parameters: definitions } } };
 }
 
 test('computed canary submission returns before queue/build/publication reads without inventing a package version', async () => {
@@ -363,9 +363,9 @@ test('metadata verification fails closed on missing identity, changed parameters
   const fake = jenkins();
   await assert.rejects(runJenkinsRelease(fake.call, { ...fake.reader, job: undefined }, fake.base, fake.io), /身份核验/);
   const plan = await runJenkinsRelease(fake.call, fake.reader, fake.base, fake.io);
-  const changed = (name, args) => name === 'jenkins_get_job_parameters'
-    ? reply({ jobName: fake.base.jobName, parameters: [{ name: 'branch', choices: ['develop', 'master'] }] }) : fake.call(name, args);
-  await assert.rejects(runJenkinsRelease(changed, fake.reader, { ...plan, execute: true, confirmed: true }, fake.io), /已变化/);
+  fake.io.frozenFixtureDefinitions = { jobName: fake.base.jobName, parameters: [{ name: 'branch', choices: ['develop', 'master'] }] };
+  await assert.rejects(runJenkinsRelease(fake.call, fake.reader, { ...plan, execute: true, confirmed: true }, fake.io), /已变化/);
+  fake.io.frozenFixtureDefinitions = { jobName: fake.base.jobName, parameters: [{ name: 'branch', choices: ['develop'] }] };
   const unconfirmedMode = { ...plan, execute: true, confirmed: true };
   delete unconfirmedMode.jobBindingMode;
   await assert.rejects(runJenkinsRelease(fake.call, fake.reader, unconfirmedMode, fake.io), /已确认清单/);

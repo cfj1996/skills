@@ -14,8 +14,12 @@ default-branch MR/write. Test Mock approval never authorizes master/main or prod
 Reject active production-scope Mock, missing/stale inventory, cosmetic retirement or
 unverified real replacement/reference cleanup/build exclusion. Source checks must be
 available before merge; future artifact output must not be fabricated. Official release
-requires a verified exact Job/config gate that inspects artifacts before publishing and
-fails closed, followed by this build/SHA-bound actual result. Disabled switches and
+requires the actual content-bound project checker, successful source check and reviewed
+versioned publishing integration proving artifact inspection runs before publishing and
+fails closed, followed by this exact build/SHA/Job and checker/config/artifact-bound
+actual result. Jenkins XML and a particular pipeline shape are not required. Missing
+project integration remains a concrete release blocker; a metadata read or self-reported
+pass flag cannot replace it. Disabled switches and
 Query Contract release-check alone are insufficient. Preserve unrelated isolated test
 assets only when exclusion from production is evidenced.
 

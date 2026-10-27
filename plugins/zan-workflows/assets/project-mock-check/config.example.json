@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "sourcePaths": ["src"],
+  "artifactPaths": ["dist"],
+  "mockModuleIds": [],
+  "forbiddenPaths": ["mocks", "fixtures", "__mocks__", "mock-service"],
+  "forbiddenContent": ["VITE_ENABLE_MOCK", "MOCK_SERVER_URL"],
+  "runtimeRules": []
+}

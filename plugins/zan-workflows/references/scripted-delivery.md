@@ -270,44 +270,90 @@ Optional `--mock-repositories` cross-checks identities; it cannot replace receip
 
 Production checks source exit/build exclusion before default-branch writes. Retained
 isolated development artifacts need actual configuration/content-bound evidence; retired
-status or disabled switches are insufficient. Before official Jenkins trigger, bind
-preDeployMockGate to the exact readable pipeline configuration and a supported unavoidable
-artifact-check-before-publish path. Metadata-only or unsupported control flow blocks until
-a verified adapter exists. Never fabricate a future artifact: verify the exact resulting
-source/Job/queue/build/artifact-bound MOCK_PRODUCTION_GATE receipt after the build. The
-pipeline itself must stop publication on check failure; post-build checking cannot undo
-an already published artifact. Follow the helper's supported pipeline grammar, not an
-invented boolean pass or a literal keyword match.
+status or disabled switches are insufficient. Official release uses the actual project
+checker and versioned publishing integration through
+[project-mock-gate.mjs](../scripts/project-mock-gate.mjs). It does not require Jenkins XML,
+parse Groovy, or impose one pipeline shape. Missing project checks or integration block
+with that concrete gap; a config-read 403 is not a reason to install or waive a Mock gate.
 
-Jenkins execution also binds `environmentBinding` to the actual Job/parameter hashes,
-environment and channel. Its mapping must be locatable in the freshly read config XML
-or project-policy file, with source hash and evidence; a Job name or test/canary label
-alone cannot prove a test target. Any verified production signal takes precedence.
-Production `preDeployMockGate.checkerEvidence` binds the invoked checker script path,
-repository/revision/content hash and review evidence; a command string merely present
-in XML is insufficient. The supported relative checker command must use the same
-repository and exact release SHA; old-revision or external checker evidence requires
-an explicit pinned-checkout adapter and is otherwise rejected before trigger.
-The currently supported inline grammar is one unconditional stage: deleteDir clears
-the CI workspace, explicit GitSCM checkout binds the exact repository and immutable
-release SHA, and one shell runs the fixed checker-integrity check, `checkCommand`,
-then `deployStep`, joined with ` && `. Optional `buildCommand` comes before integrity
-verification, so build-time replacement cannot change the reviewed checker unnoticed.
-The fixed segment is `sha256sum -- <scriptPath> | grep -Fx -- "<contentHash>  <scriptPath>"`
-(two spaces between hash and path), derived from checkerEvidence with no extra input
-field. The CI agent needs `sha256sum` and `grep`; missing tools or a changed file stop
-the shell before checking or deploying. A branch name or implicit checkout cannot prove execution identity.
-Each field is one command; shell control
-operators inside either command, conditional/parallel/SCM or other unsupported Groovy
-paths block before trigger. Add a verified adapter before using more complex pipelines.
-Read the script from the actual direct `flow-definition/definition` element with
-class `org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition`; XML comments and
-unrelated script nodes cannot substitute for an inline definition. The checker
-command is exactly `node|python3|sh|bash <scriptPath>`, without interpreter options,
-wrappers or extra arguments. A path token in `echo`, `cat` or `node --check` does
-not execute the reviewed checker and must block before triggering Jenkins.
+`projectMockGate` binds `schemaVersion=1`, the exact `repositoryPath`,
+`sourceRepository`, `sourceSha`, and:
+
+- `checker`: project-relative `scriptPath`, `contentHash`, `configPath`, `configHash`.
+  Read both files from the exact source commit, export that commit to a disposable
+  snapshot and actually execute the Node checker with structured arguments for phase
+  `source`. Validate its unique `MOCK_SOURCE_GATE` result. Source inspection cannot
+  claim that a future artifact has already passed.
+- `integration`: exact `repositoryPath`, `sourceRepository`, `sourceSha`, content-bound
+  `files` (`path`, `contentHash`), `entrypoint`, actual `checkerInvocation` and
+  `publishInvocation`, and `evidenceRefs`. Its `review` binds the same `sourceSha`,
+  `state=VERIFIED`, `filesFingerprint=projectMockIntegrationFingerprint(files)`,
+  `checkedBeforePublish`, `failClosed`, `noBypass` and actual review `evidenceRefs`.
+  Inspect all listed fixed Git objects and the real call chain; the review fingerprint
+  covers every path/content hash, and these flags are conclusions supported by source
+  review, never standalone proof. The entry may be
+  an existing npm lifecycle, a project release script or a fixed Jenkinsfile revision.
+  Bind a separate integration repository/ref/SHA explicitly when the actual release
+  entry lives outside the package repository; it must match the verified
+  `input.pipelineSource` repository and exact `expectedSha`.
+
+PLAN returns `projectMockGateHash` for this complete binding. Official EXECUTE must
+carry that unchanged approved hash and revalidate the files before the source check;
+missing or changed bindings stop before trigger. The integration checker invocation
+is a direct `node|nodejs <accurate scriptPath> --phase artifact --config <accurate
+configPath>` command, with supported identity options as needed. `echo`, `node --check`,
+shell wrappers and `|| true` cannot prove the checker executes or fails closed. This
+direct-call constraint does not constrain the overall Jenkins pipeline shape. For
+`integration.kind=npm-prepublishOnly`, the exact `package.json` lifecycle must equal the
+checker invocation, and the publication call must not disable lifecycle scripts.
+
+The project performs phase `artifact` in its real Jenkins-driven release entry before
+upload/deploy/publish. A failed check must stop that entry; successful post-publication
+inspection cannot undo a release. After the build, the actual checker and config bytes
+must still match their exact reviewed Git versions. The artifact checker must also
+verify the complete inspected source file set and bytes against that commit before
+publication; unchanged HEAD alone or a post-publication fingerprint mismatch cannot
+enforce this gate. The integration review must establish
+that every publish path stops on failure and consumes the same inspected final staging:
+no modification, replacement archive or alternate content after the check. Verify the exact resulting
+`MOCK_PRODUCTION_GATE` after the build against source SHA, Job URL, build number,
+checker/config hashes and artifact fingerprint. Its `sourceFingerprint` must equal
+the pre-trigger actual `projectMockSourceReceipt.sourceFingerprint`. Resolve queue identity through the
+exact build's readback; do not require a Jenkins `QUEUE_ID` environment variable.
+Never accept an invented boolean pass, keyword presence or a caller's receipt without
+the source and actual build evidence. Test authorization never permits production Mock.
+
+The self-contained [checker template](../assets/project-mock-check/check-mock.mjs)
+and [configuration example](../assets/project-mock-check/config.example.json) can be
+copied into an authorized project and adapted to its real source/production entries,
+artifacts and runtime configuration. Neither a Query Contract installation nor an
+installed local plugin is needed in CI. Template availability does not mean any
+existing project or Job is already integrated. Onboarding modifies only the authorized
+project and actual release entry; this plugin update changes no business repository or
+Jenkins configuration.
+
+Jenkins execution binds `jenkinsContractHash`, `jenkinsProfileHash`, the frozen local
+`parameterDefinitionsHash` and `jenkinsParametersValueHash`. The selected local profile
+owns environment/channel and exact parameter constraints; all defaults are materialized
+and fixed selectors are checked after ref/project/version bindings. Missing or changed
+contracts block, without an online fallback. The old caller-supplied `environmentBinding`
+and mappingText mechanism is not used; a Job name or test/canary label cannot replace
+the fixed profile or its actual-value checks. Any verified production signal takes precedence.
+The former `preDeployMockGate` XML/pipeline interface has been removed.
+Refresh an old release plan with the actual project script and publishing integration;
+do not copy its `VERIFIED` flag or fabricate a future artifact result. The project
+checker is executed directly with structured argv, not arbitrary caller-supplied shell.
 
 ## Jenkins deployment and package release
+
+Build definitions/defaults/choices and fixed environment profiles are owned by
+project-knowledge's `data/workspace/jenkins-build-contracts.json`; see
+[fixed Jenkins parameters](frozen-jenkins-parameters.md). The maintenance-only collector
+reads Jenkins and atomically refreshes this file. Deploy PLAN/EXECUTE must not call
+jenkins_get_job_parameters or parameter-definition endpoints, extract parameters from
+Job XML, or silently refresh a missing record. The local resolver validates actual values,
+materializes frozen defaults and binds the current Job/profile/parameter-value hashes.
+Unavailable or ambiguous records block before a trigger.
 
 `resolve-jenkins-job.mjs` (or session `job` PLAN) resolves an already routed
 exact Job name into an evidenced URL. It reads selected instance metadata and
@@ -342,25 +388,24 @@ versions are stable, explicitly bound or read back through the computed
 adapter below. Review the actual Job/channel semantics before confirmation.
 
 Call without `--execute` to obtain `instance`, `jobBindingMode`,
-`jobBindingHash`, applicable `jobConfigHash`, `adapterHash` and
+`jobBindingHash`, `adapterHash` and
 `parameterDefinitionsHash`; copy them and the exact confirmation into the one
 execution call. The caller's existing consolidated submission authorization
 is sufficient when it already displayed these exact fields/actions.
 
 ### Common Job adapters
 
-`branch-deployment-v1` resolves the real `branch` parameter and its live
+`branch-deployment-v1` resolves the real `branch` parameter and its frozen
 choices. `explicit-v1` preserves explicit bindings for other Jobs. The default
 `READABLE_METADATA` mode reads/fingerprints the exact Job URL/fullName/type/
-buildable state and live parameter definitions without calling
+buildable state and the fixed local parameter contract without calling
 `jenkins_get_job_config` or requiring that MCP tool. Include the mode in the
-release plan; known missing XML permission needs no repeated warning or
-separate confirmation. Report binding changes, insufficient evidence and
-verification failures. Metadata does not fingerprint hidden configuration.
-Set `jobBindingMode=CONFIG_XML` when full configuration verification is
-needed and readable; legacy plans with `jobConfigHash` retain XML verification.
-Only XML HTTP 403 permits a metadata preview in that mode. Reuse its returned
-mode for execution without retrying XML. Other XML errors stop. A binding
+release plan; configuration XML permission is not required for test or official
+release. Report binding changes, insufficient project-check evidence and
+verification failures. Metadata does not fingerprint hidden configuration or
+prove a Mock check ran. Use the actual project script/integration and precise
+build result for that evidence. Refresh legacy XML-bound plans rather than retrying
+config reads or treating their fingerprints as project-check proof. A binding
 mode/identity or parameter change blocks execution. Queue/build/parameters
 and actual target repository SHA remain mandatory for `BUILD_TERMINAL`;
 `TRIGGER_ACCEPTED` verifies the source ref before triggering and returns only
