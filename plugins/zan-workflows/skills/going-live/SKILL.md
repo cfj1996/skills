@@ -5,35 +5,60 @@ description: Use when submitted TAPD changes must merge original fixed branches 
 
 # Go Live
 
-## Mock production prohibition
+## 用户说明
 
-Build parameters and exact channel/environment profiles use the centrally maintained
-[fixed Jenkins contract](../../references/frozen-jenkins-parameters.md), including
-actual-value constraints. Never discover or refresh parameter definitions during a
-deployment. Missing profiles block; live source, Job identity and project-script/
-artifact proof remain separate mandatory checks. No Jenkins XML read is required.
+独立调用本技能时同样遵守[限制与确认说明](../../references/execution-checklist.md#限制与确认说明)。
+面向中文用户，用完整中文解释本技能及其引用规则、脚本结果中的限制、确认、
+阻塞与清理要求；机器字段、枚举、代码和命令保留原样并解释含义，英文原文
+仅作可选补充。下文英文执行规则同样适用此要求，不直接照抄给用户。
 
-Before any default-branch MR/create/merge or official release, apply
-[Mock production gates](../../references/mock-development.md) and the unified
-[safety helper](../../scripts/mock-safety.mjs) to all selected repositories. Test-environment
-Mock authorization never transfers to production. Inspect current full source/diff and
-mockModules; active production-scope Mock or unknown/partial retirement evidence blocks.
-Retiring requires actual real replacement, reference/entry cleanup and verified build
-exclusion; changing a tag/status or disabling a switch is insufficient.
+## 生产 Mock 禁令
 
-Source preflight precedes master/main writes. A future build artifact is not required
-before it exists and must never be fabricated. Before official Jenkins release, use
-[project-mock-gate.mjs](../../scripts/project-mock-gate.mjs) to verify and run the actual
-project source checker from the exact Git snapshot, and review the versioned real
-publishing entry proving artifact inspection runs before publish/deploy and a failure
-stops publication. After the build, require that build/SHA/Job and checker/config/artifact-
-bound result before claiming release success. No configuration XML or inline pipeline
-shape is required. Missing project scripts or release integration stop before trigger
-and are reported as those concrete gaps; this update does not install checks into
-business projects or change Jenkins configuration.
-Production artifacts/runtime may not contain Mock modules, fixture/handler/runtime or
-enablement paths. Isolated repository-only development tests may remain only with
-proved exclusion. Query Contract release-check or @api-mock status does not prove this.
+构建参数及准确的通道、环境配置使用集中维护的
+[固定 Jenkins 参数约定](../../references/frozen-jenkins-parameters.md)，同时校验实际
+参数值。交付时不得现场查询或刷新参数定义；配置缺失、不可用或无法唯一确定时，
+暂停相应构建，待独立维护同步完成后重新核对。当前源码、Job 身份及项目检查
+脚本、制品证据仍须分别核实；无需读取 Jenkins XML。
+
+创建或合并任何默认分支 MR、正式发布前，对全部选定仓库执行
+[Mock 生产门禁](../../references/mock-development.md)和统一
+[安全检查](../../scripts/mock-safety.mjs)。Mock 指模拟数据或服务；测试环境中
+允许使用 Mock 的授权不适用于默认分支交付或生产发布。检查当前完整源码、
+差异和 `mockModules`：生产范围内仍存在启用中的 Mock，或者无法完整证明
+Mock 已退出生产运行链路时，必须暂停上线。继续前须核实真实实现已替换 Mock、
+运行引用与开启入口已清理，并证明构建排除；仅修改标签、状态或关闭开关不足以放行。
+
+`master/main` 写入前先完成源码检查。尚未产生的制品留待构建后检查，不提前
+要求或伪造未来制品证据。正式 Jenkins 发布触发前，使用
+[project-mock-gate.mjs](../../scripts/project-mock-gate.mjs)核实并运行准确 Git
+快照中的真实项目源码检查器；审查固定版本的真实发布入口，证明它会在发布、
+部署前检查最终制品，且检查失败会停止发布。缺少项目检查脚本或有效发布接入时，
+在触发前停止并说明具体缺口；本流程不代为安装业务项目检查器或修改 Jenkins 配置。
+不要求配置 XML 或固定的内联流水线形式。
+
+构建后取得与本次构建、SHA、Job、检查器、配置及制品绑定的检查结果，才能
+宣称发布成功。生产制品和运行链路不得包含 Mock 模块及其模拟数据、处理器、
+运行时代码或开启入口。仅限仓库开发测试使用的隔离代码，须证明已从生产构建排除后
+才可保留；Query Contract 的 `release-check` 或 `@api-mock` 状态不能代替该证明。
+
+## 相关限制的中文说明
+
+以下是常见触发条件与继续条件的表达依据，按实际证据说明，不把整表当作每次
+都要展示的检查清单。具体操作、授权与回读要求仍以下文及引用规则为准。
+
+| 情况 | 面向用户的说明要点 |
+| --- | --- |
+| 上线输入或授权不足 | 指出缺少的已提测结果、准确仓库、原始 `feature/*` / `fixbug/*` 分支、评审范围或本轮上线授权；补齐并核实后才继续。普通提测或泛称“继续”不自动授权上线；完整执行清单已覆盖的准确上线操作复用原确认。 |
+| 等待人工合并 | `AWAITING_MERGE` 表示等待有权限人员合并。仅在明确权限拒绝时说明账号无合并权限；其他故障按实际原因解释。给出准确 MR 链接、目标分支和联系同事合并后回复“已合并，继续上线”的动作；回复后仍须只读核实合并、源码、CI 和目标包含关系。等待期间暂停依赖写入；此阶段唯一允许的写入是已授权的业务 Wiki“待合并”补丁，并须回读核实。 |
+| 工具包版本或发布证据不足 | 合并到默认分支不证明正式包已发布。先核实包的 `latest` 来源及本轮消费项目实际解析版本，再决定复用、升级或必要发布；证据未知时先补只读核实，不能靠试发包消除不确定性。完整计划已获准的操作跨阶段复用授权。 |
+| Wiki 内容变化或状态不符 | 指明实际页面、项目条目及变化；缺少、重复或旧模板状态字段不能直接迁移。非已批准条件路径的正文变化，须重新展示准确补丁和结果正文并确认，不能覆盖他人修改。`NO_WIKI` 不读写；Wiki 失败与已完成合并分别报告。 |
+| 写入结果未知 | `UNKNOWN` 表示尚无法确认操作是否生效；先只读核实实际效果，停止依赖写入，不自动重试、回滚或把它当成未执行。说明已完成部分、未知部分及所需核实。 |
+| 本地清理证据不足 | 只读收尾检查不授权删除。当前、受保护、占用、锁定、含未保存数据或未交付提交的资源须保留；关联、占用或包含关系未知时待核实。说明准确路径、分支、保留原因及缺少的检查，不能笼统宣称无可清理资源或询问删除待核实资源；检查不完整不阻止 Wiki 维护，不推翻已核实的合并结果。 |
+| 清理需要确认或范围变化 | 独立上线完成后，仅对已核实候选展示准确清理方案并按下文询问；主修复、需求流程只给后续建议。合并授权不包含清理。组合方案中泛称“确认清理”不触发任何删除，须明确本地范围或包含远程临时分支；远程开发分支另需准确授权。已精确批准的冲突临时资源清理复用原授权，后续保留指令优先；删除前事实或候选变化则停止，重新核实并展示方案。 |
+
+说明“上线完成”时区分：业务 Wiki 的 `是否上线：已合并` 仅表示本轮提交已核实
+进入默认分支，不表示业务应用已部署生产环境；工具包须另外核实正式发布、
+消费版本及适用 Wiki 回读，不能仅凭合并或字段标签宣称完成。
 
 
 Preferred lead model profile: `CRITICAL`. Read the shared
