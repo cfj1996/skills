@@ -72,6 +72,14 @@ The same task-breakdown suite covers scope/reuse/increment evidence, independent
 estimate-review freshness, shared-cost deduplication, read-only estimate previews,
 retained historical hours and metadata-only updates. Review receipts and source
 facts are simulated; no real Task or review is created by these tests.
+The same suite checks separate page-development/API-integration Tasks within one
+module Plan, isolation between page Plans and calibration-source review freshness.
+For read-only behavioral forward tests of multi-page preparation, Mock-only scope,
+user throughput references, legacy single-file Plan rules, batch copy changes and
+selected-Task continuation, use
+`plugins/zan-workflows/skills/writing-plans/tests/scenarios/review-multi-page-requirement.md`
+with an independent evaluator. The supplied facts are simulated; no company API,
+Task creation, Plan save, branch or source write is needed.
 
 For the approved pending-merge Wiki patch, shared-page entry isolation,
 permission handoff, readback failure and workflow-session write barriers, run

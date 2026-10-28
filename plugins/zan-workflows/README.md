@@ -30,8 +30,15 @@
 提交/推送”才设为否，本轮合并、Wiki、构建逐项显示不执行，不做提测登记。
 之后独立直接提测须确认本轮具体交付计划，原实施授权不自动扩展为交付授权。
 
-- 小改动使用简短执行说明；确需正式 Plan、任务创建/更新、多人协作或已有
-  正式计划时，才进入对应 Task/Plan 能力。见[准备与验证规则](references/adaptive-workflow.md)。
+- 小改动使用简短执行说明；需求涉及多页面独立业务/验收或跨仓责任衔接时，即使
+  单人、已有静态页或先做 Mock，也准备 Task 和模块 Plan。首次完整清单包含
+  真实/拟建任务、负责人及校准后的工时。见[准备与验证规则](references/adaptive-workflow.md)。
+- 页面开发与正式接口对接有独立交付时分别设计 Task，共用同一模块 Plan；
+  仅批准 Mock 时保留未来接入候选/依赖，不把真实接入计入当前工时或完成范围。
+  用户吞吐参考结合已核实 Zan 复用及具体增量校准，不当作实测或全局标准，
+  不默认每日小时数。见[估时规则](skills/breaking-down-requirement/references/effort-estimation.md)。
+- 大需求按页面/内聚模块分子目录维护 Plan，总览只作索引和依赖说明。
+  旧单文件规则不足时在原确认中预览调整，不提前迁移文件或改业务项目规则。
 - 任务创建统一交 `breaking-down-requirement`，确认后调用 TAPD MCP 的
   `create_task`（单个）或 `create_tasks`（同需求批量）；开发清单与 Plan 复用
   同一任务结果。参数与能力检查见[任务创建路由](references/tool-routing.md#tapd-任务创建)。

@@ -70,7 +70,7 @@ Mock 遵守 [跨项目规范](../../references/mock-development.md)，先发现�
 
 按 [准备深度与验证](../../references/adaptive-workflow.md) 选择实际需要的内容：
 
-- 范围、依赖、实施与验收明确的小改动，用内存 `implementationBrief`
+- 范围集中、依赖、实施与验收明确的小改动，用内存 `implementationBrief`
   记录行为、排除项、证据、有序步骤与验证。没有 Task/Plan 不强制创建。
 - 明确要求正式 Plan、Task 写入，确需多人/跨模块协调，或继续已有正式 Plan
   时，使用原任务与 Plan 能力。任务存在时读取其真实责任范围与负责人，
@@ -78,17 +78,29 @@ Mock 遵守 [跨项目规范](../../references/mock-development.md)，先发现�
 - 只有实际需要逐项复杂交互或用户选择时才使用 PANEL；其他范围用 DIALOGUE，
   不加载未采用的面板运行时。风险直接落实到验证场景，不另分流程等级。
 
+准备本轮实施时，按上述规则先判断完整所选范围：多页面各有业务/依赖/验收，或跨仓责任需
+分别交付衔接时，准备 Task 和模块 Plan，不因现有静态页、单人、成熟复用或
+先做 Mock 而降为“小增量”。首次用于实施的完整清单应已有真实/拟建 Task、核实负责人、
+校准后的最终工时及各模块 Plan 拟写内容；缺项保留草稿，不先发执行确认。
+同一小改动批量应用和仅选一个 Task 的边界保持不变。
+
 需要任务准备时，调用 `zan-workflows:breaking-down-requirement phase=PLAN`，
 并传 `confirmation_mode=DEFER_TO_ORCHESTRATOR`。核实新建/复用/更新、负责人、
 最终预估工时、范围、依赖和验收。Task 输入只检查或调整所选 Task。
 工时按 [增量估算与独立评审](../breaking-down-requirement/references/effort-estimation.md)
 执行：先核实所选责任、当前可复用能力和实际新增/适配/验证工作，公共成本不重复计算。
+用户提供的可比吞吐参考须参与本次校准，保留来源和适用边界；不能只核对算术和
+复用存在就视为充分。页面开发与正式接口对接分别设计任务和验收；仅批准 Mock 时
+本轮不含真实接入，未来任务候选与依赖单独说明，不把未来工时算进当前开发。
 新建或重估任务的独立评审须在完整确定清单前通过；旧任务范围和工时未变时保留读回值。
 估算者不能自填通过；只刷新失效证据和受影响评审，不增加一轮人类确认，仍只展示小时数。
 任务创建路线固定指向共享 [TAPD MCP 方法](../../references/tool-routing.md#tapd-任务创建)：
 单个 `create_task`、同需求批量 `create_tasks`，统一交任务模块执行，本入口不另建创建路径。
 保留完整写入内容、旧/新差异和 proposal fingerprint；不展示内部工时算法。
 需要正式 Plan 时先准备拟写正文/差异与准确目标，保留稳定任务 key。
+每个页面/可独立开发验收的内聚模块一份 Plan，可关联多个 Task；大需求总览只作
+索引与依赖说明，不承载全部实施设计。旧单文件路径不能区分模块时，按 writing-plans
+产物位置门禁预览规则调整，不能先把全需求写进该文件。
 任务未创建只显示提案，不伪造 ID 或 TASKS_READY。
 
 需求和任务依照 [任务关联](references/task-linked-delivery.md) 连接项目/分支、

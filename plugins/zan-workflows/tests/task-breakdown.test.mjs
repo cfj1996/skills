@@ -220,15 +220,43 @@ test('one TAPD Task can own multiple Plan steps without multiplying its estimate
   assert.equal(value.taskBreakdown.proposal.tasks[0].estimate.hours, 6);
 });
 
-test('a module Plan can contain multiple TAPD Tasks with separate ownership and real IDs', () => {
+test('page development and API integration share their module Plan while other pages stay separate', () => {
   const value = model();
   const second = structuredClone(value.taskBreakdown.proposal.tasks[0]);
+  value.taskBreakdown.proposal.tasks[0].name = value.taskBreakdown.proposal.tasks[0].payload.name = '登录页面开发';
+  value.taskBreakdown.proposal.tasks[0].scope = '完成本地数据场景的登录交互';
+  value.taskBreakdown.proposal.tasks[0].acceptance = ['本地失败场景允许重试，不证明真实接入'];
   second.key = 'DT-002'; second.owner.account = second.payload.owner = 'bob';
+  second.name = second.payload.name = '登录接口对接';
+  second.scope = '对接正式登录契约并退出本模块 Mock';
+  second.acceptance = ['正式接口失败与重试通过真实联调'];
+  second.dependsOn = ['DT-001'];
   second.payload.description = 'zan-task:111230010000001:DT-002';
-  value.taskBreakdown.proposal.tasks.push(second);
+  const otherPage = structuredClone(value.taskBreakdown.proposal.tasks[0]);
+  otherPage.key = 'DT-003'; otherPage.deliveryUnitKey = 'points';
+  otherPage.name = otherPage.payload.name = '积分页面开发';
+  otherPage.payload.description = 'zan-task:111230010000001:DT-003';
+  value.taskBreakdown.proposal.tasks.push(second, otherPage);
   value.taskBreakdown = binding(value.taskBreakdown.proposal);
   value.tasks.push({ ...structuredClone(value.tasks[0]), id: 'T-002', tapdTaskKey: 'DT-002' });
   assert.equal(validatePlanTaskBindings(value).valid, true);
+
+  const onlyPageStep = structuredClone(value);
+  onlyPageStep.tasks.pop();
+  assert.match(messages(validatePlanTaskBindings(onlyPageStep)), /DT-002: Plan must cover/,
+    'a page step cannot claim coverage of the separate integration Task');
+
+  const mixedPages = structuredClone(value);
+  mixedPages.tasks.push({ ...structuredClone(value.tasks[0]), id: 'T-003', tapdTaskKey: 'DT-003' });
+  assert.match(messages(validatePlanTaskBindings(mixedPages)), /another project\/module/,
+    'an all-requirement Plan cannot absorb a different page Task');
+
+  const pointsPlan = structuredClone(value);
+  pointsPlan.deliveryUnit.key = pointsPlan.taskBreakdown.deliveryUnitKey = 'points';
+  pointsPlan.tasks = [{ ...structuredClone(value.tasks[0]), tapdTaskKey: 'DT-003' }];
+  assert.equal(validatePlanTaskBindings(pointsPlan).valid, true);
+  assert.deepEqual(pointsPlan.taskBreakdown.records, value.taskBreakdown.records,
+    'separate module Plans consume the same readback result instead of recreating Tasks');
 });
 
 test('missing links, changed snapshots, foreign modules/projects and uncovered functions block Plan validation', () => {
@@ -408,6 +436,7 @@ test('scope, reuse and baseline changes invalidate review even when displayed ho
   for (const change of [
     p => { p.tasks[0].scope += '；增加另一个角色的可见范围'; },
     p => { p.tasks[0].estimate.analysis.baselineEvidence = ['new revision']; },
+    p => { p.tasks[0].estimate.analysis.scopeEvidence.push('用户补充：一天三个 CRUD 页面；未提供每日小时数，仅作当前范围定性校准'); },
     p => { p.tasks[0].estimate.analysis.reuse[0].mode = 'NEW'; },
     p => { p.tasks[0].estimate.parts[0].work += '；改变公共默认值'; },
     p => { p.tasks[0].estimate.analysis.risks.push({ description: '非关键展示差异', handling: '沿用既有行为', blocking: false }); },
