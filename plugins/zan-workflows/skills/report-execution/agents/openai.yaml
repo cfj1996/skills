@@ -1,0 +1,4 @@
+interface:
+  display_name: "提交插件执行反馈"
+  short_description: "整理插件流程、重复确认和人工纠正，脱敏导出并提交到固定项目的 GitLab Issue"
+  default_prompt: "使用 $report-execution 提交本次插件执行反馈，并附上脱敏后的流程报告。"

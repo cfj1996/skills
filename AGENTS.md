@@ -184,3 +184,9 @@ Recent history in `tapd-workflow` uses short conventional-style subjects such as
 ## Security & Configuration Tips
 
 Do not commit TAPD tokens or generated case data with sensitive details. Keep transient workflow output under ignored `docs/` paths unless the change is intentionally documenting a reusable example.
+
+For local execution feedback, secret redaction, ZIP export, fixed-project submission,
+repeat submission and unknown-write recovery checks, run
+`node --test plugins/zan-workflows/tests/execution-feedback.test.mjs`.
+These tests use disposable local data and simulated GitLab MCP responses; they never
+upload real files, create real Issues, read chat history or call company APIs.

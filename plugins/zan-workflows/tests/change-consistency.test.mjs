@@ -21,7 +21,7 @@ const review = () => ({ ...current(), scope: passed('需求 100 限定当前门�
   impact: passed('已追踪公共筛选方法的两个调用方；门店隔离及空列表验证通过'),
   documentation: passed('Wiki 400 当前项目条目覆盖列表行为及共用方法影响') });
 const merge = (changeReview = review(), currentChange = current()) => evaluateMergeReadiness({
-  codeReview: 'pass', safety: 'pass', mergeability: 'mergeable', changeReview, currentChange,
+  codeReview: 'pass', safety: 'pass', mergeability: 'mergeable', mergePermission: 'allowed', changeReview, currentChange,
   mockSafety: { ...noMockFixture({ sourceRepository: repoA, sourceSha: currentChange.sourceSha }), baseSha: currentChange.targetSha },
 }, fixtureMockIo);
 

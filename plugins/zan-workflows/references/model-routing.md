@@ -38,6 +38,7 @@ standard to compensate for model availability.
 | `breaking-down-requirement` | Conditional | Read-only task scope/estimates use `BALANCED`; confirmed TAPD creates/updates and recovery use `CRITICAL` |
 | `workspace-project-knowledge` | `BALANCED` | Read-heavy routing and graph/knowledge lookup |
 | `project-memory-context` | `BALANCED` | Bounded retrieval and evidence-aware memory synthesis |
+| report-execution | Conditional | Local diagnostics/export are BALANCED; confirmed feedback submission is CRITICAL |
 | `login-token-workflow` | `FAST` | Explicit, repeatable token retrieval and URL assembly |
 | `team-identity-map` | `FAST` | Bounded roster lookup and identifier translation |
 

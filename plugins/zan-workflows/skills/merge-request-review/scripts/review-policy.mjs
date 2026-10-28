@@ -99,11 +99,13 @@ export function classifyAdoption({
   };
 }
 
-export async function evaluateMergeReadiness(input = {}, io = {}) {
+async function evaluateReadiness(input, io, operation) {
   const {
   codeReview = 'incomplete',
   safety = 'unknown',
   mergeability = 'unknown',
+  mergePermission = 'unknown',
+  approvePermission = 'unknown',
   pipeline = 'none',
   pipelineRequired = false,
   unresolvedDiscussions = false,
@@ -120,6 +122,10 @@ export async function evaluateMergeReadiness(input = {}, io = {}) {
   else if (codeReview !== 'pass') blockers.push('code-review-incomplete');
   if (safety !== 'pass') blockers.push('safety');
   if (mergeability !== 'mergeable') blockers.push('mergeability');
+  // Verified GitLab permission is independent of MR approvals and the human
+  // authorization required for an actual write; this helper grants neither.
+  if (mergePermission !== 'allowed') blockers.push('merge-permission');
+  if (operation === 'approve' && approvePermission !== 'allowed') blockers.push('approve-permission');
   if (pipeline === 'failed') blockers.push('pipeline-failed');
   else if (pipelineRequired === true && pipeline !== 'success') {
     if (pipeline === 'none') blockers.push('pipeline-missing');
@@ -129,7 +135,12 @@ export async function evaluateMergeReadiness(input = {}, io = {}) {
   else if (!['success', 'none', 'pending'].includes(pipeline)) blockers.push('pipeline-unknown');
   if (typeof pipelineRequired !== 'boolean') blockers.push('pipeline-requirement-unknown');
   if (unresolvedDiscussions !== false) blockers.push('unresolved-discussions');
-  if (!['approved', 'not-required'].includes(approval)) blockers.push('approval');
+  // An approval may satisfy a currently unmet requirement; it must not pretend
+  // that the MR already meets that requirement or relax the subsequent merge.
+  const approvalStates = operation === 'approve'
+    ? ['approved', 'not-required', 'required-missing']
+    : ['approved', 'not-required'];
+  if (!approvalStates.includes(approval)) blockers.push('approval');
   if (!['adopted', 'not-adopted'].includes(zanStatus)) blockers.push('zan-governance');
   if (zanStatus === 'adopted' && zanMust !== 'pass') blockers.push('zan-must');
   blockers.push(...evaluateChangeConsistency(changeReview, currentChange).blockers);
@@ -166,10 +177,19 @@ export async function evaluateMergeReadiness(input = {}, io = {}) {
   }
 
   return {
-    mergeAllowed: blockers.length === 0,
     blockers,
     ...(mockSafetyError ? { mockSafetyError } : {}),
   };
+}
+
+export async function evaluateMergeReadiness(input = {}, io = {}) {
+  const result = await evaluateReadiness(input, io, 'merge');
+  return { mergeAllowed: result.blockers.length === 0, ...result };
+}
+
+export async function evaluateApprovalReadiness(input = {}, io = {}) {
+  const result = await evaluateReadiness(input, io, 'approve');
+  return { approvalAllowed: result.blockers.length === 0, ...result };
 }
 
 async function runCli() {
@@ -183,7 +203,11 @@ async function runCli() {
     process.stdout.write(`${JSON.stringify(await evaluateMergeReadiness(input), null, 2)}\n`);
     return;
   }
-  throw new Error('usage: review-policy.mjs <classify-adoption|evaluate-merge> <json>');
+  if (command === 'evaluate-approve') {
+    process.stdout.write(`${JSON.stringify(await evaluateApprovalReadiness(input), null, 2)}\n`);
+    return;
+  }
+  throw new Error('usage: review-policy.mjs <classify-adoption|evaluate-merge|evaluate-approve> <json>');
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {

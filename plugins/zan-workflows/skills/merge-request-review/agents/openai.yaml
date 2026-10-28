@@ -1,4 +1,4 @@
 interface:
-  display_name: "合并请求 Review"
-  short_description: "跨项目类型审核需求、正确性、设计与影响，按适用规则判断合并资格"
-  default_prompt: "使用 $merge-request-review 处理指定 GitLab MR 或明确项目范围：检查修改依据、正确性、工程设计、兼容影响和验证，按实际变更加载专项及适用文档/Zan 检查。分别输出代码结论与合并资格，区分必须修复、优化建议、需要重新设计和证据不足；仅在明确要求时合并。"
+  display_name: "zan: MR Review"
+  short_description: "协助有合并权限的人员发现、审核 MR，核实合并资格并执行已授权操作"
+  default_prompt: "使用 $merge-request-review 处理指定 GitLab MR 或明确项目范围，分别核实本人处理关系、当前合并权限、代码结论与合并资格；检查修改依据、正确性、设计、影响和适用门禁，仅执行我明确授权的批准或合并。"

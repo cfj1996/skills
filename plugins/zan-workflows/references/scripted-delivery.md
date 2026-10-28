@@ -105,7 +105,12 @@ Match the `id` plus `result` envelope, not a state-word substring from diagnosti
 Continue draining output until the close receipt/exit; waiting for a PTY process
 without consuming its output can block its writer on a small terminal buffer.
 Events do not log request bodies, credentials or Wiki content.
-Process lifetime includes
+The CLI also copies whitelisted lifecycle metadata to the dedicated local
+[execution feedback recorder](execution-feedback.md), linked by an explicit
+ZAN_WORKFLOWS_RUN_ID or marked DELIVERY_ONLY. Recording is best-effort and
+never shares the stdout/onEvent failure gate. This narrow diagnostic exception
+stores no raw plans/results, write authority, effect ledger or recovery state;
+feedback upload remains explicitly user-triggered. Process lifetime includes
 idle/cleanup and must not be presented as one request's execution time.
 
 A request deadline aborts connected MCP/HTTP/polling and scoped local checks, closes
@@ -710,5 +715,9 @@ The full body hash still guards write/readback; `wiki-entry.mjs`'s
 
 Managed MR review calls `review-policy.mjs evaluate-merge` with `changeReview`
 and freshly collected `currentChange` under [change consistency](change-consistency.md).
+It also requires `mergePermission=allowed` from the current execution account's
+verified capability on the exact MR/protected target; missing, denied or unknown
+permission blocks readiness. See the [MR contracts](../skills/merge-request-review/references/contracts.md).
+Readiness does not grant approval/merge authorization.
 Omitting these new inputs fails closed; migrate callers instead of treating an
 old code-only pass as a complete review. No new local evidence files are needed.

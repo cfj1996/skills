@@ -6,9 +6,16 @@ description: Deeply review one high-risk GitLab merge request for correctness, s
 # Critical MR Reviewer
 
 Review exactly one assigned high-risk MR. Remain read-only: do not approve,
-merge, edit files, push commits, or change GitLab state. Treat the supplied HEAD
-SHA as the review identity; report and stop on a changed SHA unless the lead
-explicitly requests a fresh review.
+merge, post comments, edit code or documents, push commits, or change GitLab state.
+Read [the shared contracts](../references/contracts.md) and consume the lead's
+project preflight and MR review packets without repeating verified public discovery.
+Bind the review to the supplied source/target SHA; report changed bindings and
+stop unless the lead explicitly requests a fresh review.
+
+Use the packet's execution identity and operation capabilities. Missing, denied
+or unknown `mergePermission` blocks merge advice as `merge-permission`; it does
+not change the code conclusion. Permission is not write authorization. The lead
+refreshes live permissions and runs unified gates before the final decision.
 
 ## Required analysis
 
@@ -23,11 +30,17 @@ redesign. Keep build/test evidence, CI, discussions, approvals, conflicts and
 forbidden develop history as their respective gates. A registry/team list is
 not required to review a project.
 
-Consume the leader-provided project preflight and MR review packet; do not reload public workspace/project context already verified there. Apply Zan only for `zan-enhanced/adopted`. For `ordinary/not-adopted`, perform the full critical code review without a Zan matrix and do not treat missing Zan files as a blocker. For `misconfigured/unknown`, continue the code review and keep its conclusion independent while listing `zan-governance` as a merge blocker. Treat an absent pipeline as informational unless the project explicitly requires it.
+Apply Zan only to the packet's applicable adopted scope. `ordinary/not-adopted`
+gets the full critical review without a Zan matrix or a missing-Zan blocker;
+`zan-enhanced/adopted` returns applicable Rule IDs, Exceptions and real command
+evidence. For `misconfigured/unknown`, continue code review with independent
+`zan-governance`. Keep permissions and other GitLab gates separate from code
+findings. An absent pipeline is informational unless the project requires it.
 
-Do not infer safety from the presence of tests or newly added guards. Verify
-that the real call path reaches them and inspect important edge cases. Use
-`不通过` only with concrete evidence; use `未完成` when code evidence is incomplete.
+Do not infer safety from tests or newly added guards. Verify the real call path
+reaches them; check important boundary, failure and recovery cases. Use `不通过`
+only with concrete code evidence, and `未完成` when necessary code evidence or
+review remains incomplete. Keep permission, CI and governance blockers independent.
 
 Apply [change consistency](../../../references/change-consistency.md) independently
 of Zan mode. Check the full current diff against original approved scope/feedback,
@@ -48,45 +61,15 @@ stable MOCK-* / MOCK_ONLY identities, real replacement and exit evidence. A disa
 switch, removed label, retired status or ordinary CI success is insufficient.
 Development-only fixtures may remain only with proved exclusion. Missing/stale
 evidence blocks approval/merge as `mock-safety`; the lead must rerun the shared
-source/content checker for the current refs before each remote write. Source review
-must not fabricate future artifact or Jenkins pre-deploy check results.
+source/content checker for current refs before each approve/merge. Hand-filled
+pass flags cannot replace it. Source review must not fabricate future artifact
+or Jenkins pre-deploy check results.
 
 ## Output
 
-Return exactly:
-
-```markdown
-MR: <project>!<iid>
-Review HEAD: <sha>
-Risk class: HIGH
-Review mode: ordinary | zan-enhanced | ordinary-with-zan-warning
-Zan status: not-adopted | adopted | misconfigured | unknown
-Code conclusion: 通过 | 不通过 | 未完成
-Merge eligibility: 可合并 | 不可合并
-Merge blockers: <none or comma-separated blocker ids>
-Change review: <changeReview with sourceSha, targetSha, documentHashes and evidence-backed scope/impact/documentation results under the shared contract>
-Main issue: <one-line summary>
-
-Evidence:
-- <file:line, call path, diff, pipeline, discussion, or mergeability evidence>
-
-Zan Conformance (only for zan-enhanced; otherwise write "不适用"):
-| Rule ID | Level | Changed evidence | Exception | Result | Verification |
-| --- | --- | --- | --- | --- | --- |
-| <ZAN-...> | MUST / SHOULD | <path:line or diff hunk> | <id/none> | pass / fail / warning / unknown | <command/output/resource> |
-
-Edge cases checked:
-- <important boundary or failure case>
-
-Reason:
-- <why the evidence permits or blocks merge>
-
-Suggested fix:
-- <concrete fix direction, or "无阻断修复项">
-
-Review comments (only when present):
-- <必须修复 | 优化建议 | 需要重新设计 | 证据不足; evidence, impact, blocking decision and scoped action; for redesign explain why local fixes are insufficient>
-
-GitLab reply:
-<Chinese comment only for an MR-specific actionable blocker; otherwise "无需打回说明".>
-```
+Return the [Reviewer result](../references/contracts.md#reviewer-result) with
+`Risk class: HIGH` and the actual edge cases checked. Keep concrete findings,
+evidence gaps and merge blockers distinct; use the shared checklist's opinion
+types and redesign threshold. Draft a concise GitLab reply only for an MR-specific
+actionable blocker; non-adoption or shared governance status alone is not a
+rejection reason. The reply is a draft only and must not be sent.

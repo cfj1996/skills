@@ -4,7 +4,8 @@ import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import test from 'node:test';
-import { classifyAdoption, evaluateMergeReadiness as evaluateActualMergeReadiness } from '../scripts/review-policy.mjs';
+import { classifyAdoption, evaluateMergeReadiness as evaluateActualMergeReadiness,
+  evaluateApprovalReadiness as evaluateActualApprovalReadiness } from '../scripts/review-policy.mjs';
 import { inspectMockSource, mockInventoryFingerprint } from '../../../scripts/mock-safety.mjs';
 import { noMockFixture, fixtureMockIo } from '../../../tests/helpers/mock-safety-fixture.mjs';
 
@@ -15,7 +16,8 @@ const currentChange = { sourceSha: 'a'.repeat(40), targetSha: 'b'.repeat(40), do
   sourceRepository: 'https://git.example.test/team/demo.git', targetBranch: 'main',
   purpose: 'Review and merge this exact MR', scopeFingerprint: noMockFixture().scopeFingerprint };
 const evaluateMergeReadiness = input => evaluateActualMergeReadiness(input, fixtureMockIo);
-const reviewBinding = { currentChange, mockSafety: noMockFixture({ sourceRepository: currentChange.sourceRepository, sourceSha: currentChange.sourceSha }), changeReview: { ...currentChange,
+const evaluateApprovalReadiness = input => evaluateActualApprovalReadiness(input, fixtureMockIo);
+const reviewBinding = { mergePermission: 'allowed', currentChange, mockSafety: noMockFixture({ sourceRepository: currentChange.sourceRepository, sourceSha: currentChange.sourceSha }), changeReview: { ...currentChange,
   scope: { status: 'pass', evidence: ['维护范围与当前 diff 一致'] },
   impact: { status: 'pass', evidence: ['已检查实际影响及验证'] },
   documentation: { status: 'not-required', exemption: 'NOT_APPLICABLE', evidence: ['非提测维护'] },
@@ -52,13 +54,17 @@ test('renamed CLI reviews an ordinary project without central config or a projec
     const actualChange = { ...currentChange, sourceSha, targetSha: baseSha, scopeFingerprint: snapshot.scopeFingerprint };
     const mode = run('classify-adoption', { agentDocument: 'missing', adoptionDocument: 'missing' });
     assert.equal(mode.reviewMode, 'ordinary');
-    assert.deepEqual(run('evaluate-merge', {
+    const cliInput = {
       ...reviewBinding, currentChange: actualChange, mockSafety,
       changeReview: { ...reviewBinding.changeReview, sourceSha, targetSha: baseSha },
       codeReview: 'pass', safety: 'pass', mergeability: 'mergeable',
       pipeline: 'none', pipelineRequired: false, approval: 'not-required',
       unresolvedDiscussions: false, zanStatus: mode.zanStatus,
-    }), { mergeAllowed: true, blockers: [] });
+    };
+    assert.deepEqual(run('evaluate-merge', cliInput), { mergeAllowed: true, blockers: [] });
+    const pendingApproval = { ...cliInput, approval: 'required-missing', approvePermission: 'allowed' };
+    assert.deepEqual(run('evaluate-approve', pendingApproval), { approvalAllowed: true, blockers: [] });
+    assert.deepEqual(run('evaluate-merge', pendingApproval), { mergeAllowed: false, blockers: ['approval'] });
   }
   finally {
     await rm(workspace, { recursive: true, force: true });
@@ -230,6 +236,82 @@ const passingReview = {
   safety: 'pass',
   mergeability: 'mergeable',
 };
+
+test('merge eligibility requires explicit verified merge permission', async () => {
+  const withoutPermission = { ...passingReview };
+  delete withoutPermission.mergePermission;
+  assert.deepEqual(await evaluateMergeReadiness(withoutPermission), {
+    mergeAllowed: false, blockers: ['merge-permission'],
+  });
+  for (const mergePermission of ['denied', 'unknown', undefined, null, true, 'approved', '', {}]) {
+    assert.deepEqual(await evaluateMergeReadiness({ ...passingReview, mergePermission }), {
+      mergeAllowed: false, blockers: ['merge-permission'],
+    }, JSON.stringify(mergePermission));
+  }
+});
+
+test('merge permission and MR approvals cannot substitute for other merge gates', async () => {
+  assert.deepEqual(await evaluateMergeReadiness({ ...passingReview, approval: 'required-missing' }), {
+    mergeAllowed: false, blockers: ['approval'],
+  });
+  assert.deepEqual(await evaluateMergeReadiness({ ...passingReview, mergePermission: 'denied', approval: 'approved' }), {
+    mergeAllowed: false, blockers: ['merge-permission'],
+  });
+  assert.deepEqual(await evaluateMergeReadiness({
+    ...passingReview, mergePermission: 'denied', codeReview: 'blocker', pipeline: 'failed',
+  }), { mergeAllowed: false, blockers: ['code', 'merge-permission', 'pipeline-failed'] });
+});
+
+const pendingApproval = { ...passingReview, approval: 'required-missing', approvePermission: 'allowed' };
+
+test('a missing required approval permits an authorized approval check but still blocks merging', async () => {
+  assert.deepEqual(await evaluateApprovalReadiness(pendingApproval), { approvalAllowed: true, blockers: [] });
+  assert.deepEqual(await evaluateMergeReadiness(pendingApproval), { mergeAllowed: false, blockers: ['approval'] });
+  assert.equal(pendingApproval.approval, 'required-missing', 'the checker must preserve the actual unmet approval state');
+});
+
+test('approval checks require an independently verified approve permission', async () => {
+  const withoutPermission = { ...pendingApproval };
+  delete withoutPermission.approvePermission;
+  assert.deepEqual(await evaluateApprovalReadiness(withoutPermission), {
+    approvalAllowed: false, blockers: ['approve-permission'],
+  });
+  for (const approvePermission of ['denied', 'unknown', undefined, null, true, 'approved', '', {}]) {
+    assert.deepEqual(await evaluateApprovalReadiness({ ...pendingApproval, approvePermission }), {
+      approvalAllowed: false, blockers: ['approve-permission'],
+    }, JSON.stringify(approvePermission));
+  }
+});
+
+test('approval checks reject unknown approval requirements rather than assuming they can be satisfied', async () => {
+  for (const approval of ['unknown', 'pending', '', null, true, {}]) {
+    assert.deepEqual(await evaluateApprovalReadiness({ ...pendingApproval, approval }), {
+      approvalAllowed: false, blockers: ['approval'],
+    }, JSON.stringify(approval));
+  }
+});
+
+test('permission to approve does not waive code, safety, project, documentation or Mock gates', async () => {
+  for (const [patch, blockers] of [
+    [{ codeReview: 'blocker' }, ['code']],
+    [{ safety: 'unknown' }, ['safety']],
+    [{ mergeability: 'unknown' }, ['mergeability']],
+    [{ mergePermission: 'denied' }, ['merge-permission']],
+    [{ pipeline: 'failed' }, ['pipeline-failed']],
+    [{ pipelineRequired: true }, ['pipeline-missing']],
+    [{ unresolvedDiscussions: true }, ['unresolved-discussions']],
+    [{ zanStatus: 'misconfigured' }, ['zan-governance']],
+    [{ changeReview: { ...reviewBinding.changeReview,
+      documentation: { status: 'fail', evidence: ['required migration document does not cover the current API change'] } } },
+    ['change-documentation']],
+    [{ mockSafety: undefined }, ['mock-safety']],
+  ]) {
+    const result = await evaluateApprovalReadiness({ ...pendingApproval, ...patch });
+    assert.equal(result.approvalAllowed, false, JSON.stringify(patch));
+    assert.deepEqual(result.blockers, blockers, JSON.stringify(patch));
+    assert.equal('mergeAllowed' in result, false);
+  }
+});
 
 test('ordinary review binds Issue and required migration docs without a TAPD Wiki', async () => {
   const documentHashes = { 'gitlab:issues/17': 'c'.repeat(64), 'repo:MIGRATION.md': 'd'.repeat(64) };

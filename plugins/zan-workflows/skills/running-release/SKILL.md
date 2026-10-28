@@ -83,3 +83,11 @@ build's known state; never hide an unknown outcome.
 Keep a Jenkins SUCCESS with unverified source distinct from verified completion.
 Do not create workflow JSON/recovery files or write Wiki/TAPD, merge code,
 publish locally, or add production/package operations to a daily build.
+
+## Execution feedback
+
+按 [执行反馈记录](../../references/execution-feedback.md#attach-to-a-workflow) 在顶层
+任务开始时创建本地诊断 runId，能力切换复用同一编号；实际发生时记录阶段、确认
+事项、人工纠正及最终结局。传给公共交付会话以关联脚本事件，未接入步骤标明缺口。
+诊断不保存业务 Plan/result、不作为授权或恢复依据；失败不阻断原工作。只在用户
+明确要求提交/导出时调用 report-execution，不在任务结束时自动上传。

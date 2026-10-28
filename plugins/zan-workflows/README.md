@@ -160,11 +160,14 @@ MR 和已完成效果；清理按准确资源清单单独确认，不在主入�
 [登录令牌](skills/login-token-workflow/SKILL.md)、[人员映射](skills/team-identity-map/SKILL.md)、
 [历史记忆](skills/project-memory-context/SKILL.md)。不要在开始时一并加载全部能力。
 
-合并请求 Review 使用 `$merge-request-review`。可审核指定 GitLab MR、明确项目或
-经核实的当前用户待处理列表，覆盖 B/C 端、小程序、后端、工具包和工程配置；
+合并请求 Review 使用 `$merge-request-review`，面向具有合并权限的人员。可处理指定 GitLab MR、
+明确项目或经核实的当前用户待处理列表；合并权限和本人处理关系分别核实。
+覆盖 B/C 端、小程序、后端、工具包和工程配置；
 通用检查包含修改依据、正确性、工程设计、兼容影响与验证，专项按实际改动加载。
 项目知识、TAPD/Wiki 与 Zan 按实际适用要求使用。旧管辖配置不再决定审核资格，
 未登记项目可直接基于 GitLab 和仓库证据审核；原有分支及合并授权门禁继续适用。
+发现、审核、合并可独立执行；批准和合并按准确授权分别执行，写前刷新当前账号对目标的
+有效权限及统一门禁。数据交接、合并细则和报告模板分别维护在该技能的 references 下。
 技能已更名，旧调用名称需更新；仓库历史文档中的旧名称仅记录当时状态。
 
 ## 当前数据格式
@@ -174,6 +177,20 @@ MR 和已完成效果；清理按准确资源清单单独确认，不在主入�
 独立且仍在使用的任务契约。TAPD、GitLab、Jenkins 的真实服务响应适配继续保留。
 旧 Task 交接缺少新估算证据时，从当前准确读回构造 RETAINED；新建或实际重估补齐
 CALCULATED 与独立评审。不能补造历史正常投入或通过回执，也不因此自动改旧 Task/Plan。
+
+## 插件执行反馈
+
+工作流在本地记录版本、阶段、确认事项、人工纠正和结果；公共交付会话自动关联
+请求事件，其他步骤明确区分摘要与覆盖缺口。记录失败不影响开发/交付，不保存
+原始 Plan、工具参数、凭据或完整聊天。详见[执行反馈说明](references/execution-feedback.md)。
+
+同事可说“提交本次插件执行反馈，主要问题是：中途重复确认了三次”，由
+[report-execution](skills/report-execution/SKILL.md) 导出脱敏摘要与 ZIP，上传附件并
+创建 GitLab Issue，读回后返回链接。“仅导出/先预览”不上传；未要求反馈时不上传。
+接收项目固定为 [chenfangjie/skills](http://git.jubaozan.cn/chenfangjie/skills)（ID 374），
+无需首次设置或选择项目，沿用现有 GitLab MCP 账号。相同报告修订复用 Issue，
+结果未知保留回执先核实，不自动重试写入。设置
+ZAN_WORKFLOWS_RECORDING=off 可关闭自动记录；旧运行没有日志时如实报告缺口。
 
 ## 本机准备
 

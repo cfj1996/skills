@@ -244,3 +244,11 @@ AWAITING_MERGE 暂停依赖项目，展示准确 MR、userAction.message 和人�
 链接、验证/评审、真实交付结果与剩余缺口。交接沿用当前能力结果，保留准确
 TAPD、仓库/分支、范围和已完成效果；只记录实际经过的阶段，不补假 ID/状态。
 不创建 workflow report、运行台账、原始需求 dump 或证据目录。
+
+## Execution feedback
+
+按 [执行反馈记录](../../references/execution-feedback.md#attach-to-a-workflow) 在顶层
+任务开始时创建本地诊断 runId，能力切换复用同一编号；实际发生时记录阶段、确认
+事项、人工纠正及最终结局。传给公共交付会话以关联脚本事件，未接入步骤标明缺口。
+诊断不保存业务 Plan/result、不作为授权或恢复依据；失败不阻断原工作。只在用户
+明确要求提交/导出时调用 report-execution，不在任务结束时自动上传。

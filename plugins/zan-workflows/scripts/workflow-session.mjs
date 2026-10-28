@@ -15,6 +15,7 @@ import { markPendingMergeWiki, validatePendingWikiPlan } from './pending-merge-w
 import { performance } from 'node:perf_hooks';
 import { setTimeout as delay } from 'node:timers/promises';
 import { validateWait, waitForDeadline } from './workflow-runtime.mjs';
+import { sessionRecorder } from './execution-recorder.mjs';
 
 const ordinaryTimeoutMs = 180000;
 const maxTimeoutMs = 43200000;
@@ -48,7 +49,7 @@ export function requestBudget(request, io = {}, override) {
 
 export class WorkflowSession {
   constructor({ allowExecute = false, pool = new McpClientPool(), reader = configuredJenkinsReader, io = {},
-    requestTimeoutMs, shutdownTimeoutMs = 2000, onEvent = () => {}, clock = () => performance.now() } = {}) {
+    requestTimeoutMs, shutdownTimeoutMs = 2000, onEvent = () => {}, recorder = () => {}, clock = () => performance.now() } = {}) {
     if (requestTimeoutMs !== undefined && !positiveBudget(requestTimeoutMs) || !positiveBudget(shutdownTimeoutMs) || shutdownTimeoutMs > 30000) {
       throw new Error('会话期限必须为正数；请求最多 12 小时，关闭最多 30 秒');
     }
@@ -64,6 +65,7 @@ export class WorkflowSession {
     this.requestTimeoutMs = requestTimeoutMs;
     this.shutdownTimeoutMs = shutdownTimeoutMs;
     this.onEvent = onEvent;
+    this.recorder = recorder;
     this.clock = clock;
     this.startedAt = this.lastFinishedAt = clock();
     this.busyMs = 0; this.idleMs = 0; this.requestCount = 0;
@@ -72,6 +74,8 @@ export class WorkflowSession {
   }
 
   emit(event) {
+    // Local feedback is best-effort and must not share the output channel's failure semantics.
+    try { Promise.resolve(this.recorder(event)).catch(() => {}); } catch {}
     const failed = () => { this.outputFailed = true; void this.close('OUTPUT_ERROR'); };
     try {
       const result = this.onEvent({ at: new Date().toISOString(), ...event });
@@ -346,7 +350,8 @@ export async function serveWorkflowSession({ session = new WorkflowSession(), in
   const interrupt = () => stop('INTERRUPTED', 130), terminate = () => stop('TERMINATED', 143);
   process.on('SIGINT', interrupt); process.on('SIGTERM', terminate);
   session.emit({ state: 'SESSION_READY', inputMode: transport.mode, idleTimeoutMs,
-    requestTimeoutMs: session.requestTimeoutMs ?? null, timeoutPolicy: 'ACTION_BUDGET' });
+    requestTimeoutMs: session.requestTimeoutMs ?? null, timeoutPolicy: 'ACTION_BUDGET',
+    ...(session.recorder.status ? { feedbackRecording: session.recorder.status } : {}) });
   arm();
   try {
     for await (const line of lines) {
@@ -380,6 +385,7 @@ export async function serveWorkflowSession({ session = new WorkflowSession(), in
 async function main() {
   const options = parseSessionOptions(process.argv.slice(2));
   const session = new WorkflowSession({ ...options,
+    recorder: sessionRecorder(),
     io: { onProgress: event => process.stderr.write(JSON.stringify(event) + '\n') } });
   await serveWorkflowSession({ session, idleTimeoutMs: options.idleTimeoutMs });
 }

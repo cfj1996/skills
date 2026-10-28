@@ -92,6 +92,9 @@ Zan 合规只运行项目声明的命令。命令不存在、无法执行、输�
   `success`、`pending`、`none`。原始 GitLab 状态须根据证据归一化，不能把读取失败当成 `none`。
 - `approval`：`approved` / `not-required` / `required-missing`；前两项通过，
   `not-required` 必须有项目规则依据。
+- `mergePermission`：`allowed` / `denied` / `unknown`，仅 `allowed` 通过；省略或非法值
+  同样阻断 `merge-permission`。来自执行账号对准确 MR/受保护目标的当前有效权限，
+  不是角色名称、MR 审批状态或人类操作授权。详细证据见 [交接约定](contracts.md)。
 - `unresolvedDiscussions` 必须明确为 `false` 才通过。
 - `zanStatus` 使用上表四种状态；只有 `adopted` / `not-adopted` 可继续，
   且 `adopted` 还要求 `zanMust = pass`。
@@ -102,3 +105,8 @@ Zan 合规只运行项目声明的命令。命令不存在、无法执行、输�
   免除文档要求，不免除范围与影响核对。
 
 其余省略字段沿用脚本默认值；调用方必须先核实项目门禁，不能用默认值替代未知证据。
+`mergeAllowed` 只表示当前合并资格；任何批准/合并写入仍遵守
+[执行规则](merge-rules.md)，不由 helper 返回值自动授权。
+批准专用 `evaluate-approve` 额外要求 `approvePermission=allowed`，允许已核实的
+`approval=required-missing`，其余门禁相同；它返回 `approvalAllowed`，不返回 `mergeAllowed`。
+批准后读回实际审批，再以 `evaluate-merge` 判断合并，不能复用批准资格放行。
