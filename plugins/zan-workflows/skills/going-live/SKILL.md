@@ -50,6 +50,15 @@ checks decide whether Jenkins publication or dependency upgrades are needed.
 Execute only those needed actions before the consumers' final merges.
 Then maintain business Wiki `是否上线：已合并` and tooling Wiki
 `当前版本：latest`. A master merge alone never proves package publication.
+Use the [same checklist](../../references/execution-checklist.md#围绕同一清单编排)
+and exact submitted scope/authority. A Bug or one Story with its selected Tasks
+may include several business repositories with no tooling package: retain all
+required submitted rows, original branches and per-project evidence in that
+same delivery plan. Do not rediscover scope, repeat implementation or invoke
+tooling/latest capabilities merely because the work spans projects.
+Technical merge/release/Wiki plans are precise views of that checklist; only
+new material scope needs affected approval. Standalone delivery keeps its own
+exact authorization and production/cleanup boundaries.
 
 Here `master` denotes the verified default delivery branch. Use actual `main`
 only when remote evidence confirms it as the default; keep that exact name in

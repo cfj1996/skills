@@ -51,12 +51,32 @@ class SessionInputPtyTests(unittest.TestCase):
         while offset < len(data):
             offset += os.write(self.master, data[offset:offset + 8192])
 
+    def read_response(self, identifier):
+        deadline = time.monotonic() + 5
+        while True:
+            for line in self.output.decode('utf-8', errors='replace').splitlines():
+                try:
+                    value = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if value.get('id') == identifier and 'result' in value:
+                    return value
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                self.fail('session did not return the matching id/result response')
+            readable, _, _ = select.select([self.master], [], [], remaining)
+            if readable:
+                self.output += os.read(self.master, 65536)
+
     def request(self, identifier, note):
         return (json.dumps({'id': identifier, 'action': 'closeout', 'phase': 'PLAN',
                             'input': {'note': note}}, ensure_ascii=False) + '\n').encode('utf-8')
 
     def finish(self, code=0):
         self.send(b'\x04' if code == 0 else b'\x03')
+        # Consume the close receipt while waiting: a PTY can have a tiny output
+        # buffer, and wait() without draining would block the writer itself.
+        self.read_until(b'"state":"SESSION_CLOSED"')
         self.assertEqual(self.process.wait(timeout=5), code)
         self.assertEqual(termios.tcgetattr(self.slave)[3] & (termios.ICANON | termios.ECHO),
                          self.original_flags & (termios.ICANON | termios.ECHO))
@@ -65,10 +85,8 @@ class SessionInputPtyTests(unittest.TestCase):
         payload = self.request('long-中文-request', '中文素材说明' * 5000)
         self.assertGreater(len(payload), 4096)
         self.send(payload)
-        self.read_until(b'NOT_TRIGGERED')
-        responses = [json.loads(line) for line in self.output.decode('utf-8').splitlines()
-                     if line.startswith('{') and '"id"' in line]
-        self.assertEqual(responses[-1]['id'], 'long-中文-request')
+        response = self.read_response('long-中文-request')
+        self.assertEqual(response['result']['state'], 'NOT_TRIGGERED')
         self.assertNotIn('中文素材说明', self.output.decode('utf-8'))
         self.finish()
 
@@ -76,7 +94,7 @@ class SessionInputPtyTests(unittest.TestCase):
         self.send(self.request('oversize', 'x' * 270000))
         self.read_until(b'256 KiB')
         self.send(self.request('after-oversize', 'short'))
-        self.read_until(b'NOT_TRIGGERED')
+        self.assertEqual(self.read_response('after-oversize')['result']['state'], 'NOT_TRIGGERED')
         self.assertIn(b'after-oversize', self.output)
         self.finish()
 

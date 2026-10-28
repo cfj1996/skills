@@ -15,7 +15,7 @@
 | Project | selected project, canonical repository path, Git root, origin remote, verification result |
 | Branch | requested mode, fixed branch, action `CREATE|USE_EXISTING`, selected/planned branch, local/remote refs and ancestry evidence, exact selected ref/SHA for existing work, for `CREATE` exact verified base ref/SHA, and matching current-conversation confirmation source |
 | TAPD status plan | item type, current status/`current_owner`, `WRITE_ACTIVE|NO_CHANGE|SKIPPED_ALREADY_WAITING_TEST|NOT_APPLICABLE_NON_BUG`; for applicable Bugs verified `repairOwner={account,workspaceId,source,evidence}`; exact status+owner target/payload/purpose and confirmation source only for a Bug `WRITE_ACTIVE` |
-| Validation | public mapped state and normalized failure reason |
+| Validation | evidence-backed lead/helper checks, public mapped state and concise actual basis/failure reason; independent ambiguity-review result only when invoked |
 | Terminal | `READY_FOR_HANDOFF|PENDING|BLOCKED` and blocker/next decision when needed |
 
 ## Branch invariants
@@ -65,7 +65,11 @@
 - one exact branch action and passing branch checks; and
 - one matching current-conversation branch/scope confirmation source; and
 - one status plan consistent with TAPD type, work mode and current status; and
-- private validation mapped to `VALIDATION_PASSED`.
+- all required evidence-backed checks mapped to `VALIDATION_PASSED`; ordinary
+  preparation does not require a separate private Agent. Preserve actual identity,
+  sources, canonical repo/origin, exact refs/ancestry, current type/status/owner and
+  matching human confirmation. Helper flags or old summaries alone are insufficient.
+  Independent review of a real ambiguity cannot waive missing evidence or a mismatch.
 
 Use `PENDING` only for missing evidence or a named user choice that could make
 the definition valid. Use `BLOCKED` for a proven mismatch or conflict. Neither

@@ -1,12 +1,9 @@
 #!/usr/bin/env node
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import { resolve, relative, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readCliPlan, requireText } from './workflow-runtime.mjs';
+import { readCliPlan, requireText, runScopedCommand } from './workflow-runtime.mjs';
 import { collectLocalOccupancy } from './collect-local-occupancy.mjs';
 
-const exec = promisify(execFile);
 const BASELINE = new Set(['main', 'master', 'develop', 'dev']);
 const under = (path, parent) => {
   const rel = relative(resolve(parent), resolve(path));
@@ -55,7 +52,7 @@ export async function checkLocalCloseout(input, io = {}) {
   }
   if (!validBranch(delivery.sourceBranch) || !/^(feature|fixbug)\//.test(delivery.sourceBranch)) throw new Error('原始开发分支无效');
   const git = io.git || (async (cwd, args) => {
-    try { const result = await exec('git', args, { cwd, timeout: 30000, maxBuffer: 4 * 1024 * 1024 });
+    try { const result = await runScopedCommand('git', args, { cwd, timeout: 30000, maxBuffer: 4 * 1024 * 1024 }, io);
       return { code: 0, stdout: result.stdout }; }
     catch (error) { return { code: error.code, stdout: error.stdout || '' }; }
   });

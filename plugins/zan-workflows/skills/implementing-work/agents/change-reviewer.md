@@ -25,7 +25,9 @@ Act as an isolated read-only validator/reviewer. Accept exactly one
 write operations, commit, push, merge, submit, publish, or request
 authorization.
 
-For `PRE_STATUS_WRITE`, inspect only the approved definition, verified
+For `PRE_STATUS_WRITE`, handle substantive ambiguity referred for independent
+scrutiny; ordinary deterministic matching is checked by the lead/helper under
+the same requirements. Inspect only the approved definition, verified
 repository/branch facts, exact TAPD target/current state/planned active state,
 displayed concrete changes/purpose, internal payload, and current explicit authorization. Require all to
 match and require no future write/readback evidence. Reject a missing or
@@ -81,7 +83,10 @@ contract and its blockers remain binding. Check in order:
    lint/type/build by default. A timeout/resource stop is incomplete evidence;
    preserve mandatory-check blockers and do not treat queued CI as a pass.
 5. No workflow record/evidence files were created as part of the change.
-6. No submission, Wiki, merge, or release operation is included.
+6. This implementation/reviewer performs no submission, Wiki, merge or release
+   operation. Verified predecessor outputs produced by the orchestrator under
+   their own exact authority may appear as dependency evidence; they are not
+   implementation writes or proof of whole-work completion.
 7. An applicable Bug activation has exact status and repair-owner readbacks,
    verified by `scripts/bug-repair-status.mjs`. Matching status with a missing,
    stale or partial handler readback fails; preserve the no-write waiting-test
@@ -94,8 +99,10 @@ contract and its blockers remain binding. Check in order:
 9. Verification covers the actual risks: relevant failure paths, compatibility
    and preserved behavior at affected boundaries. Small scope alone does not
    excuse missing evidence for a material risk.
-10. For a Bug, inspect the authorized start-record readback and the proposed
+10. For a whole-work Bug review, inspect the authorized start-record readback and the proposed
    final content under [Bug 溯源与修复记录](../references/bug-repair-record.md).
+   The explicitly scoped provider review below defers only the complete-comment
+   and later integration claims, never its own required code checks or start readback.
    Attribution must follow original-change/causality evidence, never merely
    the last modifier or current repairer. Unknown history stays explicit;
    an absent related requirement is omitted, and there are no project sections.
@@ -106,6 +113,18 @@ contract and its blockers remain binding. Check in order:
    The completion comment is written/read back after this review passes;
    do not require that future readback as a prerequisite for the review itself.
    Story/Task has no repair-record obligation.
+
+For a provider review specifically bound to an explicitly approved predecessor
+package/test-service output, apply the shared
+[dependency-output rules](../../../references/execution-checklist.md#前置依赖产出与整体完成).
+Require current provider code, required pre-delivery verification, precise node
+scope/authority and applicable shared status/start-record readbacks. Keep unmet
+cross-repository acceptance and the complete final-comment review explicit;
+do not demand those future facts as this local code review's prerequisites.
+A pass covers only the supplied provider scope, cannot yield an eligible partial
+ReviewedChange collection, and cannot waive the Git/release executor's gates.
+At whole-work completion review the actual final comment/claims, reusing the
+unchanged provider code review; no early Bug completion or registration is allowed.
 
 For direct-submission record-only correction after developer edits, inspect the
 current full diff/verification and proposed corrected completion body under

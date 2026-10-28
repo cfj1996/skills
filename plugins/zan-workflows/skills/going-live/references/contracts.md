@@ -12,7 +12,7 @@ that exact name through plan, executor, validation and containment checks.
 
 | Section | Required facts |
 | --- | --- |
-| Submission | upstream `SUBMITTED` result with every included repository's original repair branch and exact actual test target; single-project input or a same-Bug aggregate matched by repository/origin/fixed branch; exact related submitted owner/consumer handoffs when tooling dependencies are involved |
+| Submission | upstream `SUBMITTED` result with every included repository's original repair branch and exact actual test target; single-project input, same-Bug or same verified Story/selected Task aggregate matched by repository/origin/fixed branch; exact related submitted owner/consumer handoffs when tooling dependencies are involved |
 | Repository | expected/actual path, Git root, origin, verification result |
 | Merge | source/target branches and SHAs, current-round commits, authorization, MR result, merge readback, master containment |
 | Tooling latest | `VERIFIED|NOT_APPLICABLE|AWAITING_MERGE|BLOCKED`; exact plan/authorization, latest precheck `VERIFIED_EXISTING|NEEDS_RELEASE|BLOCKED`, package owner delivery, `REUSED_LATEST|PUBLISHED_LATEST` and publication/source/registry evidence, Jenkins result only when a release is needed, affected consumer manifests/locks/resolved versions, upgrade review/checks/delivery, and final latest recheck |
@@ -27,6 +27,13 @@ that exact name through plan, executor, validation and containment checks.
 | User action | For `AWAITING_MERGE`, `userAction.type=CONTACT_MERGER`, a message naming the exact MR/source/target and asking the user to contact a colleague with merge permission, and `resumePrompt=已合并，继续上线`; surface this in the final response even when the pending Wiki patch blocks |
 
 ## Invariants
+
+- Reuse the current complete execution checklist and actual referenced content/
+  human authority. Keep all included business repositories even when no package
+  is involved; requirement aggregation proves its parent Story and selected
+  Tasks without adding siblings, Bug records/status or Task completion. Each
+  exact technical plan/result is a view of that scope, not a new scope or an
+  authorization reset. Existing standalone approval boundaries remain binding.
 
 - `AWAITING_MERGE` is a normal handoff for manual merge, explicit MR
   `user.can_merge=false`, or merge-call HTTP 403. Retain exact MR IID/URL,

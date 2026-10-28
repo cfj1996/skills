@@ -113,6 +113,17 @@ They perform no external calls or writes. The complete Node suite includes them.
 The helper's scope and budgets are documented in
 `plugins/zan-workflows/references/local-verification.md`.
 
+For commit Hook/Node/local commitlint readiness without Git writes or dependency
+downloads, run `node --test plugins/zan-workflows/tests/commit-readiness.test.mjs`.
+For short-lived worker shutdown, persistent descendants and cancellation during
+shutdown, use `node --test plugins/zan-workflows/tests/local-verification.test.mjs`.
+The complete Node suite includes both; fixtures use disposable local repositories/processes.
+
+For workflow-session request timing, deadlines, UNKNOWN-write isolation, explicit
+finish/idle shutdown and verified owned MCP/local process cleanup, run
+`node --test plugins/zan-workflows/tests/workflow-session-lifecycle.test.mjs`.
+It uses local fake MCP processes and simulated responses, without company API calls.
+
 For actual-change scope/impact/documentation merge gates, revision freshness,
 same-page continuation corrections and shared Wiki entry preservation, run
 `node --test plugins/zan-workflows/tests/change-consistency.test.mjs plugins/zan-workflows/tests/shared-test-wiki.test.mjs`.

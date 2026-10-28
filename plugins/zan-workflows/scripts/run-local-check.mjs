@@ -1,38 +1,22 @@
 #!/usr/bin/env node
-import { spawn, execFile } from 'node:child_process';
-import { promisify } from 'node:util';
+import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setPriority, constants } from 'node:os';
+import { processGroup, signalGroup } from './process-group.mjs';
 
-const exec = promisify(execFile);
 const deadlines = { lint: 120, type: 180, test: 120, build: 300 };
 const tailBytes = 16 * 1024;
-
-async function processGroup(pid) {
-  const { stdout } = await exec('ps', ['-axo', 'pid=,pgid=,rss=,stat='],
-    { timeout: 2000, maxBuffer: 8 * 1024 * 1024 });
-  const rows = stdout.trim().split('\n').filter(Boolean).map(line => line.trim().split(/\s+/));
-  if (rows.some(row => row.length < 4 || row.slice(0, 3).some(value => !/^\d+$/.test(value)))) {
-    throw new Error('无法解析进程内存，检查未运行或已中止');
-  }
-  const group = rows.filter(row => Number(row[1]) === pid && !row[3].startsWith('Z'));
-  return { pids: group.map(row => Number(row[0])), rssMb: group.reduce((sum, row) => sum + Number(row[2]), 0) / 1024 };
-}
-
-function signalGroup(pid, signal) {
-  try { process.kill(-pid, signal); }
-  catch (error) { if (error.code !== 'ESRCH') throw error; }
-}
 
 // Bounds this invocation and its process group, not unrelated user processes.
 export async function runLocalCheck({ command, args = [], cwd = process.cwd(), kind,
   timeoutMs = deadlines[kind] * 1000, maxRssMb = 2048, intervalMs = 1000,
-  graceMs = 1000, onProgress = () => {}, signal }) {
+  graceMs = 1000, onProgress = () => {}, signal, stdinText }) {
   if (!['darwin', 'linux'].includes(process.platform)) throw new Error('本地检查执行器目前仅支持 macOS/Linux');
   if (!Object.hasOwn(deadlines, kind) || typeof command !== 'string' || !command ||
       !Array.isArray(args) || args.some(arg => typeof arg !== 'string') ||
+      (stdinText !== undefined && (typeof stdinText !== 'string' || Buffer.byteLength(stdinText) > 262144)) ||
       [timeoutMs, maxRssMb, intervalMs, graceMs].some(value => !Number.isFinite(value) || value <= 0)) {
     throw new Error('需要 kind=lint|type|test|build、命令和正数资源预算');
   }
@@ -40,23 +24,40 @@ export async function runLocalCheck({ command, args = [], cwd = process.cwd(), k
   signal?.throwIfAborted();
   const start = Date.now();
   return new Promise(resolveResult => {
-    const child = spawn(command, args, { cwd, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(command, args, { cwd, detached: true, stdio: [stdinText === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'] });
     let stdout = Buffer.alloc(0), stderr = Buffer.alloc(0), peakRssMb = null;
-    let stopping = false, monitoring = false, exitCode = null, exitSignal = null;
+    let stopping = false, monitoring = false, exitCode = null, exitSignal = null, stopReason = null;
+    let backgroundPids = [], settleElapsedMs = 0;
     let deadline, monitor, progress;
     const retain = (old, chunk) => Buffer.concat([old, chunk]).subarray(-tailBytes);
     child.stdout.on('data', chunk => { stdout = retain(stdout, chunk); });
     child.stderr.on('data', chunk => { stderr = retain(stderr, chunk); });
 
     async function stop(reason) {
+      if (reason && !stopReason) stopReason = reason;
       if (stopping) return;
       stopping = true;
       clearTimeout(deadline); clearInterval(monitor); clearInterval(progress);
       let cleanupComplete = !child.pid;
       if (child.pid) {
         try {
-          const before = await processGroup(child.pid);
-          if (!reason && before.pids.length) reason = 'BACKGROUND_PROCESSES';
+          let before = await processGroup(child.pid);
+          // Build workers may finish shortly after their successful parent exits.
+          // Let them drain naturally before classifying them as abandoned work.
+          if (!stopReason && exitCode === 0 && before.pids.length) {
+            const settleStart = Date.now();
+            const settleEnd = Math.min(settleStart + graceMs, start + timeoutMs);
+            while (!stopReason && before.pids.length && Date.now() < settleEnd) {
+              peakRssMb = Math.max(peakRssMb ?? 0, before.rssMb);
+              if (before.rssMb > maxRssMb) { stopReason = 'MEMORY_LIMIT'; break; }
+              await delay(Math.min(50, Math.max(1, settleEnd - Date.now())));
+              before = await processGroup(child.pid);
+            }
+            settleElapsedMs = Date.now() - settleStart;
+            if (!stopReason && before.pids.length && Date.now() >= start + timeoutMs) stopReason = 'TIMEOUT';
+          }
+          backgroundPids = before.pids;
+          if (!stopReason && exitCode === 0 && before.pids.length) stopReason = 'BACKGROUND_PROCESSES';
           signalGroup(child.pid, 'SIGTERM');
           const end = Date.now() + graceMs;
           while (Date.now() < end && (await processGroup(child.pid)).pids.length) await delay(50);
@@ -76,10 +77,11 @@ export async function runLocalCheck({ command, args = [], cwd = process.cwd(), k
       process.removeListener('SIGINT', interrupt); process.removeListener('SIGTERM', terminate);
       signal?.removeEventListener('abort', abort);
       child.stdout.destroy(); child.stderr.destroy();
-      const status = !cleanupComplete ? 'CLEANUP_FAILED' : reason || (exitCode === 0 ? 'PASSED' : 'FAILED');
+      const status = !cleanupComplete ? 'CLEANUP_FAILED' : stopReason || (exitCode === 0 ? 'PASSED' : 'FAILED');
       resolveResult({ status, command, args, cwd: resolve(cwd), kind, timeoutMs, maxRssMb,
         exitCode, signal: exitSignal, elapsedMs: Date.now() - start,
         peakRssMb: peakRssMb === null ? null : Math.ceil(peakRssMb), cleanupComplete,
+        backgroundPids, settleElapsedMs,
         stdoutTail: stdout.toString('utf8'), stderrTail: stderr.toString('utf8') });
     }
     const interrupt = () => { void stop('CANCELLED'); };
@@ -114,6 +116,13 @@ export async function runLocalCheck({ command, args = [], cwd = process.cwd(), k
       };
       monitor = setInterval(sample, intervalMs);
       void sample();
+      if (stdinText !== undefined) {
+        child.stdin.on('error', error => {
+          // A rejected message may close stdin before consuming it; retain the command's verdict.
+          if (error.code !== 'EPIPE') { stderr = retain(stderr, Buffer.from(error.message)); void stop('INPUT_ERROR'); }
+        });
+        child.stdin.end(stdinText);
+      }
       progress = setInterval(() => {
         if (stopping) return;
         Promise.resolve().then(() => onProgress({ kind, elapsedMs: Date.now() - start,

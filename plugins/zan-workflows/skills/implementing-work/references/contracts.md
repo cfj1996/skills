@@ -114,14 +114,30 @@ not a new persisted schema or a queue of unrelated work items.
   is never returned or persisted.
 - A required TAPD active-state write requires an exact Chinese state/account
   preview mapping to the verified internal payload, authorization,
-  `PRE_STATUS_WRITE=VALIDATION_PASSED`, and matching readback before source
-  edits. Final review uses a separate `POST_CHANGE_REVIEW` call.
+  passing lead/helper pre-write checks with actual state/owner/member evidence,
+  and matching readback before source edits. Ordinary deterministic matching
+  needs no private PRE_STATUS_WRITE Agent; a genuine ambiguity may use that
+  role but cannot waive missing facts or authority. Do not describe the lead's
+  checks as independent review. Final code review still requires the independent
+  `POST_CHANGE_REVIEW` call.
 - In a grouped Bug, verify every required repository definition before the
   first write, then perform the common state/owner operation and start record
   once. Its verified effect replaces the old shared status snapshot for later
   repository steps; it is not external drift or a reason to repeat the write.
   Each repository still receives its own branch, diff, verification and review
   checks. Required cross-repository acceptance belongs to the Bug's complete scope.
+  A planned predecessor may require package publication or an explicitly approved
+  test-service delivery before downstream acceptance. Retain the verified provider
+  facts and remaining gap without emitting a partial eligible REVIEWED collection;
+  the orchestrator alone may execute that exact dependency node under the
+  [shared rules](../../../references/execution-checklist.md#前置依赖产出与整体完成).
+  It does not relax failed/UNKNOWN-write barriers, explicit non-delivery limits,
+  whole-Bug completion records or final submission's complete-set requirements.
+  The provider's independent POST_CHANGE_REVIEW is explicitly scoped to that
+  authorized predecessor and its current code/pre-delivery checks. It may leave
+  later integration and complete-comment review pending, but cannot be labelled
+  full REVIEWED. The final actual completion comment is reviewed when all
+  required work is ready, without repeating unchanged provider code review.
 - Apply [修复中状态与处理人](bug-repair-owner.md): the write and readback must
   include both status and `current_owner`. Already-active state alone cannot
   select `NO_CHANGE`; verify the handler too. Missing/incorrect/partial owner

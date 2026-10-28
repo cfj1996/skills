@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { clientFor } from './mcp-client.mjs';
 import { checkMockSafetySet, mockSafetyPreview } from './mock-safety.mjs';
 import { assertTransitionFields, resolveBugWorkflow, resolveVersionField } from './tapd-mappings.mjs';
-import { readCliPlan, sha256, stableJson, requireText } from './workflow-runtime.mjs';
+import { readCliPlan, sha256, stableJson, requireText, repositoryKey } from './workflow-runtime.mjs';
 
 export function apiData(result, name) {
   if (result?.isError) throw new Error(`${name} 调用失败`);
@@ -45,7 +45,7 @@ const assigneeFields = item => Object.fromEntries(['current_owner', 'te', 'repor
 
 function checkPrerequisites(input) {
   const gates = input.prerequisites;
-  if (!gates || gates.git !== 'VERIFIED' || !['BUILD_SUBMITTED', 'DEPLOYED', 'SKIPPED_BY_INTENT'].includes(gates.deployment)) {
+  if (!gates || gates.git !== 'VERIFIED' || !['BUILD_SUBMITTED', 'DEPLOYED', 'RELEASED', 'SKIPPED_BY_INTENT'].includes(gates.deployment)) {
     throw new Error('登记前必须有 Git 交付和构建提交/部署/跳过部署的成功证据');
   }
   if (gates.deployment === 'BUILD_SUBMITTED') {
@@ -56,6 +56,22 @@ function checkPrerequisites(input) {
         !/^[a-f\d]{40}(?:[a-f\d]{24})?$/i.test(receipt.expectedSha || '') ||
         !receipt.submittedParams || !Object.keys(receipt.submittedParams).length) {
       throw new Error('登记前缺少本次 Jenkins 构建提交的确切队列和参数回执');
+    }
+  }
+  if (gates.deployment === 'RELEASED') {
+    const receipt = gates.deploymentReceipt;
+    if (receipt?.state !== 'RELEASED' || receipt.releaseKind !== 'package' ||
+        receipt.completionMode !== 'BUILD_TERMINAL' || receipt.sourceVerified !== true || receipt.writes !== 1 ||
+        !Number.isSafeInteger(receipt.queueId) || receipt.queueId < 1 ||
+        !Number.isSafeInteger(receipt.buildNumber) || receipt.buildNumber < 1 ||
+        !receipt.buildUrl || !receipt.jobUrl || !receipt.jobName || !receipt.sourceRepository ||
+        !/^[a-f\d]{40}(?:[a-f\d]{24})?$/i.test(receipt.expectedSha || '')) {
+      throw new Error('复用包发布缺少原始 RELEASED 终态、准确构建和源码核验回执');
+    }
+    if (!input.gitDeliveryReceipts?.some(git => ['VERIFIED', 'MERGED'].includes(git.state) && git.containment === true &&
+        ['dev', 'develop'].includes(git.targetBranch) && git.deliveredSha === receipt.expectedSha &&
+        repositoryKey(git.originUrl || git.sourceRepository) === repositoryKey(receipt.sourceRepository))) {
+      throw new Error('复用包发布的仓库或源码与当前 Git 测试交付回执不匹配');
     }
   }
   if (gates.profile === 'NO_WIKI' ? gates.wiki !== 'SKIPPED_NO_WIKI'
@@ -76,8 +92,8 @@ export async function registerTestSubmission(call, input, io = {}) {
   }
   if (input.versionAction === 'WRITE') {
     requireText(input.testVersion, '完整测试版本载荷');
-    const native = input.entryType === 'bug' ? 'test_version' : 'version';
-    if (input.versionField && input.versionField !== native && !/^custom_field_[a-z0-9_]+$/.test(input.versionField)) {
+    const native = input.entryType === 'bug' ? ['version_test', 'test_version'] : ['version'];
+    if (input.versionField && !native.includes(input.versionField) && !/^custom_field_[a-z0-9_]+$/.test(input.versionField)) {
       throw new Error('版本字段未采用已解析的原生/自定义字段');
     }
   }

@@ -15,27 +15,65 @@ external write inside that unchanged authorized plan:
    stop stale bindings and refresh the accurate plan when needed. Reuse
    authority for permitted technical derivations; material scope/operation
    changes need fresh approval.
-3. Ask the private validator to check this operation, execute only after it
-   passes, and read the result back before proceeding.
+3. Require the complete plan's independent review below, then let the owning
+   executor check this operation's actual prerequisites and read its result
+   back before proceeding. Do not start another Agent for unchanged inputs.
+
+## Whole-plan review
+
+Before the first delivery write, give the complete `SubmissionPlan` to the
+private submission validator once with `PRE_SUBMISSION_PLAN`: all repository
+reviews, authority, Git actions, exact deployment selections, complete Wiki
+body/patch and ownership evidence, and registration preview. Under STANDARD,
+include the Wiki validator's criteria in this same review; NO_WIKI loads no
+Wiki capability. A prepared draft is not yet
+`VALIDATED`. Map a passing review to the plan and its Wiki validation together.
+An independently validated unchanged draft may instead reuse its existing
+review; do not review that document again merely to change phases.
+Standalone PLAN can be reviewed with its proposed human authority pending;
+only the later matching real confirmation permits EXECUTE. An orchestrator
+instead verifies its already-confirmed complete checklist. Review is not approval.
+For the skill's sole record-only Bug correction PLAN exception, keep the
+corrected comment readback/full REVIEWED handoff pending while verifying all
+current code reviews, history and required repositories. Review the exact first
+comment action and require its readback/full-gate restoration before any other
+delivery write. No other missing input is deferred by whole-plan review.
+
+Future commit/MR/queue/Wiki identifiers are unknown at planning time. Review
+their exact derivation and dependency rules, never invent successful receipts.
+Each executor must refresh its own mutable facts, require the preceding real
+receipt before writing, and perform its immediate readback. A failed or unknown
+effect stops dependent steps immediately, not at the final summary.
+
+At the end the lead checks all actual receipts once using `POST_WRITE`'s
+criteria. This is a deterministic result check, not another routine private
+Agent call. A material plan/body semantic change, unreviewed diff, conflict
+resolution or ambiguous receipt needs scoped independent review; one initial
+review is not a limit on necessary later reviews. Standalone individual actions
+may still use `PRE_GIT_WRITE|PRE_SUBMISSION_WRITE|POST_WRITE` for their exact scope.
+Do not use them in addition to an unchanged complete plan review.
 
 The Wiki creation/supplementation/comment helper is one `WIKI_WRITE_AND_LINK_BUNDLE`
-operation: validate its complete authorized inputs once before invocation,
-let the script perform each deterministic readback internally, then validate
-the final result. Do not re-enter the per-operation process or run a separate
+operation: include its complete authorized inputs in the plan review,
+let the script perform each deterministic readback internally, then have the lead
+check the final result. Do not re-enter the per-operation process or run a separate
 validator between the helper's month, child create/update and comment calls.
 
-Likewise, validate one `GIT_DELIVERY_BUNDLE` before the unchanged authorized
+Likewise, include one `GIT_DELIVERY_BUNDLE` in the unchanged authorized
 commit/push/MR sequence. Local Git checks exact reviewed files/diff and reads
 back the derived commit/push; `merge-reviewed-branch.mjs` owns MR/CI/merge
-checks and source containment. Validate `JENKINS_TEST_DEPLOY` once before its
-one Jenkins executor call. Do not spawn validators for each internal check or
-poll; retain actual readbacks for the final `POST_WRITE` validation.
+checks and source containment. Include `JENKINS_TEST_DEPLOY` in that same review
+before its one executor call. Do not spawn validators for each internal check or
+poll; retain actual readbacks for the lead's final `POST_WRITE` check.
 
 Generated IDs and readbacks that follow the authorized derivation are not
 changed plan facts and do not require another prompt. If a bound value changed
 or a result cannot be proved, return `BLOCKED`. This
-simple version does not retry, recover an interrupted operation, or infer that
-an earlier call succeeded.
+simple version does not retry or automatically recover an interrupted operation,
+or infer that an earlier call succeeded. A later continuation may retain completed
+effects only after reliable exact current readbacks establish them under the
+skill's normal continuation gates; an old UNKNOWN flag/summary is not proof and
+cannot bypass a session write barrier.
 
 All TAPD, Wiki, GitLab and Jenkins operations follow the shared
 [tool-routing policy](../../../references/tool-routing.md). Browser state is never the default
@@ -59,7 +97,10 @@ testing. All reviewed delivery changes must already be committed in the bound
 source SHA; pending uncommitted delivery changes or missing/unknown containment
 block before any commit/push, without silently enabling merge.
 For an ordinary authorized merge, when uncommitted, the exact reviewed diff/file list is the commit payload in
-the displayed bundle. Commit/push only that payload with local Git, reuse the
+the displayed bundle. Run [commit readiness](../../../references/commit-readiness.md)
+once for the exact message and planned commit environment before its first commit;
+correct a blocked environment/message without attempting Git writes or bypassing Hooks.
+Commit/push only that payload with local Git, reuse the
 derived SHA, then invoke `merge-reviewed-branch.mjs` once with the confirmed
 source/target facts. Do not redisplay/revalidate push, MR and merge merely
 because the stage changed. Prove current-round containment in
@@ -223,7 +264,12 @@ or write a Wiki-link comment.
 
 Follow [deployment-and-confirmation.md](deployment-and-confirmation.md).
 Resolve `DEPLOY|SKIP`, finish the deployment gate after confirmed test-target containment,
-then write Wiki/TAPD data. `DEPLOY` uses `TRIGGER_ACCEPTED`: verify the expected
+then write Wiki/TAPD data. First reuse any completed selected predecessor only
+after [current delivery checks](../../../references/execution-checklist.md#已完成交付的复用);
+retain its original `BUILD_SUBMITTED|DEPLOYED|RELEASED` state. A package's
+`RELEASED` satisfies only its tooling row, with real available versions/content,
+not a consumer deployment. Do not repeat a fulfilled action or replay UNKNOWN.
+For a new selected build, `DEPLOY` uses `TRIGGER_ACCEPTED`: verify the expected
 target ref/SHA before trigger, require the exact `BUILD_SUBMITTED` queue receipt,
 and continue without waiting for the build. Retain the receipt for registration
 and report only build submission. A queued or building task is sufficient;

@@ -19,6 +19,9 @@ Read [contracts.md](references/contracts.md),
 TAPD through `tapd-mcp`; do not open a browser merely because a TAPD page is available.
 Read [acceptance-scenarios.md](references/acceptance-scenarios.md) only for an
 ambiguous case or regression check.
+Use the [same checklist](../../references/execution-checklist.md#围绕同一清单编排)
+and existing handoff facts. Preparation fills missing facts for its selected row;
+it is not a new scope, authorization or full-workflow entry at each stage.
 
 When the orchestrator already supplied an exact project, repository, TAPD
 identity, scope and fixed branch with current evidence, validate those facts
@@ -55,7 +58,10 @@ repository, or branch with a more plausible candidate.
 
 ## Procedure
 
-1. Parse type and ID from the URL and fetch the TAPD item read-only. Retain the
+1. Parse type and ID from the URL and reuse the exact item's still-valid readback
+   from the current checklist/context; fetch it read-only when missing or changed.
+   Shared Bug/Story content is collected once, with selected Task/parent facts
+   preserved. Refresh actual mutable fields at their write boundaries. Retain the
    title, description, acceptance facts, attachments/comments that affect
    scope, and missing or conflicting claims in memory.
 2. Derive the requested work scope, explicit non-scope, acceptance criteria,
@@ -99,9 +105,17 @@ repository, or branch with a more plausible candidate.
    project/repository, selected/planned branch, and confidence/missing facts.
    For `CONTINUE`, reuse still-valid project/branch confirmation and ask only
    when incremental scope is not explicit or a bound fact changed.
-8. Run the private read-only validator in [agents/validator.md](agents/validator.md).
-   Map its result to `VALIDATION_PASSED` or `VALIDATION_FAILED` and discard the
-   private protocol line.
+8. The lead checks every invariant in [contracts.md](references/contracts.md)
+   against actual cited facts and matching human authority. Use applicable
+   [branch-ref checks](scripts/inspect-branch-refs.mjs) and the Bug status/owner
+   helper; their outputs validate structure/relations, not the truth of membership
+   evidence or permission. Normalize evidence-backed checks to `VALIDATION_PASSED`
+   or `VALIDATION_FAILED` with a concise actual basis; never fill a flag from an
+   old summary or label this an independent review. Missing evidence stays PENDING
+   and a proven mismatch stays BLOCKED. Invoke the private read-only
+   [validator](agents/validator.md) only for substantive evidence/interpretation
+   ambiguity needing independent scrutiny; it cannot supply missing facts or
+   authorize a conflicting target. Map that result and discard its private line.
 9. Return one in-memory `TapdWorkDefinition`. Do not write it to disk.
 
 ## Hard rules

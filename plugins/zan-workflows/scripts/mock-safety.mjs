@@ -1,12 +1,9 @@
 #!/usr/bin/env node
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import { readFile, lstat, realpath } from 'node:fs/promises';
 import { resolve, relative, isAbsolute, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readCliPlan, repositoryKey, sha256, stableJson } from './workflow-runtime.mjs';
+import { readCliPlan, repositoryKey, sha256, stableJson, runScopedCommand } from './workflow-runtime.mjs';
 
-const run = promisify(execFile);
 const SHA = /^[a-f\d]{40}(?:[a-f\d]{24})?$/i;
 const HASH = /^[a-f\d]{64}$/i;
 const text = value => typeof value === 'string' && value.trim().length > 0;
@@ -31,12 +28,15 @@ function declarations(path, body) {
 const CODE = new Set(['.js', '.mjs', '.cjs', '.jsx', '.ts', '.tsx', '.vue', '.svelte', '.json', '.yaml', '.yml', '.html']);
 const nonRuntime = path => /(?:^|\/)(?:tests?|__tests__|docs|node_modules|dist|\.git|\.query-contract\/cache)(?:\/|$)/.test(path) || /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(path);
 const unique = values => [...new Set(values)].sort();
-const git = async (root, args) => (await run('git', args, { cwd: root, timeout: 30000, maxBuffer: 16 * 1024 * 1024 })).stdout;
+const gitReader = io => async (root, args) => (await runScopedCommand('git', args,
+  { cwd: root, timeout: 30000, maxBuffer: 16 * 1024 * 1024 }, io)).stdout;
 
 // This snapshot proves revision/content binding, not the semantic absence of all
 // possible mocks. evidenceRefs must identify the project's inventory/import/
 // activation review; marker discoveries are additionally reconciled below.
-export async function inspectMockSource(input) {
+export async function inspectMockSource(input, io = {}) {
+  const git = gitReader(io);
+  const run = (command, args, options) => runScopedCommand(command, args, options, io);
   if (!text(input.repositoryPath) || !SHA.test(input.baseSha || '') ||
       !texts(input.inspectedPaths) || !input.inspectedPaths.every(relpath) ||
       !texts(input.mockBindingPaths) || !input.mockBindingPaths.every(relpath) || !texts(input.runtimePaths) || !input.runtimePaths.every(relpath)) {
@@ -103,7 +103,9 @@ export async function inspectMockSource(input) {
     changedPaths: unique([...changed, ...untracked]), ignoredRuntimePaths, fileFingerprints: Object.fromEntries(files), markedPaths: markedPaths.sort(), markerBindings, writes: 0 };
 }
 
-async function verifyCommittedContent(safety, revision) {
+async function verifyCommittedContent(safety, revision, io = {}) {
+  const git = gitReader(io);
+  const run = (command, args, options) => runScopedCommand(command, args, options, io);
   if (!SHA.test(revision || '')) throw new Error('派生源码缺少准确 SHA');
   try { await git(safety.repositoryPath, ['merge-base', '--is-ancestor', safety.sourceSha, revision]); }
   catch { throw new Error('交付版本不能验证为原已检查版本的后继；不能机械更新 Mock 授权'); }
@@ -123,11 +125,12 @@ async function verifyCommittedContent(safety, revision) {
 }
 
 async function verifyDeliveredSource(safety, revision, sourceSnapshot, io) {
+  const git = gitReader(io);
   const evidence = safety.deliverySourceEvidence;
   if (!evidence || evidence.deliveredSha !== revision || !texts(evidence.evidenceRefs)) throw new Error('目标分支包含额外内容，需要只读 revision 清查及目标依赖评审证据');
   try { await git(safety.repositoryPath, ['merge-base', '--is-ancestor', safety.sourceSha, revision]); }
   catch { throw new Error('交付目标未包含原已清查的 source SHA'); }
-  const target = await (io.inspectMockSource || inspectMockSource)({ ...safety, revisionSha: revision });
+  const target = await (io.inspectMockSource || inspectMockSource)({ ...safety, revisionSha: revision }, io);
   if (target.sourceSha !== revision || target.inspectionKind !== 'revision' || target.scopeFingerprint !== evidence.scopeFingerprint ||
       target.contentFingerprint !== evidence.contentFingerprint) throw new Error('交付目标 revision 清查证据已过期或不一致');
   const bindingRoots = [...safety.mockBindingPaths, ...safety.mockModules.flatMap(module => module.paths)];
@@ -224,7 +227,7 @@ export async function checkMockSafety(safety, context, io = {}) {
   if (!['test', 'production'].includes(context.environmentKind) || !text(context.operation) || !text(context.targetEnvironment)) {
     throw new Error('Mock 门禁必须绑定明确交付类别、目标环境和操作');
   }
-  const snapshot = await (io.inspectMockSource || inspectMockSource)(safety);
+  const snapshot = await (io.inspectMockSource || inspectMockSource)(safety, io);
   if (snapshot.baseSha !== safety.baseSha ||
       snapshot.scopeFingerprint !== safety.scopeFingerprint || snapshot.contentFingerprint !== safety.contentFingerprint ||
       stableJson(snapshot.inspectedPaths) !== stableJson(safety.inspectedPaths)) {
@@ -232,7 +235,7 @@ export async function checkMockSafety(safety, context, io = {}) {
   }
   let deliveredSnapshot = null;
   if (snapshot.sourceSha !== safety.sourceSha || context.requireCommitted || context.sourceSha && context.sourceSha !== safety.sourceSha) {
-    try { await (io.verifyMockCommittedContent || verifyCommittedContent)(safety, context.sourceSha || snapshot.sourceSha); }
+    try { await (io.verifyMockCommittedContent || verifyCommittedContent)(safety, context.sourceSha || snapshot.sourceSha, io); }
     catch (error) {
       if (!context.sourceSha || context.sourceSha === snapshot.sourceSha) throw error;
       deliveredSnapshot = await verifyDeliveredSource(safety, context.sourceSha, snapshot, io);

@@ -1,4 +1,24 @@
 import { createHash } from 'node:crypto';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+
+const exec = promisify(execFile);
+
+// Cancellation and close verification belong to the caller's current request.
+export function runScopedCommand(command, args, options = {}, io = {}) {
+  io.signal?.throwIfAborted();
+  const pending = exec(command, args, { ...options, ...(io.signal ? { signal: io.signal } : {}) });
+  io.trackLocalChild?.(pending.child);
+  return pending;
+}
+
+export async function waitForDeadline(promise, deadline) {
+  let timer;
+  try {
+    return await Promise.race([Promise.resolve(promise).then(value => ({ settled: true, value }), () => ({ settled: true })),
+      new Promise(resolve => { timer = setTimeout(() => resolve({ settled: false }), Math.max(0, deadline - Date.now())); })]);
+  } finally { clearTimeout(timer); }
+}
 
 export function requireText(value, name) {
   if (typeof value !== 'string' || !value.trim()) throw new Error(`缺少 ${name}`);

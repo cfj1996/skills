@@ -48,6 +48,13 @@ test('verification runs with lower CPU scheduling priority', async () => {
   assert.ok(Number(result.stdoutTail.trim()) > 0);
 });
 
+test('bounded commands receive literal multiline stdin without a shell or payload file', async () => {
+  const message = 'fix: 中文标题\n\n$(literal) `literal`';
+  const result = await check('console.log(JSON.stringify(require("node:fs").readFileSync(0,"utf8")))', { stdinText: message });
+  assert.equal(result.status, 'PASSED');
+  assert.equal(JSON.parse(result.stdoutTail), message);
+});
+
 test('a successful parent cannot leave background descendants behind or claim a pass', async () => {
   const result = await check(`
     const {spawn}=require('node:child_process');
@@ -57,6 +64,51 @@ test('a successful parent cannot leave background descendants behind or claim a 
   `);
   assert.equal(result.status, 'BACKGROUND_PROCESSES');
   assert.equal(result.exitCode, 0);
+  assert.equal(result.cleanupComplete, true);
+  assert.ok(result.backgroundPids.length > 0);
+  assertGroupStopped(Number(result.stdoutTail.trim()));
+});
+
+test('short-lived workers can exit naturally after a successful parent without a build retry', async () => {
+  const result = await check(`
+    const {spawn}=require('node:child_process');
+    spawn(process.execPath,['-e','setTimeout(()=>{},150)'],{stdio:'ignore'});
+    console.log(process.pid);
+    process.exit(0);
+  `, { graceMs: 800 });
+  assert.equal(result.status, 'PASSED');
+  assert.equal(result.cleanupComplete, true);
+  assert.deepEqual(result.backgroundPids, []);
+  assert.ok(result.settleElapsedMs > 0);
+  assertGroupStopped(Number(result.stdoutTail.trim()));
+});
+
+test('cancellation during natural worker shutdown still cancels and cleans the process group', async () => {
+  const controller = new AbortController();
+  const resultPromise = check(`
+    const {spawn}=require('node:child_process');
+    spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'ignore'});
+    console.log(process.pid);
+    process.exit(0);
+  `, { graceMs: 1500, signal: controller.signal });
+  const timer = setTimeout(() => controller.abort(), 300);
+  try {
+    const result = await resultPromise;
+    assert.equal(result.status, 'CANCELLED');
+    assert.equal(result.cleanupComplete, true);
+    assertGroupStopped(Number(result.stdoutTail.trim()));
+  } finally { clearTimeout(timer); }
+});
+
+test('a failed parent remains a failed check even when it also leaves a worker', async () => {
+  const result = await check(`
+    const {spawn}=require('node:child_process');
+    spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'ignore'});
+    console.log(process.pid);
+    process.exit(7);
+  `);
+  assert.equal(result.status, 'FAILED');
+  assert.equal(result.exitCode, 7);
   assert.equal(result.cleanupComplete, true);
   assertGroupStopped(Number(result.stdoutTail.trim()));
 });

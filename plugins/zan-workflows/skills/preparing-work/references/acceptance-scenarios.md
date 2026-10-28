@@ -25,5 +25,7 @@
 | Fixed project or repository mismatches actual fingerprint | `BLOCKED`; never route to a similarly named project. |
 | Several projects remain plausible | `PENDING` with the exact user choice required. |
 | Scope lacks a material requirement | `PENDING`; do not invent scope. |
+| Current checklist already contains complete verified identity/repository/branch/status facts | Lead/helper invariant checks map the actual evidence; no routine separate preparation Agent or repeat global discovery. |
+| An old pass flag exists but current refs, membership or human confirmation cannot be verified | Keep the concrete PENDING/BLOCKED gap; never manufacture READY_FOR_HANDOFF from the flag or a summary. |
 
 Every scenario is read-only and creates no local document or workflow state.

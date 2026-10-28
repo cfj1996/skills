@@ -9,6 +9,9 @@ Preferred lead model profile: `CRITICAL`。可选模型时使用
 [模型路由](../../references/model-routing.md)，可用性不阻塞实际工作。
 
 编排 Bug 修复，复用准备、实施和交付能力；只在进入相应阶段时读取其技能。
+按 [同一清单编排](../../references/execution-checklist.md#围绕同一清单编排)
+选择当前已授权、依赖就绪且未完成的节点。各能力结果回到同一清单，不另起
+范围/确认或把同一 Bug 的共享操作复制到每个仓库。
 读取 [交接约定](references/contracts.md)，异常或回归检查时再读
 [验收场景](references/acceptance-scenarios.md)。不在入口复制下游写入流程。
 读取或写入外部系统时沿用 [工具路由](../../references/tool-routing.md)。
@@ -96,8 +99,9 @@ A → C → B 处理，不因换技能或进入提交、构建、Wiki、登记�
 
 按确认顺序逐 Bug 执行：
 
-1. 写前为本 Bug 的全部项目定义再次调用 `preparing-work`，按仓库复用 Git 证据，复核可变 refs、状态/处理人及确认绑定，
-   不重复广泛定位。只接受 `READY_FOR_HANDOFF`；若返回 `PENDING|BLOCKED`
+1. 写前沿用本 Bug 的原项目定义，按 `preparing-work` 的检查规则刷新可变 refs、
+   状态/处理人及确认绑定；不重新执行完整准备或常规独立 validator。
+   只有实际证据仍满足全部门禁才规范化为 `READY_FOR_HANDOFF`；若为 `PENDING|BLOCKED`
    或准确仓库、分支、范围、人员/状态变化，暂停整个队列并更新相应事实。
    已核实的本轮分支创建、状态/处理人写入是预期效果，续接复用其读回与
    仍匹配的授权；不把它们当成外部变化或再次发送旧状态 payload。
@@ -110,6 +114,12 @@ A → C → B 处理，不因换技能或进入提交、构建、Wiki、登记�
    同一 Bug 内独立步骤可按 [多任务实施](../implementing-work/references/parallel-execution.md)
    并行；主代理统一控制状态和评论，子代理只处理分配的代码及局部验证。
    本节逐 Bug 顺序及共享分支交付等待不因子代理并行而改变。
+   若原清单明确的包/测试服务产出是后续实施或验收前置，按共享
+   [前置依赖产出](../../references/execution-checklist.md#前置依赖产出与整体完成)
+   处理：实施能力保留提供方局部验证/独立评审事实及未就绪范围，编排只在该
+   节点自身门禁和准确授权满足时调用原子 Git/发布能力，再续接原定义与分支。
+   不向正式提测交接部分 `REVIEWED`，不提前写整 Bug 完成记录或登记；
+   这不是验证失败/UNKNOWN 后继续写入的例外，也不解除明确的不提交/不发布限制。
 3. 各仓库第一次成功创建并读回固定分支后，该仓库后续 Bug 使用 `USE_EXISTING`。
    `CONTINUE` 复用仍有效的范围授权；增量范围不明确才询问。
    已待测试的续修使用 `SKIPPED_ALREADY_WAITING_TEST`，保留状态与处理人。

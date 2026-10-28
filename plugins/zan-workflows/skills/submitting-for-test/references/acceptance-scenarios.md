@@ -1,5 +1,17 @@
 # Acceptance scenarios
 
+## Consolidated review and scoped verification
+
+| Scenario | Expected result |
+| --- | --- |
+| Stable component fix plus consumer version upgrade, STANDARD | Each changed repository retains its own code review. Review the complete submission/Wiki plan once; scripts check Git, queue, Wiki and registration in dependency order and the lead checks final receipts. No per-stage Agent calls for unchanged facts. |
+| Standalone NO_WIKI plan has not yet received human confirmation | Review the exact proposed plan with authority pending, without loading Wiki or demanding future queue/MR readbacks. PLAN writes nothing; EXECUTE waits for matching actual human approval. |
+| Developer edits were reviewed but the Bug completion comment still needs the approved correction | Whole-plan review accepts only the existing narrow PLAN exception with current code/proposed-comment reviews, history and all repositories verified. Correction/reuse and exact readback run first; restore full REVIEWED before any commit/push/MR, build, Wiki or registration. Never defer code review or invent a completed comment. |
+| Commit creates a new SHA with exactly the reviewed content | Verify content/diff/dependency/environment correspondence and update the in-memory binding; do not rerun code review solely for the new SHA. A target's additional unreviewed diff still needs scoped review. |
+| Parent build succeeds and workers exit within the bounded shutdown grace | Return PASSED after natural exit and verified group cleanup; do not rerun build merely because the parent exited before a worker. Persistent workers remain a failed check and are terminated. |
+| Planned commit has missing Husky init, incompatible local commitlint/Node or invalid body | Read-only commit preflight blocks with diagnostics before commit. Repair the exact cause, never skip Hooks or download a new linter to make the check pass. |
+| Wiki update result is unknown or the body gained an unreviewed semantic change | Unknown effects stop dependent registration immediately without retry. A semantic change requires scoped review; an earlier whole-plan pass cannot authorize the new body. |
+
 | Scenario | Expected result |
 | --- | --- |
 | Standalone first invocation after `ReviewedChange=REVIEWED` | Run read-only PLAN, display the complete plan/body, ask and stop; no writes before its own matching confirmation. |
@@ -21,6 +33,8 @@
 | Plain “提测” without explicit disabled choices | `AUTO` selects `DEPLOY` and `STANDARD`; show merge/build/Wiki and the Wiki preview before confirmation. Explicit `SKIP`/`NO_WIKI` remain authoritative. |
 | Trigger fails, receipt is missing/unknown, or pre-trigger source ref/SHA drifts | Return `BLOCKED`; keep current Bug status and perform no later Wiki/status/version writes; never retry a trigger. |
 | Exact queue accepted but remains queued/building | Return BUILD_SUBMITTED with queue link and submitted params; continue Wiki/TAPD without polling or claiming deployment/publication success. |
+| A selected predecessor already deployed its exact current test source, or published the exact available package | Verify current Git/source, Job/environment/channel/parameters and actual availability, retain its original DEPLOYED/RELEASED receipt, and do not trigger it again; consumer rows still need their own gates. |
+| An old successful receipt has drifted source, parameters, environment or actual package contents | Reopen affected checks/planning; no success reuse or automatic retry of UNKNOWN. An explicit repeat request remains its own accurately authorized operation. |
 | `STANDARD` without a supplied Wiki URL | Inspect TAPD links and Wiki hierarchy; never stop to request a Wiki target. |
 | TAPD contains an existing Wiki link | Reuse/update/read back that child and never create a duplicate. |
 | No link but one related child exists | Reuse it based on TAPD/branch evidence. |

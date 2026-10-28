@@ -1,12 +1,10 @@
-import { execFile, spawn } from 'node:child_process';
-import { promisify } from 'node:util';
+import { spawn } from 'node:child_process';
 import { mkdtemp, mkdir, writeFile, rm, chmod, realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve, relative, dirname, join, isAbsolute } from 'node:path';
-import { repositoryKey, sha256, stableJson } from './workflow-runtime.mjs';
+import { repositoryKey, sha256, stableJson, runScopedCommand } from './workflow-runtime.mjs';
 import { runLocalCheck } from './run-local-check.mjs';
 
-const exec = promisify(execFile);
 const SHA = /^[a-f\d]{40}(?:[a-f\d]{24})?$/i;
 const HASH = /^[a-f\d]{64}$/;
 const text = value => typeof value === 'string' && value.trim().length > 0;
@@ -22,19 +20,19 @@ function directArtifactInvocation(invocation, checker) {
     /(?:^|\s)--phase\s+artifact(?:\s|$)/.test(invocation) &&
     new RegExp('(?:^|\\s)--config\\s+' + pathToken(checker.configPath) + '(?:\\s|$)').test(invocation);
 }
-const git = (root, args, options = {}) => exec('git', args, {
+const git = (root, args, options = {}, io = {}) => runScopedCommand('git', args, {
   cwd: root, timeout: 30000, maxBuffer: 16 * 1024 * 1024,
   env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }, ...options,
-});
+}, io);
 
-async function repository(row) {
+async function repository(row, io = {}) {
   if (!text(row?.repositoryPath) || !text(row.sourceRepository) || !SHA.test(row.sourceSha || '')) {
     throw new Error('项目 Mock 检查需要准确仓库路径、源码地址和不可变 SHA');
   }
   const [root, origin, revision] = await Promise.all([
-    git(row.repositoryPath, ['rev-parse', '--show-toplevel']),
-    git(row.repositoryPath, ['remote', 'get-url', 'origin']),
-    git(row.repositoryPath, ['rev-parse', '--verify', `${row.sourceSha}^{commit}`]),
+    git(row.repositoryPath, ['rev-parse', '--show-toplevel'], {}, io),
+    git(row.repositoryPath, ['remote', 'get-url', 'origin'], {}, io),
+    git(row.repositoryPath, ['rev-parse', '--verify', `${row.sourceSha}^{commit}`], {}, io),
   ]);
   if (await realpath(root.stdout.trim()) !== await realpath(row.repositoryPath) ||
       repositoryKey(origin.stdout.trim()) !== repositoryKey(row.sourceRepository) || revision.stdout.trim() !== row.sourceSha) {
@@ -42,17 +40,17 @@ async function repository(row) {
   }
 }
 
-async function trackedFile(row) {
+async function trackedFile(row, io) {
   if (!safePath(row.path)) throw new Error('项目 Mock 检查路径必须是仓库内的准确相对文件');
-  await repository(row);
-  const tree = await git(row.repositoryPath, ['ls-tree', '-z', row.sourceSha, '--', row.path]);
+  await repository(row, io);
+  const tree = await git(row.repositoryPath, ['ls-tree', '-z', row.sourceSha, '--', row.path], {}, io);
   const entries = tree.stdout.split('\0').filter(Boolean);
   if (entries.length !== 1 || !/^100(?:644|755) blob [a-f\d]+\t/.test(entries[0]) || entries[0].slice(entries[0].indexOf('\t') + 1) !== row.path) {
     throw new Error('项目 Mock 检查文件不存在，或使用了符号链接/子模块/目录');
   }
   return (await git(row.repositoryPath, ['show', `${row.sourceSha}:${row.path}`], {
     encoding: 'buffer', maxBuffer: 8 * 1024 * 1024,
-  })).stdout;
+  }, io)).stdout;
 }
 
 export function projectMockIntegrationFingerprint(files) {
@@ -72,7 +70,7 @@ export async function prepareProjectMockGate(input, io = {}) {
       !safePath(checker.configPath) || !HASH.test(checker.contentHash || '') || !HASH.test(checker.configHash || '')) {
     throw new Error('项目 Mock 检查器缺少准确脚本、配置或内容指纹');
   }
-  const read = io.readProjectMockFile || trackedFile;
+  const read = io.readProjectMockFile || (row => trackedFile(row, io));
   const [scriptBytes, configBytes] = await Promise.all([checker.scriptPath, checker.configPath].map(path => read({ ...gate, path })));
   const script = Buffer.isBuffer(scriptBytes) ? scriptBytes : Buffer.from(scriptBytes);
   const config = Buffer.isBuffer(configBytes) ? configBytes : Buffer.from(configBytes);
@@ -129,11 +127,13 @@ export async function prepareProjectMockGate(input, io = {}) {
   return { gate, gateHash, checkerHash: checker.contentHash, configHash: checker.configHash };
 }
 
-async function batchBlobs(root, entries) {
+async function batchBlobs(root, entries, io) {
+  io.signal?.throwIfAborted();
   const limit = 64 * 1024 * 1024;
   return new Promise((resolveResult, reject) => {
     const child = spawn('git', ['cat-file', '--batch'], { cwd: root, stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
+      env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }, signal: io.signal, killSignal: 'SIGKILL' });
+    io.trackLocalChild?.(child);
     const chunks = []; let size = 0, stderr = '', failed = false;
     const timer = setTimeout(() => { failed = true; child.kill('SIGKILL'); reject(new Error('项目源码快照读取超时')); }, 30000);
     child.stdout.on('data', chunk => {
@@ -142,7 +142,7 @@ async function batchBlobs(root, entries) {
       else chunks.push(chunk);
     });
     child.stderr.on('data', chunk => { stderr = (stderr + chunk).slice(-4096); });
-    child.on('error', error => { clearTimeout(timer); reject(error); });
+    child.on('error', error => { failed = true; clearTimeout(timer); reject(error); });
     child.on('close', code => { clearTimeout(timer); if (failed) return;
       if (code !== 0) reject(new Error('项目源码快照读取失败：' + stderr)); else resolveResult(Buffer.concat(chunks)); });
     child.stdin.on('error', () => {});
@@ -150,9 +150,9 @@ async function batchBlobs(root, entries) {
   });
 }
 
-async function withSourceSnapshot(gate, action) {
-  await repository(gate);
-  const tree = (await git(gate.repositoryPath, ['ls-tree', '-r', '-l', '-z', gate.sourceSha])).stdout;
+async function withSourceSnapshot(gate, action, io) {
+  await repository(gate, io);
+  const tree = (await git(gate.repositoryPath, ['ls-tree', '-r', '-l', '-z', gate.sourceSha], {}, io)).stdout;
   let total = 0;
   const entries = tree.split('\0').filter(Boolean).map(line => {
     const match = line.match(/^(100(?:644|755)) blob ([a-f\d]+)\s+(\d+)\t([\s\S]+)$/);
@@ -161,7 +161,7 @@ async function withSourceSnapshot(gate, action) {
     return { oid: match[2], size: Number(match[3]), path: match[4] };
   });
   if (!entries.length || entries.length > 100000 || total > 64 * 1024 * 1024) throw new Error('项目源码快照为空或超过检查预算');
-  const blobs = await batchBlobs(gate.repositoryPath, entries);
+  const blobs = await batchBlobs(gate.repositoryPath, entries, io);
   const temporary = await mkdtemp(join(tmpdir(), 'zan-project-mock-'));
   const snapshot = join(temporary, 'source');
   const directories = new Set([snapshot]);
@@ -169,6 +169,7 @@ async function withSourceSnapshot(gate, action) {
   try {
     let position = 0;
     for (const entry of entries) {
+      io.signal?.throwIfAborted();
       const newline = blobs.indexOf(10, position);
       const header = blobs.subarray(position, newline).toString('utf8');
       if (newline < 0 || header !== `${entry.oid} blob ${entry.size}`) throw new Error('项目源码快照对象内容不可核实');
@@ -217,7 +218,7 @@ export async function runProjectMockSource(prepared, io = {}) {
   });
   const output = io.executeProjectMockSource
     ? await execute({ gate, command: process.execPath, args })
-    : await withSourceSnapshot(gate, sourceSnapshot => execute({ gate, command: process.execPath, args, sourceSnapshot }));
+    : await withSourceSnapshot(gate, sourceSnapshot => execute({ gate, command: process.execPath, args, sourceSnapshot }), io);
   return parseSourceReceipt(output, prepared);
 }
 

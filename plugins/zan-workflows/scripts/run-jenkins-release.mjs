@@ -1,26 +1,23 @@
 #!/usr/bin/env node
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import { clientFor } from './mcp-client.mjs';
 import { configuredJenkinsReader } from './jenkins-readonly.mjs';
 import { checkMockSafetySet, mockSafetyPreview, verifyProductionMockArtifact } from './mock-safety.mjs';
 import { prepareProjectMockGate, runProjectMockSource } from './project-mock-gate.mjs';
 import { adaptJenkinsInput, jenkinsAdapterFingerprint, parseNpmToolsPublication } from './jenkins-job-adapters.mjs';
 import { loadFrozenJenkinsContract, resolveFrozenJenkinsParameters } from './frozen-jenkins-contracts.mjs';
-import { pollState, progressToStderr, readCliPlan, readTool, repositoryKey, requireText, sha256, stableJson, toolData, validateWait } from './workflow-runtime.mjs';
+import { pollState, progressToStderr, readCliPlan, readTool, repositoryKey, requireText, sha256, stableJson, toolData, validateWait, runScopedCommand } from './workflow-runtime.mjs';
 
 const CANARY = /(?:^|[^a-z\d])(?:canary|alpha|beta|next|rc|test)(?:$|[^a-z\d])|测试|金丝雀/i;
 const OFFICIAL = /(?:^|[^a-z\d])(?:latest|stable|official|production)(?:$|[^a-z\d])|正式/i;
-const git = promisify(execFile);
 
 export async function checkReleaseSource(input, readRemote = async (uri, patterns) => {
-  const result = await git('git', ['ls-remote', uri, ...patterns], {
+  const result = await runScopedCommand('git', ['ls-remote', uri, ...patterns], {
     timeout: 30000, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
-  });
+  }, io);
   return result.stdout;
-}) {
+}, io = {}) {
   repositoryKey(input.sourceRepository);
   const url = input.sourceRepository.includes('://') ? new URL(input.sourceRepository) : null;
   if (url && ['http:', 'https:'].includes(url.protocol) && (url.username || url.password)) {
@@ -263,11 +260,11 @@ export async function runJenkinsRelease(call, reader, input, io = {}) {
   if (jobBindingMode === 'READABLE_METADATA' && input.jobBindingMode !== jobBindingMode) {
     throw new Error('Job 元数据核验方式尚未纳入已确认清单');
   }
-  const sourceBinding = await (io.checkSource || checkReleaseSource)(input);
+  const sourceBinding = await (io.checkSource || checkReleaseSource)(input, undefined, io);
   const pipelineIntegration = projectGate && repositoryKey(projectGate.gate.integration.sourceRepository) !== repositoryKey(input.sourceRepository);
   if (input.jobAdapter === 'npm-tools-v1' || pipelineIntegration) await (io.checkSource || checkReleaseSource)({
     sourceRepository: input.pipelineSource.repositoryUrl, releaseRef: input.pipelineSource.ref, expectedSha: input.pipelineSource.expectedSha,
-  });
+  }, undefined, io);
   if (!production && /(?:^|[\W_])(?:prod|production)(?:$|[\W_])|线上|正式/i.test(input.jobName + ' ' + input.jobUrl)) {
     throw new Error('测试环境声明与生产 Jenkins Job 标识冲突，不能绕过生产 Mock 门禁');
   }

@@ -24,7 +24,7 @@ const registration = () => ({ workspaceId: 12345, entryId: '123450001', entryTyp
   statusAction: 'WAITING_TEST', versionAction: 'WRITE', testVersion: 'demo@1.0.0-canary.1', purpose: '提测登记',
   prerequisites: { git: 'VERIFIED', deployment: 'DEPLOYED', profile: 'NO_WIKI', wiki: 'SKIPPED_NO_WIKI' } });
 function tapd({ custom = false, required = false, owner = 'reviewer', failWrite = false } = {}) {
-  const item = { id: '123450001', status: 'in_progress', workitem_type_id: '', test_version: '', custom_field_one: '',
+  const item = { id: '123450001', status: 'in_progress', workitem_type_id: '', version_test: '', custom_field_one: '',
     te: 'tester', reporter: 'creator', current_owner: owner };
   const calls = [];
   const call = async (name, args) => {
@@ -108,7 +108,7 @@ test('actual TAPD transition shapes and symbolic custom fields are mapped withou
 
 test('native version fallback keeps the custom metadata fingerprint across execution', async () => {
   const fake = tapd(); const plan = await registerTestSubmission(fake.call, registration());
-  assert.equal(plan.versionField, 'test_version');
+  assert.equal(plan.versionField, 'version_test');
   assert.ok(plan.metadataHashes.customFields);
   const result = await registerTestSubmission(fake.call, { ...plan, execute: true, confirmed: true });
   assert.equal(result.state, 'REGISTERED');

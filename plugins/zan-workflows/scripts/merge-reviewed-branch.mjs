@@ -1,17 +1,15 @@
 #!/usr/bin/env node
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { clientFor } from './mcp-client.mjs';
 import { verifyMergeApprovals } from './gitlab-approvals.mjs';
 import { checkMockSafetySet, mockSafetyPreview } from './mock-safety.mjs';
-import { pollState, progressToStderr, readCliPlan, readTool, repositoryKey, requireText, toolData, validateWait } from './workflow-runtime.mjs';
+import { pollState, progressToStderr, readCliPlan, readTool, repositoryKey, requireText, toolData, validateWait, runScopedCommand } from './workflow-runtime.mjs';
 
-const run = promisify(execFile);
 const SHA = /^[a-f\d]{40}(?:[a-f\d]{24})?$/i;
 
-async function checkRepository(input) {
+async function checkRepository(input, io = {}) {
+  const run = (command, args, options) => runScopedCommand(command, args, { timeout: 30000, ...options }, io);
   const [root, origin] = await Promise.all([
     run('git', ['rev-parse', '--show-toplevel'], { cwd: input.repositoryPath }),
     run('git', ['remote', 'get-url', 'origin'], { cwd: input.repositoryPath }),
@@ -21,7 +19,8 @@ async function checkRepository(input) {
   }
 }
 
-export async function inspectTargetContainment(input) {
+export async function inspectTargetContainment(input, io = {}) {
+  const run = (command, args, options) => runScopedCommand(command, args, { timeout: 30000, ...options }, io);
   try {
     await run('git', ['fetch', '--no-tags', 'origin',
       `+refs/heads/${input.targetBranch}:refs/remotes/origin/${input.targetBranch}`], { cwd: input.repositoryPath });
@@ -41,15 +40,15 @@ export async function inspectTargetContainment(input) {
   } catch { throw new Error('远端目标分支的 source SHA 包含关系未能验证'); }
 }
 
-async function containsSource(input) {
-  const proof = await inspectTargetContainment(input);
+async function containsSource(input, io) {
+  const proof = await inspectTargetContainment(input, io);
   if (!proof.contained) throw new Error('远端目标分支的 source SHA 包含关系未能验证');
   return proof;
 }
 
 async function testTargetReceipt(input, targetSha, io) {
   const proof = input.sourceSha === targetSha ? { contained: true, targetSha }
-    : await (io.inspectContainment || inspectTargetContainment)(input);
+    : await (io.inspectContainment || inspectTargetContainment)(input, io);
   if (typeof proof?.contained !== 'boolean' || !SHA.test(proof.targetSha || '')) {
     throw new Error('测试分支包含关系不可核实');
   }
@@ -176,7 +175,7 @@ export async function mergeReviewedBranch(call, input, io = {}) {
   if (input.execute && (input.confirmed !== true || !SHA.test(input.sourceSha || '') || !SHA.test(input.targetSha || ''))) {
     throw new Error('执行必须有当前清单确认及固定 source/target SHA');
   }
-  await (io.checkRepository || checkRepository)(input);
+  await (io.checkRepository || checkRepository)(input, io);
   const projectArgs = { project_id: input.projectId };
   const [target, project, candidates] = await Promise.all([
     readTool(call, 'get_branch', { ...projectArgs, branch_name: input.targetBranch }),
@@ -273,7 +272,7 @@ export async function mergeReviewedBranch(call, input, io = {}) {
       const readiness = mergeState(freshMr, plan);
       if (readiness.state !== 'READY') throw new Error(readiness.error || '合并前 MR 条件已变化');
       result.approvalEvidence = approvals;
-      await (io.checkRepository || checkRepository)(input);
+      await (io.checkRepository || checkRepository)(input, io);
       await checkMockSafetySet(input, mockContext, io);
       phase = 'MERGE_MR';
       try {
@@ -296,7 +295,7 @@ export async function mergeReviewedBranch(call, input, io = {}) {
     if ((plan.pipelineRequired && pipeline?.status !== 'success') ||
         (pipeline && !['success', 'skipped'].includes(pipeline.status))) throw new Error('已合并 MR 的当前 CI 未验证通过');
     phase = 'VERIFY_CONTAINMENT';
-    const proof = await (io.containsSource || containsSource)(plan);
+    const proof = await (io.containsSource || containsSource)(plan, io);
     if (proof?.contained !== true || !SHA.test(proof.targetSha || '')) throw new Error('源提交未验证包含在目标分支');
     result.containment = true;
     return { ...result, state: 'MERGED', observedTargetSha: proof.targetSha,

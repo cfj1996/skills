@@ -25,7 +25,7 @@ clear:
 
 | Mode | Trigger | Result requirement |
 | --- | --- | --- |
-| `DEPLOY` | “发布测试环境”“发布版本”“部署并提测” or a named project policy requiring deployment | Jenkins must accept the exact confirmed test build; continue on `BUILD_SUBMITTED` without waiting |
+| `DEPLOY` | “发布测试环境”“发布版本”“部署并提测” or a named project policy requiring deployment | Reuse a currently verified matching selected operation, or submit its exact confirmed test build and continue on `BUILD_SUBMITTED` |
 | `SKIP` | “不构建”“跳过发布”“不发测试环境” | No build/deploy/parameter/poll calls; allow only missing canonical Wiki Job metadata lookup; record `SKIPPED_BY_INTENT` |
 | `AUTO` | No explicit override within selected test delivery | Select `DEPLOY`; preserve an explicit `SKIP` or overall non-delivery scope |
 
@@ -92,8 +92,10 @@ remain unchanged. Generated commit SHA, MR ID, Wiki/month/child ID, Jenkins
 queue/build ID, verified implementation/results and template completion do not require another confirmation
 when they follow the authorized derivation. Pure technical binding refreshes
 still stop the stale write and require a fresh accurate validated plan; they
-do not automatically require another human approval. Validate each complete operation bundle once;
-scripts still check and read back every write without another Agent invocation.
+do not automatically require another human approval. Include all complete bundles
+and the Wiki draft in one independent `PRE_SUBMISSION_PLAN` review under
+[whole-plan review](submission-rules.md#whole-plan-review); scripts still check
+and read back every write without another Agent invocation.
 
 Require fresh authorization when project/repository, business scope or key
 approach, source/target branch, operation set, Wiki owner/body semantics,
@@ -117,7 +119,7 @@ every included repository's deployment gate is resolved:
 
 ```text
 Each repository: Git commit/push/MR -> confirmed test-target containment
-  -> DEPLOY: confirmed ref/SHA + accepted exact Jenkins queue (BUILD_SUBMITTED)
+  -> DEPLOY: reuse verified matching predecessor, or submit exact Jenkins queue (BUILD_SUBMITTED)
      SKIP: no Jenkins deployment call + SKIPPED_BY_INTENT
 All required repositories pass:
   -> one shared Wiki create/update/readback when STANDARD
@@ -125,7 +127,20 @@ All required repositories pass:
   -> one Bug registration with waiting-test/test-version writes when required
 ```
 
-For `DEPLOY`, resolve the exact Job and preview its parameters/fingerprints once.
+For `DEPLOY`, first apply
+[completed delivery reuse](../../../references/execution-checklist.md#已完成交付的复用).
+Match each original receipt to its own repository, current containment/delivered
+SHA, Job, environment, channel, parameters and purpose. Read back the current
+source/deployment or actual package contents needed for that gate. Keep these
+facts in the existing consolidated plan; no new persisted ledger or success flag.
+Reuse `BUILD_SUBMITTED` only as accepted submission, `DEPLOYED` with its verified
+deployment/source, or `RELEASED` only for that package provider with real package
+availability. Do not relabel a publication as a consumer deployment. A mismatch
+reopens affected evidence/planning; UNKNOWN never causes a retry. Explicit repeat
+requests retain their own exact selected action and authorization.
+
+When a new selected build remains necessary, resolve the exact Job and preview
+its parameters/fingerprints once.
 Use the [scripted delivery executors](../../../references/scripted-delivery.md)
 with `completionMode=TRIGGER_ACCEPTED` in both PLAN and EXECUTE, reusing the
 unchanged consolidated authority. The helper refreshes symbolic ref/SHA before
@@ -148,12 +163,16 @@ source/publication verification; this shortcut belongs only to test submission.
 Deployment states are:
 
 ```text
-BUILD_SUBMITTED | DEPLOYED | SKIPPED_BY_INTENT | FAILED | UNKNOWN | NOT_ATTEMPTED
+BUILD_SUBMITTED | DEPLOYED | RELEASED | SKIPPED_BY_INTENT | FAILED | UNKNOWN | NOT_ATTEMPTED
 ```
 
 - `BUILD_SUBMITTED` permits later Wiki/TAPD writes with the exact queue receipt.
 - `DEPLOYED` permits later Wiki/TAPD writes only after `SUCCESS` and ref/SHA
   proof.
+- `RELEASED` retains an original package `BUILD_TERMINAL` receipt with exact
+  build/queue/Job/source identity, `sourceVerified=true`, original `writes=1`,
+  matching current Git delivery and verified real package/version/content.
+  It satisfies only the corresponding tooling row, not a consumer/service row.
 - `SKIPPED_BY_INTENT` permits direct提测 but the result must say the test
   environment was not published.
 - `FAILED|UNKNOWN` blocks later Wiki/TAPD status/test-version writes; keep the
@@ -161,7 +180,7 @@ BUILD_SUBMITTED | DEPLOYED | SKIPPED_BY_INTENT | FAILED | UNKNOWN | NOT_ATTEMPTE
 
 ## TAPD status policy
 
-- `INITIAL`: after `BUILD_SUBMITTED`, `DEPLOYED` or `SKIPPED_BY_INTENT`, write/read `待测试`, the
+- `INITIAL`: after `BUILD_SUBMITTED`, `DEPLOYED`, `RELEASED` or `SKIPPED_BY_INTENT`, write/read `待测试`, the
   waiting-test owner and the test-version field exactly once.
 - `CONTINUE` while already `待测试`: use
   `SKIPPED_ALREADY_WAITING_TEST`; do not write `修复中`, `待测试`, or the same

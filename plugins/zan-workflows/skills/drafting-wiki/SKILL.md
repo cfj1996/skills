@@ -142,6 +142,12 @@ invent a value or render a placeholder.
    under `TRIGGER_ACCEPTED` when no existing publication is evidenced. Preserve
    an evidenced prior channel; queue acceptance never proves a new publication.
 7. For a policy skip, map validation to `NOT_RUN` with its normalized reason.
+   When composed inside `submitting-for-test`, prepare steps 1–6 in the caller
+   with validation `NOT_RUN`, then include their complete facts/body and the
+   [wiki-validator.md](agents/wiki-validator.md) criteria in the one submission
+   `PRE_SUBMISSION_PLAN` review. Do not produce `VALIDATED` before that pass or
+   start a second document validator afterward. A prepared draft alone permits
+   no delivery write. Standalone drafting still uses the independent Wiki review.
    Otherwise, give the target plan, hierarchy/readback evidence, normalized
    facts, reviewed behavior/basis/impact/verification with exact diff evidence,
    coverage mapping, calculation, patch, and proposed body to the private read-only

@@ -11,6 +11,9 @@ Preferred lead model profile: `CRITICAL`。可选模型时使用
 编排一个准确 Story/Task 的需求开发；按阶段调用现有能力，不重复其写入规则。
 普通开发主线：读取需求与缺口 → 准备方案及必要任务 → 确定清单获确认成为执行清单 →
 精确任务/Plan 写回与分支 → 实施、验证、独立评审 → 返回实际结果。
+以 [同一清单编排](../../references/execution-checklist.md#围绕同一清单编排)
+推进需求与本轮所选 Task；各项目结果回填到原范围，已覆盖且未变的事实与授权
+跨阶段复用，不把每个技能或每个 Task 变成一条新的完整流程。
 
 首次开发和后续续修统一遵循 [变更与文档一致性](../../references/change-consistency.md)。
 将需求/反馈依据、实际行为变化、直接及间接影响和验证对应到同一范围说明；
@@ -47,9 +50,13 @@ Bug 使用 `zan-workflows:fixing-bug`。
 
 ## 2. 查清范围，准备必要产物
 
-调用 `zan-workflows:writing-plans phase=SCOPE_REVIEW`，传入项目、基准、`delivery_mode` 与
-`confirmation_mode=DEFER_TO_ORCHESTRATOR`。先只读取得交付/排除范围、
-实施证据、验收及真实缺口，不在子阶段重复请求范围确认。
+先核对已有清单、brief 或 Plan 是否完整覆盖同一需求/所选 Task、远程基准、
+范围/排除项、来源、验收、依赖及阻塞。仍有效时由编排按相同就绪规则复核复用，
+不再次调用 `SCOPE_REVIEW`；不能只凭摘要或已有通过标志清零缺口。
+需要新收敛范围、正式 Plan/协调、材料不足或实质变化时，再调用
+`zan-workflows:writing-plans phase=SCOPE_REVIEW`，传项目、基准、`delivery_mode` 与
+`confirmation_mode=DEFER_TO_ORCHESTRATOR`，只读补齐实际缺口，
+不在子阶段重复请求范围确认。语义/就绪检查始终保留。
 按 [需求就绪检查](../writing-plans/references/requirement-readiness-checklist.md)
 区分需求不完整与实施条件缺失，限定本轮范围，不能用假设填平缺口。
 界面/Mock 范围不自动扩大到后端实现；真实集成交付不能自行改成 Mock。
@@ -146,7 +153,8 @@ Task/Plan 内容合并确认，不另问一轮范围或分支；任务写入须�
 
 ## 4. 精确写回与分支交接
 
-确认后再次调用 `preparing-work`，只刷新可变事实和授权绑定，取得准确
+确认后沿用原定义，按 `preparing-work` 规则只刷新可变事实和授权绑定，
+不重做完整准备或常规独立 validator。全部检查有实际证据后才取得准确
 `TapdWorkDefinition` 与 `READY_FOR_HANDOFF`。固定仓库/分支/基准、范围、
 人员或实际写入改变时先展示差异，不能继续沿用过期授权。
 
@@ -190,6 +198,12 @@ PLAN_ONLY 在保存读回后返回，阶段 Plan 不宣称可实施。BRANCH_ONL
 Task 验收通过。每个项目只有独立评审为 `REVIEW_PASSED` 才可返回 `REVIEWED`。
 首个 BLOCKED 停止依赖执行，真实报告已完成部分；所有项目通过才报告整轮完成。
 任务的实际完成范围、验证/评审和遗留项按任务关联规则汇总，不自动标 Task done。
+若清单明确授权的包/测试服务产出是后续实施或验收前置，沿用共享
+[依赖节点规则](../../references/execution-checklist.md#前置依赖产出与整体完成)：
+保留已验证提供方事实，由编排在其自身 Git/发布门禁满足后完成准确前置操作，
+核实真实可用产出再续接原 Task/Plan/分支。整轮仍未完成，不把局部结果当成
+完整 REVIEWED、不调用接受缺仓输入的正式提测、不标父需求/Task done；
+未知写入、验证失败或缺授权不享有例外，明确只实施/不提交等限制仍优先。
 IMPLEMENT 到这里结束，不进入提交、推送、提测或上线。
 
 Mock 完成、正式接口补齐时续接原分支、Task和Plan。先刷新契约、当前代码和

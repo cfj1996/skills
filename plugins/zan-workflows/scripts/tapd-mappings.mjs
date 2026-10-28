@@ -41,8 +41,11 @@ export function customFieldRows(metadata) {
 }
 
 export function resolveVersionField(metadata, input) {
-  const native = input.entryType === 'bug' ? 'test_version' : 'version';
-  if (input.versionField === native) return { versionField: native, versionFieldVerified: true, versionFieldSource: 'NATIVE' };
+  const native = input.entryType === 'bug' ? 'version_test' : 'version';
+  // Accept the old helper input name, but always query/write TAPD's native field.
+  if (input.versionField === native || input.entryType === 'bug' && input.versionField === 'test_version') {
+    return { versionField: native, versionFieldVerified: true, versionFieldSource: 'NATIVE' };
+  }
   const labels = input.versionFieldLabel ? [input.versionFieldLabel] : ['测试版本', '提测版本'];
   const rows = customFieldRows(metadata).filter(row => row && !['0', 0, false].includes(row.enabled) &&
     !['1', 1, true].includes(row.freeze) && labels.includes(text(row.name)));

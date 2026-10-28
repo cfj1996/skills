@@ -16,6 +16,32 @@ or obtain the standalone skill's own plan confirmation. Follow
 `confirmed=true` alone is not evidence, and internal preview/execution calls do
 not require another human turn when the main authorization already covers them.
 
+## Compose stable checklist operations
+
+Use the current [execution checklist](execution-checklist.md#围绕同一清单编排)
+and existing handoffs as scope/authority. Prepare the exact technical inputs
+once, then compose a stable, already-authorized segment with the exported
+helpers or `WorkflowSession.dispatch()` inside one controlled Node/tool call.
+Await and check each real result before deriving the next input; e.g. use the
+verified delivered target SHA for the selected build, never a guessed future
+merge ID. Stop that segment on a mismatch, missing prerequisite or unknown
+effect and return the actual completed effects and first gap to the caller.
+
+Do not return to the model merely to rediscover the plan between deterministic
+GETs, fields or unchanged bundles. This is composition of existing capabilities,
+not a new JSON execution language or end-to-end engine. Do not blindly pipeline
+future requests, bypass each helper's PLAN/confirmation/live checks, or put a
+still-unapproved business choice inside the batch. Finish the session before
+human/reviewer waits and after the final selected operation.
+
+An explicitly authorized package/test-service predecessor may be executed by
+its owning Git/release helpers before the complete work is REVIEWED, under the
+shared dependency-output rules. Its provider code review and all exact operation
+gates remain mandatory; neither formal submission nor parent completion follows
+from that partial output. Verify real package/service availability before
+dependent integration. An UNKNOWN write never permits replay or a new session
+to bypass the original write barrier.
+
 ## Reuse one live MCP session
 
 For successive previews/executions/helpers, start
@@ -41,14 +67,64 @@ collecting missing evidence or fixing a read-only decoder.
 The pool starts/initializes each needed MCP once and shares its connection
 and tool catalog. Ref/item/metadata/confirmation/build facts are not cached;
 their checks remain fresh. Failed connections stay failed without a relaunch.
-EOF, signals or 30 minutes idle close the process/connections. Standalone
-helper CLIs remain available for isolated calls or after a session ended.
+The default idle limit is 5 minutes. Reuse a session for consecutive operations;
+finish it before a long human/reviewer wait or immediately after the final
+selected operation, rather than leaving its MCP processes open for later prose.
+Standalone helper CLIs remain available for isolated calls or after a session ended.
+
+Send this read-only control request and require its actual close receipt:
+
+```json
+{"id":"finish","action":"finish","phase":"PLAN","input":{}}
+```
+
+`SESSION_CLOSED` with `cleanupComplete=true` confirms process cleanup, not business
+delivery success. `CLEANUP_FAILED` is nonzero and cannot be reported as clean exit.
+The close receipt includes MCP process-group checks, `executionSettled`, tracked
+local-child exit checks, and `requestCount/busyMs/idleMs/shutdownMs/lifetimeMs`.
+Unknown or uncooperative work keeps the cleanup result unverified; do not infer
+success or replay any earlier mutation. Verified group cleanup applies to
+macOS/Linux; other platforms report their unverified cleanup scope explicitly.
+Programs deliberately escaping the owned process group are outside that proof.
+
+Optional startup flags, in seconds:
+
+- `--idle-timeout-seconds N`: default 300; input gaps do not consume a request's budget.
+- `--request-timeout-seconds N`: override the whole-request budget. Otherwise ordinary
+  requests use 180 seconds; EXECUTE merge/terminal-release requests retain the original
+  CI/build wait budget plus 180 seconds for surrounding checks (default total 33 minutes).
+  `TRIGGER_ACCEPTED` test submission uses the ordinary budget and never waits for a build.
+- `--shutdown-timeout-seconds N`: default 2, at most 30; bounded cleanup/exit verification.
+
+Structured stderr events identify `REQUEST_STARTED` and `REQUEST_FINISHED` by `requestId`,
+action and phase, with ISO timestamps, deadline, active elapsed time and preceding
+idle time. The final lifecycle event reports cleanup and totals. Stdout remains one
+request/result JSON line with `id` and `result`. Diagnostics never use that top-level
+`id`, so ID-based response selection also works when a PTY combines stdout/stderr.
+Match the `id` plus `result` envelope, not a state-word substring from diagnostics.
+Continue draining output until the close receipt/exit; waiting for a PTY process
+without consuming its output can block its writer on a small terminal buffer.
+Events do not log request bodies, credentials or Wiki content.
+Process lifetime includes
+idle/cleanup and must not be presented as one request's execution time.
+
+A request deadline aborts connected MCP/HTTP/polling and scoped local checks, closes
+the session, and prevents late responses from starting later writes. An interrupted
+EXECUTE returns `UNKNOWN`, `writes=null`; PLAN reports a blocked read-only operation.
+Known public MR/queue/build/Wiki/work-item identities survive the timeout, including helper
+facts settled within the same bounded close. Progress-only identifiers remain
+under `observedIdentifiers`; they prove neither write completion nor readiness.
+Do not treat retained identities as a successful receipt or permission to retry.
+First inspect actual remote effects, never automatically retry or restart mutations.
+Idle expiry only closes resources; reopening for further work must refresh actual facts
+and consume the existing accurate handoff/authority, not restore hidden session state.
 
 Wait for the single `SESSION_READY` event before sending input. On a PTY the
 session switches only its own stdin to raw mode, preventing canonical-line
 truncation and input echo. Long Chinese JSON is accepted up to 256 KiB;
 oversized/malformed requests stop before helper calls. Ctrl-C terminates the
-session; Ctrl-D ends its input. EOF/signals/idle shutdown restore its original
+session; Ctrl-D ends its input after the current bounded request. EOF, finish,
+signals and idle shutdown restore its original
 TTY mode. Do not locate another `/dev/ttys*` or run manual `stty` commands.
 The pinned helper runtime is independent of a business project's older Node
 version; keep that project's own runtime for its build/install commands.
@@ -509,7 +585,7 @@ removed after invocation, never retained as workflow state.
 `workspaceId`, `entryType=bug|stories|tasks`, `entryId`, `workMode`, purpose,
 `statusAction=WAITING_TEST|NONE` and `versionAction=WRITE|NONE`. Bug automatic
 registration uses WAITING_TEST; Story/Task does not receive that status. An
-applicable version uses the exact native `test_version` (Bug), `version`
+applicable version uses the exact native `version_test` (Bug), `version`
 (Story/Task), or a semantically verified `custom_field_*` with the complete
 approved string payload in `testVersion`.
 
@@ -545,9 +621,16 @@ native fallback retains any collected custom metadata fingerprint.
 
 Execution also carries the existing consolidated confirmation and
 `prerequisites`: `git=VERIFIED`,
-`deployment=BUILD_SUBMITTED|DEPLOYED|SKIPPED_BY_INTENT`,
+`deployment=BUILD_SUBMITTED|DEPLOYED|RELEASED|SKIPPED_BY_INTENT`,
 plus the helper's full `deploymentReceipt` for `BUILD_SUBMITTED` (state,
 completionMode, Job/queue URL/ID, source repository/SHA, submitted params, writes=1),
+or its original `RELEASED` package receipt (`BUILD_TERMINAL`, verified source,
+positive queue/build identities, Job/build URL, original writes=1) plus matching
+current test-target Git delivery. The whole-plan/lead checks still require the
+same Job/environment/channel/parameters and actual package/version/content
+availability; this receipt only satisfies its own tooling row. Reuse completed
+operations under [delivery reuse](execution-checklist.md#已完成交付的复用), never
+fabricate another trigger or treat a package as a consumer deployment.
 `profile=STANDARD|NO_WIKI`, with `wiki=VERIFIED|SKIPPED_NON_FUNCTIONAL` for
 STANDARD or `SKIPPED_NO_WIKI` for NO_WIKI. This helper never calls Wiki tools.
 Continue already waiting skips status, owner and version writes; a completely matching final

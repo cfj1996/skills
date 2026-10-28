@@ -33,8 +33,13 @@ Preferred lead model profile: `CRITICAL`. Read the shared
 or delegation is available; model availability never weakens write gates.
 
 Consume one `TapdWorkDefinition` and matching `ReviewedChange`, or one Bug's
-`work_definitions` and `reviewed_changes` collections. Normalize either input
+or one verified Story/selected Tasks' `work_definitions` and `reviewed_changes`
+collections. Normalize either input
 into per-repository delivery rows and one in-memory `TestSubmissionResult`.
+Use the [same checklist](../../references/execution-checklist.md#围绕同一清单编排)
+as the shared scope/authority source; this phase derives exact technical inputs,
+not another business plan. A precursor output or partial provider review cannot
+replace the required complete reviewed set for formal submission.
 Reuse the checklist's current explicit choices. Without overrides, resolve
 `STANDARD` and `DEPLOY` by default, including incoming `AUTO`: merge to the
 verified test target, build/deploy its test environment and include Wiki.
@@ -67,6 +72,11 @@ do not expand a missing `rules` field into manual endpoint probing.
 Send each authorized action separately, retain no workflow file, and refresh
 mutable facts inside its executor. Session reuse caches connections, not
 authorization, item state, refs or deployment evidence.
+After the last selected helper result, send `action=finish, phase=PLAN` and
+require `SESSION_CLOSED` with verified cleanup before returning. Close before
+long human/reviewer waits; the default idle limit is five minutes. Request
+timeouts/unknown writes require actual-effect inspection, never automatic
+replay. Follow the linked session reference for timing and budget flags.
 
 Accept `submission_phase=PLAN|EXECUTE`. The first invocation is always `PLAN`:
 it is read-only and returns the complete plan. Follow the shared
@@ -184,6 +194,11 @@ required rows return `BLOCKED`; do not silently submit a partial Bug.
 Only the explicitly scoped record-only PLAN exception may defer the corrected
 completion readback; it never defers repository coverage, code review or
 cross-repository acceptance, and EXECUTE must restore the record gate first.
+Apply the same repository pairing/completeness rules to grouped requirement work,
+also verifying the exact parent Story and selected Task/Plan coverage. Do not add
+sibling Tasks or a Bug repair-record/state gate. One successful row does not
+complete the whole selected requirement. Story/Task registration uses only its
+explicit applicable version policy, never Bug status/owner or automatic Task done.
 
 Each source is the original `feature/*` or `fixbug/*` branch. Reuse its
 upstream verified and confirmed test target (`dev` or `develop`). For a
@@ -196,6 +211,11 @@ requires a refreshed confirmation. Never rebuild on the test target or use
 
 ## Procedure
 
+Use the [whole-plan review](references/submission-rules.md#whole-plan-review):
+one independent `PRE_SUBMISSION_PLAN` covers the complete plan and its prepared
+Wiki. The lead and executors own subsequent fresh checks/readbacks; routine
+stage transitions do not start new private validators.
+
 1. For each repository row, re-read repository, original source branch/SHA,
    confirmed test-target ref/SHA, current diff and commits. Verify they match
    that row's reviewed change and contain no unrelated paths.
@@ -205,18 +225,27 @@ requires a refreshed confirmation. Never rebuild on the test target or use
 2. Resolve `deployment_mode` per repository and, for `DEPLOY`, resolve its exact Jenkins Job,
    test environment, release channel, parameters/version identity, and purpose
    through workspace project knowledge and release-safety rules.
+   First check the same checklist's completed predecessor receipts under
+   [delivery reuse](../../references/execution-checklist.md#已完成交付的复用).
+   Bind each reusable receipt to its own row and current target/source,
+   Job/environment/channel/parameters and availability readback in this plan.
+   Missing or drifted facts reopen only affected checks; UNKNOWN is not replayable.
 3. Under `STANDARD`, pass the resolved `DEPLOY|SKIP` and available parameter
    evidence to `zan-workflows:drafting-wiki`, invoke it read-only, and require
-   either one validated target/body plan or a
+   either one complete prepared target/body plan for the joint review in step 4 or a
    `SKIPPED_BY_POLICY` result proven to be `NON_FUNCTIONAL_CONTINUE` with a
    verified owner page/current repository+branch entry and retained exact
    target/body readback. No historical page/entry uses the normal draft path. Under
    `NO_WIKI`, set Wiki to `SKIPPED_BY_POLICY` without loading Wiki capability.
    Reuse the item's current details/comments and the original source branch;
-   do not start an independent Wiki search in this skill.
+   do not start an independent Wiki search in this skill. Keep prepared Wiki facts
+   internal with validation `NOT_RUN`; do not claim `VALIDATED` until the joint
+   review passes. A still-current independently validated draft is reusable.
 4. Build one consolidated `SubmissionPlan` containing each
    repository's Git/target/deployment selection, applicable shared Wiki/comment
-   actions, and one final TAPD registration for the Bug.
+   actions, and the exact final TAPD registration targets/policies. A Bug registers
+   once; Story/Task has only its explicitly applicable actions, without Bug status
+   or inferred Task/parent completion. Preserve each selected target separately.
    MR descriptions include accurate work-item links, actual change/impact and
    any already-verified Wiki link under the shared change-consistency rules.
    A first submission with no page yet uses the work-item link for later
@@ -233,7 +262,13 @@ requires a refreshed confirmation. Never rebuild on the test target or use
    Job parameters through its adapter, showing a metadata-only Job binding
    or pipeline-computed version policy explicitly when used. Under
    `NO_WIKI`, explicitly list that no Wiki discovery/read/write/comment tool
-   will be called. Return `PlannedTestSubmission` with
+   will be called. Review this complete plan once with the private
+   [submission-validator.md](agents/submission-validator.md), phase
+   `PRE_SUBMISSION_PLAN`, including the Wiki validator's document criteria
+   only under STANDARD with a prepared body; NO_WIKI loads no Wiki capability.
+   Require a mapped pass for the plan and, under STANDARD, the complete draft
+   before the first delivery write. Unknown future IDs remain derivations,
+   not successful effects. Then return `PlannedTestSubmission` with
    `terminal_state=AWAITING_CONFIRMATION`; PLAN itself performs no write.
    Standalone calls display this complete plan, ask and stop. An orchestrator
    instead checks it against the confirmed execution checklist and continues
@@ -252,10 +287,12 @@ requires a refreshed confirmation. Never rebuild on the test target or use
    delivered target revision without requiring an MR or claiming a merge.
    Uncommitted, missing or unknown containment blocks before any commit/push;
    never fall through to an unapproved write. Otherwise, before its first Git
-   write, validate one `GIT_DELIVERY_BUNDLE` with the
-   private [submission-validator.md](agents/submission-validator.md) using
-   `PRE_GIT_WRITE`. Bind the complete reviewed diff/file list, repository,
-   original branch, target refs, commit/push/MR actions and purpose once.
+   write, require the plan-reviewed `GIT_DELIVERY_BUNDLE`. Bind the complete
+   reviewed diff/file list, repository, original branch, target refs,
+   commit/push/MR actions and purpose once. Run the read-only
+   [commit preflight](../../references/commit-readiness.md) for its exact message
+   and environment before the first commit; blocked Hooks/runtime/message stop
+   that write without installing a new linter or disabling Hooks.
    Commit/push through local Git only when needed, checking actual bound facts
    and reading back the derived SHA without another Agent validator. Run
    [merge-reviewed-branch.mjs](../../scripts/merge-reviewed-branch.mjs) once for
@@ -272,7 +309,15 @@ requires a refreshed confirmation. Never rebuild on the test target or use
    business source and retain the complete ConflictMergeHandoff, association
    and cleanup/retention/deferred outcomes in TestSubmissionResult for go-live.
 7. Resolve every repository's deployment gate through `jenkins-mcp`:
-   - `DEPLOY`: validate `JENKINS_TEST_DEPLOY` once, then run
+   - `DEPLOY` with a completed, still-matching selected operation: reuse its
+     original `BUILD_SUBMITTED|DEPLOYED|RELEASED` receipt after the plan's current
+     identity/readback checks. Do not trigger again. `RELEASED` satisfies only
+     the package provider's gate, with real package/version/content availability;
+     it never replaces a consumer deployment or service-readiness proof. Retain
+     the original terminal semantics and `deploymentReceipt`, not a fabricated
+     new submission. An explicit repeat deployment/publication remains a new
+     accurately authorized action.
+   - `DEPLOY` still requiring a new selected build: consume the plan-reviewed `JENKINS_TEST_DEPLOY`, then run
      [run-jenkins-release.mjs](../../scripts/run-jenkins-release.mjs) once with
      the exact confirmed release plan, `completionMode=TRIGGER_ACCEPTED` and
      Job-identity and frozen-parameter fingerprints, plus applicable project-check
@@ -290,7 +335,7 @@ requires a refreshed confirmation. Never rebuild on the test target or use
      reason to load or call Jenkins.
    `FAILED|UNKNOWN` blocks every later Wiki/TAPD write.
 8. Only after every required repository passes Git containment and
-   `BUILD_SUBMITTED|DEPLOYED|SKIPPED_BY_INTENT`, execute the authorized Wiki plan under
+   `BUILD_SUBMITTED|DEPLOYED|RELEASED|SKIPPED_BY_INTENT`, execute the authorized Wiki plan under
    `STANDARD` only when the drafter returned `VALIDATED`. For creation,
    functional `CONTINUE` supplementation, or unchanged reuse, run
    [ensure-test-wiki.mjs](scripts/ensure-test-wiki.mjs) once with the exact
@@ -304,8 +349,8 @@ requires a refreshed confirmation. Never rebuild on the test target or use
    `--expected-wiki-id`, `--expected-month-id`, approved title and
    `--expected-body-sha256`; for creation pass the fixed `--month`, title,
    creator and any existing month ID. Add `--execute` only under the unchanged
-   consolidated authorization. Validate `WIKI_WRITE_AND_LINK_BUNDLE` once
-   before invocation. The script uses `tapd-mcp` to create or update/read back
+   consolidated authorization. Consume the plan-reviewed `WIKI_WRITE_AND_LINK_BUNDLE`
+   without another Agent invocation. The script uses `tapd-mcp` to create or update/read back
    the approved body and ensure/read back its comment. Independent initial
    reads run in parallel; it refreshes the exact body immediately before an
    update and comments after a Wiki write. No separate Agent validation or
@@ -330,8 +375,13 @@ requires a refreshed confirmation. Never rebuild on the test target or use
    already in `待测试` returns `SKIPPED_ALREADY_WAITING_TEST` without duplicate
    writes. Story/Task never receives a Bug status; version-only registration
    requires its explicit policy. Do not manually repeat reads or validate the
-   fields separately. Give the final readbacks to `POST_WRITE`; return
-   `SUBMITTED` only on a passing verdict.
+   fields separately. If a grouped requirement explicitly includes several
+   applicable registration targets, apply this atomic bundle only to those exact
+   targets under the same plan; no new Bug/Task status or sibling target is inferred.
+   The lead checks final readbacks once against `POST_WRITE`
+   criteria without another routine Agent invocation; return `SUBMITTED` only
+   after that check passes. Ambiguous evidence gets scoped review, never a
+   guessed receipt or continued dependent write.
    Report the actual readback status in the result, never the checklist's target
    as a completed transition while merge/deployment/Wiki prerequisites remain pending.
 
@@ -339,8 +389,15 @@ requires a refreshed confirmation. Never rebuild on the test target or use
 
 On a write failure, unknown effect or missing readback, return `BLOCKED` with
 actual completed actions and stop this TAPD item. Do not retry automatically
-any external mutation, adopt an earlier unknown effect, roll back, or continue
-later writes. A PLAN-only parser/input/evidence failure with no mutation
+any external mutation, adopt an earlier unknown effect without reliable exact
+readback, roll back, or continue dependent writes in the blocked execution.
+On a later authorized continuation, first inspect the original operation's exact
+target, fields/content/source and receipts read-only. Only authoritative matching
+facts can turn an unknown effect into verified completed work; preserve it without
+replaying the mutation, refresh the normal plan/gates and finish only missing
+authorized actions. Insufficient/ambiguous readback stays BLOCKED. Do not clear a
+poisoned session's write barrier or treat a new session as recovery evidence.
+A PLAN-only parser/input/evidence failure with no mutation
 attempt is a read-only preflight problem: correct it and prepare a fresh
 read-only preview with a new request ID. It neither authorizes a write nor
 requires repeating implementation/review. Present a valid complete plan before

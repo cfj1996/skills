@@ -8,12 +8,12 @@ const id = '1150372234001000001';
 const response = data => ({ content: [{ type: 'text', text: JSON.stringify({ status: 1, data }) }] });
 const input = () => ({ workspaceId: 50372234, entryId: id, entryType: 'bug', workMode: 'INITIAL',
   statusAction: 'WAITING_TEST', versionAction: 'WRITE', activeStatus: 'fixing', waitingStatus: 'testing',
-  workitemTypeId: 'bugs', workflowVerified: true, versionField: 'test_version', testVersion: 'demo@1.0.0-canary.1',
+  workitemTypeId: 'bugs', workflowVerified: true, versionField: 'version_test', testVersion: 'demo@1.0.0-canary.1',
   purpose: '登记已经核实的提测结果', prerequisites: { git: 'VERIFIED', deployment: 'DEPLOYED', profile: 'STANDARD', wiki: 'VERIFIED' } });
 
 function tapdFake({ status = 'fixing', version = '', onCall } = {}) {
   const calls = [], item = { id, status, te: 'tester', reporter: 'creator', current_owner: 'developer',
-    test_version: version, version, custom_field_10: version };
+    version_test: version, version, custom_field_10: version };
   const call = async (name, args) => {
     calls.push({ name, args });
     const override = await onCall?.(name, args, item);
@@ -41,6 +41,47 @@ const submittedBuild = () => ({ state: 'BUILD_SUBMITTED', completionMode: 'TRIGG
   queueId: 8, queueUrl: 'https://ci.example.test/queue/item/8/', jobName: 'demo-test',
   jobUrl: 'https://ci.example.test/job/demo-test/', sourceRepository: 'https://git.example.test/team/demo.git',
   expectedSha: 'a'.repeat(40), submittedParams: { branch: 'develop' }, sourceVerified: false, buildNumber: null });
+
+const releasedPackage = () => ({ ...submittedBuild(), state: 'RELEASED', releaseKind: 'package',
+  completionMode: 'BUILD_TERMINAL', sourceVerified: true, buildNumber: 18,
+  buildUrl: 'https://ci.example.test/job/demo-test/18/',
+  publishedPackages: [{ name: '@demo/ui', version: '1.0.0-canary.1' }] });
+
+test('an original completed package receipt can satisfy its publication gate without another trigger', async () => {
+  const fake = tapdFake();
+  const receipt = releasedPackage();
+  const result = await register(fake, { prerequisites: { ...input().prerequisites,
+    deployment: 'RELEASED', deploymentReceipt: receipt } });
+  assert.equal(result.state, 'REGISTERED');
+  assert.equal(fake.item.status, 'testing');
+  assert.equal(fake.calls.some(call => call.name.startsWith('jenkins_')), false);
+  assert.equal(receipt.state, 'RELEASED');
+  assert.equal(receipt.completionMode, 'BUILD_TERMINAL');
+});
+
+test('incomplete, unknown and non-package results cannot masquerade as completed publication', async () => {
+  const invalid = [undefined, ...[
+    { state: 'UNKNOWN' }, { state: 'FAILED' }, { state: 'BUILD_SUBMITTED' }, { releaseKind: 'project' },
+    { completionMode: 'TRIGGER_ACCEPTED' }, { sourceVerified: false }, { writes: 0 },
+    { queueId: 0 }, { buildNumber: -1 }, { buildUrl: '' }, { jobUrl: '' }, { jobName: '' },
+    { sourceRepository: '' }, { expectedSha: 'not-a-sha' },
+  ].map(change => ({ ...releasedPackage(), ...change }))];
+  for (const receipt of invalid) {
+    const fake = tapdFake();
+    await assert.rejects(register(fake, { prerequisites: { ...input().prerequisites,
+      deployment: 'RELEASED', deploymentReceipt: receipt } }), /原始 RELEASED/);
+    assert.equal(fake.calls.some(call => call.name.startsWith('update_')), false);
+  }
+});
+
+test('publication receipt repository and SHA must match current test-target containment', async () => {
+  for (const change of [{ sourceRepository: 'https://git.example.test/team/other.git' }, { expectedSha: 'b'.repeat(40) }]) {
+    const fake = tapdFake();
+    await assert.rejects(register(fake, { prerequisites: { ...input().prerequisites,
+      deployment: 'RELEASED', deploymentReceipt: { ...releasedPackage(), ...change } } }), /当前 Git 测试交付回执不匹配/);
+    assert.equal(fake.calls.some(call => call.name.startsWith('update_')), false);
+  }
+});
 
 test('an accepted build receipt permits waiting-test registration before Jenkins completes', async () => {
   const fake = tapdFake();
@@ -71,13 +112,35 @@ test('registration updates status, owner and version in one exact write and read
   assert.equal(result.actualOwner, 'tester');
   const writes = fake.calls.filter(call => call.name === 'update_bug');
   assert.equal(writes.length, 1);
-  assert.deepEqual(writes[0].args.options, { id, status: 'testing', current_owner: 'tester', test_version: input().testVersion });
+  assert.deepEqual(writes[0].args.options, { id, status: 'testing', current_owner: 'tester', version_test: input().testVersion });
   for (const read of fake.calls.filter(call => call.name === 'get_bug')) {
     assert.ok(['te', 'reporter', 'current_owner'].every(name => read.args.options.fields.split(',').includes(name)));
   }
   const repeated = await register(fake);
   assert.equal(repeated.state, 'ALREADY_REGISTERED');
   assert.equal(fake.calls.filter(call => call.name === 'update_bug').length, 1);
+});
+
+test('legacy helper field input resolves to the actual TAPD version_test field without an adapter', async () => {
+  const fake = tapdFake();
+  const plan = await registerTestSubmission(fake.call, { ...input(), versionField: 'test_version' });
+  assert.equal(plan.versionField, 'version_test');
+  assert.equal(plan.payload.version_test, input().testVersion);
+  assert.equal(Object.hasOwn(plan.payload, 'test_version'), false);
+  const result = await registerTestSubmission(fake.call, { ...plan, execute: true, confirmed: true });
+  assert.equal(result.state, 'REGISTERED');
+  assert.equal(result.actualVersion, input().testVersion);
+  for (const { name, args } of fake.calls) {
+    if (name === 'get_bug') assert.equal(args.options.fields.split(',').includes('test_version'), false);
+    if (name === 'update_bug') assert.equal(Object.hasOwn(args.options, 'test_version'), false);
+  }
+});
+
+test('missing native version readback blocks before update instead of inventing an empty version', async () => {
+  const fake = tapdFake();
+  delete fake.item.version_test;
+  await assert.rejects(registerTestSubmission(fake.call, input()), /未读回实际测试版本字段/);
+  assert.equal(fake.calls.some(call => call.name === 'update_bug'), false);
 });
 
 test('missing or blank tester falls back to the creator even without a version write', async () => {
@@ -114,7 +177,7 @@ test('changes to assignment facts after preview require fresh confirmation', asy
 test('an owner readback mismatch reports partial effects and never retries', async () => {
   const fake = tapdFake({ onCall(name, args, item) {
     if (name === 'update_bug') {
-      item.status = args.options.status; item.test_version = args.options.test_version;
+      item.status = args.options.status; item.version_test = args.options.version_test;
       return response({ Bug: item });
     }
   } });
@@ -171,7 +234,7 @@ test('continue while waiting skips status and version even when a new version wa
   const fake = tapdFake({ status: 'testing', version: 'previous-version' });
   const result = await register(fake, { workMode: 'CONTINUE' });
   assert.equal(result.state, 'SKIPPED_ALREADY_WAITING_TEST');
-  assert.equal(fake.item.test_version, 'previous-version');
+  assert.equal(fake.item.version_test, 'previous-version');
   assert.equal(fake.item.current_owner, 'developer');
   assert.equal(result.ownerState, 'UNCHANGED');
   assert.equal(fake.calls.some(call => call.name.startsWith('update_')), false);
@@ -208,7 +271,7 @@ test('failed prerequisites and changed state/version block before update', async
   const plan = await registerTestSubmission(fake.call, input());
   await assert.rejects(registerTestSubmission(fake.call, { ...plan, execute: true, confirmed: true,
     prerequisites: { ...plan.prerequisites, deployment: 'FAILED' } }), /成功证据/);
-  fake.item.test_version = 'other-editor-version';
+  fake.item.version_test = 'other-editor-version';
   await assert.rejects(registerTestSubmission(fake.call, { ...plan, execute: true, confirmed: true }), /不能覆盖/);
   assert.equal(fake.calls.some(call => call.name.startsWith('update_')), false);
 });

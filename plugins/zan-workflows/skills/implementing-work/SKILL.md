@@ -11,7 +11,8 @@ or delegation is available; do not spawn an agent merely to change models.
 
 Produce one in-memory `ReviewedChange` from an approved `TapdWorkDefinition`:
 implement the confirmed scope, verify relevant behavior, and obtain independent
-review. Submission, merge, publication and Wiki writes belong to later stages.
+review. Submission, merge, publication and Wiki writes belong to separately
+authorized capabilities owned by the orchestrator, never this implementation worker.
 For approved work spanning projects, accept `work_definitions`: the complete set
 of single-project definitions for one Bug, or one Story and its selected Tasks.
 Verify the parent Story and selected scope before grouping requirement work;
@@ -19,6 +20,9 @@ do not add sibling Tasks. Return per-repository `reviewed_changes` only after
 all required work passes. A grouped Bug shares one start/completion record.
 Single-definition calls keep the original input/result. Do not combine different
 Bugs or Stories, or drop a required project to close early.
+Consume the [same execution checklist](../../references/execution-checklist.md#围绕同一清单编排)
+and existing definitions/brief/Plan. Return actual results to their bound scope;
+do not repeat global collection, ordinary preparation validation or user confirmation.
 
 Read [contracts.md](references/contracts.md),
 [development-rules.md](references/development-rules.md) and
@@ -94,8 +98,14 @@ reuse its readback for the other definitions instead of replaying their old payl
    [owner rules](references/bug-repair-owner.md). Reuse the checklist's exact
    authorization; a standalone call obtains any missing authorization through
    the same Chinese TAPD/record preview. Changed facts require an updated preview.
-2. For `WRITE_ACTIVE`, call [change-reviewer](agents/change-reviewer.md) with
-   `PRE_STATUS_WRITE`. After it passes, send one `tapd-mcp` `update_bug`
+2. For `WRITE_ACTIVE`, the lead uses the owner helper plus actual current
+   status/owner/member evidence and the checklist's exact Chinese preview/authority
+   to check the complete payload. Helpers do not prove membership or permission;
+   retain those sources and the actual validation basis, not a self-filled flag.
+   Missing/conflicting facts block. Routine deterministic matching needs no
+   separate Agent; substantive interpretation ambiguity may use
+   [change-reviewer](agents/change-reviewer.md) with `PRE_STATUS_WRITE` after
+   collecting its evidence. Once checks pass, send one `tapd-mcp` `update_bug`
    containing both status and `current_owner`; immediately read both back and
    run the owner's helper validation. Partial readback blocks source edits,
    retaining actual effects without automatic rollback or retry.
@@ -131,6 +141,14 @@ Before integration and final review, stop related writers and verify they have
 finished; then run agreed cross-task/cross-repository acceptance on stable code.
 Missing required work blocks the whole handoff. A Bug also cannot publish its
 completion comment or hand out a partly eligible `ReviewedChange`.
+When the precise missing predecessor is an authorized dependency-output node,
+return its provider's actual diff/verification/independent-review facts and the
+remaining gap under [dependency-output rules](../../references/execution-checklist.md#前置依赖产出与整体完成).
+The orchestrator may perform only that node through its original Git/release
+capabilities and then resume this same scope/branch/Task/Plan. This skill still
+does not submit or publish, partial progress is not an eligible REVIEWED collection,
+and failed/unknown writes, missing authority or explicit IMPLEMENT restrictions
+cannot use this route to continue delivery.
 
 Use current requirement/acceptance references and confirmed amendments to
 identify behaviors to preserve, change or remove. Existing code and reference
@@ -147,6 +165,11 @@ Before verification, apply [local verification budgets](../../references/local-v
 inspect the project's runtime and actual script scope, then select the smallest
 sufficient behavior tests/reproduction and affected file/package checks. Do not
 automatically chain whole-project lint, typecheck and build after development.
+Apply its project-check selection matrix: absent checks create no installation
+work; diagnose existing configuration failures once and distinguish optional
+gaps from actual required-check or delivery blockers. Do not repair an unrelated
+toolchain to make a nonessential command pass. Equivalent evidence must cover
+the same acceptance and risks; required gaps still block dependent work.
 Broaden only for an explicit requirement or a concrete uncovered risk; retain
 required checks as blockers when incomplete. Keep heavy checks serial across
 repositories/workers and run them with the bounded executor. Tests should observe
@@ -174,12 +197,22 @@ reviews of stable independent repositories still need integration acceptance.
 Give the exact diff, approved scope, Plan/brief, behavior expectations and their
 sources, repository/branch facts, concrete risks and verification results/gaps
 to [change-reviewer](agents/change-reviewer.md) with `POST_CHANGE_REVIEW`.
+For a specifically approved predecessor-output node, identify that exact purpose
+and provider scope in this review. Obtain independent review of the provider's
+current code and required pre-delivery checks while keeping later integration
+acceptance and the whole-Bug final-comment review pending. That local pass only
+supplies provider facts for the orchestrator; it is not a partial eligible
+ReviewedChange, a completed Task/Story/Bug or an exemption from the atomic
+Git/release capability's own gates. Review the actual complete Bug comment when
+the required scope is all ready, reusing unchanged provider code-review evidence.
 For a grouped Bug, obtain this review for every required repository, supply the
 full Bug boundary and applicable cross-repository acceptance, and attribute
 comment claims to the evidence each review covers. Do not infer that one
 repository's review accepts another repository.
-For Bugs include start-record readback, record authorization and the proposed
-complete final comment. One independent review covers requirement behavior and
+For whole-work Bug review include start-record readback, record authorization
+and the proposed complete final comment; an explicitly scoped predecessor
+review uses the narrow rule above and leaves that complete-comment review pending.
+One independent review covers requirement behavior and
 engineering design/test coupling. Map its private line to
 `REVIEW_PASSED|REVIEW_FAILED|NOT_RUN`, retain a concise reason and discard the raw
 line. If review causes edits, verify and review the affected delta.

@@ -12,19 +12,19 @@ complete `SubmissionPlan` (visible for standalone confirmation or material chang
 
 | Section | Required facts |
 | --- | --- |
-| Inputs | one source definition/reviewed change pair or a Bug's `work_definitions`/`reviewed_changes` collections matched by canonical repository/root, origin and fixed branch; shared Bug identity/repair-record readbacks and all required repository evidence;  `INITIAL|CONTINUE`, exact Wiki profile, and `AUTO|DEPLOY|SKIP` deployment mode |
+| Inputs | one source definition/reviewed change pair, one Bug's or one verified Story/selected Tasks' `work_definitions`/`reviewed_changes` collections matched by canonical repository/root, origin and fixed branch; shared Bug identity/repair-record readbacks only for Bugs, or exact parent/selected Task/Plan coverage for requirements; all required repository evidence; `INITIAL|CONTINUE`, exact Wiki profile, and `AUTO|DEPLOY|SKIP` deployment mode |
 | Repository | expected/actual path, Git root, origin, verification result |
 | Authorization | complete execution checklist and actual human confirmation from a main entry, or the standalone plan's own confirmation; current scope-coverage comparison, exact technical plan/bound facts, deterministic derivations, and any reauthorization reason |
 | Mock safety | per-repository current source/diff-bound inspection and same Plan/brief inventory; explicit evidenced no-Mock or exact MOCK-* scope and matching human test authorization for target environment/branch/Job, purpose and selected writes; stale/missing evidence blocks; preserve real acceptance gaps in result/Wiki |
 | Git delivery | per repository: original source branch/SHA, verified confirmed test target (`dev` or `develop`), current-round commits, commit/push/MR/merge results, actual-target containment |
 | Conflict handoff | when A → C → B was used, exact ConflictMergeHandoff including original A/B, C MR/revisions/containment, temporary resources, upfront cleanup authority, latest retention policy and per-resource cleanup/deferred outcome; retain it even if C is absent |
-| Deployment | `BUILD_SUBMITTED|DEPLOYED|SKIPPED_BY_INTENT|FAILED|UNKNOWN|NOT_ATTEMPTED`, Jenkins job/environment/ref/version/channel/purpose and trigger/readback evidence when applicable |
+| Deployment | `BUILD_SUBMITTED|DEPLOYED|RELEASED|SKIPPED_BY_INTENT|FAILED|UNKNOWN|NOT_ATTEMPTED`, original Jenkins job/environment/ref/version/channel/purpose and trigger/readback evidence; reused receipts retain current matching/availability proof and their own repository gate |
 | Shared Wiki | `sharedWikiPlan`, `wikiOwner` (workspace/type/ID), owner/Task relationship readback, one target per Story/Bug, repository+branch entry identities, complete combined body/hash, all comment targets and included project gates; same final page ID in every participating result |
 | Wiki | `WRITTEN|SKIPPED_BY_POLICY|BLOCKED|NOT_ATTEMPTED`, auto-resolved target plan when written or retained for `going-live`, hierarchy evidence, create/update authorizations and readbacks when written, actual final child ID/URL and source-branch identity when available, business merge-status or tooling current-version/channel readback, and final body when applicable |
 | Change consistency | current reviewed behavior/basis/impact/verification and full delivery delta under [shared rules](../../../references/change-consistency.md); STANDARD draft/readback coverage of content, impact and verification, scoped corrections or evidenced unchanged result; exact TAPD and available Wiki links for MR descriptions |
 | TAPD | exact status action, waiting-test owner and source (`te` or `reporter`) for Bug transitions, owner write/readback result, exact `Bug|Story|Task` Wiki-link result when applicable, duplicate/conflict evidence, and write/readback results |
 | Test version | `WRITTEN|SKIPPED_ALREADY_WAITING_TEST|BLOCKED|NOT_ATTEMPTED`, structured payload and readback when written |
-| Validation | mapped results for each pre-write operation and final post-write validation |
+| Validation | one mapped complete-plan review including Wiki, each executor's immediate prerequisite/readback checks, scoped review for material changes, and the lead's final receipt check |
 | Terminal | `SUBMITTED|BLOCKED` and blocker when applicable |
 
 ## Direct-submission continuation
@@ -78,8 +78,8 @@ never rerun business implementation or invent a missing READY/REVIEWED handoff.
 
 - `SUBMITTED` requires every necessary repository's matching upstream inputs,
   exact repository/original source and confirmed test target (`dev` or
-  `develop`), passing authorization and private pre-write validation for every
-  executed write, immediate readback, and containment of all current-round
+  `develop`), passing authorization, an independent complete-plan review,
+  immediate prerequisite checks/readbacks for every executed write, and containment of all current-round
   commits in that repository's exact remote target. Never replace an upstream
   confirmed `dev` with `develop`, or the reverse.
 - For one Bug across repositories, normalize the existing singular inputs or
@@ -97,6 +97,15 @@ never rerun business implementation or invent a missing READY/REVIEWED handoff.
 - One consolidated submission authorization covers the unchanged Git, Wiki,
   deployment, comment, and final TAPD plan. Deterministically generated commit,
   MR, Wiki, queue, and build identifiers do not create new confirmation points.
+  It is the current execution checklist plus its actual referenced content and
+  real human authority, not a title/summary or true flag. Technical PLAN/results
+  are its structured views. Grouped requirements retain the same completeness
+  and dependency checks as grouped Bugs, but use the verified parent Story and
+  selected Task scope with no Bug repair record or state/owner transition. Final
+  registration acts only on the exact applicable targets/policies in that plan.
+  A planned predecessor may have already produced a real package/test service;
+  its partial review/output is dependency evidence, not formal submission input
+  eligibility. Never use it to waive the complete reviewed set.
 - The Git sequence is commit when needed, push when needed, MR create/update,
   then MR merge. Include every step in the displayed validated bundle, perform
   its fresh bound checks, execute and read back before the next.
@@ -117,7 +126,7 @@ never rerun business implementation or invent a missing READY/REVIEWED handoff.
   merge and safety checks trigger that unchanged scope without another prompt.
   User retention revokes the affected deletion authority and survives go-live.
   Preserve exact related-branch association and cleanup outcomes in the handoff.
-- One displayed `GIT_DELIVERY_BUNDLE` and pre-write validation cover that
+- One displayed `GIT_DELIVERY_BUNDLE` included in the complete-plan review covers that
   unchanged sequence; internal fresh checks/readbacks remain mandatory without
   per-step Agent validators. The merge executor supplies the actual delivered
   merge revision and observed target tip; deployment must not confuse the
@@ -144,7 +153,7 @@ never rerun business implementation or invent a missing READY/REVIEWED handoff.
   current channel, or use `当前版本：待发布` when none exists. Only verified
   publication may update the channel. `SKIP` keeps its existing evidence rules.
 - Wiki creation and functional supplementation plus their comment are one
-  `WIKI_WRITE_AND_LINK_BUNDLE` with one pre-invocation validation. Its internal
+  `WIKI_WRITE_AND_LINK_BUNDLE` included in the same plan review. Its internal
   readbacks satisfy the per-write invariant without extra Agent validators.
   Bind existing ID/parent/title/original SHA-256 or the new planned month/title.
   Require exact item/branch/Wiki, approved final `bodySha256` and separate
@@ -171,7 +180,17 @@ never rerun business implementation or invent a missing READY/REVIEWED handoff.
   and exact retained readback; it omits Wiki and Wiki-comment writes while still
   completing the remaining authorized submission steps. Missing history uses
   the normal draft path; unresolved evidence blocks before delivery writes.
-- `DEPLOY` uses `completionMode=TRIGGER_ACCEPTED` and requires the exact accepted
+- `DEPLOY` first reuses a still-matching completed selected operation under
+  [delivery reuse](../../../references/execution-checklist.md#已完成交付的复用),
+  after exact row/current Git, Job/environment/channel/parameters and real
+  source/package availability readbacks. Retain its original receipt and state;
+  `RELEASED` is a package-only `BUILD_TERMINAL` result with original `writes=1`,
+  verified source and exact positive queue/build/Job identities matching current
+  test-target containment. It cannot satisfy another repository's deployment.
+  The lead/whole-plan review still verifies real package versions/content and
+  current parameters; accepting a receipt shape does not establish availability.
+  Missing, drifted or UNKNOWN evidence does not authorize replay.
+  A new selected build uses `completionMode=TRIGGER_ACCEPTED` and requires the exact accepted
   Jenkins queue receipt for the confirmed delivered test-target ref/SHA and
   parameters. `BUILD_SUBMITTED` permits Wiki/TAPD without waiting for a build.
   A missing/failed/unknown trigger blocks and must never be retried automatically.
@@ -181,7 +200,7 @@ never rerun business implementation or invent a missing READY/REVIEWED handoff.
   sole read-only exception. It records
   `SKIPPED_BY_INTENT`. `FAILED|UNKNOWN` forbids later Wiki/status/version writes.
 - `INITIAL` writes `待测试`/waiting-test owner/test version only after
-  `BUILD_SUBMITTED|DEPLOYED|SKIPPED_BY_INTENT`. `CONTINUE` already in `待测试` performs no status
+  `BUILD_SUBMITTED|DEPLOYED|RELEASED|SKIPPED_BY_INTENT`. `CONTINUE` already in `待测试` performs no status
   or owner write, or duplicate test-version write.
 - Status, waiting-test owner and test version use one
   `TAPD_REGISTRATION_BUNDLE`: exact item,

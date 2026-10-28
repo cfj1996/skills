@@ -2,7 +2,7 @@ import { buildLaunch, configPath, readConfig } from './start-mcp.mjs';
 
 // The connected Jenkins MCP omits queue executables, build queueId, parameters and SCM actions.
 // Fill only those read gaps; writes continue to use jenkins-mcp.
-export function createJenkinsReader(env, jobName, jobUrl, fetchImpl = fetch) {
+export function createJenkinsReader(env, jobName, jobUrl, fetchImpl = fetch, signal) {
   const base = new URL(env.MCP_JENKINS_URL);
   const expected = new URL(jobUrl);
   const basePath = base.pathname.replace(/\/$/, '');
@@ -17,7 +17,8 @@ export function createJenkinsReader(env, jobName, jobUrl, fetchImpl = fetch) {
     let response;
     try {
       response = await fetchImpl(url, { method: 'GET', redirect: 'error',
-        headers: { Authorization: authorization, Accept: accept }, signal: AbortSignal.timeout(30000) });
+        headers: { Authorization: authorization, Accept: accept },
+        signal: signal ? AbortSignal.any([AbortSignal.timeout(30000), signal]) : AbortSignal.timeout(30000) });
     } catch { throw new Error('Jenkins 只读 API 连接失败；不会重试发布'); }
     if (!response.ok) throw new Error(`Jenkins 只读 API HTTP ${response.status}`);
     return response;
@@ -79,7 +80,7 @@ export function createJenkinsReader(env, jobName, jobUrl, fetchImpl = fetch) {
   };
 }
 
-export function configuredJenkinsReader(input) {
+export function configuredJenkinsReader(input, { signal } = {}) {
   const launch = buildLaunch('jenkins-mcp', readConfig(configPath()), {});
-  return createJenkinsReader(launch.env, input.jobName, input.jobUrl);
+  return createJenkinsReader(launch.env, input.jobName, input.jobUrl, fetch, signal);
 }

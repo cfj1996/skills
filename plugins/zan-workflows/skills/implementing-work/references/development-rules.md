@@ -14,8 +14,10 @@ Do not edit until all are true:
   source for repository, scope, source/base, target branch, operation and purpose;
 - current branch equals that fixed branch; and
 - required Bug state/account changes were displayed in Chinese and authorized in the
-  current standalone call or confirmed `fixing-bug` checklist, then privately
-  validated/written/read back with both status and verified repair-owner
+  current standalone call or confirmed `fixing-bug` checklist, then checked by
+  the lead/helper against actual state/owner/member evidence and exact authority
+  (independent scrutiny only for a substantive ambiguity), written/read back with
+  both status and verified repair-owner
   `current_owner`; or the evidence-backed status action is
   `NO_CHANGE|SKIPPED_ALREADY_WAITING_TEST|NOT_APPLICABLE_NON_BUG`;
 - the concrete preview maps exactly to the internally verified payload/base;

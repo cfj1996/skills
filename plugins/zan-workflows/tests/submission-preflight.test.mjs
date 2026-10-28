@@ -8,7 +8,7 @@ import { WorkflowSession as originalWorkflowSession } from '../scripts/workflow-
 
 const response = value => ({ content: [{ type: 'text', text: JSON.stringify(value) }] });
 const id = '123450001';
-const item = () => ({ id, status: 'in_progress', te: 'tester', reporter: 'creator', current_owner: 'developer', test_version: '' });
+const item = () => ({ id, status: 'in_progress', te: 'tester', reporter: 'creator', current_owner: 'developer', version_test: '' });
 const actualList = value => ({ base_url: 'https://www.tapd.cn', data: [{ Bug: value }],
   count: { status: 1, data: { count: 1 }, info: 'success' } });
 
