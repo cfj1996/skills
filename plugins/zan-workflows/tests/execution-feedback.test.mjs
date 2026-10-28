@@ -1,42 +1,55 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { homedir, tmpdir } from 'node:os';
+import { dirname, isAbsolute, join, normalize, relative, resolve, sep } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { WorkflowSession } from '../scripts/workflow-session.mjs';
 import { dataDirectory, limits, listRuns, pluginIdentity, readRun, recordEvent, redactText,
-  runDirectory, sessionRecorder, startRun, writePrivateFile } from '../scripts/execution-recorder.mjs';
+  hash, runDirectory, sessionRecorder, startRun, writePrivateFile } from '../scripts/execution-recorder.mjs';
 import { exportExecutionReport } from '../scripts/export-execution-report.mjs';
 import { FEEDBACK_TARGET, submitExecutionFeedback } from '../scripts/submit-execution-feedback.mjs';
 
-function fixture(t) {
-  const dataDir = fs.mkdtempSync(join(tmpdir(), 'zan-feedback-'));
+function fixture(t, parent = tmpdir()) {
+  const dataDir = fs.realpathSync(fs.mkdtempSync(join(parent, 'zan-feedback-')));
   t.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
   const pluginRoot = join(dataDir, 'plugin');
   fs.mkdirSync(join(pluginRoot, '.codex-plugin'), { recursive: true });
   fs.writeFileSync(join(pluginRoot, '.codex-plugin/plugin.json'), '{"version":"test"}');
-  const options = { dataDir, pluginRoot, force: true };
+  const options = { dataDir, pluginRoot, force: true, uploadBaseDir: dataDir };
   const { runId } = startRun({ skill: 'fixing-bug', goal: '修复重复确认' }, options);
   return { options, runId, input: { runId, feedback: { goalReached: 'PARTIAL', problem: '中途重复确认了三次' } } };
 }
 const response = value => ({ content: [{ type: 'text', text: JSON.stringify(value) }] });
-function gitlab() {
+function gitlab(uploadBaseDir = homedir(), { stringIds = false } = {}) {
+  const base = fs.realpathSync(uploadBaseDir);
   const calls = [], issues = [];
-  const project = { id: 374, web_url: 'http://git.jubaozan.cn/chenfangjie/skills', visibility: 'public', issues_enabled: true };
+  const project = { id: stringIds ? '374' : 374,
+    web_url: 'http://git.jubaozan.cn/chenfangjie/skills', visibility: 'public', issues_enabled: true };
   const call = async (name, args) => {
     calls.push({ name, args });
     switch (name) {
       case 'get_project': return response(project);
       case 'list_issues': return response(issues);
-      case 'get_issue': return response(issues.find(row => row.iid === Number(args.issue_iid)));
-      case 'upload_markdown':
-        assert.ok(fs.readFileSync(args.file_path).subarray(0, 2).equals(Buffer.from('PK')));
+      case 'get_issue': return response(issues.find(row => String(row.iid) === args.issue_iid));
+      case 'upload_markdown': {
+        const path = normalize(args.file_path);
+        assert.equal(isAbsolute(path), false, 'MCP rejects absolute file_path');
+        assert.equal(path === '..' || path.startsWith('..' + sep), false, 'MCP rejects traversal');
+        let current = base;
+        for (const part of path.split(sep)) {
+          current = join(current, part);
+          assert.equal(fs.lstatSync(current).isSymbolicLink(), false, 'MCP rejects symlinks');
+        }
+        assert.equal(relative(base, fs.realpathSync(current)).startsWith('..'), false, 'MCP rejects escapes');
+        assert.ok(fs.readFileSync(current).subarray(0, 2).equals(Buffer.from('PK')));
         return response({ url: '/uploads/' + 'a'.repeat(32) + '/execution-report.zip' });
+      }
       case 'create_issue': {
-        const issue = { iid: issues.length + 1, project_id: 374, description: args.description,
+        const issue = { iid: stringIds ? String(issues.length + 1) : issues.length + 1,
+          project_id: stringIds ? '374' : 374, description: args.description,
           web_url: project.web_url + '/-/issues/' + (issues.length + 1) };
         issues.push(issue);
         return response(issue);
@@ -46,8 +59,22 @@ function gitlab() {
   };
   return { calls, issues, project, call };
 }
-function submissionFixture(t) {
-  return { ...fixture(t), fake: gitlab() };
+function submissionFixture(t, { stage = false } = {}) {
+  const result = fixture(t);
+  if (stage) {
+    result.options.uploadBaseDir = join(result.options.dataDir, 'upload-home');
+    fs.mkdirSync(result.options.uploadBaseDir, { mode: 0o700 });
+  }
+  return { ...result, fake: gitlab(result.options.uploadBaseDir) };
+}
+
+function existingFeedbackIssue(fake, exported, overrides = {}) {
+  const issue = { iid: 1, project_id: 374,
+    description: '<!-- zan-feedback-' + exported.runId + '-' + exported.revision + ' -->\n' +
+      '[execution-report.zip](/uploads/' + 'a'.repeat(32) + '/execution-report.zip)',
+    web_url: fake.project.web_url + '/-/issues/1', ...overrides };
+  fake.issues.push(issue);
+  return issue;
 }
 
 test('content fingerprint detects changed installed scripts even without a version bump', t => {
@@ -202,7 +229,8 @@ test('feedback always uses the pinned project without reading an old destination
 
 test('destination overrides and a mismatched GitLab project cannot redirect feedback', async t => {
   const { options, input, fake } = submissionFixture(t);
-  for (const override of [{ projectId: '999' }, { projectUrl: 'https://other.test/a/b' }, { target: {} }]) {
+  for (const override of [{ projectId: '999' }, { projectUrl: 'https://other.test/a/b' }, { target: {} },
+    { uploadBaseDir: options.dataDir }, { file_path: '/etc/passwd' }]) {
     await assert.rejects(submitExecutionFeedback(fake.call, { ...input, ...override }, options), /固定接收地址/);
   }
   assert.equal(fake.calls.length, 0);
@@ -232,6 +260,156 @@ test('execute uploads once, creates once, reads back and reuses the same report 
   assert.equal(fake.calls.filter(row => row.name === 'create_issue').length, 1);
 });
 
+test('decimal string IDs from project, list, create and get responses normalize before verification and reuse', async t => {
+  const { options, input } = fixture(t), fake = gitlab(options.uploadBaseDir, { stringIds: true });
+  const request = { ...input, execute: true, confirmed: true };
+  const first = await submitExecutionFeedback(fake.call, request, options);
+  assert.equal(first.state, 'VERIFIED'); assert.equal(first.issueIid, 1); assert.equal(first.writes, 2);
+  assert.equal(fake.issues[0].iid, '1'); assert.equal(fake.issues[0].project_id, '374');
+  const second = await submitExecutionFeedback(fake.call, request, options);
+  assert.equal(second.state, 'VERIFIED'); assert.equal(second.issueIid, 1);
+  assert.equal(second.writes, 0); assert.equal(second.reused, true);
+  assert.equal(fake.calls.filter(row => row.name === 'upload_markdown').length, 1);
+  assert.equal(fake.calls.filter(row => row.name === 'create_issue').length, 1);
+  assert.ok(fake.calls.filter(row => row.name === 'get_issue').every(row => row.args.issue_iid === '1'));
+});
+
+test('an existing matching Issue with string IDs reconciles without an upload or create', async t => {
+  const { options, input } = fixture(t), fake = gitlab(options.uploadBaseDir, { stringIds: true });
+  existingFeedbackIssue(fake, exportExecutionReport(input, options), { iid: '1', project_id: '374' });
+  const result = await submitExecutionFeedback(fake.call, { ...input, execute: true, confirmed: true }, options);
+  assert.equal(result.state, 'VERIFIED'); assert.equal(result.issueIid, 1);
+  assert.equal(result.writes, 0); assert.equal(result.reused, true);
+  assert.equal(fake.calls.some(row => ['upload_markdown', 'create_issue'].includes(row.name)), false);
+});
+
+const malformedIds = ['', ' ', ' 1', '1 ', '1\n', '01', '0', '-1', '1.0', '1e0', '0x1',
+  '9007199254740992', 0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1, null, false, {}, []];
+
+test('malformed list identities and foreign projects are rejected before Issue reads or writes', async t => {
+  for (const field of ['iid', 'project_id']) {
+    for (const value of [...malformedIds, ...(field === 'project_id' ? [375, '375', '0374'] : [])]) {
+      const { options, input, fake } = submissionFixture(t);
+      existingFeedbackIssue(fake, exportExecutionReport(input, options), { [field]: value });
+      await assert.rejects(submitExecutionFeedback(fake.call, { ...input, execute: true, confirmed: true }, options), /缺少身份|项目不匹配/);
+      assert.equal(fake.calls.some(row => ['get_issue', 'upload_markdown', 'create_issue'].includes(row.name)), false);
+    }
+  }
+});
+
+test('malformed get identities and foreign projects cannot verify an existing feedback Issue', async t => {
+  for (const field of ['iid', 'project_id']) {
+    for (const value of [...malformedIds, ...(field === 'project_id' ? [375, '375', '0374'] : [])]) {
+      const { options, input, fake } = submissionFixture(t);
+      const issue = existingFeedbackIssue(fake, exportExecutionReport(input, options));
+      const call = (name, args) => name === 'get_issue' ? response({ ...issue, [field]: value }) : fake.call(name, args);
+      await assert.rejects(submitExecutionFeedback(call, { ...input, execute: true, confirmed: true }, options), /内容或归属/);
+      assert.equal(fake.calls.some(row => ['upload_markdown', 'create_issue'].includes(row.name)), false);
+    }
+  }
+});
+
+test('malformed create acknowledgments remain UNKNOWN and require independent reconciliation', async t => {
+  for (const field of ['iid', 'project_id']) {
+    for (const value of [...malformedIds, ...(field === 'project_id' ? [375, '375', '0374'] : [])]) {
+      const { options, input, fake } = submissionFixture(t), request = { ...input, execute: true, confirmed: true };
+      const call = async (name, args) => {
+        const result = await fake.call(name, args);
+        return name === 'create_issue' ? response({ ...fake.issues[0], [field]: value }) : result;
+      };
+      const first = await submitExecutionFeedback(call, request, options);
+      assert.equal(first.state, 'UNKNOWN'); assert.equal(first.priorState, 'CREATE_STARTED');
+      assert.equal(fake.calls.some(row => row.name === 'get_issue'), false);
+      const reconciled = await submitExecutionFeedback(fake.call, request, options);
+      assert.equal(reconciled.state, 'VERIFIED'); assert.equal(reconciled.writes, 0);
+      assert.equal(fake.calls.filter(row => row.name === 'upload_markdown').length, 1);
+      assert.equal(fake.calls.filter(row => row.name === 'create_issue').length, 1);
+    }
+  }
+});
+
+test('the default MCP home base receives an existing home report as a relative path', async t => {
+  const { options, input } = fixture(t, homedir()), fake = gitlab();
+  delete options.uploadBaseDir;
+  const exported = exportExecutionReport(input, options);
+  const result = await submitExecutionFeedback(fake.call, { ...input, execute: true, confirmed: true }, options);
+  assert.equal(result.state, 'VERIFIED');
+  const upload = fake.calls.find(row => row.name === 'upload_markdown');
+  assert.equal(upload.args.file_path, relative(fs.realpathSync(homedir()), exported.archivePath));
+  assert.equal(isAbsolute(upload.args.file_path), false);
+  assert.equal(hash(fs.readFileSync(exported.archivePath)), exported.archiveHash);
+});
+
+test('reports outside MCP home use a private identical ZIP and clean only their unique staging directory', async t => {
+  const { options, input, fake } = submissionFixture(t, { stage: true });
+  const exported = exportExecutionReport(input, options), keep = join(options.uploadBaseDir, 'keep');
+  fs.writeFileSync(keep, 'unrelated file');
+  let staged;
+  const call = async (name, args) => {
+    if (name === 'upload_markdown') {
+      staged = resolve(options.uploadBaseDir, args.file_path);
+      assert.match(args.file_path, /^\.zan-feedback-upload-[^/\\]+[/\\]execution-report\.zip$/);
+      assert.equal(fs.statSync(dirname(staged)).mode & 0o777, 0o700);
+      assert.equal(fs.statSync(staged).mode & 0o777, 0o600);
+      assert.equal(hash(fs.readFileSync(staged)), exported.archiveHash);
+      assert.deepEqual(fs.readFileSync(staged), fs.readFileSync(exported.archivePath));
+    }
+    return fake.call(name, args);
+  };
+  const result = await submitExecutionFeedback(call, { ...input, execute: true, confirmed: true }, options);
+  assert.equal(result.state, 'VERIFIED');
+  assert.equal(fs.existsSync(staged), false); assert.equal(fs.existsSync(dirname(staged)), false);
+  assert.equal(fs.readFileSync(keep, 'utf8'), 'unrelated file');
+  assert.equal(hash(fs.readFileSync(exported.archivePath)), exported.archiveHash);
+});
+
+test('MCP upload mock rejects absolute paths, traversal and symlinks before reading files', async t => {
+  const { options } = fixture(t), fake = gitlab(options.uploadBaseDir);
+  const path = join(options.uploadBaseDir, 'valid.zip');
+  fs.writeFileSync(path, 'PKfixture');
+  fs.symlinkSync(path, join(options.uploadBaseDir, 'linked.zip'));
+  await assert.rejects(fake.call('upload_markdown', { file_path: path }), /absolute/);
+  await assert.rejects(fake.call('upload_markdown', { file_path: '../valid.zip' }), /traversal/);
+  await assert.rejects(fake.call('upload_markdown', { file_path: 'linked.zip' }), /symlinks/);
+  await fake.call('upload_markdown', { file_path: 'valid.zip' });
+});
+
+for (const stage of [false, true]) {
+  test(`report directory symlinks are rejected before upload state is saved (staging=${stage})`, async t => {
+    const { options, input, fake } = submissionFixture(t, { stage });
+    const exported = exportExecutionReport(input, options), dir = dirname(exported.archivePath);
+    const moved = dir + '-original';
+    const call = async (name, args) => {
+      if (name === 'get_project') {
+        fs.renameSync(dir, moved);
+        fs.symlinkSync(moved, dir);
+      }
+      return fake.call(name, args);
+    };
+    await assert.rejects(submitExecutionFeedback(call, { ...input, execute: true, confirmed: true }, options), /符号链接/);
+    assert.equal(fake.calls.some(row => ['upload_markdown', 'create_issue'].includes(row.name)), false);
+    assert.equal(fs.readdirSync(moved).some(name => name.startsWith('submission-')), false);
+    if (stage) assert.deepEqual(fs.readdirSync(options.uploadBaseDir), []);
+  });
+}
+
+test('an external data directory replaced by a root symlink during preflight cannot become a trusted source', async t => {
+  const { options, input, fake } = submissionFixture(t, { stage: true });
+  const exported = exportExecutionReport(input, options), root = options.dataDir, moved = root + '-original';
+  t.after(() => fs.rmSync(moved, { recursive: true, force: true }));
+  const call = async (name, args) => {
+    if (name === 'get_project') {
+      fs.renameSync(root, moved);
+      fs.symlinkSync(moved, root);
+    }
+    return fake.call(name, args);
+  };
+  await assert.rejects(submitExecutionFeedback(call, { ...input, execute: true, confirmed: true }, options), /符号链接/);
+  assert.equal(fake.calls.some(row => ['upload_markdown', 'create_issue'].includes(row.name)), false);
+  assert.equal(fs.readdirSync(join(moved, relative(root, dirname(exported.archivePath))))
+    .some(name => name.startsWith('submission-')), false);
+});
+
 test('the pinned public project is supported, while disabled Issues block writes', async t => {
   const { options, input, fake } = submissionFixture(t);
   assert.equal(fake.project.visibility, 'public');
@@ -242,10 +420,19 @@ test('the pinned public project is supported, while disabled Issues block writes
 });
 
 test('unknown upload is never replayed after a lost response', async t => {
-  const { options, input, fake } = submissionFixture(t);
-  const call = (name, args) => name === 'upload_markdown' ? Promise.reject(new Error('response lost')) : fake.call(name, args);
+  const { options, input, fake } = submissionFixture(t, { stage: true });
+  let staged;
+  const call = (name, args) => {
+    if (name === 'upload_markdown') {
+      staged = resolve(options.uploadBaseDir, args.file_path);
+      assert.equal(fs.existsSync(staged), true);
+      return Promise.reject(new Error('response lost'));
+    }
+    return fake.call(name, args);
+  };
   const first = await submitExecutionFeedback(call, { ...input, execute: true, confirmed: true }, options);
   assert.equal(first.state, 'UNKNOWN'); assert.equal(first.writes, null);
+  assert.equal(fs.existsSync(staged), false); assert.equal(fs.existsSync(dirname(staged)), false);
   const again = await submitExecutionFeedback(fake.call, { ...input, execute: true, confirmed: true }, options);
   assert.equal(again.state, 'UNKNOWN');
   assert.equal(fake.calls.some(row => ['upload_markdown', 'create_issue'].includes(row.name)), false);

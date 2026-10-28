@@ -1,17 +1,24 @@
 #!/usr/bin/env node
 import * as fs from 'node:fs';
-import { join, resolve } from 'node:path';
+import { homedir } from 'node:os';
+import { isAbsolute, join, normalize, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { McpClientPool } from './mcp-client.mjs';
 import { readTool } from './workflow-runtime.mjs';
 import { exportExecutionReport, renderReport } from './export-execution-report.mjs';
-import { hash, readFeedbackInput, readPrivateFile, readPrivateJson, redactText,
+import { dataDirectory, hash, readFeedbackInput, readPrivateFile, readPrivateJson, redactText,
   writePrivateFile } from './execution-recorder.mjs';
 
 export const FEEDBACK_TARGET = Object.freeze({
   projectId: '374',
   projectUrl: 'http://git.jubaozan.cn/chenfangjie/skills',
 });
+
+function positiveId(value) {
+  if (typeof value !== 'number' && (typeof value !== 'string' || !/^[1-9][0-9]*$/.test(value))) return null;
+  const id = Number(value);
+  return Number.isSafeInteger(id) && id > 0 && (typeof value === 'number' || String(id) === value) ? id : null;
+}
 
 function projectUrl(value) {
   const url = new URL(value);
@@ -24,7 +31,7 @@ function projectUrl(value) {
 
 async function checkedProject(call) {
   const project = await readTool(call, 'get_project', { project_id: FEEDBACK_TARGET.projectId });
-  if (!project || project.id !== Number(FEEDBACK_TARGET.projectId) ||
+  if (!project || positiveId(project.id) !== Number(FEEDBACK_TARGET.projectId) ||
       projectUrl(project.web_url) !== FEEDBACK_TARGET.projectUrl) {
     throw new Error('反馈项目读回与内置目标不匹配');
   }
@@ -35,15 +42,16 @@ async function checkedProject(call) {
 }
 
 function verifyIssue(issue, target, key, attachment) {
-  if (!Number.isSafeInteger(issue?.iid) || issue.iid <= 0 || issue.project_id !== Number(target.projectId) ||
+  const iid = positiveId(issue?.iid);
+  if (!iid || positiveId(issue?.project_id) !== Number(target.projectId) ||
       typeof issue.description !== 'string' || !issue.description.includes('<!-- ' + key + ' -->') ||
       attachment && !issue.description.includes(attachment)) throw new Error('Issue 内容或归属读回不匹配');
   const url = new URL(issue.web_url);
   const expected = new URL(target.projectUrl);
-  if (url.origin !== expected.origin || ![expected.pathname + '/-/issues/' + issue.iid,
-    expected.pathname + '/issues/' + issue.iid].includes(url.pathname) ||
+  if (url.origin !== expected.origin || ![expected.pathname + '/-/issues/' + iid,
+    expected.pathname + '/issues/' + iid].includes(url.pathname) ||
     url.username || url.password || url.search || url.hash) throw new Error('Issue 链接不属于反馈项目');
-  return { issueIid: issue.iid, issueUrl: issue.web_url };
+  return { issueIid: iid, issueUrl: issue.web_url };
 }
 
 async function findIssue(call, target, key) {
@@ -53,8 +61,9 @@ async function findIssue(call, target, key) {
       scope: 'all', state: 'all', search: key, per_page: 100, page, summary: false });
     if (!Array.isArray(rows)) throw new Error('反馈 Issue 查询结果无法识别');
     for (const row of rows) {
-      if (!Number.isSafeInteger(row?.iid)) throw new Error('反馈 Issue 查询缺少身份');
-      const issue = await readTool(call, 'get_issue', { project_id: target.projectId, issue_iid: String(row.iid) });
+      const iid = positiveId(row?.iid);
+      if (!iid || positiveId(row?.project_id) !== Number(target.projectId)) throw new Error('反馈 Issue 查询缺少身份或项目不匹配');
+      const issue = await readTool(call, 'get_issue', { project_id: target.projectId, issue_iid: String(iid) });
       if (typeof issue.description === 'string' && issue.description.includes('<!-- ' + key + ' -->')) {
         matches.push(issue);
       }
@@ -72,6 +81,63 @@ function attachmentLink(upload) {
     throw new Error('附件响应不是本项目的标准相对上传路径');
   }
   return '[execution-report.zip](' + path + ')';
+}
+
+function insideBase(path) {
+  return path !== '' && !isAbsolute(path) && !path.startsWith('..');
+}
+
+function checkedUploadFile(base, filePath) {
+  if (!insideBase(filePath) || filePath.split(sep).includes('..') || normalize(filePath) !== filePath) {
+    throw new Error('附件路径必须位于受信目录内，不能包含路径穿越');
+  }
+  let current = base;
+  for (const part of filePath.split(sep)) {
+    current = join(current, part);
+    if (fs.lstatSync(current).isSymbolicLink()) throw new Error('附件路径不允许符号链接');
+  }
+  const real = fs.realpathSync(current);
+  if (!insideBase(relative(base, real))) throw new Error('附件路径超出受信目录');
+  return real;
+}
+
+function prepareReportUpload(exported, options) {
+  // start-mcp.mjs launches GitLab MCP in homedir(). The optional base is a
+  // trusted test dependency; feedback input cannot change it.
+  const base = fs.realpathSync(options.uploadBaseDir ?? homedir());
+  const dataRoot = dataDirectory(options), dataStat = fs.lstatSync(dataRoot);
+  if (!dataStat.isDirectory() || dataStat.isSymbolicLink()) throw new Error('附件数据目录不允许符号链接');
+  const homeRelative = relative(base, exported.archivePath);
+  const source = insideBase(homeRelative)
+    ? checkedUploadFile(base, homeRelative)
+    : checkedUploadFile(fs.realpathSync(dataRoot), relative(dataRoot, exported.archivePath));
+  const bytes = readPrivateFile(source, 4194304);
+  if (hash(bytes) !== exported.archiveHash) throw new Error('报告附件已变化');
+  const direct = relative(base, source);
+  if (insideBase(direct)) return { filePath: direct, cleanup() {} };
+
+  const dir = fs.mkdtempSync(join(base, '.zan-feedback-upload-'));
+  const identity = fs.lstatSync(dir), path = join(dir, 'execution-report.zip');
+  const cleanup = () => {
+    const stat = fs.lstatSync(dir);
+    if (!stat.isDirectory() || stat.isSymbolicLink() || stat.dev !== identity.dev || stat.ino !== identity.ino) {
+      throw new Error('附件暂存目录已变化，拒绝清理其他路径');
+    }
+    try { fs.unlinkSync(path); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+    fs.rmdirSync(dir);
+  };
+  try {
+    fs.chmodSync(dir, 0o700);
+    writePrivateFile(path, bytes, { exclusive: true });
+    fs.chmodSync(path, 0o600);
+    const filePath = relative(base, path);
+    checkedUploadFile(base, filePath);
+    if (hash(readPrivateFile(path, 4194304)) !== exported.archiveHash) throw new Error('暂存附件已变化');
+    return { filePath, cleanup };
+  } catch (error) {
+    cleanup();
+    throw error;
+  }
 }
 
 export async function submitExecutionFeedback(call, input, options = {}) {
@@ -120,11 +186,14 @@ export async function submitExecutionFeedback(call, input, options = {}) {
     if (hash(readPrivateFile(exported.archivePath, 4194304)) !== exported.archiveHash) throw new Error('报告附件已变化');
     let attachment = receipt?.attachment;
     if (!attachment) {
-      save({ state: 'UPLOAD_STARTED' }); writePending = true;
-      const uploaded = await readTool(call, 'upload_markdown', { project_id: target.projectId,
-        file_path: exported.archivePath, _confirmed: true });
-      writes++; attachment = attachmentLink(uploaded);
-      save({ state: 'UPLOADED', attachment }); writePending = false;
+      const upload = prepareReportUpload(exported, options);
+      try {
+        save({ state: 'UPLOAD_STARTED' }); writePending = true;
+        const uploaded = await readTool(call, 'upload_markdown', { project_id: target.projectId,
+          file_path: upload.filePath, _confirmed: true });
+        writes++; attachment = attachmentLink(uploaded);
+        save({ state: 'UPLOADED', attachment }); writePending = false;
+      } finally { upload.cleanup(); }
     }
     if (hash(readPrivateFile(exported.archivePath, 4194304)) !== exported.archiveHash) throw new Error('报告附件已变化');
     save({ state: 'CREATE_STARTED', attachment }); writePending = true;
@@ -133,10 +202,11 @@ export async function submitExecutionFeedback(call, input, options = {}) {
       description: renderReport(exported.report, 60) + '\n附件：' + attachment + '\n\n<!-- ' + key + ' -->\n',
       _confirmed: true });
     writes++;
-    if (!Number.isSafeInteger(created?.iid)) throw new Error('建单响应缺少 Issue 身份');
+    const createdIid = positiveId(created?.iid);
+    if (!createdIid || positiveId(created?.project_id) !== Number(target.projectId)) throw new Error('建单响应缺少 Issue 身份或项目不匹配');
     // Persist the acknowledged write before its independent readback.
-    save({ state: 'CREATED_UNVERIFIED', attachment, issueIid: created.iid }); writePending = false;
-    const issue = await readTool(call, 'get_issue', { project_id: target.projectId, issue_iid: String(created.iid) });
+    save({ state: 'CREATED_UNVERIFIED', attachment, issueIid: createdIid }); writePending = false;
+    const issue = await readTool(call, 'get_issue', { project_id: target.projectId, issue_iid: String(createdIid) });
     const identity = verifyIssue(issue, target, key, attachment);
     save({ state: 'VERIFIED', attachment, ...identity });
     return { state: 'VERIFIED', ...local, ...target, ...identity, writes, reused: false };
