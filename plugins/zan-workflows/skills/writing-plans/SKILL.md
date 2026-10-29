@@ -403,21 +403,16 @@ Plan 细化发现任务范围、人员或工时需变更时，返回受影响任
 
 ## 确认更新 Plan
 
-Write the Plan only after the user explicitly confirms the displayed update.
-The authorization must bind the 产物位置规则 and development branch facts;
-standalone and panel confirmation can remain separate when those facts were
-not already shown together.
+只有用户明确确认已展示的更新后，才允许写入 Plan。授权须绑定产物位置规则
+和开发分支事实；这些事实尚未一并展示时，独立确认与面板确认可以分别完成。
 
-For `DEFER_TO_ORCHESTRATOR`, the combined requirement/branch checklist may also
-serve as this Plan-update confirmation only when it already displays the exact
-Plan paths and proposed content or diff. Reuse that current-conversation
-authorization if the saved content is unchanged apart from the explicitly
-approved, verified system-ID/link fill above; do not ask the same question
-again just because `PLAN_WRITE` begins. A new location, new module or material
-content change requires a fresh preview and confirmation. `PANEL` still uses
-its trusted `confirmPlan` and saved-plan receipt protocol.
+对于 `DEFER_TO_ORCHESTRATOR`，合并展示的需求、分支清单只有已包含准确 Plan
+路径及拟写内容或差异时，才可同时作为本次 Plan 更新确认。保存内容未变化，
+或仅按上文已明确批准、核实的映射回填系统 ID 和链接时，复用当前对话的
+原授权，不因进入 `PLAN_WRITE` 再问同一个问题。新位置、新模块或正文实质
+变化须重新预览并确认；`PANEL` 仍使用可信 `confirmPlan` 与保存回执协议。
 
-Use the human-readable [页面交付 Plan 模板](assets/page-delivery-plan-template.md) only after both the project location rule and this update are confirmed. 按模块原样保存需求、验收例子、`reviewConclusion`、实现方案、未决事项与本轮变更。需求已确认但实现 `blocked` 时允许阶段保存，明确缺口且不得标为可实施；`ready` 方案仍须保留一句话摘要、四块实施内容与证据。新建规范化 Plan 使用 `schemaVersion=4`，旧 v3 可读取并按新审查要求迁移，缺依赖审查信息不默认为就绪；业务 `questions`、本轮阶段必需外部依赖和内部实施依据都须满足门禁才能实施。Markdown 中不嵌入 JSON。保持同一模块一份 Plan、稳定编号与明确双向关联。用户确认只表示允许写入，Agent 写入并读回核对后调用 `markPlanSaved`，面板才显示“已保存”。
+项目产物位置规则和本次更新均确认后，才使用[页面交付 Plan 模板](assets/page-delivery-plan-template.md)。按模块原样保存需求、验收例子、`reviewConclusion`、实现方案、未决事项与本轮变更。需求已确认但实现 `blocked` 时允许阶段保存，明确缺口且不得标为可实施；`ready` 方案仍须保留一句话摘要、四块实施内容与证据。新建规范化 Plan 使用 `schemaVersion=4`，旧 v3 可读取并按新审查要求迁移，缺依赖审查信息不默认为就绪；业务 `questions`、本轮阶段必需外部依赖和内部实施依据都须满足门禁才能实施。Markdown 中不嵌入 JSON。保持同一模块一份 Plan、稳定编号与明确双向关联。用户确认只表示允许写入，Agent 写入并读回核对后调用 `markPlanSaved`，面板才显示“已保存”。
 
 ## 输出契约与交接
 

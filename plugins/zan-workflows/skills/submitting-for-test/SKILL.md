@@ -5,6 +5,13 @@ description: Use for 直接提测 after implementation or developer inspection; 
 
 # Submit for Test
 
+## 用户说明
+
+独立调用本技能时同样遵守[限制与确认说明](../../references/execution-checklist.md#限制与确认说明)。
+面向中文用户时，限制、确认理由与阻塞原因均用中文说明；解释确认出处时，
+链接本技能并引用下方中文确认条款。用户未要求核对英文原文时，不附英文
+规则引文；机器字段、枚举、代码、命令和路径保持原样。
+
 ## Mock test-delivery gate
 
 Before any selected commit/push/MR/merge, build, Wiki/comment or TAPD registration,
@@ -78,15 +85,14 @@ long human/reviewer waits; the default idle limit is five minutes. Request
 timeouts/unknown writes require actual-effect inspection, never automatic
 replay. Follow the linked session reference for timing and budget flags.
 
-Accept `submission_phase=PLAN|EXECUTE`. The first invocation is always `PLAN`:
-it is read-only and returns the complete plan. Follow the shared
-[confirmation-reuse contract](../../references/execution-checklist.md#执行清单的确认复用).
-When a Bug/requirement orchestrator supplies its complete execution checklist
-and real human confirmation, compare the exact plan to that authority and
-continue to EXECUTE without another user turn. For a standalone invocation,
-display the plan, ask for its confirmation and stop; only that matching
-confirmation permits EXECUTE. A helper's PLAN state is not a mandatory new
-human approval when the orchestrator already has matching authority.
+接受 `submission_phase=PLAN|EXECUTE`。首次调用始终进入 `PLAN`，只读准备并
+返回完整计划，遵守[执行清单的确认复用](../../references/execution-checklist.md#执行清单的确认复用)：
+
+- 独立提测时，先展示完整计划，询问是否确认并等待回复；只有用户对该计划的
+  匹配确认，才允许进入 `EXECUTE` 执行。
+- 由 Bug 或需求主流程调用时，若完整执行清单及真实用户确认已覆盖本次准确
+  操作，核对匹配后直接进入 `EXECUTE`，无需再次询问。辅助脚本返回 `PLAN`
+  技术状态，本身不构成新的人工确认节点。
 
 Carry the `ReviewedChange`, work definition, Git snapshot, TAPD item and Wiki
 target through both phases. `PLAN` does not repeat implementation review or
@@ -122,10 +128,9 @@ with the same delivery checklist, then append/reuse and read it back before
 any delivery write. Refresh the existing ReviewedChange only after the record
 gate passes; failed/unknown comments block all later writes without replay.
 
-For standalone use, show the direct-submission 确定清单 with actual change/review
-facts, 合并与测试环境 and the requested complete Wiki body/patch, then obtain its
-one matching confirmation before EXECUTE. Implementation-only approval never
-authorizes delivery. Main-entry matching complete authority is reused unchanged.
+独立直接提测时，展示包含实际变更与评审事实、合并与测试环境，以及所选完整
+Wiki 正文或补丁的确定清单，取得一次匹配确认后才进入 `EXECUTE`。仅实施授权
+不包含提测交付；主流程已有匹配的完整执行清单授权时，继续复用，不重复确认。
 
 ## Shared Wiki ownership
 
@@ -165,15 +170,14 @@ READY_FOR_HANDOFF/REVIEWED gates before any commit/push/MR, build, Wiki or final
 registration. Missing code review, required repositories, history or acceptance
 is not this exception and still blocks PLAN.
 
-For `EXECUTE`, also require one `PlannedTestSubmission` with
-`terminal_state=AWAITING_CONFIRMATION` and authorization covering its exact
-operation set: the orchestrator's unchanged complete execution checklist or
-the standalone plan's own human confirmation. Repair-only authorization,
-implementation completion and a true flag alone are insufficient.
+进入 `EXECUTE` 还须有一份 `PlannedTestSubmission`，其
+`terminal_state=AWAITING_CONFIRMATION`，且准确操作集已获授权：来源可以是
+主流程未变化的完整执行清单确认，也可以是独立提测计划的真实用户确认。
+仅修复授权、实现完成或设为真的确认字段，均不能代替提测授权。
 
-Before the first submission write, require one current-conversation
-consolidated authorization binding every displayed submission operation. A
-fresh authorization is required only when a bound fact changes.
+首次提测写入前，须有当前对话中覆盖每项已展示提测操作的统一授权。绑定事实
+变化时，先停止旧计划写入并核对原授权；仅缺失或实质变化的授权范围需要重新
+确认，按[统一提测授权](references/deployment-and-confirmation.md#consolidated-submission-authorization)处理。
 
 `STANDARD` does not require a user-supplied Wiki URL. Wiki discovery and
 creation planning are producer-owned behavior, not an input gate.
@@ -270,15 +274,13 @@ stage transitions do not start new private validators.
    before the first delivery write. Unknown future IDs remain derivations,
    not successful effects. Then return `PlannedTestSubmission` with
    `terminal_state=AWAITING_CONFIRMATION`; PLAN itself performs no write.
-   Standalone calls display this complete plan, ask and stop. An orchestrator
-   instead checks it against the confirmed execution checklist and continues
-   when fully covered; keep unchanged technical plans internal and do not turn
-   a preview into another approval or end-of-stage user question.
-5. In `EXECUTE`, verify the matching standalone confirmation or the
-   orchestrator's exact unchanged checklist authority, then re-read each mutable bound fact at its write
-   boundary. A changed technical binding stops the stale write and requires a
-   fresh accurate plan; compare it to the original authority. Only missing or
-   materially changed scope needs user confirmation, not deterministic receipts.
+   独立调用时展示这份完整计划，询问是否确认并等待回复。主流程调用则核对
+   已确认执行清单，完整覆盖时连续执行；未变化的技术计划保留在内部，不把
+   预览变成新的审批或阶段结束时的询问。
+5. 在 `EXECUTE` 中核对独立提测的匹配确认，或主流程未变化的准确清单授权，
+   并在每次写入边界重新读取可变绑定事实。技术绑定变化时停止旧计划写入，
+   生成准确的新计划并核对原授权；仅缺失或实质变化的范围需要用户确认，
+   按已授权规则确定产生的回执不新增确认。
 6. For each repository, if already delivered or merge is explicitly disabled,
    first ensure every reviewed change is committed in the bound source SHA,
    with no uncommitted delivery delta. Run merge read-only in `CONTAINMENT_ONLY`

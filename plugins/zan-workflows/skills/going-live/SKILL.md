@@ -9,8 +9,8 @@ description: Use when submitted TAPD changes must merge original fixed branches 
 
 独立调用本技能时同样遵守[限制与确认说明](../../references/execution-checklist.md#限制与确认说明)。
 面向中文用户，用完整中文解释本技能及其引用规则、脚本结果中的限制、确认、
-阻塞与清理要求；机器字段、枚举、代码和命令保留原样并解释含义，英文原文
-仅作可选补充。下文英文执行规则同样适用此要求，不直接照抄给用户。
+阻塞与清理要求；机器字段、枚举、代码和命令保留原样并解释含义。用户未明确
+要求核对英文原文时，不附英文规则引文；下文英文执行规则同样适用此要求。
 
 ## 生产 Mock 禁令
 
@@ -284,21 +284,16 @@ user specifies whether to include or exclude the remote temporary rows.
 
 1. Re-read repository fingerprint, original source ref, `master` ref, existing
    MR state, and current-round commits.
-2. Prepare one complete delivery checklist with repository, original source,
-   exact default target, source/target SHAs, commits, MR actions and purpose.
-   Resolve involved packages and include their complete `ToolingLatestPlan`
-   with package latest check, subsequent consumer-version checks, and the
-   resulting release/upgrade/no-op decision (or evidenced
-   `NOT_APPLICABLE`) and the Wiki actions below before showing
-   this checklist. One explicit current-conversation confirmation can bind
-   merge, official package release, scoped consumer upgrades/delivery and exact
-   Wiki-patch authority when fully displayed. An omitted scope still
-   needs its own confirmation; changed facts require a fresh actual preview.
-   A main entry's complete execution checklist may already supply that explicit
-   go-live authority. Apply [confirmation reuse](../../references/execution-checklist.md#执行清单的确认复用),
-   compare the exact delivery/derived facts and continue without another user
-   turn when covered. Standalone going-live still displays and confirms its
-   own complete plan; test-delivery approval never implies master/production.
+2. 准备一份完整上线清单，包含仓库、原始源分支、准确默认目标、源/目标 SHA、
+   提交、MR 操作与目的。涉及工具包时，先补齐完整 `ToolingLatestPlan`：包的
+   latest 检查、随后各消费项目的版本检查及据此决定的发布、升级或无需操作
+   （或有证据的 `NOT_APPLICABLE`），连同下文 Wiki 操作一起展示。
+   当前对话的一次明确确认可覆盖已完整展示的合并、正式包发布、指定消费项目
+   升级与交付，以及准确 Wiki 补丁；遗漏范围仍须补确认，事实变化须重新展示
+   准确预览。按[执行清单的确认复用](../../references/execution-checklist.md#执行清单的确认复用)
+   核对主流程已有完整清单的上线授权，准确操作及派生事实已被覆盖时直接继续。
+   独立上线时，仍须展示并确认完整计划；测试交付授权不包含默认分支交付或
+   生产操作。
 3. For a `STANDARD` submission, read its exact Wiki target and uniquely locate
    the entry by the original source branch. Resolve the project category and
    service type before planning the Wiki operation:

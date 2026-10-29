@@ -30,12 +30,11 @@ Wiki target containing workspace ID, Wiki ID, canonical URL, and association
 evidence. Accept `link_phase=PLAN|EXECUTE` and
 `confirmation_mode=STANDALONE|DEFER_TO_ORCHESTRATOR`.
 
-- `STANDALONE`: `PLAN` is mandatory, displays the exact comment operation and
-  stops. A later exact confirmation permits `EXECUTE`.
-- `DEFER_TO_ORCHESTRATOR`: used by `submitting-for-test`. The current confirmed
-  `SubmissionPlan` must already contain the exact item target, Wiki target,
-  deterministic comment payload, operation, and purpose. Never ask again while
-  those facts remain unchanged.
+- `STANDALONE`：先进入 `PLAN`，展示准确评论操作并等待用户确认；取得后续
+  匹配确认后，才允许进入 `EXECUTE`。
+- `DEFER_TO_ORCHESTRATOR`：由 `submitting-for-test` 调用。当前已确认的
+  `SubmissionPlan` 须已包含准确条目、Wiki 目标、按已授权规则确定的评论正文、
+  操作和目的；这些事实未变化时，不再次询问。
 
 A raw URL alone is not association proof. Accept association from a validated
 `WikiTargetPlan|TestSubmissionResult`, or prove it from the Wiki readback using
@@ -69,13 +68,12 @@ conflicting association evidence is `BLOCKED`.
 
    Do not append implementation, MR, build, deployment, verification, or status
    text.
-5. For standalone `PLAN`, display item type/ID, canonical Wiki ID/URL, exact
-   payload, `intended_operation=TAPD_COMMENT`, and purpose, return
-   `AWAITING_CONFIRMATION`, ask exactly `是否补写以上 Wiki 链接评论？`, and stop.
-6. For `EXECUTE`, require the matching standalone or unchanged orchestrator
-   confirmation and run [comment-validator.md](agents/comment-validator.md)
-   once for the full authorized script invocation. Only `验证通过` permits
-   execution; discard the private line.
+5. 独立调用的 `PLAN` 展示条目类型/ID、规范 Wiki ID/URL、准确评论正文、
+   `intended_operation=TAPD_COMMENT` 和目的，返回 `AWAITING_CONFIRMATION`，
+   询问“是否补写以上 Wiki 链接评论？”并等待回复。
+6. 进入 `EXECUTE` 前，须有匹配的独立确认或主流程未变化的授权；对完整已授权
+   脚本调用执行一次 [comment-validator.md](agents/comment-validator.md)。
+   只有“验证通过”才允许执行，丢弃该私有校验行。
 7. Call the helper once with `--mode link --execute`, exact item/branch,
    `--expected-wiki-id`, `--expected-month-id`, title,
    `--expected-body-sha256`, `--expect-target REUSE_EXISTING` and comment

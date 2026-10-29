@@ -43,74 +43,64 @@ question, not a separate deployment preference prompt.
 
 ## Consolidated submission authorization
 
-Follow [execution-checklist confirmation reuse](../../../references/execution-checklist.md#执行清单的确认复用).
-After `ReviewedChange` passes, prepare one complete `SubmissionPlan` before the
-first submission write. `submission_phase=PLAN` is always read-only and returns
-`AWAITING_CONFIRMATION`; this technical state does not itself require another
-human turn. There are two authorization paths:
+沿用[执行清单的确认复用](../../../references/execution-checklist.md#执行清单的确认复用)。
+`ReviewedChange` 通过后，首次提测写入前准备一份完整 `SubmissionPlan`。
+`submission_phase=PLAN` 始终只读，返回 `AWAITING_CONFIRMATION`；该技术状态
+本身不要求新增一轮人工确认。授权分为两条路径：
 
-- From `fixing-bug`/`developing-requirement`: consume the complete execution
-  checklist, actual human confirmation and current handoffs. Compare each
-  selected operation and derived fact to that scope, validate the accurate
-  plan and call `submission_phase=EXECUTE` directly when fully covered. Do not
-  redisplay an unchanged full plan or ask “是否执行正式提测计划”.
-- Standalone skill invocation: display the complete exact plan/body, ask for
-  its confirmation and stop. A later matching human confirmation permits
-  EXECUTE. Merely mentioning a prior repair, supplying a true flag or having
-  implementation results does not establish orchestrated authority.
+- 由 `fixing-bug` / `developing-requirement` 编排：接收完整执行清单、真实人工
+  确认和当前交接结果，逐项比较所选操作及派生事实是否属于原授权范围。
+  准确计划校验通过且完全覆盖时，直接调用 `submission_phase=EXECUTE`，不重新
+  展示未变化的完整计划，也不再询问“是否执行正式提测计划”。
+- 独立调用本技能：展示完整、准确的操作计划和正文，请求确认后停下，等待用户
+  对这份内容作出匹配的明确确认，才可进入 `EXECUTE`。仅提及此前修复、提供
+  true 标志或已有实施结果，不能证明具备主编排的完整授权。
 
-The applicable confirmed checklist/standalone plan must cover:
+适用的已确认清单或独立计划必须覆盖：
 
-- repository, reviewed paths/diff identity, original source branch, verified
-  test target (`dev` or `develop`), and commit/push/MR create-or-update/merge intent;
-- `STANDARD|NO_WIKI`, owner/hierarchy/entry scope, template and evidence-based
-  completion rule, or the exact final body/patch when confirmed standalone;
-- `DEPLOY|SKIP`; for `DEPLOY`, target project, release target, test environment,
-  Jenkins Job, exact confirmed test-target ref/SHA identity, version/build parameter,
-  test release channel, and purpose;
-- deterministic `Bug|Story|Task` Wiki-link comment and final TAPD status/owner/
-  test-version actions, including a bounded version-text derivation rule;
-- status behavior from `work_mode`.
+- 仓库、已评审路径和差异标识、原始源分支、已核实的测试目标（`dev` 或
+  `develop`），以及提交、推送、创建或更新 MR、合并的操作意图。
+- `STANDARD|NO_WIKI`、Wiki 归属、层级与条目范围，以及主编排确认中的模板和
+  基于证据补全内容的规则，或独立确认中的准确最终正文或补丁。
+- `DEPLOY|SKIP`；选择 `DEPLOY` 时，覆盖目标项目、发布目标、测试环境、
+  Jenkins Job、准确且已确认的测试目标 ref/SHA 标识、版本或构建参数、测试
+  发布通道及目的。
+- 内容可确定的 `Bug|Story|Task` Wiki 链接评论，以及最终 TAPD 状态、处理人、
+  测试版本操作，包括有明确边界的版本文本派生规则。
+- `work_mode` 对应的状态处理行为。
 
-Exact post-review diff/SHA, final Wiki body/patch/hashes, release parameters
-and metadata bindings must still be calculated and validated before writing.
-An approved business scope is not a guessed future diff or permission to
-deploy unrelated target commits. Keep the exact reviewed/source containment
-and mutable-fact checks; populate derived technical fields only from evidence.
+写入前仍须计算并校验评审后的准确差异与 SHA、最终 Wiki 正文、补丁和指纹、
+发布参数及元数据绑定。业务范围获准不代表可以猜测未来差异，也不授权部署目标
+中的无关提交。保留已评审版本与源码的准确包含关系检查及可变事实核对；派生
+技术字段只能依据证据填写。
 
-The plan shows “需要提测 Wiki” or “不需要提测 Wiki”, mapped internally to
-`STANDARD|NO_WIKI`; do not show only “标准流程” or raw profile codes. For `NO_WIKI`, list Wiki discovery,
-read, create, update and comment as omitted operations.
+计划面向用户展示“需要提测 Wiki”或“不需要提测 Wiki”，内部映射到
+`STANDARD|NO_WIKI`，不能只展示“标准流程”或原始配置代码。`NO_WIKI` 须明确
+列出不执行 Wiki 查找、读取、创建、更新和评论。
 
-Repair-only/implementation-only confirmation, “修复完成就提测”, defaults, or an
-unconfirmed checklist do not authorize missing delivery operations. If the
-main execution checklist already explicitly covers those operations, reuse
-it; do not reject it merely because its confirmation preceded implementation.
+仅修复或仅实施的确认、“修复完成就提测”、默认选项或未确认的清单，均不能
+授权尚未覆盖的交付操作。主执行清单已明确覆盖这些操作时复用其授权，不能仅因
+确认发生在实施前就拒绝复用。
 
-The same authorization remains valid while scope and authorized semantics
-remain unchanged. Generated commit SHA, MR ID, Wiki/month/child ID, Jenkins
-queue/build ID, verified implementation/results and template completion do not require another confirmation
-when they follow the authorized derivation. Pure technical binding refreshes
-still stop the stale write and require a fresh accurate validated plan; they
-do not automatically require another human approval. Include all complete bundles
-and the Wiki draft in one independent `PRE_SUBMISSION_PLAN` review under
-[whole-plan review](submission-rules.md#whole-plan-review); scripts still check
-and read back every write without another Agent invocation.
+范围和已授权操作的含义不变时，原授权继续有效。按已授权规则派生的提交 SHA、
+MR ID、Wiki 及月份页、子页 ID、Jenkins 队列或构建 ID、已核实的实施结果和
+模板补全，不要求再次确认。仅刷新技术绑定时，仍须停止使用旧绑定写入，并准备
+一份更新、准确且校验通过的计划，但不会自动触发新的人工审批。按
+[完整计划评审](submission-rules.md#whole-plan-review)，将所有完整操作包和 Wiki
+草稿纳入一次独立 `PRE_SUBMISSION_PLAN` 评审；脚本仍逐项检查写入并读回，无须
+为每一步再调用 Agent。
 
-Require fresh authorization when project/repository, business scope or key
-approach, source/target branch, operation set, Wiki owner/body semantics,
-Jenkins Job/environment/channel or parameter semantics, TAPD target/personnel,
-or purpose extends/changes the approved scope. Automatic A → C → B conflict
-handling consumes the conditional scope already included in the main checklist;
-otherwise show and confirm that exact additional scope. A `master` operation
-requires explicit source/target/purpose authority and is never inferred from
-test delivery. Preserve separately required cleanup authority.
-When those facts or the merge/Wiki/deployment choices change, re-display the
-whole current checklist and submission operation set, including applicable Wiki
-body/patch, before asking for confirmation. A changed preference alone does not
-authorize remaining writes; an unchanged affirmative answer consumes the valid
-plan without another loop. Follow the shared
-[revised-checklist rules](../../../references/execution-checklist.md#用户调整后的重新展示).
+项目或仓库、业务范围或关键方案、源或目标分支、操作集合、Wiki 归属或正文
+语义、Jenkins Job、环境、通道或参数含义、TAPD 目标或人员、操作目的超出或
+改变已批准范围时，必须重新取得授权。自动 A → C → B 冲突处理复用主清单中
+已包含的条件范围；未覆盖时，展示并确认这部分准确新增范围。`master` 操作
+必须有明确的源分支、目标分支和目的授权，不能从测试交付推导。清理仍须保留
+其单独要求的授权。
+
+上述事实或合并、Wiki、部署选择变化后，先重新展示完整当前清单和提测操作
+集合，包括适用的 Wiki 正文或补丁，再请求确认。用户只调整偏好并不授权剩余
+写入；对未变有效计划的明确肯定回复直接用于执行，不再循环询问。沿用共享的
+[用户调整后的重新展示规则](../../../references/execution-checklist.md#用户调整后的重新展示)。
 
 ## Execution order
 

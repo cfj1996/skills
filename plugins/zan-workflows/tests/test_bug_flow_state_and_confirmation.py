@@ -50,9 +50,9 @@ class BugFlowStateAndConfirmationTests(unittest.TestCase):
         self.assertIn("单独调用提测技能仍按其独立计划确认", FIXING)
         self.assertIn("Select `DEPLOY`; preserve an explicit `SKIP`", DEPLOYMENT)
         self.assertIn("SKIPPED_BY_INTENT", DEPLOYMENT)
-        self.assertIn("one complete `SubmissionPlan`", DEPLOYMENT)
-        self.assertIn("commit SHA, MR ID, Wiki/month/child ID", DEPLOYMENT)
-        self.assertIn("do not require another confirmation", DEPLOYMENT)
+        self.assertIn("一份完整 `SubmissionPlan`", DEPLOYMENT)
+        self.assertIn("按已授权规则派生的提交 SHA", DEPLOYMENT)
+        self.assertIn("模板补全，不要求再次确认", DEPLOYMENT)
 
     def test_deployment_and_wiki_registration_keep_order(self):
         deployment = SUBMITTING.index("deployment gate through `jenkins-mcp`")

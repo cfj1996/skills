@@ -33,16 +33,14 @@ go-live retain their terminal-result/source verification.
 
 ## Daily project build
 
-Every build first applies [Mock gates](../../references/mock-development.md).
-Resolve current source and the project's Mock bindings/inventory using the same
-read-only [safety helper](../../scripts/mock-safety.mjs); missing evidence cannot
-be treated as no Mock. This is source/authorization preflight, not a deployment.
-With Mock present, show its stable IDs, actual scope/paths, remaining real calls,
-test environment/branch/Job, purpose and limits and require explicit human test
-permission before trigger. The compact build confirmation may cover this once;
-normal build requests/defaults alone do not. Changed content/inventory/target
-requires refreshed scope authorization. Do not bypass the gate by calling MCP
-directly. An unclear or production/publishing effect routes to the full flow.
+每次构建先应用 [Mock 门禁](../../references/mock-development.md)，通过同一只读
+[安全检查](../../scripts/mock-safety.mjs)核实当前源码及项目 Mock 绑定、清单；
+缺少证据不能视为没有 Mock。这是源码与授权预检，不执行部署。
+存在 Mock（模拟数据或服务）时，展示稳定编号、实际范围与路径、仍会发生的
+真实调用、测试环境/分支/Job、目的及验证局限，触发前须取得明确的人类测试
+授权。简短构建方案的一次确认可以覆盖这些内容；普通构建请求或默认项不能
+代替该许可。内容、清单或目标变化须刷新对应范围授权，不得直接调用 MCP
+绕过。效果不明确或涉及生产、包发布时，转入完整流程。
 
 Use the existing [run-jenkins-release.mjs](../../scripts/run-jenkins-release.mjs)
 script for a compact PLAN/EXECUTE. Apply [fixed parameters](../../references/frozen-jenkins-parameters.md)
@@ -61,11 +59,10 @@ missing project integration is a concrete release gap, not a config-permission e
    to fill every supported default explicitly. Validate actual submitted values against
    fixed environment/release conditions; do not query Jenkins parameter definitions or
    extract them from XML. Preserve explicit project/ref/channel choices.
-3. Prepare the helper's read-only PLAN with actual parameters, contract/profile/value
-   hashes and exact source identity. Briefly display project, test environment, profile,
-   Job, ref/SHA and relevant parameters. Reuse a matching explicit user build instruction;
-   where confirmation is required, obtain it once for the concrete plan. Mock testing
-   still needs explicit approval of its exact inventory/target, not generic build intent.
+3. 使用实际参数、约定/环境配置/参数值指纹和准确源码身份准备辅助脚本的只读
+   `PLAN`，简要展示项目、测试环境、环境配置、Job、ref/SHA 及相关参数。
+   复用匹配的明确构建指令；仍需确认时，对这份具体方案取得一次确认。
+   Mock 测试仍须明确批准准确清单与目标，泛称构建不能代替该授权。
 4. Execute that plan once. The helper re-reads the local contract and mutable source/Job
    identity, rejects changed facts, triggers once, follows only the returned queue and
    verifies its exact build. It must make zero parameter-definition calls. Ordinary daily
