@@ -455,6 +455,12 @@ builds may use this mode; official/production releases must wait. Unknown or
 missing trigger receipts block later writes without retrying. Job lookup and
 release intent stay with the producer; scripts do not guess a Job from cwd.
 
+面向用户的 Jenkins 入口使用回执中已核实的 `jobUrl`。`BUILD_SUBMITTED` 回复写
+“构建任务已提交”，测试构建链接指向该 Job 页面；`queueId`/`queueUrl` 仅作内部
+触发接受证据，不作为用户访问构建的链接。只有实际读回本次构建的 `buildUrl`
+后才可补充具体构建链接，不能从队列地址推导或预造。修正展示链接时复用原回执，
+不重新触发构建，也不为此增加队列、构建或日志查询。
+
 Required facts: `targetProject`, `releaseTarget` (package name for a package),
 `targetEnvironment`, `jobName`, evidenced `jobUrl`, `releaseRef`, `expectedSha`,
 `sourceRepository`, `version`, `releaseChannel=canary|official`,

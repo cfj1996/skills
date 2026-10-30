@@ -211,7 +211,7 @@ test('release triggers once, follows its exact queue/build and verifies target r
   assert.ok(fake.reads.every(value => value === 'queue' || value === 12));
 });
 
-test('test submission returns the accepted queue without reading or waiting for the build', async () => {
+test('test submission retains the verified Job link and internal queue receipt without waiting for the build', async () => {
   const fake = releaseFake({ queuePending: 100, status: 'FAILURE' });
   const input = { ...releaseInput(), completionMode: 'TRIGGER_ACCEPTED' };
   const plan = await runJenkinsRelease(fake.call, fake.reader, input, fake.io);
@@ -219,9 +219,11 @@ test('test submission returns the accepted queue without reading or waiting for 
   assert.equal(fake.calls.some(call => call.name === 'jenkins_trigger_build'), false);
   const result = await runJenkinsRelease(fake.call, fake.reader, { ...plan, execute: true, confirmed: true }, fake.io);
   assert.equal(result.state, 'BUILD_SUBMITTED');
+  assert.equal(result.jobUrl, input.jobUrl);
   assert.equal(result.queueId, 8);
   assert.equal(result.queueUrl, 'https://ci.example.test/jenkins/queue/item/8/');
   assert.equal(result.buildNumber, null);
+  assert.equal(result.buildUrl, undefined);
   assert.equal(result.sourceVerified, false);
   assert.deepEqual(result.submittedParams, input.params);
   assert.deepEqual(fake.reads, []);

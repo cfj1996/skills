@@ -329,8 +329,11 @@ stage transitions do not start new private validators.
      execution or build completion, fetch logs, or require `SUCCESS`/actual SCM
      checkout to continue. Retain the receipt as `deploymentReceipt` for TAPD
      registration. This applies to both main entries and standalone submission,
-     including canary package builds. Report “构建任务已提交” and the queue link;
-     it proves neither deployment nor publication, and supplies no actual npm version;
+     including canary package builds. Report “构建任务已提交” with the verified `jobUrl`
+     as the user-facing link. Keep `queueId`/`queueUrl` only as internal acceptance
+     evidence; do not use a queue URL as the Job/build link, invent a `buildUrl`,
+     or retrigger a build to correct a displayed link. Queue acceptance proves neither
+     deployment nor publication, and supplies no actual npm version;
    - `SKIP`: make no Jenkins build/deploy/parameter/queue/log call and record
      `SKIPPED_BY_INTENT`. Only a STANDARD Wiki's missing canonical Job URL
      permits the earlier exact read-only metadata lookup. NO_WIKI+SKIP has no

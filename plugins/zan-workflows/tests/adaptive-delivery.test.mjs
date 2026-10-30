@@ -272,6 +272,10 @@ test('computed canary submission returns before queue/build/publication reads wi
     console: async () => assert.fail('must not read publication log') };
   const result = await runJenkinsRelease(fake.call, reader, { ...plan, execute: true, confirmed: true }, fake.io);
   assert.equal(result.state, 'BUILD_SUBMITTED');
+  assert.equal(result.jobUrl, input.jobUrl);
+  assert.equal(result.queueUrl, 'https://ci.example.test/queue/item/9/');
+  assert.equal(result.buildNumber, null);
+  assert.equal(result.buildUrl, undefined);
   assert.equal(result.releaseKind, 'package');
   assert.equal(result.version, null);
   assert.equal(result.versionIdentity, sha);

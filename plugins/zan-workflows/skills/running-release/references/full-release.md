@@ -101,6 +101,9 @@ another terminal to deliver a long plan.
    `completionMode=TRIGGER_ACCEPTED` in PLAN/EXECUTE, retain the exact accepted
    Job/queue URL/ID and submitted params as `BUILD_SUBMITTED`, and return without
    queue/build/log polling or waiting; continue the submission's Wiki/TAPD steps.
+   Report the verified `jobUrl` as the user-facing link; `queueId`/`queueUrl` remain
+   internal acceptance evidence. Correct a displayed link using the original receipt,
+   without retriggering or querying a future build URL.
    Do not report deployment/publication success or actual npm versions. Standalone
    releases and go-live use `BUILD_TERMINAL` and wait in the helper's process.
    In `BUILD_TERMINAL` only, the configured GET-only API supplies queue executable, build queueId,

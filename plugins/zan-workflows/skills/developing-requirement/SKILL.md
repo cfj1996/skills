@@ -233,7 +233,9 @@ Mock 完成、正式接口补齐时续接原分支、Task和Plan。先刷新契�
 仍在原授权范围内，就直接 `submission_phase=EXECUTE`，不再次询问提交/推送/
 MR/部署确认。首轮未覆盖或实质变化才补充授权；单独执行技能仍先确认其具体计划。
 提测构建统一使用 `completionMode=TRIGGER_ACCEPTED`：确认 Jenkins 已接受确切队列，
-记录 `BUILD_SUBMITTED` 和队列链接后继续 Wiki/TAPD，不等待排队、启动或构建完成。
+记录 `BUILD_SUBMITTED` 和内部队列回执后继续 Wiki/TAPD，不等待排队、启动或构建完成。
+面向用户的测试构建链接使用回执中已核实的 `jobUrl`；`queueId`/`queueUrl` 仅作内部接受证据。
+修正展示链接时复用原回执，不重新触发构建。
 结果写“构建任务已提交”，不能写部署成功或发包成功；上线/正式发布仍需独立验证。
 使用 [共享提测 Wiki](../../references/shared-test-wiki.md)，同一 Story 的所选
 项目/Tasks 共用一页，全部相关交付门禁通过后再统一写回；不按 Task 新建 Wiki。

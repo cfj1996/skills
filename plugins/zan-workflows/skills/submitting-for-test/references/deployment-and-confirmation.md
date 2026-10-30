@@ -143,7 +143,10 @@ the same instance. Retain the helper's `BUILD_SUBMITTED` receipt, including
 submitted params and planned source identity, in `prerequisites.deploymentReceipt`.
 Do not poll the queue/build, wait for startup or terminal SUCCESS, or fetch logs.
 Unknown/missing receipts block later writes; do not retry the trigger. Report
-“构建任务已提交” with its queue link. Actual deployment, checkout and package
+“构建任务已提交” with the receipt's verified `jobUrl` as the user-facing link.
+Keep `queueId`/`queueUrl` as internal acceptance evidence, not a Job/build link.
+Reuse the original receipt when correcting a displayed link; do not retrigger
+or poll to obtain a replacement URL. Actual deployment, checkout and package
 versions remain unverified; a source SHA must never become a package version.
 For tooling Wiki entries preserve an evidenced current channel or use
 `当前版本：待发布` if none exists; do not infer publication from queue acceptance.
