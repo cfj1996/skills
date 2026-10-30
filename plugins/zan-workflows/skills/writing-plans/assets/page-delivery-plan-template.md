@@ -139,6 +139,9 @@ Markdown 与面板使用同一模块内容，临时规范化模型使用 `schema
 
 - `UI-001`：<初始、加载、空态、错误、禁用或成功状态>；关联：`<F-001, AC-001>`
 
+此处记录产品交互与反馈，不要求为各状态建立 Mock fixture 或切换入口；异常
+模拟仅按下方 Mock 范围的明确依据实施。
+
 ## 外部数据与依赖
 
 此处保存同一 Plan 的规范事实，清单和评审面板只引用/展示；不得建立第二份台账。
@@ -170,14 +173,17 @@ required 消费先查正式来源；未核实时只记录缺口，不猜 method/
 
 - `MOCK-001`：固定标识 `MOCK_ONLY`；状态 `<active/retired>`；方式 `<function-data/http-contract/managed-draft>`；关联：`<EXT-001, API-001, F-001, T-001 或不适用>`。
 - 关联功能/步骤：<featureRefs/taskRefs>；实现路径：<仓库相对 paths；数据、handler、替换及开启入口>。
-- 场景与切换：<scenarios、activation、重置方式>；真实请求边界：<realRequestBoundary>。
+- 接入依据：<已接通 Query Contract Mock / 仅 Query / 未接入 Query；实际版本、消费与数据/配置入口证据>。
+- 场景与启停：<scenarios 默认仅正常业务数据，一个即可；activation 和必要重置通过数据/开发配置完成>；真实请求边界：<realRequestBoundary>。
+- 异常模拟：<默认无；明确要求时引用用户/PRD/已确认验收依据及对应操作、预期>。
 - 原 Mock 范围批准依据：<authorizationEvidenceRefs；真实人类确认，不以 bool 代替>。
-- 退出条件与证据：<exitCondition、exitEvidenceRefs；retired 必须有真实替换/清除及验证依据>。
+- 退出条件与证据：<exitCondition、exitEvidenceRefs；列明恢复真实数据源与可独立移除的 Mock 文件/配置/绑定，业务调用接口保持稳定；retired 必须有真实替换/清除及验证依据>。
 - 验证局限：<verificationLimits；区分功能 Mock、接口 Mock、契约检查与真实联调>。
 - 本轮是否允许进入测试环境：<默认否；只有明确准确 Mock 范围/环境/目的和限制的有效确认才允许>。
 - 生产限制：**禁止携带 Mock 模块及运行依赖；关闭开关不构成豁免。**
 
 ui-mock 执行须匹配 active MOCK_ONLY 模块和范围批准依据；未知机器事实只能做功能数据 Mock。
+默认不增加业务页面 Mock 标识、说明模块、场景选择器或重置按钮，不以 Mock 阶段命名分支。
 测试交付与生产门禁读取本次源码/制品及准确授权，不能由 Plan 字段、保存或 retired 标记代替。
 后续接入更新同一 Plan，保留已完成成果；仅技术补齐不重开业务结论，范围或交付变化补确认。
 
@@ -225,7 +231,8 @@ Task，功能必须在该 Task 的范围内；单步完成不代表 Task 已验�
 关联沿用 `taskBreakdown` 与 `tasks[].tapdTaskKey`，不新增运行时关联字段；
 不得为显示关联强制新增 Task、Plan 或分支，或未经确认回写 Task 描述、状态、
 评论、工时及日期。REUSE 保留旧描述，以已有核验结果完成关联。
-优先用一个完整路径验证主要设计或联动风险，再扩展场景；每步关联相应的
+优先用一个完整路径验证主要设计或联动风险，再覆盖其余已要求的验收场景；不据此
+默认新增异常 Mock 场景。每步关联相应的
 验收入口和预期。按本次责任范围贯通必要层次，不把跨仓库联调当成单方
 完成，也不按字段、组件或技术层机械拆出新的 TAPD Task。
 上述分工写入既有步骤文本，不新增模型字段；子代理编号不是 TAPD 人员身份。

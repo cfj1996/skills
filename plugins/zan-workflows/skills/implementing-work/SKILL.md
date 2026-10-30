@@ -66,7 +66,15 @@ implementation evidence. Validate the approved current steps and stage, not
 future integration prerequisites unrelated to those steps. Preserve future
 blockers and never describe a partial UI/Mock result as the whole Story done.
 Every Mock has a stable `MOCK-*`/`MOCK_ONLY` identity, paths, scenarios, real-call
-boundary, reset/switch and exit conditions in the same Plan/brief. Unknown
+boundary, configuration activation/reset and exit conditions in the same Plan/brief.
+Reuse the existing Query/Query Contract data path when connected; otherwise use the
+existing Mock or nearest feature-data boundary. Default to normal business data only;
+exception simulation needs explicit user, requirement or approved acceptance evidence.
+Keep Mock selection and controls in data/configuration, with no default product-page
+markers, panels or controls and no Mock-specific branch naming. Business hooks/stores
+and rules must not import Mock implementations or carry Mock flags/parameters. Use
+stable data interfaces and removable data/configuration files so exit does not require
+rewriting business callers or flows. Unknown
 contracts permit only approved feature-data fixtures, never invented HTTP facts.
 
 ## 2. Check scope, task links and Bug records

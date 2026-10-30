@@ -21,6 +21,11 @@ description: Implement one assigned, approved scope on a verified fixed branch a
   需要额外路径、公共类型/配置或接口变化时报告影响，等待主代理重新分配。
 - 依已确定的接口实施，不靠未完成任务的临时文件推断最终契约。先验证
   最可能推翻方案的行为，再完成当前范围；不得将真实集成悄悄改成 Mock。
+- Mock 按[共享规范](../../../references/mock-development.md)复用已接通的 Query
+  链路或既有功能数据入口。默认只提供正常数据，异常模拟须有明确需求依据；
+  启停/数据选择/重置在数据或配置层，默认不增加业务页面标识、面板或控件。
+  业务 hook/store 和规则不导入 Mock 实现、不透传 Mock 参数；数据接口保持
+  稳定，独立 Mock 文件和配置可拆除，不为退出 Mock 重写业务调用方。
 - 运行分配的、不争用共享资源的局部检查，明确成功、失败和未覆盖项。
   安装依赖、改测试环境或占用未分配资源需要主代理处理。
   遵守 [本地验证预算](../../../references/local-verification.md)；全仓检查和

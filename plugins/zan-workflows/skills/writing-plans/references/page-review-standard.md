@@ -128,6 +128,9 @@ Bug 的该区块末尾另列 TAPD 目标：完整提测为待测试（交付完�
 | `revision` | 模块内容版本，正整数 |
 
 输入输出须说明模块对外的行为约定，输出包括展示、事件、状态变化或业务结果。验收例子用“给定输入 → 触发行为 → 约定输出”描述。待确认项须给出缺口、影响、负责查证或决定的人以及建议；Agent 能查证的先查证，不把全部问题交给用户。
+`module.rules/scenarios` 描述产品行为与验收，不等于 `mockModules.scenarios`
+的数据场景清单；产品有异常处理要求不自动授权建立异常 Mock 数据或故障开关。
+后者按共享 Mock 规范和本轮明确模拟范围确定。
 
 问题按决定依赖顺序提出，先解决会改变后续行为的选择，再问前提已明确的
 问题。建议说明对范围、风险或返工的影响；已解决决定保留结论和必要理由，
@@ -231,12 +234,14 @@ API 契约正文保留在正式来源，`sourceRefs`/`evidenceRefs` 引用它。
 | `id`、`marker` | 唯一 `MOCK-*` 编号；固定 `marker=MOCK_ONLY` |
 | `status`、`mode` | `active / retired`；实现方式为 `function-data / http-contract / managed-draft` |
 | `featureRefs[]`、`taskRefs[]`、`paths[]` | 准确功能/步骤和仓库相对实现路径；必须能识别全部数据、handler、替换入口及启动依赖 |
-| `scenarios[]`、`activation`、`realRequestBoundary` | 可复现场景、显式开启/关闭方式、仍调用真实服务的边界 |
+| `scenarios[]`、`activation`、`realRequestBoundary` | 实际提供的正常业务场景（一个即可）、数据/配置层显式启停及必要重置方式、仍调用真实服务的边界；异常模拟须有明确需求依据 |
 | `exitCondition`、`verificationLimits[]` | 真实替换条件及 Mock 不能证明的验收 |
 | `authorizationEvidenceRefs[]` | 引用 kind=human-confirmation 的真实人类 Mock 范围依据；主流程核实原文，不能自行以 bool 代替 |
 | `exitEvidenceRefs[]` | `active` 可空；`retired` 必须引用真实替换、移除/构建排除及退出验证依据 |
 
 所有编号引用必须能解析，步骤及验收必须属于关联功能。`paths` 不得为绝对路径或含 `..`。
+Mock 标记和场景配置属于数据/配置层；默认不在业务页面显示标记或调试控件。
+本评审面板如实显示 Mock 范围，不表示产品页面也应添加同类模块。
 仅设置 `stage=ui-mock` 不授予实施权限：每个选定功能必须有匹配的 active MOCK_ONLY
 记录、有效批准依据及本轮可实施方案。未知机器事实仅允许功能数据 Mock；HTTP/Draft
 Mock 必须具备可验证契约。关闭开关不等于 retired；retired 也不证明生产制品已清理。

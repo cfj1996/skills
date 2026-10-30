@@ -81,6 +81,14 @@ selected-Task continuation, use
 with an independent evaluator. The supplied facts are simulated; no company API,
 Task creation, Plan save, branch or source write is needed.
 
+For read-only behavioral checks of connected Query Contract, Query-only, non-Query
+Mock reuse, normal-only defaults, explicit fault scope and business-state handling,
+use `plugins/zan-workflows/skills/writing-plans/tests/scenarios/review-mock-data-boundaries.md`
+with an independent evaluator under its read-only constraints. The existing
+`external-data-state.test.mjs` and `mock-safety.test.mjs` suites also verify that one
+normal scenario and configuration activation work through Plan/session persistence
+and authorized delivery checks; no page debug controls or company writes are needed.
+
 For the approved pending-merge Wiki patch, shared-page entry isolation,
 permission handoff, readback failure and workflow-session write barriers, run
 `node --test plugins/zan-workflows/tests/pending-merge-wiki.test.mjs`.

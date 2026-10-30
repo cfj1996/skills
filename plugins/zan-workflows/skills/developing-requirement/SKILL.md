@@ -66,7 +66,10 @@ Bug 使用 `zan-workflows:fixing-bug`。
 记录已知事实与缺口，内部代码落点仍在实施依据。需求确认、当前步骤依赖就绪和
 执行授权分开判断。按本轮已选功能/Task/阶段处理阻塞，保留后续未就绪事实。
 Mock 遵守 [跨项目规范](../../references/mock-development.md)，先发现项目真实能力，
-不强制安装 Query Contract；契约未知时仅提供功能模型场景，不猜 HTTP 事实。
+已接入 Query 的沿原数据链路补数据/配置，未接入的复用现有 Mock 或功能数据入口，
+不强制安装 Query Contract；契约未知时仅提供功能模型数据，不猜 HTTP 事实。
+默认只做正常业务数据；异常模拟须有明确用户/需求/验收依据。Mock 启停、重置和
+数据选择放在数据/配置层，默认不增加页面标识或调试控件，也不附加 Mock 分支后缀。
 
 按 [准备深度与验证](../../references/adaptive-workflow.md) 选择实际需要的内容：
 

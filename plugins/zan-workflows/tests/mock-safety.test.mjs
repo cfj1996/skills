@@ -18,7 +18,7 @@ const jobUrl = 'https://ci.example.test/job/demo-test/';
 const context = () => ({ environmentKind: 'test', operation: 'git-delivery', purpose: 'deliver reviewed code', targetEnvironment: 'test', targetBranch: 'develop',
   sourceRepository: originUrl, sourceSha });
 const active = () => ({ id: 'MOCK-list', marker: 'MOCK_ONLY', status: 'active', featureRefs: ['F-list'], taskRefs: [],
-  paths: ['src/list.mock.ts'], mode: 'function-data', scenarios: ['success', 'empty'], activation: 'dev only',
+  paths: ['src/list.mock.ts'], mode: 'function-data', scenarios: ['success'], activation: 'development data-source config; restart resets data',
   realRequestBoundary: 'Only list is mocked; save is disabled', exitCondition: 'formal query integrated',
   verificationLimits: ['real backend not verified'], authorizationEvidenceRefs: ['E-mock'] });
 const safety = () => ({ ...noMockFixture({ originUrl, sourceSha }), mockModules: [active()] });

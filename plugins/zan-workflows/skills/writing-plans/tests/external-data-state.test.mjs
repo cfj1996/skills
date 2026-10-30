@@ -14,7 +14,7 @@ function dependency(overrides = {}) {
   return { id: 'EXT-001', kind: 'api-contract', summary: '查询与保存契约', facts: [], sourceRefs: [], environment: 'test', status: 'missing', owner: '后端责任方待核实', completionCondition: '取得正式契约并核实机器事实', blockingStages: ['implementation', 'integration', 'acceptance'], featureRefs: ['F-001'], taskRefs: ['T-001'], acceptanceRefs: ['A-001'], evidenceRefs: ['E-001'], ...overrides };
 }
 function mock(overrides = {}) {
-  return { id: 'MOCK-001', marker: 'MOCK_ONLY', status: 'active', featureRefs: ['F-001'], taskRefs: ['T-001'], paths: ['src/login/mock-provider.ts'], mode: 'function-data', scenarios: ['success', 'empty', 'failure'], activation: '开发入口显式开启', realRequestBoundary: '本模块不发送真实保存请求', exitCondition: '替换真实请求并验证', verificationLimits: ['仅证明页面交互，未证明真实链路'], authorizationEvidenceRefs: ['E-AUTH'], exitEvidenceRefs: [], ...overrides };
+  return { id: 'MOCK-001', marker: 'MOCK_ONLY', status: 'active', featureRefs: ['F-001'], taskRefs: ['T-001'], paths: ['src/login/mock-provider.ts'], mode: 'function-data', scenarios: ['success'], activation: '开发数据源配置显式开启；重启恢复固定数据', realRequestBoundary: '本模块不发送真实保存请求', exitCondition: '替换真实请求并验证', verificationLimits: ['仅证明页面交互，未证明真实链路'], authorizationEvidenceRefs: ['E-AUTH'], exitEvidenceRefs: [], ...overrides };
 }
 function mockPlan() {
   const model = plan(); model.deliveryUnit.status = '可实施'; model.executionScope.stage = 'ui-mock';
@@ -35,9 +35,10 @@ test('legacy Plan and Session remain readable but missing dependency review neve
   assert.deepEqual(state.externalDependencies, []);
 });
 
-test('approved UI Mock can run while contract integration remains blocked without changing business confirmation', () => {
+test('normal-only data-layer Mock can run while contract integration remains blocked without changing business confirmation', () => {
   const model = mockPlan();
   assert.deepEqual(validatePagePlanModel(model), { valid: true, errors: [] });
+  assert.deepEqual(model.mockModules[0].scenarios, ['success']);
   assert.equal(model.features[0].reviewConclusion, '已确认');
   model.executionScope.stage = 'integration';
   assert.ok(codes(model).includes('external-dependency-blocked'));
@@ -135,10 +136,13 @@ test('dependencies and Mock survive canonical submit, draft and restore, and sta
   assert.deepEqual(submitted.lastSubmission.externalDependencies, state.externalDependencies);
   const restored = restoreSubmittedReview(state, submitted.lastSubmission);
   assert.equal(restored.mode, 'reviewing');
+  assert.deepEqual(restored.mockModules[0].scenarios, ['success']);
+  assert.equal(restored.mockModules[0].activation, input.mockModules[0].activation);
   const snapshot = structuredClone(submitted.lastSubmission); snapshot.mockModules[0].activation = 'other';
   assert.throws(() => restoreSubmittedReview(state, snapshot), error => error.code === 'invalid-submission-restore');
   const draft = saveDraft('external-draft', { ...state, savedAt: 1000, cards: state.cards }, { setItem() {} });
   assert.deepEqual(draft.externalDependencies, state.externalDependencies);
+  assert.deepEqual(restoreDraft(state, draft, 1001).mockModules, state.mockModules);
   draft.currentCardIndex = 1;
   assert.equal(restoreDraft(state, draft, 1001).currentCardIndex, 1);
   draft.externalDependencies[0].completionCondition = 'changed';

@@ -13,7 +13,14 @@ Independently check the same Plan/brief external dependencies and selected execu
 stage. Business questions contain business decisions only; missing contract/config/
 environment facts must still block affected implementation/integration/acceptance.
 For each Mock verify stable MOCK-* / MOCK_ONLY identity, actual paths and reachable
-scope, scenarios/reset, real-call boundary and exit conditions. Reject invented HTTP
+scope, scenarios/configuration reset, real-call boundary and exit conditions. Apply
+[Mock rules](../../../references/mock-development.md): reuse the connected Query path
+or existing data boundary, default to normal business data, and require explicit scope
+evidence for simulated exceptions or product-page debug UI. Do not require a failure/
+delay scenario catalog or a visible Mock label to pass review. Check business hooks/
+stores and rules for Mock imports, flags or parameter propagation; stable data interfaces
+and independently removable Mock files/configuration must permit exit without rewriting
+business callers or flows. Reject invented HTTP
 facts, catch-to-fixture fallbacks, and Mock checks reported as real integration.
 Review current full diff including manual changes and any claimed retirement; deleting
 a marker or disabling a switch is not exit proof. Mock-only implementation cannot

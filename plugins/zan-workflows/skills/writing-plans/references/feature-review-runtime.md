@@ -91,6 +91,8 @@ Badge 区分状态，右侧展示当前详情。列表点击与上一个/下一�
 外部数据与依赖单独显示来源、环境、状态、影响阶段和补齐条件；Mock 显示 MOCK_ONLY、
 实现路径、场景、真实请求边界、退出条件、未验证项及禁止上线限制。顶层事实按 featureRefs
 关联，不为两个页面复制同一依赖。接口/字段契约、Key 配置和环境不混入需求问题。
+上述展示属于 Plan 评审工具，不是产品 UI 要求；不得据此在业务页面增加 Mock
+标识、场景选择或重置控件。Mock 数据和控制仍遵守共享规范的数据/配置层边界。
 
 `externalDependencies`、`mockModules`、`dependencyReview`、`executionScope` 必须随同当前
 会话 normalize、update、草稿、submission、恢复和 Plan 保存完整传递。外部事实改变时使用

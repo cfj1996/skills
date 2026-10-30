@@ -229,8 +229,10 @@ For a formal review, keep the page state only as “评审中” or “阻塞”
 补齐技术事实保留业务结论，但刷新受影响实施/保存确认与验证，不沿用旧快照。
 
 所有 Mock 按 [跨项目规范](../../references/mock-development.md)登记 `mockModules`，
-关联稳定 `MOCK-*` 和 `MOCK_ONLY`、真实实现位置、场景、切换/重置、真实调用
-边界、验证局限及退出证据。ui-mock 仅在准确范围明确获准且其前置条件就绪时
+关联稳定 `MOCK-*` 和 `MOCK_ONLY`、真实实现位置、正常场景、配置启停/重置、真实
+调用边界、验证局限及退出证据。区分 Query/Query Contract 已接通、仅 Query 和未
+接入的实际落点；异常模拟须有明确用户/需求/验收依据，默认不规划业务页面 Mock
+标识、调试控件或 Mock 专用分支。ui-mock 仅在准确范围明确获准且其前置条件就绪时
 可执行；真实接入的未来缺口保留。默认仅本地，含 Mock 到测试环境必须另在同一
 完整清单明确展示并获确认；生产制品及运行链路禁止 Mock，不能靠开关关闭放行。
 
