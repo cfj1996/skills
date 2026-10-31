@@ -2,7 +2,7 @@
 
 ## 总则
 
-访问公司外部系统时，默认按以下优先级选择工具；任务创建与项目知识遵循下方各自的专用路由：
+访问公司外部系统时，默认按以下优先级选择工具；TAPD 文件读取、任务创建与项目知识遵循下方各自的专用路由：
 
 ```text
 专用 MCP → 官方 API/受控 CLI → 浏览器降级
@@ -14,7 +14,7 @@
 
 | 系统 | 首选能力 | 典型操作 |
 | --- | --- | --- |
-| TAPD / TAPD Wiki | `tapd-mcp` | Bug/Story/Task 读取、任务创建/更新、评论、状态、测试版本、Wiki 查询与写入 |
+| TAPD / TAPD Wiki | `tapd-mcp` | Bug/Story/Task 读取、图片/附件/关联文档文件下载、任务创建/更新、评论、状态、测试版本、Wiki 查询与写入 |
 | GitLab | `gitlab-mcp` | 项目、MR、diff、冲突、pipeline、审批、创建/更新/合并 MR |
 | Jenkins | `jenkins-mcp` | Job 查询、参数读取、触发构建、队列/构建跟踪、结果与日志读取 |
 | YApi | `yapi-mcp` | 项目、分类、接口、请求/响应字段及契约事实查询 |
@@ -22,6 +22,29 @@
 | 本地 Git | `git` CLI | status、diff、fetch、branch、commit、push、包含性校验 |
 
 本地 Git CLI 不替代 GitLab MCP 的 MR/审批/合并能力；GitLab MCP 也不替代本地源码 diff 和 commit。
+
+## TAPD 图片与附件读取
+
+读取需求、Bug、任务或 Wiki 时，需要核对正文、评论中的图片、文件或附件，统一调用
+TAPD MCP 0.0.4 起提供的 `download_workitem_files(workspace_id, entry_type, entry_id, output_dir?)`。
+`entry_type` 为 `story|bug|task|wiki`，传准确项目和条目 ID；需求/Bug/任务支持短 ID，Wiki 使用完整 ID。
+不为每张图片或附件分别拼接网页直链、读取本机凭证或编写临时 API 下载脚本。
+
+该工具在 MCP 内分页发现正文、自定义富文本字段、评论和附件中的资源，换取下载链接，
+下载内嵌图片、普通附件及关联的 TAPD 文档文件并去重；不递归展开关联需求/Bug/Wiki。
+`output_dir` 可选，每次创建独立子目录；返回 `directory`、逐项 `files` 和 `errors`。
+调用方使用返回的本地 `path` 实际查看图片或读取文档，不能只拿到清单就声称看过内容。
+本地 STDIO 模式路径可直接使用；远程模式路径属于 MCP 服务端，不能冒充调用方本地路径。
+
+只有 `state=complete` 才表示全部发现与下载成功。`partial` 保留成功文件并逐项报告
+未完成阶段/文件；`failed` 表示无法读取条目。根据实际缺口说明影响，不忽略失败项。
+工具按文件内容识别图片，兼容错误的扩展名或 `Content-Type: text/plain`，
+不由调用方仅凭响应头判定图片失效。
+
+先通过工具发现及实际 `tools/list` 核对方法。缺失时检查 MCP 启动版本、连接及工具策略，
+升级到已发布的 0.0.4 或更新兼容版本并重新连接；仍缺失时报告
+`BLOCKED_TAPD_FILE_CAPABILITY`。本能力不降级为调用方直接请求 API 或浏览器登录。
+插件版本接入以对应 MCP 包已经发布为前提，不能把源码实现完成当作当前安装版本已可调用。
 
 ## TAPD 任务创建
 
@@ -48,7 +71,7 @@ entity_type；人员、预估工时按已核实字段映射传输，标准字段
 和读回，完整校验及 partial/unknown 等停止与恢复规则由任务模块维护。
 开发入口和 Plan 消费同一 `TaskBreakdownResult`，不自行另建任务或重复写入。
 
-方法缺失时先核对 0.0.3 的启动版本与 MCP 连接；仍未恢复，或必填字段不受
+方法缺失时先核对实际启动版本（任务创建最低为 0.0.3）与 MCP 连接；仍未恢复，或必填字段不受
 支持时，保留草稿并返回 `BLOCKED_TASK_WRITE_CAPABILITY`。任务创建以本节
 方法为准，不因旧连接缺工具就转用通用创建、API/CLI 或浏览器，也不拿更新
 方法冒充创建。这里只确定工具路线，不替代拟写入内容的确认和准确读回。

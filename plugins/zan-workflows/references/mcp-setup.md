@@ -38,7 +38,7 @@
 
 - Node.js 22（`node` 必须能从 Codex 的 PATH 找到）。
 - Volta 和 Node.js 22.20.0：用于现有三个 npm MCP 的启动方式。
-- uv/uvx 和 Python 3.13 或更新版本：用于固定版本 `zan-tapd-mcp==0.0.3` 的启动。
+- uv/uvx 和 Python 3.13 或更新版本：用于固定版本 `zan-tapd-mcp==0.0.4` 的启动。
 - 能访问公司服务、私有 npm 源，以及 npm/Python 包所需的下载源。
 
 三个 npm MCP 显式使用 `https://registry.npmjs.org/` 下载公共包及依赖，
@@ -49,6 +49,11 @@
 TAPD 0.0.3 提供 `create_task` 和 `create_tasks`，用于在需求下创建单个或多个任务。
 任务拆分、确认及结果消费仍由 [需求任务模块](../skills/breaking-down-requirement/SKILL.md)
 处理；更新插件后重新连接 TAPD MCP，并通过实际 `tools/list` 核对新增能力。
+
+TAPD 0.0.4 新增统一的 `download_workitem_files`，在 MCP 内读取需求/Bug/任务/Wiki
+正文、评论和附件中的文件并下载，返回逐项结果及本地路径。调用和不完整结果的处理见
+[图片与附件读取](tool-routing.md#tapd-图片与附件读取)。升级启动版本前先确认对应包
+已发布；源码测试通过不代表现有已连接的 0.0.3 服务具有该工具，升级后需重新连接验证。
 
 Windows 使用同一份 Node.js 脚本，直接启动 `volta.exe` / `uvx.exe`；Volta
 负责解析 npx，无 Bash、`shell: true` 或手工拼接 `npx.cmd` 命令。其他平台
