@@ -65,8 +65,10 @@ question, not a separate deployment preference prompt.
 - `DEPLOY|SKIP`；选择 `DEPLOY` 时，覆盖目标项目、发布目标、测试环境、
   Jenkins Job、准确且已确认的测试目标 ref/SHA 标识、版本或构建参数、测试
   发布通道及目的。
-- 内容可确定的 `Bug|Story|Task` Wiki 链接评论，以及最终 TAPD 状态、处理人、
-  测试版本操作，包括有明确边界的版本文本派生规则。
+- 内容可确定的 `Bug|Story|Task` Wiki 链接评论，以及 Bug 的单条完整修复记录：
+  准确账号、已评审正文及在 Git/所选构建和适用 Wiki/独立回链通过后的发表/复用动作。
+  两条评论保持独立，最终 TAPD 状态、处理人、测试版本操作在修复记录读回后执行，
+  包括有明确边界的版本文本派生规则。
 - `work_mode` 对应的状态处理行为。
 
 写入前仍须计算并校验评审后的准确差异与 SHA、最终 Wiki 正文、补丁和指纹、
@@ -76,7 +78,7 @@ question, not a separate deployment preference prompt.
 
 计划面向用户展示“需要提测 Wiki”或“不需要提测 Wiki”，内部映射到
 `STANDARD|NO_WIKI`，不能只展示“标准流程”或原始配置代码。`NO_WIKI` 须明确
-列出不执行 Wiki 查找、读取、创建、更新和评论。
+列出不执行 Wiki 查找、读取、创建、更新和链接评论；Bug 修复记录仍执行。
 
 仅修复或仅实施的确认、“修复完成就提测”、默认选项或未确认的清单，均不能
 授权尚未覆盖的交付操作。主执行清单已明确覆盖这些操作时复用其授权，不能仅因
@@ -114,6 +116,7 @@ Each repository: Git commit/push/MR -> confirmed test-target containment
 All required repositories pass:
   -> one shared Wiki create/update/readback when STANDARD
   -> idempotent Bug/Story/Task Wiki-link comment when applicable
+  -> one separate Bug repair record: publish/reuse and verify readback (also for NO_WIKI)
   -> one Bug registration with waiting-test/test-version writes when required
 ```
 
@@ -173,13 +176,15 @@ BUILD_SUBMITTED | DEPLOYED | RELEASED | SKIPPED_BY_INTENT | FAILED | UNKNOWN | N
 
 ## TAPD status policy
 
-- `INITIAL`: after `BUILD_SUBMITTED`, `DEPLOYED`, `RELEASED` or `SKIPPED_BY_INTENT`, write/read `待测试`, the
-  waiting-test owner and the test-version field exactly once.
+- `INITIAL`: after `BUILD_SUBMITTED`, `DEPLOYED`, `RELEASED` or `SKIPPED_BY_INTENT`,
+  applicable Wiki/link gates and the final Bug repair-record readback, write/read
+  `待测试`, the waiting-test owner and the test-version field exactly once.
 - `CONTINUE` while already `待测试`: use
   `SKIPPED_ALREADY_WAITING_TEST`; do not write `修复中`, `待测试`, or the same
   test-version field again; leave the current owner unchanged.
-- `CONTINUE` while still `修复中`: write `待测试` once after the deployment gate
-  and Wiki steps complete, assigning its waiting-test owner at the same time.
+- `CONTINUE` while still `修复中`: write `待测试` once after the deployment gate,
+  applicable Wiki/link steps and final repair-record readback, assigning its
+  waiting-test owner at the same time.
 - Any other current state requires an explicit policy/user decision; do not
   guess a transition.
 

@@ -58,9 +58,9 @@ Execute exactly one profile:
 
 - `STANDARD`: Git delivery, optional Jenkins test deployment, Wiki
   draft/write/readback, idempotent Wiki-link comment for the originating
-  `Bug|Story|Task`, and final TAPD test registration.
-- `NO_WIKI`: Git delivery, optional Jenkins test deployment, and final TAPD
-  test registration; never load or invoke Wiki capability.
+  `Bug|Story|Task`, the Bug's separate final repair record, and final TAPD test registration.
+- `NO_WIKI`: Git delivery, optional Jenkins test deployment, the Bug's final
+  repair record, and TAPD test registration; never load or invoke Wiki capability.
 
 Read [contracts.md](references/contracts.md),
 [change consistency](../../references/change-consistency.md),
@@ -119,14 +119,12 @@ review evidence from human inspection or rerun implementation/Task/Plan/branch
 creation solely to deliver. Missing trustworthy handoffs need scoped read-only
 reconstruction; unresolved evidence blocks, not invented READY/REVIEWED flags.
 Direct submission does not authorize business-source edits or Bug reactivation.
-For a Bug whose completion record became stale, follow the record-only refresh
-in [direct-submission.md](references/direct-submission.md#人工改动后的-bug-完成记录):
-review the corrected proposed body with the current diff. PLAN may preview the
-record correction and delivery after current code checks/review pass; do not
-claim a complete REVIEWED handoff yet. Confirm that exact comment action/body
-with the same delivery checklist, then append/reuse and read it back before
-any delivery write. Refresh the existing ReviewedChange only after the record
-gate passes; failed/unknown comments block all later writes without replay.
+For Bugs, refresh the single reviewed repair-record draft with current code and
+verification under [record rules](../implementing-work/references/bug-repair-record.md).
+The normal REVIEWED handoff carries this draft, not a required published comment.
+PLAN includes the exact account/body and late create/reuse action; EXECUTE publishes
+only after Git, deployment and applicable Wiki/link gates. Submission-preflight
+rework refreshes affected code checks/review and the draft before any publication.
 
 独立直接提测时，展示包含实际变更与评审事实、合并与测试环境，以及所选完整
 Wiki 正文或补丁的确定清单，取得一次匹配确认后才进入 `EXECUTE`。仅实施授权
@@ -161,14 +159,11 @@ Require:
 - one explicit profile `STANDARD|NO_WIKI`; and
 - `deployment_mode=AUTO|DEPLOY|SKIP`.
 
-The sole PLAN-only exception is the direct Bug record-only correction above:
-current code verification/independent review and the proposed corrected record
-must already pass, with exact repository/branch/scope and historical evidence.
-Its missing completion readback remains explicit. At EXECUTE, perform only the
-confirmed record action first, obtain its readback, and then require all normal
-READY_FOR_HANDOFF/REVIEWED gates before any commit/push/MR, build, Wiki or final
-registration. Missing code review, required repositories, history or acceptance
-is not this exception and still blocks PLAN.
+For a Bug, require a reviewed complete repair-record draft bound to the current
+source/verification and exact record authority. Its publication/readback is a
+later execution result, not a PLAN or code-REVIEWED prerequisite. Missing code
+review, required repositories, record evidence or acceptance still blocks PLAN;
+unknown introducing cause/author/time stays explicit and does not alone block repair.
 
 进入 `EXECUTE` 还须有一份 `PlannedTestSubmission`，其
 `terminal_state=AWAITING_CONFIRMATION`，且准确操作集已获授权：来源可以是
@@ -193,11 +188,8 @@ repository/root, origin and fixed branch, and match each group to its one
 original subproject definition; grouping must not overwrite scope or acceptance.
 Require the same Bug identity, every
 necessary repository, per-repository review evidence, cross-repository
-acceptance and the shared completion-record readback. Missing or mismatched
+acceptance and the shared reviewed repair-record draft. Missing or mismatched
 required rows return `BLOCKED`; do not silently submit a partial Bug.
-Only the explicitly scoped record-only PLAN exception may defer the corrected
-completion readback; it never defers repository coverage, code review or
-cross-repository acceptance, and EXECUTE must restore the record gate first.
 Apply the same repository pairing/completeness rules to grouped requirement work,
 also verifying the exact parent Story and selected Task/Plan coverage. Do not add
 sibling Tasks or a Bug repair-record/state gate. One successful row does not
@@ -247,7 +239,8 @@ stage transitions do not start new private validators.
    review passes. A still-current independently validated draft is reusable.
 4. Build one consolidated `SubmissionPlan` containing each
    repository's Git/target/deployment selection, applicable shared Wiki/comment
-   actions, and the exact final TAPD registration targets/policies. A Bug registers
+   actions, the Bug's separate `BUG_REPAIR_RECORD` with exact account/reviewed body
+   after those gates, and final TAPD registration targets/policies. A Bug registers
    once; Story/Task has only its explicitly applicable actions, without Bug status
    or inferred Task/parent completion. Preserve each selected target separately.
    MR descriptions include accurate work-item links, actual change/impact and
@@ -366,14 +359,31 @@ stage transitions do not start new private validators.
    For `SKIPPED_BY_POLICY`, perform no Wiki or Wiki-comment operation. A
    conflict or failed readback blocks later TAPD actions. Retain the exact
    final Wiki target for `going-live`.
-9. After all required repository gates and the shared Wiki/comment gate pass,
-   apply the status policy from the work mode through one validated
+9. For a Bug only, after all required Git/deployment gates and the applicable
+   shared Wiki/link gate pass, consume the plan-reviewed `BUG_REPAIR_RECORD`.
+   Follow [record rules](../implementing-work/references/bug-repair-record.md):
+   refresh current source/review/draft bindings and relevant comments, reuse a
+   verified record covering this round or create the single authorized complete
+   record, then read back its exact ID/item/account/body. Keep it separate from
+   the Wiki-link comment. NO_WIKI skips only Wiki/link steps, not this record.
+   Set execution `prerequisites.repairRecord={commentId, author, bodySha256}` from
+   that verified readback; hash the actual returned HTML, not the pre-write draft.
+   Do not require another Agent for unchanged reviewed content. Any failure or
+   unknown effect blocks registration while retaining earlier Git/build/Wiki
+   receipts; continuation verifies/reuses them and the original comment before
+   finishing only missing work. Story/Task skips this step.
+10. After all required repository gates, applicable Wiki/link and Bug repair-record
+   readbacks pass, apply the status policy from the work mode through one validated
    `TAPD_REGISTRATION_BUNDLE`, then invoke
    [register-test-submission.mjs](../../scripts/register-test-submission.mjs)
    once with the exact item, work mode, approved status/version policy,
    automatically resolved workflow/field mappings and metadata fingerprints.
    Reuse the consolidated authorization and successful Git/deployment/Wiki
-   prerequisites. Through `tapd-mcp` it refreshes the bound facts, sends one
+   prerequisites, including that exact repair-record evidence for Bugs. The
+   executor freshly reads the comment and checks identity/account/body before
+   reading current Bug state/assignment; missing or mismatched evidence blocks
+   before any update, including an already-waiting CONTINUE. Story/Task has no
+   repair-record requirement or comment read. Through `tapd-mcp` it refreshes the bound facts, sends one
    combined update for status, waiting-test owner and version, and reads all
    written fields back. The owner uses `te` first, otherwise `reporter`;
    verify it through `current_owner`. `CONTINUE`

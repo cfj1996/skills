@@ -17,7 +17,10 @@ For approved work spanning projects, accept `work_definitions`: the complete set
 of single-project definitions for one Bug, or one Story and its selected Tasks.
 Verify the parent Story and selected scope before grouping requirement work;
 do not add sibling Tasks. Return per-repository `reviewed_changes` only after
-all required work passes. A grouped Bug shares one start/completion record.
+all required work passes. A grouped Bug shares one repair-record draft and one
+final publication. Carry the confirmed checklist's `delivery_mode` so that a
+submission-bound implementation leaves publication to submission; a standalone
+implementation ends at `IMPLEMENT`.
 Single-definition calls keep the original input/result. Do not combine different
 Bugs or Stories, or drop a required project to close early.
 Consume the [same execution checklist](../../references/execution-checklist.md#围绕同一清单编排)
@@ -120,9 +123,10 @@ reuse its readback for the other definitions instead of replaying their old payl
 3. `NO_CHANGE` requires matching active state and repair owner. A waiting-test
    `CONTINUE` preserves both fields using `SKIPPED_ALREADY_WAITING_TEST`.
 4. Apply the [record rules](references/bug-repair-record.md): diagnose and
-   verify introduction evidence, then create/reuse the authorized start comment
-   and read it back before the first edit. Preserve unknown history explicitly,
-   omit an absent related requirement, and keep one flat record per Bug.
+   verify introduction evidence, retain one authorized in-memory record draft,
+   preserve unknown history explicitly and omit an absent related requirement.
+   Source edits require the status/owner gate, not a comment write/readback.
+   Do not publish a repair record while implementation or rework is in progress.
 
 Story/Task uses `NOT_APPLICABLE_NON_BUG` and skips Bug status and record writes.
 Use `tapd-mcp` for authorized writes, following the shared tool-routing policy.
@@ -186,7 +190,7 @@ repeat only checks invalidated by later changes. Record actual scope, results an
 gaps in memory, without workflow evidence files. Never report unrun, timed-out or
 resource-limited checks as passed.
 
-## 4. Review, complete records and return
+## 4. Review, prepare the final record and return
 
 Compare the final diff with the starting baseline and approved scope. Exclude
 unrelated paths; check removed, moved or disconnected logic against authorized
@@ -217,8 +221,8 @@ For a grouped Bug, obtain this review for every required repository, supply the
 full Bug boundary and applicable cross-repository acceptance, and attribute
 comment claims to the evidence each review covers. Do not infer that one
 repository's review accepts another repository.
-For whole-work Bug review include start-record readback, record authorization
-and the proposed complete final comment; an explicitly scoped predecessor
+For whole-work Bug review include record authorization and the proposed complete
+final comment, not a future comment ID/readback; an explicitly scoped predecessor
 review uses the narrow rule above and leaves that complete-comment review pending.
 One independent review covers requirement behavior and
 engineering design/test coupling. Map its private line to
@@ -227,19 +231,26 @@ line. If review causes edits, verify and review the affected delta.
 
 After all required repositories and cross-repository acceptance pass verification
 and review, refresh their source/diff facts; changed evidence reopens only the
-affected checks/review. Aggregate the reviewed claims into one flat Bug completion
-record, append/reuse it once and read it back under the same authorization. A comment failure blocks
-handoff while preserving the actual code/review result; resume only missing work.
+affected checks/review. Aggregate the reviewed claims into one flat Bug repair-record
+draft under the same authorization. For `SUBMIT|GO_LIVE`, return that reviewed draft
+without a comment write; publication/readback belongs to submission after its Git,
+deployment and applicable Wiki/link gates. For `IMPLEMENT`, publish/reuse and read
+back the single record only at the final implementation endpoint. A failure there
+blocks final completion while retaining the actual code/review result; resume only
+missing work. Same-round rework refreshes the draft and affected review, not comments.
 Story/Task has no repair-record obligation.
 
-Return `REVIEWED` only when repository, branch, scope, verification, review and
-applicable Bug records pass; otherwise return `BLOCKED` with the actual gap.
+Return `REVIEWED` only when repository, branch, scope, verification and review pass.
+For Bugs also require the reviewed record draft; an IMPLEMENT endpoint additionally
+requires its final record readback. Submission-bound `REVIEWED` never requires future comment evidence.
+Otherwise return `BLOCKED` with the actual gap.
 Keep one in-memory `ReviewedChange`, or `reviewed_changes` for grouped work,
 paired to definitions by canonical repo/origin/fixed_branch, not array position.
 Each grouped result retains its selected scope and the confirmed required set;
-Bug results also reference the same complete repair record. Until the whole scope closes, report `BLOCKED` plus actual
+Bug results reference the same reviewed record draft and, only when already
+published at the selected endpoint, its verified comment. Until the whole scope closes, report `BLOCKED` plus actual
 per-repository progress without labelling partial results `REVIEWED`. On resume,
-verify existing comments and completed source/review evidence, then only finish
+verify completed source/review evidence and any actual published record, then only finish
 missing or invalidated work. Add no report file or runtime ledger.
 Do not commit, push, submit, merge, publish, or write a Wiki in this skill.
 

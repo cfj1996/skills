@@ -16,13 +16,15 @@ import { collectLocalOccupancy, parseOpenFiles, readCodexTasks, readProcessFiles
 import { releaseRequiredTools, runJenkinsRelease as originalRunJenkinsRelease } from '../scripts/run-jenkins-release.mjs';
 import { adaptJenkinsInput, parseNpmToolsPublication } from '../scripts/jenkins-job-adapters.mjs';
 import { createJenkinsReader } from '../scripts/jenkins-readonly.mjs';
+import { repairRecordFixture, repairCommentFixture } from './helpers/bug-repair-record-fixture.mjs';
 
 const reply = data => ({ content: [{ type: 'text', text: JSON.stringify(data) }] });
 const api = data => reply({ status: 1, data });
 const sha = 'a'.repeat(40), pipelineSha = 'b'.repeat(40);
 const registration = () => ({ workspaceId: 12345, entryId: '123450001', entryType: 'bug', workMode: 'INITIAL',
   statusAction: 'WAITING_TEST', versionAction: 'WRITE', testVersion: 'demo@1.0.0-canary.1', purpose: '提测登记',
-  prerequisites: { git: 'VERIFIED', deployment: 'DEPLOYED', profile: 'NO_WIKI', wiki: 'SKIPPED_NO_WIKI' } });
+  prerequisites: { git: 'VERIFIED', deployment: 'DEPLOYED', profile: 'NO_WIKI', wiki: 'SKIPPED_NO_WIKI',
+    repairRecord: repairRecordFixture() } });
 function tapd({ custom = false, required = false, owner = 'reviewer', failWrite = false } = {}) {
   const item = { id: '123450001', status: 'in_progress', workitem_type_id: '', version_test: '', custom_field_one: '',
     te: 'tester', reporter: 'creator', current_owner: owner };
@@ -30,6 +32,7 @@ function tapd({ custom = false, required = false, owner = 'reviewer', failWrite 
   const call = async (name, args) => {
     calls.push({ name, args });
     if (name === 'get_bug') return api([{ Bug: { ...item } }]);
+    if (name === 'get_comments') return api([{ Comment: repairCommentFixture(item.id, 12345) }]);
     if (name === 'get_workflows_status_map') return api({ in_progress: '修复中', resolved: '待测试' });
     if (name === 'get_workflows_all_transitions') return api([{ StepPrevious: 'in_progress', StepNext: 'resolved',
       Appendfield: required ? [{ FieldName: 'current_owner', Notnull: 'yes' }] : [] }]);

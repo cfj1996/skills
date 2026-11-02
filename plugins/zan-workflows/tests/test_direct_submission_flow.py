@@ -82,22 +82,29 @@ class DirectSubmissionFlowTests(unittest.TestCase):
                     with self.subTest(path=relative, target=target):
                         self.assertTrue((path.parent / target.split('#', 1)[0]).is_file())
 
-    def test_bug_record_only_preview_restores_the_record_gate_before_delivery(self):
+    def test_bug_record_publication_is_a_normal_late_step_not_an_input_exception(self):
         flow = read('skills/submitting-for-test/references/direct-submission.md')
-        record = flow.split('## 人工改动后的 Bug 完成记录\n', 1)[1].split('## 独立直接提测的确定清单', 1)[0]
-        for rule in ['仍有效则复用', '失效则按下节准备更正后的完整完成正文']:
-            self.assertIn(rule, flow)
-        for rule in ['PLAN', '不能宣称 Bug 已有完整 `REVIEWED`', '同一提测清单确认',
-                     '先刷新评论并按语义查重', '不倒补开始评论、不重复激活 Bug',
-                     '所有必要仓库引用这一份已核实记录', '不盲目重发评论']:
-            self.assertIn(rule, record)
-        self.assertLess(record.index('先连同当前'), record.index('EXECUTE 的第一项受控写入'))
-        self.assertLess(record.index('准确 ID'), record.index('才通过正常提测输入门禁'))
+        record = flow.split('## Bug 修复记录\n', 1)[1].split('## 独立直接提测的确定清单', 1)[0]
+        self.assertIn('已评审的完整草稿即可正常进入 PLAN', record)
+        self.assertIn('没有已发表评论不是缺口', record)
+        self.assertIn('适用 Wiki/独立回链之后、TAPD 登记之前', record)
+        self.assertIn('不追加另一条完整记录', record)
         skill = read('skills/submitting-for-test/SKILL.md')
-        self.assertIn('sole PLAN-only exception', skill)
-        self.assertIn('before any commit/push/MR, build, Wiki or final', skill)
-        validator = read('skills/implementing-work/agents/change-reviewer.md')
-        self.assertIn('Do not demand the future corrected-comment readback', validator)
+        step = skill.split('9. For a Bug only', 1)[1].split('10. After all required', 1)[0]
+        self.assertIn('NO_WIKI skips only Wiki/link steps, not this record', step)
+        self.assertIn('unknown effect blocks registration', step)
+        for path in ['skills/submitting-for-test/SKILL.md',
+                     'skills/submitting-for-test/agents/submission-validator.md',
+                     'skills/submitting-for-test/references/submission-rules.md',
+                     'skills/submitting-for-test/references/contracts.md']:
+            with self.subTest(path=path):
+                self.assertNotIn('record-only', read(path))
+        rules = read('skills/implementing-work/references/bug-repair-record.md')
+        self.assertNotIn('｜开始', rules)
+        self.assertNotIn('｜完成', rules)
+        self.assertIn('修复记录与提测 Wiki 链接是两条独立评论', rules)
+        prompts = json.loads(read('.codex-plugin/plugin.json'))['interface']['defaultPrompt']
+        self.assertNotIn('start/completion records', '\n'.join(prompts))
 
     def test_existing_delivery_is_verified_without_committing_a_disabled_merge(self):
         skill = read('skills/submitting-for-test/SKILL.md')

@@ -5,6 +5,7 @@ import test from 'node:test';
 import { apiData, registerTestSubmission as originalRegisterTestSubmission } from '../scripts/register-test-submission.mjs';
 import { resolveJenkinsJob } from '../scripts/resolve-jenkins-job.mjs';
 import { WorkflowSession as originalWorkflowSession } from '../scripts/workflow-session.mjs';
+import { repairRecordFixture, repairCommentFixture } from './helpers/bug-repair-record-fixture.mjs';
 
 const response = value => ({ content: [{ type: 'text', text: JSON.stringify(value) }] });
 const id = '123450001';
@@ -45,6 +46,7 @@ function tapd({ malformedFirst = false } = {}) {
       return response(actualList({ ...current }));
     }
     if (name === 'get_workflows_status_map') return response({ status: 1, data: { in_progress: '修复中', resolved: '待测试' } });
+    if (name === 'get_comments') return response({ status: 1, data: [{ Comment: repairCommentFixture(id, 12345) }] });
     if (name === 'get_workflows_all_transitions') return response({ status: 1, data: [
       { StepPrevious: 'in_progress', StepNext: 'resolved', Appendfield: [{ FieldName: 'current_owner', Notnull: 'yes' }] },
     ] });
@@ -55,7 +57,8 @@ function tapd({ malformedFirst = false } = {}) {
 }
 const registration = () => ({ workspaceId: 12345, entryId: id, entryType: 'bug', workMode: 'INITIAL',
   statusAction: 'WAITING_TEST', versionAction: 'NONE', purpose: '验证提测预检',
-  prerequisites: { git: 'VERIFIED', deployment: 'SKIPPED_BY_INTENT', profile: 'STANDARD', wiki: 'VERIFIED' } });
+  prerequisites: { git: 'VERIFIED', deployment: 'SKIPPED_BY_INTENT', profile: 'STANDARD', wiki: 'VERIFIED',
+    repairRecord: repairRecordFixture() } });
 
 test('registration previews the actual Bug list shape without writes and executes only after confirmation', async () => {
   const fake = tapd();

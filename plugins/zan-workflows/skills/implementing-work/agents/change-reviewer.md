@@ -106,10 +106,10 @@ contract and its blockers remain binding. Check in order:
 9. Verification covers the actual risks: relevant failure paths, compatibility
    and preserved behavior at affected boundaries. Small scope alone does not
    excuse missing evidence for a material risk.
-10. For a whole-work Bug review, inspect the authorized start-record readback and the proposed
+10. For a whole-work Bug review, inspect the record authorization and the proposed
    final content under [Bug 溯源与修复记录](../references/bug-repair-record.md).
    The explicitly scoped provider review below defers only the complete-comment
-   and later integration claims, never its own required code checks or start readback.
+   and later integration claims, never its own required code checks or status/owner readbacks.
    Attribution must follow original-change/causality evidence, never merely
    the last modifier or current repairer. Unknown history stays explicit;
    an absent related requirement is omitted, and there are no project sections.
@@ -117,15 +117,18 @@ contract and its blockers remain binding. Check in order:
    Check that the proposed comment uses HTML paragraphs with bold title/field
    labels and lists for long repair/verification details; plain newlines inside
    one paragraph or unrendered Markdown do not provide TAPD comment formatting.
-   The completion comment is written/read back after this review passes;
-   do not require that future readback as a prerequisite for the review itself.
+   This review accepts the proposed final record, not its publication. The
+   selected endpoint owns the single write/readback: after Git/deployment and
+   applicable Wiki/link gates for submission, or at the final IMPLEMENT exit.
+   Do not require a future comment readback for code review or submission-bound
+   REVIEWED, and do not publish comments for intermediate review passes or rework.
    Story/Task has no repair-record obligation.
 
 For a provider review specifically bound to an explicitly approved predecessor
 package/test-service output, apply the shared
 [dependency-output rules](../../../references/execution-checklist.md#前置依赖产出与整体完成).
 Require current provider code, required pre-delivery verification, precise node
-scope/authority and applicable shared status/start-record readbacks. Keep unmet
+scope/authority and applicable shared status/owner readbacks. Keep unmet
 cross-repository acceptance and the complete final-comment review explicit;
 do not demand those future facts as this local code review's prerequisites.
 A pass covers only the supplied provider scope, cannot yield an eligible partial
@@ -133,15 +136,13 @@ ReviewedChange collection, and cannot waive the Git/release executor's gates.
 At whole-work completion review the actual final comment/claims, reusing the
 unchanged provider code review; no early Bug completion or registration is allowed.
 
-For direct-submission record-only correction after developer edits, inspect the
-current full diff/verification and proposed corrected completion body under
-[direct submission](../../submitting-for-test/references/direct-submission.md#人工改动后的-bug-完成记录).
-Verified original records establish historical facts; a valid prior completion
-may support comment-only recovery without a retroactive start comment or Bug
-reactivation. Do not demand the future corrected-comment readback before this
-review. A pass covers code and proposed record only: it cannot establish a full
-Bug REVIEWED handoff until the authorized comment is written/reused and read
-back. Reject stale claims, missing historical evidence or incomplete repositories.
+For developer edits or submission-preflight rework, inspect the current full
+diff/verification and updated record draft under the same record rules. A pass
+covers code and proposed record, allowing a normal REVIEWED handoff without
+requiring publication before delivery. Reject stale claims, missing attribution
+evidence or incomplete repositories. A published record may be reused only when
+it covers the current round; never append another whole record to correct a
+same-round published claim.
 
 When implementation used subagents, require a stable reviewed diff with related
 writers stopped. Verify actual task/path ownership and that local checks cover
@@ -155,7 +156,7 @@ Review only claims supported by those facts; a pass covers this repository,
 not unseen sibling diffs. The caller must collect a passing independent review
 for every required repository and verify agreed cross-repository acceptance
 before publishing one complete Bug record and eligible `reviewed_changes`.
-Shared start/status readbacks are valid for this same Bug and repair round;
+Shared status/owner readbacks are valid for this same Bug and repair round;
 do not demand a separate comment or repeated state write per repository.
 
 Loss of a still-required behavior without an equivalent reachable replacement

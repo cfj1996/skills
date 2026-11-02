@@ -22,13 +22,17 @@ class BugFlowStateAndConfirmationTests(unittest.TestCase):
             self.assertIn("SKIPPED_ALREADY_WAITING_TEST", text)
         self.assertIn("保留状态与处理人", FIXING)
 
-    def test_repair_records_bracket_source_and_review(self):
+    def test_record_is_drafted_during_implementation_and_published_at_endpoint(self):
         self.assertIn("bug-repair-owner.md", FIXING)
         self.assertIn("bug-repair-record.md", FIXING)
         self.assertIn("联合写入读回", FIXING)
-        self.assertIn("开始评论读回后改源码", FIXING)
-        self.assertIn("验证及独立评审通过后写完成评论", FIXING)
+        self.assertIn("源码前不发表评论", FIXING)
+        self.assertIn("SUBMIT/GO_LIVE 交接草稿而不写评论", FIXING)
+        self.assertIn("IMPLEMENT 在本轮实施最终结束时", FIXING)
         self.assertIn("评论失败保留已有代码与评审结果", FIXING)
+        reviewer = (PLUGIN_ROOT / 'skills/implementing-work/agents/change-reviewer.md').read_text()
+        self.assertNotRegex(reviewer, r'\bstart(?:-record)? readbacks?\b')
+        self.assertIn('status/owner readbacks', reviewer)
 
     def test_explicit_implementation_endpoint_stops_before_submission_even_plan(self):
         self.assertIn("delivery_mode=IMPLEMENT|SUBMIT|GO_LIVE", FIXING)
@@ -57,9 +61,11 @@ class BugFlowStateAndConfirmationTests(unittest.TestCase):
     def test_deployment_and_wiki_registration_keep_order(self):
         deployment = SUBMITTING.index("deployment gate through `jenkins-mcp`")
         wiki = SUBMITTING.index("execute the authorized Wiki plan")
+        repair_record = SUBMITTING.index("9. For a Bug only")
         status = SUBMITTING.lower().index("apply the status policy")
         self.assertLess(deployment, wiki)
-        self.assertLess(wiki, status)
+        self.assertLess(wiki, repair_record)
+        self.assertLess(repair_record, status)
         self.assertIn("blocks every later Wiki/TAPD write", SUBMITTING)
 
     def test_go_live_and_cleanup_are_delegated_without_early_shared_cleanup(self):

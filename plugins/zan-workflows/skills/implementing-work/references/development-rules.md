@@ -25,14 +25,11 @@ Do not edit until all are true:
 - Bug `NO_CHANGE` proves both active status and the verified repair handler;
   an already-active Bug still owned by a tester needs an authorized correction.
   A waiting-test continuation preserves both state and owner;
-- for a Bug, the start comment under
-  [Bug 溯源与修复记录](bug-repair-record.md) is authorized and read back
-  (or verified as already present for the current round); Story/Task skips it;
 - overlapping pre-existing changes have been reconciled or block the work.
 
 For one Bug spanning repositories, apply the definition/repository/scope checks
 to the whole confirmed `work_definitions` set before the first write. Use one
-shared status/owner operation and start-comment readback, then create/select each
+shared status/owner operation/readback, then create/select each
 repository's fixed branch at its source-work boundary. A failure in one required
 repository blocks Bug completion, including when other repositories already passed.
 
@@ -72,11 +69,11 @@ same branch.
 - Before review, compare the actual final diff/status with the starting
   baseline and exclude unrelated changes.
 - After every required repository and agreed cross-repository acceptance passes
-  verification/review, recheck the reviewed source facts and read back the Bug's complete repair
-  comment before handoff. A comment failure retains code/review evidence and
-  blocks delivery; it does not trigger another repair or duplicate comment.
-  Per-repository progress remains actual progress, not independently eligible
-  `REVIEWED` results. The final collection shares one complete record/readback.
+  verification/review, recheck source facts and the shared final record draft
+  under [repair-record rules](bug-repair-record.md). Submission-bound handoffs
+  contain the reviewed draft without a published-comment prerequisite. Only an
+  IMPLEMENT endpoint writes/reuses and reads back that record before final exit.
+  Per-repository progress cannot become independently eligible `REVIEWED` results.
 
 ## Review boundary
 

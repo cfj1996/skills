@@ -33,7 +33,7 @@ not a new persisted schema or a queue of unrelated work items.
 | External data and Mock | same Plan/brief external dependency records and selected stage/steps; source evidence, stage-specific blockers and stable Mock inventory/paths/scenarios/real-call boundary; current source/diff fingerprints, Mock and real verification limits, and actual retirement evidence when applicable |
 | Schedule (only when requested) | optional `scheduleRecommendation`: remaining effort, owner capacity/source, dependencies, proposed dates or conditional workday window, assumptions/risks and `writeState=NOT_WRITTEN`; grants no date/status write authority |
 | Review | `REVIEW_PASSED|REVIEW_FAILED|NOT_RUN` and normalized reason |
-| Bug repair record | Bug only: exact item/comment account, matching record authorization, created/reused comment IDs and bodies/readbacks for the current round, introduction evidence or explicit unknowns, and actual repair/verification result; Story/Task is not applicable |
+| Bug repair record | Bug only: exact item/comment account, matching authorization and selected delivery endpoint, reviewed full HTML draft bound to the current diff/verification, introduction evidence or explicit unknowns, and comment ID/body/readback only if published at the final IMPLEMENT endpoint or safely reused; submission-bound handoffs need no future comment evidence; Story/Task is not applicable |
 | Terminal | `REVIEWED|BLOCKED` and blocker when applicable |
 
 ## Invariants
@@ -121,8 +121,8 @@ not a new persisted schema or a queue of unrelated work items.
   checks as independent review. Final code review still requires the independent
   `POST_CHANGE_REVIEW` call.
 - In a grouped Bug, verify every required repository definition before the
-  first write, then perform the common state/owner operation and start record
-  once. Its verified effect replaces the old shared status snapshot for later
+  first write, then perform the common state/owner operation once. Its verified
+  effect replaces the old shared status snapshot for later
   repository steps; it is not external drift or a reason to repeat the write.
   Each repository still receives its own branch, diff, verification and review
   checks. Required cross-repository acceptance belongs to the Bug's complete scope.
@@ -151,23 +151,24 @@ not a new persisted schema or a queue of unrelated work items.
   This applies to every definition in a grouped requirement; grouping does not
   create Bug records, Task status writes, or a shared status transition.
 - Apply [Bug 溯源与修复记录](bug-repair-record.md). A Bug `REVIEWED` requires
-  verified start and completion comments (created or safely reused), independent
-  of submission/Wiki. Start readback precedes source edits; completion follows
-  passing verification/review and precedes handoff. A failed completion readback
-  returns `BLOCKED` while retaining the actual code/review result. Unknown
-  historical cause/author/time is explicit, never invented or inferred solely
-  from the current handler or last modifier. Comment-only recovery may reuse
-  a verified complete record covering the current repair without retroactively
-  posting a start comment or redoing source work. Story/Task has no such comments.
+  passing current code/verification/review and one reviewed complete record draft.
+  The same checklist's `delivery_mode` selects its final publication owner:
+  `SUBMIT|GO_LIVE` defers the single write/readback to submission after Git,
+  deployment and applicable Wiki/link gates; `IMPLEMENT` writes/reuses and reads
+  back the record at final implementation exit. That endpoint's comment failure
+  returns `BLOCKED` while retaining code/review facts. Before source edits only
+  the applicable status/owner write/readback is required. Unknown historical
+  cause/author/time stays explicit, never inferred solely from the handler or
+  last modifier. Story/Task has no repair-record obligation.
 - Grouped Bug closure requires passing current verification and independent
   review for every required repository plus agreed cross-repository acceptance.
-  Revalidate source/diff facts before the single completion comment; refresh
-  only invalidated checks. All `reviewed_changes` then share that complete
-  record/readback. Missing or blocked repositories cannot be omitted, marked
+  Revalidate source/diff facts before handoff; refresh only invalidated checks.
+  All `reviewed_changes` share the same reviewed record draft and any real
+  endpoint publication/readback. Missing or blocked repositories cannot be omitted, marked
   `REVIEWED`, or submitted separately to close the Bug. Return `BLOCKED` with
-  actual per-repository work until the whole scope and record are verified.
-  Resume from verified effects; a comment-only failure does not repeat source
-  work, status changes or start comments. No new stage enum or ledger is needed.
+  actual per-repository work until the whole scope and draft review pass.
+  Resume from verified effects; an endpoint comment failure does not repeat source
+  work or status changes. No new stage enum or ledger is needed.
 - The result grants no commit, push, MR, submission, Wiki, or release authority.
 - MR, build and Wiki associations belong to the existing delivery result only
   after they actually exist in a later authorized stage; IMPLEMENT does not

@@ -644,6 +644,17 @@ operations under [delivery reuse](execution-checklist.md#已完成交付的复�
 fabricate another trigger or treat a package as a consumer deployment.
 `profile=STANDARD|NO_WIKI`, with `wiki=VERIFIED|SKIPPED_NON_FUNCTIONAL` for
 STANDARD or `SKIPPED_NO_WIKI` for NO_WIKI. This helper never calls Wiki tools.
+For a Bug, EXECUTE additionally requires
+`prerequisites.repairRecord={commentId, author, bodySha256}`. Use the exact string
+comment ID/account and SHA-256 of the verified comment readback's raw
+`description`, including TAPD's HTML normalization. The helper reads that comment
+by ID in the exact workspace/Bug, requires one matching Bug record with the
+expected author/title/body fingerprint, then refreshes current Bug state and
+assignment before updating. Missing, conflicting or unreadable evidence blocks
+without a write; a true/VERIFIED flag cannot substitute for a comment. PLAN may
+omit this future evidence and fill it after the authorized late publication.
+Story/Task needs no repair record and performs no comment read. The executor
+returns the verified record identity for successful or skipped Bug registration.
 Continue already waiting skips status, owner and version writes; a completely matching final
 state is read-only. Unknown writes are never repeated. Partial readback
 reports actual status/owner/version effects and blocks the submission result.

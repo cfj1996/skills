@@ -12,7 +12,7 @@ complete `SubmissionPlan` (visible for standalone confirmation or material chang
 
 | Section | Required facts |
 | --- | --- |
-| Inputs | one source definition/reviewed change pair, one Bug's or one verified Story/selected Tasks' `work_definitions`/`reviewed_changes` collections matched by canonical repository/root, origin and fixed branch; shared Bug identity/repair-record readbacks only for Bugs, or exact parent/selected Task/Plan coverage for requirements; all required repository evidence; `INITIAL|CONTINUE`, exact Wiki profile, and `AUTO|DEPLOY|SKIP` deployment mode |
+| Inputs | one source definition/reviewed change pair, one Bug's or one verified Story/selected Tasks' `work_definitions`/`reviewed_changes` collections matched by canonical repository/root, origin and fixed branch; shared Bug identity and reviewed repair-record draft only for Bugs, or exact parent/selected Task/Plan coverage for requirements; all required repository evidence; `INITIAL|CONTINUE`, exact Wiki profile, and `AUTO|DEPLOY|SKIP` deployment mode |
 | Repository | expected/actual path, Git root, origin, verification result |
 | Authorization | complete execution checklist and actual human confirmation from a main entry, or the standalone plan's own confirmation; current scope-coverage comparison, exact technical plan/bound facts, deterministic derivations, and any reauthorization reason |
 | Mock safety | per-repository current source/diff-bound inspection and same Plan/brief inventory; explicit evidenced no-Mock or exact MOCK-* scope and matching human test authorization for target environment/branch/Job, purpose and selected writes; stale/missing evidence blocks; preserve real acceptance gaps in result/Wiki |
@@ -23,6 +23,7 @@ complete `SubmissionPlan` (visible for standalone confirmation or material chang
 | Wiki | `WRITTEN|SKIPPED_BY_POLICY|BLOCKED|NOT_ATTEMPTED`, auto-resolved target plan when written or retained for `going-live`, hierarchy evidence, create/update authorizations and readbacks when written, actual final child ID/URL and source-branch identity when available, business merge-status or tooling current-version/channel readback, and final body when applicable |
 | Change consistency | current reviewed behavior/basis/impact/verification and full delivery delta under [shared rules](../../../references/change-consistency.md); STANDARD draft/readback coverage of content, impact and verification, scoped corrections or evidenced unchanged result; exact TAPD and available Wiki links for MR descriptions |
 | TAPD | exact status action, waiting-test owner and source (`te` or `reporter`) for Bug transitions, owner write/readback result, exact `Bug|Story|Task` Wiki-link result when applicable, duplicate/conflict evidence, and write/readback results |
+| Bug repair record | Bug only: shared reviewed draft/authority, late publication or safe reuse after all Git/deployment and applicable Wiki/link gates; execution `prerequisites.repairRecord={commentId, author, bodySha256}` from the actual raw HTML readback; the registration executor freshly verifies that exact comment and returns its verified identity before registration; independent of the Wiki-link comment |
 | Test version | `WRITTEN|SKIPPED_ALREADY_WAITING_TEST|BLOCKED|NOT_ATTEMPTED`, structured payload and readback when written |
 | Validation | one mapped complete-plan review including Wiki, each executor's immediate prerequisite/readback checks, scoped review for material changes, and the lead's final receipt check |
 | Terminal | `SUBMITTED|BLOCKED` and blocker when applicable |
@@ -39,15 +40,16 @@ never rerun business implementation or invent a missing READY/REVIEWED handoff.
 
 ## Invariants
 
-- Direct Bug record-only refresh follows `direct-submission.md`: when manual
-  edits invalidate the old completion record, PLAN may carry a reviewed
-  corrected body after all current code/repository/acceptance checks pass.
-  This is a read-only preview, not a complete REVIEWED handoff. The same exact
-  checklist confirms the Bug/account/body and append/reuse action; at EXECUTE
-  write/reuse and read back that one record first, then refresh every matching
-  ReviewedChange before any delivery write. Other missing evidence still blocks.
-  A valid current record is reused. Failure blocks delivery without repeating
-  code work, status activation, start comments or unknown comment writes.
+- A Bug's normal REVIEWED/PLAN input contains one current independently reviewed
+  record draft; publication is not an input prerequisite. The same complete
+  checklist binds the exact Bug/account/body and create/reuse action after all
+  Git/deployment and applicable Wiki/link gates, immediately before registration.
+  Current code review, every required repository and cross-repository acceptance
+  still must pass. Rework refreshes the draft before publication. Reuse a valid
+  same-round record; a failed/unknown write blocks registration while retaining
+  earlier delivery results, without replaying code, status or fulfilled operations.
+  A same-round published record is corrected under the record rules, never
+  replaced by another whole comment.
 
 - Explicit checklist choices are preserved. Without overrides, selected test
   delivery defaults to merge plus `STANDARD` and `DEPLOY`, including `AUTO`;
@@ -88,11 +90,12 @@ never rerun business implementation or invent a missing READY/REVIEWED handoff.
   Several subproject definitions may share that key; retain every definition's
   scope/acceptance while using one reviewed result and one Git operation per key.
   Missing required repositories, mismatched Bug identity or missing review/
-  cross-repository acceptance/shared completion-record readback block the plan.
+  cross-repository acceptance/shared reviewed record draft block the plan.
   One `SubmissionPlan` binds each row's independent source SHA, actual target
   and deployment choice. Execute existing helpers per repository; only after
-  every selected Git/deployment gate passes write the shared Wiki/comments and
-  register the Bug once. A first successful repository cannot mark it waiting
+  every selected Git/deployment gate passes write the shared Wiki/link comments,
+  then publish/reuse and read back the single repair record and register the Bug once.
+  A first successful repository cannot mark it waiting
   for test while another required repository is incomplete.
 - One consolidated submission authorization covers the unchanged Git, Wiki,
   deployment, comment, and final TAPD plan. Deterministically generated commit,
@@ -170,7 +173,7 @@ never rerun business implementation or invent a missing READY/REVIEWED handoff.
   source branch needed for `going-live` to locate and update the same entry.
 - `NO_WIKI` requires `SKIPPED_BY_POLICY`; every Wiki and Wiki-comment operation
   is omitted. It still requires Git delivery, deployment resolution, and
-  applicable TAPD registration/readbacks.
+  the Bug's final repair record plus applicable TAPD registration/readbacks.
 - A Wiki update or valid link does not prove scope or impact correctness. Both
   remain separately reviewed, including manual and continuation changes. Fix
   stale content in the matching entry; do not merely append an already-listed
@@ -200,7 +203,8 @@ never rerun business implementation or invent a missing READY/REVIEWED handoff.
   sole read-only exception. It records
   `SKIPPED_BY_INTENT`. `FAILED|UNKNOWN` forbids later Wiki/status/version writes.
 - `INITIAL` writes `待测试`/waiting-test owner/test version only after
-  `BUILD_SUBMITTED|DEPLOYED|RELEASED|SKIPPED_BY_INTENT`. `CONTINUE` already in `待测试` performs no status
+  `BUILD_SUBMITTED|DEPLOYED|RELEASED|SKIPPED_BY_INTENT`, applicable Wiki/link gates
+  and the Bug repair-record readback. `CONTINUE` already in `待测试` performs no status
   or owner write, or duplicate test-version write.
 - Status, waiting-test owner and test version use one
   `TAPD_REGISTRATION_BUNDLE`: exact item,

@@ -15,22 +15,22 @@
 | Active status readback passes but owner is missing, unchanged or includes another person | `BLOCKED` before source edits; preserve actual effects without automatic retry/rollback. |
 | Continue Bug is already `待测试` | Keep the status unchanged and implement on the original branch. |
 | Story or Task reaches implementation | Require `NOT_APPLICABLE_NON_BUG`; do not validate or write a Bug `修复中` status. |
-| Confirmed Bug repair begins | After diagnosis, create/reuse and read back the original Bug's start record before source edits; complete the final record only after verification/review pass. |
+| Confirmed Bug repair begins | Verify the applicable status/owner readback and diagnose before edits; retain an in-memory record draft without publishing a comment. |
 | Last modifier differs from the evidenced introducing author | Use original-change and causal evidence; never assign introduction responsibility from `git blame` or repair ownership alone. |
 | Historical author/time/cause cannot be established | State the unknown and evidence gap; continue the approved scoped repair without inventing attribution. |
 | Bug has no verified related requirement or involves several projects | Omit the related-requirement line when absent and retain one flat record without project fields/sections. |
-| One Bug supplies several repository definitions | Preflight the complete confirmed set, share one state/start-record operation, then implement and independently review every repository; close only after agreed cross-repository acceptance. |
+| One Bug supplies several repository definitions | Preflight the complete confirmed set, share one status/owner operation, then implement and independently review every repository; close only after agreed cross-repository acceptance. |
 | Two subprojects resolve to the same repository and fixed branch | Combine their scoped work into one repository result; conflicting branch bindings block before writes. |
 | The first repository passes but another required repository fails | Return BLOCKED with actual progress; no completion comment, partial REVIEWED result or delivery handoff. |
 | Shared state/owner changed through this round's verified write | Reuse its readback for later repositories; do not repeat the old payload or mistake the expected effect for external drift. |
-| Grouped Bug resumes after one repository failed | Read back shared comments and source facts, retain valid work/reviews, and complete only missing or invalidated steps. |
-| All repositories pass but shared completion readback fails | Preserve each code/review result and return BLOCKED; verify the original comment before any missing write, without rerunning implementation. |
+| Grouped Bug resumes after one repository failed | Verify shared state/source facts and any actual endpoint publication, retain valid work/reviews, and complete only missing or invalidated steps. |
+| All repositories pass but IMPLEMENT final-record readback fails | Preserve each code/review result and return BLOCKED; verify the original comment before any missing write, without rerunning implementation. |
 | Reviewed source changes before grouped closure | Reverify/review affected work before publishing a complete record or any REVIEWED result. |
-| Start record is already verified for this round | Reuse it; only append the missing completion record, without duplicate start comments. |
-| Completed record already covers the current repair and only comment recovery remains | Verify and reuse it without adding a retroactive start record or rerunning the repair. |
+| SUBMIT or GO_LIVE implementation passes all required reviews | Return normal REVIEWED with one shared reviewed record draft; publish no comment and require no future comment ID/readback. |
+| Existing final record already covers this round and only comment recovery remains | Verify and reuse its exact ID/body without another publication or source repair. |
 | Continued Bug is already waiting for test | Preserve status/owner; still record genuinely new incremental repair with the same comment rules. |
-| Start comment fails or cannot be read back | Block source edits, retain actual effects and raw error, then read before retrying a write. |
-| Code verification/review passed but completion comment readback fails | Return `BLOCKED` before submission while preserving code/review results; recover only the missing comment/readback. |
+| Implementation-only work passes all verification/review and is ready to end | Publish/reuse and read back the single complete record at this final endpoint; do not load submission, Jenkins or Wiki. |
+| A submitted draft needs same-round rework before publication | Refresh only affected code checks/review and the draft; do not publish intermediate records or create a new repair round. |
 | Existing unrelated changes overlap the approved files | `BLOCKED`; do not stash, reset, overwrite, or absorb them. |
 | Relevant verification fails | `BLOCKED` with the actual command/result; do not claim review success. |
 | Reviewer rejects scope or correctness | Map to `REVIEW_FAILED` and return `BLOCKED`. |

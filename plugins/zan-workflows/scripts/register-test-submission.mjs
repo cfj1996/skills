@@ -78,6 +78,44 @@ function checkPrerequisites(input) {
     : gates.profile !== 'STANDARD' || !['VERIFIED', 'SKIPPED_NON_FUNCTIONAL'].includes(gates.wiki)) {
     throw new Error('登记前的 Wiki/评论或政策跳过证据不完整');
   }
+  if (input.entryType === 'bug') {
+    const record = gates.repairRecord;
+    if (!record || typeof record.commentId !== 'string' || !/^\d+$/.test(record.commentId) ||
+        typeof record.author !== 'string' || !record.author.trim() ||
+        typeof record.bodySha256 !== 'string' || !/^[a-f\d]{64}$/i.test(record.bodySha256)) {
+      throw new Error('Bug 登记前缺少修复记录的准确评论 ID、作者及已核实正文指纹');
+    }
+  }
+}
+
+async function verifyRepairRecord(call, input) {
+  const expected = input.prerequisites.repairRecord;
+  try {
+    const data = await readApi(call, 'get_comments', { workspace_id: input.workspaceId,
+      options: { id: expected.commentId, entry_id: input.entryId, entry_type: 'bug', limit: 2, page: 1,
+        fields: 'id,workspace_id,entry_id,entry_type,author,description' } });
+    const rows = Array.isArray(data) ? data : [data];
+    const comment = rows.length === 1 ? rows[0]?.Comment : null;
+    if (!comment || String(comment.id) !== expected.commentId ||
+        String(comment.workspace_id) !== String(input.workspaceId) ||
+        String(comment.entry_id) !== input.entryId || comment.entry_type !== 'bug') {
+      throw new Error('修复记录评论不存在、不唯一或不属于当前 Bug/空间');
+    }
+    if (typeof comment.author !== 'string' || comment.author.trim() !== expected.author.trim()) {
+      throw new Error('修复记录评论作者与已确认账号不一致');
+    }
+    if (typeof comment.description !== 'string' ||
+        !comment.description.includes('【Bug 溯源与修复记录】') ||
+        sha256(comment.description) !== expected.bodySha256.toLowerCase()) {
+      throw new Error('修复记录正文缺失、不是完整修复记录或已发生变化');
+    }
+    return { state: 'VERIFIED', workspaceId: input.workspaceId, entryId: input.entryId,
+      commentId: expected.commentId, author: comment.author, bodySha256: sha256(comment.description) };
+  } catch (error) {
+    error.result = { state: 'BLOCKED', phase: 'CHECK_REPAIR_RECORD', entryId: input.entryId,
+      writes: 0, error: error.message };
+    throw error;
+  }
 }
 
 export async function registerTestSubmission(call, input, io = {}) {
@@ -162,6 +200,8 @@ export async function registerTestSubmission(call, input, io = {}) {
     if (found.length !== 1) throw new Error('登记条目不存在或身份不唯一');
     return found[0];
   };
+  const repairRecord = input.execute && input.entryType === 'bug' ? await verifyRepairRecord(call, input) : undefined;
+  // Read state/assignment after the comment read so drift during that GET cannot be overwritten.
   const before = await readItem();
   if (input.statusAction === 'WAITING_TEST' && before.workitem_type_id && String(before.workitem_type_id) !== input.workitemTypeId) {
     throw new Error('登记条目的工作流类别已变化');
@@ -198,6 +238,7 @@ export async function registerTestSubmission(call, input, io = {}) {
     state, entryId: input.entryId, statusState: 'UNCHANGED', versionState: skipContinue ? 'SKIPPED_ALREADY_WAITING_TEST' : 'UNCHANGED',
     ownerState: 'UNCHANGED', actualOwner: before.current_owner,
     actualStatus: before.status, actualVersion: currentVersion, writes: 0,
+    ...(repairRecord ? { repairRecord } : {}),
   };
   if (input.expectedStatus !== before.status || (input.versionAction === 'WRITE' && input.expectedVersion !== currentVersion)) {
     throw new Error('TAPD 状态或版本已变化，不能覆盖其他人的登记');
@@ -206,6 +247,7 @@ export async function registerTestSubmission(call, input, io = {}) {
     throw new Error('TAPD 处理人、测试人员或创建人已变化，需要重新确认登记计划');
   }
   const result = { state: 'BLOCKED', entryId: input.entryId, writes: 0,
+    ...(repairRecord ? { repairRecord } : {}),
     statusState: statusWrite ? 'UNKNOWN' : 'UNCHANGED', ownerState: statusWrite ? 'UNKNOWN' : 'UNCHANGED',
     versionState: versionWrite ? 'UNKNOWN' : 'UNCHANGED' };
   let phase = 'UPDATE';

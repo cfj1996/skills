@@ -10,6 +10,7 @@ import { createJenkinsReader } from '../scripts/jenkins-readonly.mjs';
 import { FixtureWorkflowSession } from './helpers/mock-safety-fixture.mjs';
 import { runScopedCommand } from '../scripts/workflow-runtime.mjs';
 import { PassThrough } from 'node:stream';
+import { repairRecordFixture, repairCommentFixture } from './helpers/bug-repair-record-fixture.mjs';
 
 const reply = value => ({ content: [{ type: 'text', text: JSON.stringify(value) }] });
 const api = value => reply({ status: 1, data: value });
@@ -63,6 +64,7 @@ test('an EXECUTE timeout stays UNKNOWN and a late write response cannot start re
     if (name === 'get_workflows_status_map') return api({ fixing: '修复中', testing: '待测试' });
     if (name === 'get_workflows_all_transitions') return api({ fixing: ['testing'] });
     if (name === 'get_bug') return api([{ Bug: { ...item } }]);
+    if (name === 'get_comments') return api([{ Comment: repairCommentFixture(item.id, 12345) }]);
     if (name === 'update_bug') {
       updates++; return new Promise(resolve => { completeWrite = () => { Object.assign(item, args.options); resolve(api({ Bug: item })); }; });
     }
@@ -71,7 +73,8 @@ test('an EXECUTE timeout stays UNKNOWN and a late write response cannot start re
   const session = new FixtureWorkflowSession({ pool, allowExecute: true, requestTimeoutMs: 40, shutdownTimeoutMs: 25 });
   const input = { workspaceId: 12345, entryId: item.id, entryType: 'bug', workMode: 'INITIAL', workitemTypeId: 'bugs',
     purpose: '测试真实写入边界', statusAction: 'WAITING_TEST', versionAction: 'WRITE', versionField: 'version_test',
-    testVersion: 'demo@1.0.1', prerequisites: { git: 'VERIFIED', deployment: 'SKIPPED_BY_INTENT', profile: 'NO_WIKI', wiki: 'SKIPPED_NO_WIKI' } };
+    testVersion: 'demo@1.0.1', prerequisites: { git: 'VERIFIED', deployment: 'SKIPPED_BY_INTENT', profile: 'NO_WIKI',
+      wiki: 'SKIPPED_NO_WIKI', repairRecord: repairRecordFixture() } };
   const plan = await session.dispatch({ id: 'preview', action: 'registration', phase: 'PLAN', input });
   await assert.rejects(session.dispatch({ id: 'write', action: 'registration', phase: 'EXECUTE', input: { ...plan, confirmed: true } }), error => {
     assert.equal(error.result.state, 'UNKNOWN');

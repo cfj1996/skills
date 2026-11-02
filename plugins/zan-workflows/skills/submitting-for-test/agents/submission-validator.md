@@ -46,17 +46,12 @@ matching real human authority. An orchestrated plan checks its existing complete
 checklist confirmation. Apply Wiki criteria only for STANDARD with a prepared
 body; NO_WIKI never loads Wiki capability and a policy skip keeps its own criteria.
 
-Preserve the skill's sole record-only Bug PLAN exception after developer edits:
-current code/verification, independent code and proposed-comment review, exact
-history/authority and every required repository must already pass. Only the
-corrected completion-comment readback and consequent full `REVIEWED` handoff
-may remain pending during `PRE_SUBMISSION_PLAN`; do not fabricate them or
-reject this exact preview for those future facts. The plan must bind the
-authorized correction/reuse as its first controlled write, require its exact
-readback, then restore the normal full `REVIEWED`/record gates before any
-commit/push/MR, build, Wiki or registration. This exception defers no code
-review, required repository, cross-repository acceptance or runtime write gate,
-and applies to no other phase or missing evidence.
+For Bugs, require the current independently reviewed complete record draft and
+its exact item/account/authority. Normal REVIEWED/PLAN needs no published comment.
+The plan must publish/reuse and read back that single record only after every
+Git/deployment and applicable Wiki/link gate, before registration. Reject an
+early comment write or publication on an intermediate review pass. Current code
+reviews, required repositories and cross-repository acceptance cannot be deferred.
 
 Unknown future SHA/MR/queue/Wiki IDs are not missing past receipts and cannot be
 marked successful. Check that each executor will require the preceding actual
@@ -69,8 +64,8 @@ each repository's code review, explicit human authority or final readbacks.
 ## Common checks
 
 - Definition is `READY_FOR_HANDOFF`; reviewed change is `REVIEWED` with public
-  `REVIEW_PASSED`; repository and original source branch match. Only the exact
-  record-only `PRE_SUBMISSION_PLAN` exception above may defer the full handoff.
+  `REVIEW_PASSED`; repository and original source branch match. A Bug also carries
+  the reviewed final record draft; its later publication is not a code-handoff gate.
 - Profile is exactly `STANDARD|NO_WIKI`; each Git delivery target is the
   verified and confirmed actual test branch (`dev` or `develop`), unchanged
   from its upstream selection. Never normalize one alias to the other.
@@ -86,8 +81,7 @@ each repository's code review, explicit human authority or final readbacks.
 - For a Bug across repositories, pair all required definitions/reviews by
   canonical repository/root, origin and fixed branch, not array position.
   Require matching Bug identity, per-repository passing reviews, cross-repository
-  acceptance and the shared completion-record readback (only the record-only
-  PLAN exception above may defer its corrected readback). One consolidated plan
+  acceptance and the shared reviewed repair-record draft. One consolidated plan
   binds independent source/target SHAs and deployment choices. Shared Wiki and
   TAPD writes require every required Git/deployment gate; reject partial-Bug
   registration.
@@ -95,8 +89,7 @@ each repository's code review, explicit human authority or final readbacks.
   selected Task/Plan coverage. Apply the same per-repository and cross-repository
   completeness checks without inventing Bug status/records or Task completion.
   A valid dependency-output review does not make a partial collection eligible
-  for formal submission; only the existing record-only Bug PLAN exception may
-  defer its explicitly named completion-comment readback.
+  for formal submission.
 - The current operation's confirmed business facts, evidence-derived exact
   bindings/payload, current re-read facts, purpose, `tool_route`, and authority
   all match. Apply the shared [confirmation reuse](../../../references/execution-checklist.md#执行清单的确认复用):
@@ -177,11 +170,11 @@ consumed without another prompt after C → develop/dev, independent of master
 go-live. Carry the complete ConflictMergeHandoff and per-resource outcomes.
 
 For `PRE_SUBMISSION_WRITE`, accept exactly one operation:
-`JENKINS_TEST_DEPLOY|WIKI_WRITE_AND_LINK_BUNDLE|TAPD_REGISTRATION_BUNDLE|WIKI_MONTH_CREATE|WIKI_CHILD_CREATE|WIKI_UPDATE|TAPD_COMMENT|TAPD_STATUS|TEST_VERSION`.
+`JENKINS_TEST_DEPLOY|WIKI_WRITE_AND_LINK_BUNDLE|BUG_REPAIR_RECORD|TAPD_REGISTRATION_BUNDLE|WIKI_MONTH_CREATE|WIKI_CHILD_CREATE|WIKI_UPDATE|TAPD_COMMENT|TAPD_STATUS|TEST_VERSION`.
 Require successful prior dependencies and validate only that operation. A
 child created after a new month uses the read-back real month ID under the
-unchanged consolidated authorization. Under `NO_WIKI`, reject Wiki and comment operations and require
-no Wiki material.
+unchanged consolidated authorization. Under `NO_WIKI`, reject Wiki and Wiki-link
+comment operations and require no Wiki material; the Bug repair record still applies.
 
 For completed predecessor reuse, match the original receipt to its own current
 row/containment/delivered SHA, Job, environment/channel, parameters and purpose,
@@ -256,6 +249,15 @@ the exact Wiki ID/body hash and performs no Wiki create/update. Accept
 `ALREADY_LINKED` as a no-comment-write result only with same-ID comment
 readback evidence; a Wiki bundle may still have `wikiState=UPDATED`.
 
+For `BUG_REPAIR_RECORD`, require a Bug, the reviewed complete HTML body,
+verified account and exact authority, all required Git/deployment and applicable
+Wiki/link receipts, and current source/review bindings. Apply
+[record rules](../../implementing-work/references/bug-repair-record.md): verify
+same-round comments before a single create or reuse, then require exact
+ID/item/account/body readback. Keep Wiki-link text out of the repair record.
+A failure/unknown result stops registration, preserving completed delivery.
+Do not append another complete record to correct a published same-round record.
+
 `TAPD_REGISTRATION_BUNDLE` validates one `register-test-submission.mjs`
 invocation. Require exact type/ID/workspace, current work mode, purpose,
 expected status/version/assignment fields, selected owner, complete
@@ -269,7 +271,14 @@ otherwise `reporter`; missing both blocks. Require the preview's selected
 owner and old `te`/`reporter`/`current_owner` values. The resolved owner can
 satisfy a required `current_owner`; other required transition fields need
 actual existing values and must not be silently added to the payload.
-Git/deployment and applicable Wiki/comment gates must pass first. The script
+Git/deployment, applicable Wiki/link and Bug repair-record readback gates must
+pass first. For a Bug, EXECUTE must carry `prerequisites.repairRecord` with the
+exact string `commentId`, verified `author` and SHA-256 of the returned comment's
+raw `description`. PLAN needs no future comment. The executor reads that exact
+current comment and checks workspace/Bug/type/account/title/body fingerprint
+before reading current status/assignment or sending an update; a caller's flag
+is not proof. This check also applies to already-waiting CONTINUE; Story/Task
+does not read or require Bug comments. The script
 writes status, waiting-test owner and the approved version field in one
 `tapd-mcp` update and reads the written fields back, without another private Agent call.
 Continue already waiting skips these writes; Story/Task rejects Bug status/owner writes.
@@ -286,7 +295,10 @@ only on queue acceptance. Require Wiki readback and work-item link state
 `LINKED|ALREADY_LINKED` under `STANDARD` whenever the Wiki target is validated;
 a policy skip requires retained existing target/body/entry evidence, but no
 post-write readbacks.
-For `INITIAL`, require applicable waiting-test/owner/version readbacks; for
+For a Bug, require the final repair-record readback after the applicable
+Wiki/link gate and before registration, or exact verified reuse of an already
+valid same-round record. Reject duplicated whole-record publication on rework
+or continuation. For `INITIAL`, require applicable waiting-test/owner/version readbacks; for
 `CONTINUE` already in `待测试`, require no status/owner/version write and public
 `SKIPPED_ALREADY_WAITING_TEST`. Verify ordering and truthful completed effects.
 

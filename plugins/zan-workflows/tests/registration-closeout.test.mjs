@@ -3,13 +3,15 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { registerTestSubmission as originalRegisterTestSubmission } from '../scripts/register-test-submission.mjs';
 import { checkLocalCloseout, parseWorktrees } from '../scripts/check-local-closeout.mjs';
+import { repairRecordFixture, repairCommentFixture } from './helpers/bug-repair-record-fixture.mjs';
 
 const id = '1150372234001000001';
 const response = data => ({ content: [{ type: 'text', text: JSON.stringify({ status: 1, data }) }] });
 const input = () => ({ workspaceId: 50372234, entryId: id, entryType: 'bug', workMode: 'INITIAL',
   statusAction: 'WAITING_TEST', versionAction: 'WRITE', activeStatus: 'fixing', waitingStatus: 'testing',
   workitemTypeId: 'bugs', workflowVerified: true, versionField: 'version_test', testVersion: 'demo@1.0.0-canary.1',
-  purpose: '登记已经核实的提测结果', prerequisites: { git: 'VERIFIED', deployment: 'DEPLOYED', profile: 'STANDARD', wiki: 'VERIFIED' } });
+  purpose: '登记已经核实的提测结果', prerequisites: { git: 'VERIFIED', deployment: 'DEPLOYED', profile: 'STANDARD',
+    wiki: 'VERIFIED', repairRecord: repairRecordFixture() } });
 
 function tapdFake({ status = 'fixing', version = '', onCall } = {}) {
   const calls = [], item = { id, status, te: 'tester', reporter: 'creator', current_owner: 'developer',
@@ -21,6 +23,7 @@ function tapdFake({ status = 'fixing', version = '', onCall } = {}) {
     if (name === 'get_workflows_status_map') return response({ fixing: '修复中', testing: '待测试' });
     if (name === 'get_workflows_all_transitions') return response({ fixing: ['testing'] });
     if (name === 'get_entity_custom_fields') return response({ custom_field_10: { name: '测试版本', type: 'text' } });
+    if (name === 'get_comments') return response([{ Comment: repairCommentFixture(id, 50372234) }]);
     const kind = args.options.entity_type === 'tasks' ? 'Task' : args.options.entity_type === 'stories' ? 'Story' : 'Bug';
     if (name === 'get_bug' || name === 'get_stories_or_tasks') return response([{ [kind]:
       Object.fromEntries(args.options.fields.split(',').filter(name => Object.hasOwn(item, name)).map(name => [name, item[name]])) }]);

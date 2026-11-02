@@ -24,7 +24,8 @@ external write inside that unchanged authorized plan:
 Before the first delivery write, give the complete `SubmissionPlan` to the
 private submission validator once with `PRE_SUBMISSION_PLAN`: all repository
 reviews, authority, Git actions, exact deployment selections, complete Wiki
-body/patch and ownership evidence, and registration preview. Under STANDARD,
+body/patch and ownership evidence, the Bug's reviewed final record draft and
+late create/reuse action, and registration preview. Under STANDARD,
 include the Wiki validator's criteria in this same review; NO_WIKI loads no
 Wiki capability. A prepared draft is not yet
 `VALIDATED`. Map a passing review to the plan and its Wiki validation together.
@@ -33,11 +34,10 @@ review; do not review that document again merely to change phases.
 Standalone PLAN can be reviewed with its proposed human authority pending;
 only the later matching real confirmation permits EXECUTE. An orchestrator
 instead verifies its already-confirmed complete checklist. Review is not approval.
-For the skill's sole record-only Bug correction PLAN exception, keep the
-corrected comment readback/full REVIEWED handoff pending while verifying all
-current code reviews, history and required repositories. Review the exact first
-comment action and require its readback/full-gate restoration before any other
-delivery write. No other missing input is deferred by whole-plan review.
+Bug publication is a future execution effect, not a REVIEWED/PLAN prerequisite.
+Review its complete proposed body and single-write timing after Git/deployment
+and applicable Wiki/link gates, before registration. All current code reviews,
+required repositories and agreed acceptance still must pass before delivery.
 
 Future commit/MR/queue/Wiki identifiers are unknown at planning time. Review
 their exact derivation and dependency rules, never invent successful receipts.
@@ -58,6 +58,14 @@ operation: include its complete authorized inputs in the plan review,
 let the script perform each deterministic readback internally, then have the lead
 check the final result. Do not re-enter the per-operation process or run a separate
 validator between the helper's month, child create/update and comment calls.
+
+The Bug's `BUG_REPAIR_RECORD` is a separate operation in this same plan. After
+the applicable Wiki/link gate, follow the shared
+[record rules](../../implementing-work/references/bug-repair-record.md) to
+write/reuse and read back the one final record before registration. No stage
+comment or intermediate-review publication is allowed. NO_WIKI omits only
+Wiki/link operations; it keeps this Bug record step. A record failure preserves
+all completed delivery receipts and stops registration.
 
 Likewise, include one `GIT_DELIVERY_BUNDLE` in the unchanged authorized
 commit/push/MR sequence. Local Git checks exact reviewed files/diff and reads

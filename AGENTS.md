@@ -18,14 +18,29 @@ node --test plugins/zan-workflows/skills/writing-plans/tests/*.test.mjs
 node --test plugins/zan-workflows/skills/merge-request-review/tests/*.test.mjs
 python3 /Users/cfj/.codex/skills/.system/skill-creator/scripts/quick_validate.py \
   plugins/zan-workflows/skills/writing-plans
-python3 /Users/cfj/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py \
+python3 -B plugins/zan-workflows/scripts/vendor/openai-plugin-validator/validate_plugin.py \
   plugins/zan-workflows
 ```
 
-The `npx` command fetches TAPD data for workflow execution. Run Git commands from this repository root; use a pathspec such as `-- skills/tapd-workflow` when history should be limited to one standalone skill. The remaining commands run the Zan plugin's complete Node test suite and official Skill/Plugin validators. For a focused Wiki creation/supplementation/comment helper check, run `node --test plugins/zan-workflows/tests/ensure-test-wiki.test.mjs`; the complete Node suite already includes it. This test uses simulated TAPD responses and performs no external writes. For merge/Jenkins executor checks, run `node --test plugins/zan-workflows/tests/delivery-helpers.test.mjs`; these tests also use simulated remote responses. For TAPD registration and read-only closeout checks, run `node --test plugins/zan-workflows/tests/registration-closeout.test.mjs`; these tests simulate both TAPD and Git, without updating real items or deleting resources. For MCP session reuse, Jenkins adapters, automatic TAPD mappings and occupancy collectors, run `node --test plugins/zan-workflows/tests/adaptive-delivery.test.mjs`; remote responses are simulated and SQLite tests use disposable fixture databases. For long session input and GitLab approval compatibility, run `node --test plugins/zan-workflows/tests/session-approval-compat.test.mjs` and `python3 -m unittest discover -s plugins/zan-workflows/tests -p 'test_session_input_pty.py'`; the latter checks a real local PTY without remote writes. For TAPD list decoding, read-only preview recovery and exact Jenkins Job URL lookup, run `node --test plugins/zan-workflows/tests/submission-preflight.test.mjs`; these tests simulate responses without external writes. For browser checks, run `node plugins/zan-workflows/skills/writing-plans/tests/preview-review-panel.mjs`, then open the printed URL for the interactive module preview, add `?assert` for browser regression checks or `?wake&assert` for notification races.
+The `npx` command fetches TAPD data for workflow execution. Run Git commands from this repository root; use a pathspec such as `-- skills/tapd-workflow` when history should be limited to one standalone skill. The remaining commands run the Zan plugin's complete Node test suite, official Skill validator and repository-pinned OpenAI Plugin validator. For a focused Wiki creation/supplementation/comment helper check, run `node --test plugins/zan-workflows/tests/ensure-test-wiki.test.mjs`; the complete Node suite already includes it. This test uses simulated TAPD responses and performs no external writes. For merge/Jenkins executor checks, run `node --test plugins/zan-workflows/tests/delivery-helpers.test.mjs`; these tests also use simulated remote responses. For TAPD registration and read-only closeout checks, run `node --test plugins/zan-workflows/tests/registration-closeout.test.mjs`; these tests simulate both TAPD and Git, without updating real items or deleting resources. For MCP session reuse, Jenkins adapters, automatic TAPD mappings and occupancy collectors, run `node --test plugins/zan-workflows/tests/adaptive-delivery.test.mjs`; remote responses are simulated and SQLite tests use disposable fixture databases. For long session input and GitLab approval compatibility, run `node --test plugins/zan-workflows/tests/session-approval-compat.test.mjs` and `python3 -m unittest discover -s plugins/zan-workflows/tests -p 'test_session_input_pty.py'`; the latter checks a real local PTY without remote writes. For TAPD list decoding, read-only preview recovery and exact Jenkins Job URL lookup, run `node --test plugins/zan-workflows/tests/submission-preflight.test.mjs`; these tests simulate responses without external writes. For browser checks, run `node plugins/zan-workflows/skills/writing-plans/tests/preview-review-panel.mjs`, then open the printed URL for the interactive module preview, add `?assert` for browser regression checks or `?wake&assert` for notification races.
+
+The Plugin validator is an unmodified, revision-pinned copy from OpenAI Codex;
+its source, Git blob hashes and license are in
+`plugins/zan-workflows/scripts/vendor/openai-plugin-validator/SOURCE.md`.
+It needs Python 3.10+ and PyYAML, like the official Skill validator. Run
+`node --test plugins/zan-workflows/tests/plugin-validation.test.mjs` for source-integrity,
+portable CLI, invalid manifest/asset/MCP and malformed skill checks. Fixtures are
+local disposable packages; validation performs no service calls or writes.
 
 The registration checks also cover waiting-test owner selection (`te` before
 `reporter`), assignment drift and partial owner readback, without real TAPD writes.
+
+For the registration executor's live Bug repair-record gate, run
+`node --test plugins/zan-workflows/tests/bug-repair-registration.test.mjs`.
+These simulated MCP calls cover record-free PLAN, required EXECUTE evidence,
+exact comment/workspace/Bug/author/body verification, read failures, late-bound
+HTML readback fingerprints, state drift, CONTINUE, non-Bug registration and
+the workflow-session entry. No remote comments or items are written.
 
 For default direct submission, the implementation-only developer-inspection stop,
 manual-edit review refresh and standalone delivery confirmation, run
@@ -37,7 +52,15 @@ stale/missing evidence and workflow-session continuation, run
 `node --test plugins/zan-workflows/tests/test-merge-containment.test.mjs`.
 It uses simulated APIs and disposable local Git repositories/bare remotes,
 without company remote calls or MR writes. The direct-submission Python checks
-also cover Bug completion-record refresh before delivery.
+also cover the single Bug repair record published after delivery/Wiki gates,
+independent Wiki-link comments, and removal of pre-delivery comment gates.
+
+For read-only behavioral forward checks of preflight rework, separate Wiki/repair
+comments, late publication, implementation-only completion, NO_WIKI/SKIP and
+unknown-write continuation, use
+`plugins/zan-workflows/skills/submitting-for-test/tests/scenarios/review-single-bug-repair-record.md`
+with an independent evaluator. All supplied facts are simulated; no TAPD write,
+Git mutation, Jenkins call or source edit is needed.
 
 For the mounted review panel's public API authorization and destroyed-session
 isolation, run `node --test plugins/zan-workflows/skills/writing-plans/tests/review-panel-public-api.test.mjs`.
@@ -177,7 +200,7 @@ Write skill docs in concise Markdown with clear `#`/`##` headings, short rule li
 
 ## Testing Guidelines
 
-The `zan-workflows` plugin includes the Writing Plans skill's Node tests under `plugins/zan-workflows/skills/writing-plans/tests/`; run the complete suite and both official validators for every plugin change. For a standalone skill, run its owning workflow's targeted command, validate `skills/<skill-name>` with `skill-creator/scripts/quick_validate.py`, inspect generated artifacts when applicable, and confirm documented paths and commands still match the repository layout. Keep new scripts and tests inside their owning skill or plugin directory and document the exact command here.
+The `zan-workflows` plugin includes the Writing Plans skill's Node tests under `plugins/zan-workflows/skills/writing-plans/tests/`; run the complete suite, official Skill validator and repository-pinned Plugin validator for every plugin change. For a standalone skill, run its owning workflow's targeted command, validate `skills/<skill-name>` with `skill-creator/scripts/quick_validate.py`, inspect generated artifacts when applicable, and confirm documented paths and commands still match the repository layout. Keep new scripts and tests inside their owning skill or plugin directory and document the exact command here.
 
 Also run `skills/merge-request-review/tests/*.test.mjs` within the plugin. These
 tests cover the renamed CLI without central configuration, ordinary and Zan
