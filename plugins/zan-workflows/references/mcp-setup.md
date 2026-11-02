@@ -55,6 +55,10 @@ TAPD 0.0.4 新增统一的 `download_workitem_files`，在 MCP 内读取需求/B
 [图片与附件读取](tool-routing.md#tapd-图片与附件读取)。升级启动版本前先确认对应包
 已发布；源码测试通过不代表现有已连接的 0.0.3 服务具有该工具，升级后需重新连接验证。
 
+插件为 TAPD MCP 配置 `tool_timeout_sec: 210`，覆盖批量文件下载的 180 秒处理期限
+及结果返回余量；启动超时仍为 120 秒。更新插件后重新连接 MCP，使新的包版本和
+超时配置一同生效。[Codex MCP 配置说明](https://learn.chatgpt.com/docs/extend/mcp?surface=cli)。
+
 Windows 使用同一份 Node.js 脚本，直接启动 `volta.exe` / `uvx.exe`；Volta
 负责解析 npx，无 Bash、`shell: true` 或手工拼接 `npx.cmd` 命令。其他平台
 启动 `volta` / `uvx`。本机未配置的服务会给出缺失字段并退出，不影响独立服务。

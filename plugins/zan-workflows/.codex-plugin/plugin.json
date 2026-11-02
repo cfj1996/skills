@@ -1,6 +1,6 @@
 {
   "name": "zan-workflows",
-  "version": "0.4.10+codex.20261030-mock-data-layer",
+  "version": "0.4.11+codex.20261102-tapd-file-download",
   "description": "TAPD Bug repair and requirement development with scoped plans, task links, verified implementation and explicit delivery.",
   "author": {
     "name": "Local developer"
