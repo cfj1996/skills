@@ -52,7 +52,7 @@ approve 能力单独记录，不能从 merge 能力或 MR 已获得审批推断�
 | Gates | mergeability、pipeline、approval、未解决讨论及项目要求；原始来源和读取时间 |
 | Review | `ROUTINE|HIGH`、从 changed hunk 得出的风险依据、选定 reviewer |
 | Documents | 适用文档正文、准确条目标识/指纹、适用性依据及缺口 |
-| Mock | 当前完整源码清查、同 Plan/brief 的现有 Mock inventory、运行入口/绑定与隔离证据 |
+| Mock | 本次完整待交付差异及影响边界、关联 Mock 清单、运行入口/绑定与隔离证据 |
 | Gaps | 无法获取的事实及其具体影响；未命中或读取失败不是“不存在” |
 
 无直接链接但项目要求提测 Wiki 时，只沿已核实 TAPD 工作项详情/评论定位已有页；

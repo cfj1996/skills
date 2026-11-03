@@ -64,11 +64,13 @@ pipeline 按统一规则阻断。若需要等待 pipeline，写前再次读取 r
 
 所有模式遵循 [变更与文档一致性](../../../references/change-consistency.md) 和
 [Mock 规范](../../../references/mock-development.md)。未采用 Zan、无 TAPD/Wiki、普通 CI
-成功、用户说跳过审核，都不能豁免。没有当前完整源码/差异证据时，只读审核可继续，
+成功、用户说跳过审核，都不能豁免。没有本次完整差异及关联入口证据时，只读审核可继续，
 不能给可合并结论或执行 approve/merge。
 
-只读准备准确源码并运行共享 [Mock 检查](../../../scripts/mock-safety.mjs)。
-清查完整待交付差异、运行入口和绑定，复用同 Plan/brief 已有 `mockModules`；
+只读准备准确源码并按[本次变更与影响范围](../../../references/mock-development.md#清查范围)
+运行共享 [Mock 检查](../../../scripts/mock-safety.mjs)。
+清查完整待交付差异、关联运行入口和绑定，复用仍匹配的 `mockModules`，
+历史库存中与本次无关联的模块只作提示。
 生产范围仍有 Mock、退役仅改标签/开关、或隔离依据不足均阻断。
 已证明仅用于开发且排除生产运行/构建的 fixture 可保留 MOCK-* / MOCK_ONLY 标识。
 源码检查不冒充未来制品检查；实际发布仍走 Jenkins 先检后发和当次制品门禁。

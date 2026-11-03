@@ -9,8 +9,11 @@ reasoning_effort: high
 
 ## Mock source and production gate
 
-Validate the current full pending diff and same Plan/brief Mock inventory before any
+Validate the current full pending diff, affected runtime/activation/build boundaries
+and related Plan/brief Mock inventory before any
 default-branch MR/write. Test Mock approval never authorizes master/main or production.
+Apply the shared change-impact scope. Unchanged unrelated historical inventory
+entries remain informational, while existing Mock newly reached by this change remains in scope.
 Reject active production-scope Mock, missing/stale inventory, cosmetic retirement or
 unverified real replacement/reference cleanup/build exclusion. Source checks must be
 available before merge; future artifact output must not be fabricated. Official release

@@ -105,10 +105,9 @@ reviewer 只读自己分配的 MR，消费 packet 并按共享契约返回结果
 合并资格为可合并 / 不可合并，由技术、安全、治理和当前账号的目标合并权限共同决定。
 没有 pipeline 仅在项目明确要求时阻断；必要契约不可见且影响正确性判断时才判未完成。
 
-所有项目适用 [Mock 生产禁令](../../references/mock-development.md)。没有当前完整源码清查
-不能给可合并结论；普通 CI、无 Zan/TAPD、关闭开关或 retired 标签均不豁免。
-复用同 Plan/brief 的现有 inventory，检查完整 source/target 范围、运行入口和构建隔离；
-源码检查不等于未来制品检查，测试 Mock 授权不覆盖 master/main。
+所有项目按[本次变更与影响范围](../../references/mock-development.md#清查范围)执行 Mock 检查。
+核对完整 source/target 差异及实际关联的运行入口与构建隔离，复用匹配的 Plan/brief 依据。
+未关联的库存历史条目只作提示。本次涉及的 Mock 仍执行生产隔离门禁，测试许可仅覆盖原测试目标。
 
 按 [当前变更和 Mock 复核](references/merge-rules.md#当前变更和-mock-复核) 准备
 `currentChange/changeReview`、当前 `mergePermission` 和 Mock 证据，运行

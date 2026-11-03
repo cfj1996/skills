@@ -187,6 +187,9 @@ Jenkins XML requirement, run
 These checks execute copied project scripts against disposable Git snapshots and
 final staging trees, reject stale script/configuration/review evidence, stop a
 simulated publication on check failure, and verify exact build-bound receipts.
+The source-boundary suite also covers unrelated historical Mock declarations,
+reviewed non-runtime inventory metadata, new out-of-scope declarations, affected
+unchanged dependencies and pinned revisions with concurrent worktree files.
 `ensure-test-wiki.test.mjs` covers standalone CLI receipt
 arguments through real local source inspection and simulated TAPD writes.
 

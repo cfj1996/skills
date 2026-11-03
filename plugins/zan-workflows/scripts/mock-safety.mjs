@@ -13,6 +13,7 @@ const covered = (path, roots) => roots.some(root => root === '.' || path === roo
 const relpath = value => text(value) && !isAbsolute(value) && value !== '..' && !value.split(/[\\/]/).includes('..') && !value.includes('\\');
 function declarations(path, body) {
   const ids = [];
+  let inventory = false;
   const comment = /^\s*(?:\/\/|\/\*+|\*|#|<!--)\s*(?:@mock-module\s+(MOCK-[A-Za-z0-9-]+)(?:\s+MOCK_ONLY)?|MOCK_ONLY\s+(MOCK-[A-Za-z0-9-]+))\b/gm;
   for (const match of body.matchAll(comment)) ids.push(match[1] || match[2]);
   const apiMock = /^\s*(?:\/\/|\/\*+|\*)\s*@api-mock\s+true\b/m.test(body);
@@ -22,9 +23,15 @@ function declarations(path, body) {
       if (value.marker === 'MOCK_ONLY' && /^MOCK-[A-Za-z0-9-]+$/.test(value.id || '')) ids.push(value.id);
       for (const item of Object.values(value)) visit(item);
     };
-    try { visit(JSON.parse(body)); } catch { /* Non-JSON is not inferred as a declaration. */ }
+    try {
+      const data = JSON.parse(body);
+      inventory = Array.isArray(data?.modules) && data.modules.every(row =>
+        /^MOCK-[A-Za-z0-9-]+$/.test(row?.id || '') && row.marker === 'MOCK_ONLY' &&
+        texts(row.sourcePaths) && row.sourcePaths.every(relpath) && text(row.activation));
+      visit(data);
+    } catch { /* Non-JSON is not inferred as a declaration. */ }
   }
-  return { detected: apiMock || ids.length > 0, moduleIds: unique(ids) };
+  return { detected: apiMock || ids.length > 0, moduleIds: unique(ids), inventory };
 }
 const CODE = new Set(['.js', '.mjs', '.cjs', '.jsx', '.ts', '.tsx', '.vue', '.svelte', '.json', '.yaml', '.yml', '.html']);
 const nonRuntime = path => /(?:^|\/)(?:tests?|__tests__|docs|node_modules|dist|\.git|\.query-contract\/cache)(?:\/|$)/.test(path) || /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(path);
@@ -41,6 +48,18 @@ function reviewedDocuments(input) {
     throw new Error('只可声明已核实在运行、构建及 Mock 配置边界之外的准确需求 Plan');
   }
   return unique(paths);
+}
+function reviewedInventoryPath(input) {
+  const path = input.nonRuntimeInventoryPath;
+  if (path === undefined) return null;
+  const runtimeInputs = [...input.runtimePaths, ...input.mockBindingPaths,
+    ...(input.mockModules || []).flatMap(module => module.paths || []),
+    ...(input.productionIsolation?.configPaths || []), ...(input.productionSourceEvidence?.configPaths || [])];
+  if (!relpath(path) || extname(path) !== '.json' || !covered(path, input.inspectedPaths) ||
+      covered(path, runtimeInputs) || !texts(input.nonRuntimeInventoryEvidenceRefs)) {
+    throw new Error('库存元数据须有非运行时依据，且不能属于运行、构建、Mock 模块或启用配置');
+  }
+  return path;
 }
 const gitReader = io => async (root, args) => (await runScopedCommand('git', args,
   { cwd: root, timeout: 30000, maxBuffer: 16 * 1024 * 1024 }, io)).stdout;
@@ -111,8 +130,9 @@ export async function inspectMockSource(input, io = {}) {
   const sourceSha = revision || head.trim();
   if (base.trim() !== input.baseSha || !SHA.test(sourceSha)) throw new Error('Mock 清查基准或当前 HEAD 不可核实');
   const inspectedPaths = unique(input.inspectedPaths), planPaths = reviewedDocuments(input);
+  const inventoryPath = reviewedInventoryPath(input);
   const cacheKey = stableJson({ root, origin: actualOrigin.trim(), base: input.baseSha, revision, inspectedPaths,
-    runtimePaths: input.runtimePaths, mockBindingPaths: input.mockBindingPaths, planPaths });
+    runtimePaths: input.runtimePaths, mockBindingPaths: input.mockBindingPaths, planPaths, inventoryPath });
   const cache = io.mockInspectionCache?.snapshots;
   if (revision && cache?.has(cacheKey)) return structuredClone(cache.get(cacheKey));
   const changed = unique((await git(root, ['diff', '--name-only', '-z', input.baseSha, ...(revision ? [revision] : []), '--'])).split('\0').filter(Boolean));
@@ -122,7 +142,13 @@ export async function inspectMockSource(input, io = {}) {
       [...input.mockBindingPaths, ...input.runtimePaths, ...ignoredRuntimePaths].some(path => !covered(path, inspectedPaths))) {
     throw new Error('Mock 清查范围未覆盖完整待交付差异/未跟踪文件及项目 Mock 配置入口');
   }
-  const parseAs = path => !nonRuntime(path) && CODE.has(extname(path));
+  // The diff is always inspected. Unchanged code needs semantic review only
+  // inside the declared impact/activation scope, even when inspectedPaths is broad.
+  const declarationPaths = unique([...input.runtimePaths, ...input.mockBindingPaths, ...changed, ...untracked]);
+  const runtimeOverrides = [...input.runtimePaths, ...input.mockBindingPaths].filter(nonRuntime);
+  const parseAs = path => path === inventoryPath ||
+    CODE.has(extname(path)) && (covered(path, runtimeOverrides) ||
+      !nonRuntime(path) && covered(path, declarationPaths));
   const committed = revision && await inspectRevisionFiles(root, revision, inspectedPaths, parseAs, declarations, io);
   const currentNames = revision ? [...committed.keys()]
     : (await git(root, ['ls-files', '--cached', '--others', '--exclude-standard', '-z', '--', ...inspectedPaths])).split('\0').filter(Boolean);
@@ -150,6 +176,10 @@ export async function inspectMockSource(input, io = {}) {
       declaration = parseAs(path) ? declarations(path, data.toString('utf8')) : null;
     }
     files.push([path, hash]);
+    if (path === inventoryPath) {
+      if (!declaration?.inventory) throw new Error('非运行时库存必须是包含稳定模块来源与启用说明的库存 JSON');
+      continue;
+    }
     if (declaration?.detected) {
       markedPaths.push(path);
       markerBindings.push({ path, moduleIds: declaration.moduleIds });
@@ -161,6 +191,8 @@ export async function inspectMockSource(input, io = {}) {
   const runtimeFiles = planPaths.length ? files.filter(([path]) => !planPaths.includes(path)) : files;
   const contentFingerprint = sha256(stableJson(runtimeFiles));
   const scopeFingerprint = sha256(stableJson({ baseSha: input.baseSha, inspectedPaths, files: runtimeFiles,
+    runtimePaths: unique(input.runtimePaths), mockBindingPaths: unique(input.mockBindingPaths),
+    ...(inventoryPath ? { nonRuntimeInventoryPath: inventoryPath } : {}),
     ...(planPaths.length ? { nonRuntimePlanPaths: planPaths } : {}) }));
   const snapshot = { sourceSha, inspectionKind: revision ? 'revision' : 'working-tree', baseSha: input.baseSha, inspectedPaths, contentFingerprint, scopeFingerprint,
     auditContentFingerprint: planPaths.length ? sha256(stableJson(files)) : contentFingerprint,
@@ -370,7 +402,7 @@ export function mockSafetyPreview(input, production = false) {
   return { mockSafetyState: unknown ? 'MISSING_INSPECTION' : production ? 'SOURCE_AND_ARTIFACT_GATE_REQUIRED'
       : active.length ? 'EXPLICIT_MOCK_TEST_CONFIRMATION_REQUIRED' : 'FRESH_INSPECTION_REQUIRED',
     mockModuleIds: active.map(row => row.id),
-    mockSafetyRequirements: ['Refresh complete source/diff and project activation bindings before every write',
+    mockSafetyRequirements: ['Refresh the complete delivery diff and affected runtime/activation/build bindings before every write',
       ...(active.length ? ['Bind human confirmation to exact Mock scope, purpose, target and operations'] : []),
       ...(production ? ['Verify source isolation and fail-closed artifact check before deployment'] : [])] };
 }
