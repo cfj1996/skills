@@ -16,8 +16,8 @@ Turn a requirement or prototype into verified project scope and a branch-bound P
 [执行流程](../../references/adaptive-workflow.md)。范围集中、行为与验收明确、
 实施方式有证据且没有阻塞时，返回范围和内存 `implementationBrief`。
 用户明确要求正式 Plan、需要 Task 写入或实际多人/跨模块业务交付协调时，使用正式 Plan；已有
-Plan/TaskBreakdown 延续其任务、阻塞和读回要求。不要为简短摘要创建模型、
-文件或形式上的 Task，也不通过省略 Plan 绕过已有约束。验证根据实际风险
+Plan/TaskBreakdown 延续其任务、阻塞和读回要求。普通对话摘要无需新模型、
+文件或形式上的 Task。验证根据实际风险
 选择场景与证据，不增加流程档位或风险枚举。
 TAPD 需求的实施准备涉及多页面独立行为/验收或跨仓交付衔接时，按上述执行流程准备 Task 和模块 Plan，
 不因单人、既有静态页、成熟复用或本轮先 Mock 而仅返回 brief；同一小改动
@@ -94,6 +94,7 @@ Reuse the orchestrator's evidenced TAPD/prototype, exact project,
 `origin/master` SHA and scope when supplied. Refresh a mutable fact before a
 dependent write or after an observed change; do not restart routing, fetch and
 prototype inspection at every `SCOPE_REVIEW` / `PLAN_WRITE` handoff.
+When a prototype still needs inspection, follow [原型读取与标签页复用](../../references/tool-routing.md#原型读取与标签页复用).
 
 ## 固定主流程
 
@@ -102,13 +103,14 @@ prototype inspection at every `SCOPE_REVIEW` / `PLAN_WRITE` handoff.
 1. 根据需求、PRD 或原型确定受影响项目；多项目时区分主项目、协同项目及各自责任边界。
 2. 对每个项目获取并验证最新远程 `origin/master`，以远程代码和项目规则为基线收敛需求范围、功能点、现有能力、缺口及排除项；不得用当前本地开发分支替代基线。
 3. 生成需求确认前检查清单，区分 `REQUIREMENT_BLOCKER`、`IMPLEMENTATION_BLOCKER` 和 `NON_BLOCKING`。
-4. 根据范围复杂度选择评审模式：简单需求直接在对话中确认，复杂需求才开启评审面板。
+4. 按下文[评审模式选择](#评审模式选择)在对话或原型面板中确认范围。
 5. 需求范围和上下文确认后，输出配置对应的 confirmed/proposed scope，交由分支绑定能力确定每个项目的 `CREATE|USE_EXISTING`、固定分支和基准。
 6. 需要正式 Plan 时，消费已验证的分支定义，基于确认范围、远程基线和项目上下文编写并确认 Plan。
 7. 输出范围与 brief 或 branch-bound Plan；本技能不直接修改业务源码，端到端请求交回 `zan-workflows:developing-requirement` 编排执行。
 
 简短摘要在步骤 5 返回，包含行为、排除项、证据、有序步骤和验证入口/预期/局限，
-由编排复用准备/分支门禁后实施；不创建 ReviewSession、PagePlan 或形式上的
+由编排复用准备/分支门禁后实施。对话摘要无需 ReviewSession。若选了面板，先用
+ReviewSession 收集本轮提交，随后仍可返回简短摘要。摘要不创建 PagePlan 或形式上的
 TAPD Task，也不报告 PLAN_READY。正式 Plan 才继续步骤 6 及产物规则。
 
 以一个页面或模块为主要交付单元；模块必须具备可独立开发、对接和验收的内聚边界。拒绝项目级“大 Plan”；
@@ -189,9 +191,8 @@ TAPD Task，也不报告 PLAN_READY。正式 Plan 才继续步骤 6 及产物规
 
 ## 范围与功能点
 
-以下行为、证据和阻塞判断同时适用于简短摘要与正式 Plan。简短摘要以对话和
-内存保留适用事实；模块卡、规范化模型和正式 Plan 的结构仅用于对应的评审/产物，
-不为一个简短执行摘要启动浏览器或构造完整模型。
+以下行为、证据和阻塞判断同时适用于简短摘要与正式 Plan。对话模式在内存中保留适用事实。
+面板模式使用模块卡收集范围意见。是否保存正式 Plan 由本轮交付范围决定。
 
 Narrowly check for an existing Plan linked to the selected item/module; read it
 semantically when present, without scanning unrelated artifact directories.
@@ -238,7 +239,9 @@ For a formal review, keep the page state only as “评审中” or “阻塞”
 
 ## 评审模式选择
 
-完成项目定位和远程 `master` 范围分析后再选择模式，并记录选择理由：
+完成项目定位和远程 `master` 范围分析后，在绑定开发分支前选择模式。向用户简要说明选择理由。
+用户明确说“用可视化需求评审面板”就选 `PANEL`，单字段也适用。用户指定对话则用 `DIALOGUE`。
+没有指定时，按本轮需要用户决定的业务问题选择。
 
 - `DIALOGUE`：单项目、单一内聚页面/模块，或同一交互模式应用于多个页面；功能点关系清晰，且没有需要逐项收集的多组业务决定。直接在对话中展示范围、功能点、排除项、未决问题和实现摘要，用户一次确认或给出增量修正即可。
 - `PANEL`：存在需要用户逐项比较、选择或多轮收集的业务决定，例如多项目/多页面之间不同的行为选择，或复杂状态、跨模块依赖、API/权限/路由冲突引出的待决行为。使用评审面板逐项确认。
@@ -257,20 +260,22 @@ For a formal review, keep the page state only as “评审中” or “阻塞”
 长内容使用同一 Plan/编号备注，不再另建一张重复的检查台账。
 不需要正式 Plan 时，保留相同检查与真实阻塞计数，确认后返回范围和 brief。
 需要正式 Plan 的 `STANDALONE` 由用户确认该摘要后进入“开发分支与 Plan”；
-`DEFER_TO_ORCHESTRATOR` 不单独提问，把摘要交给需求开发清单统一确认。两者都无需打开
-in-app 浏览器、注入 Shadow DOM、启动通知桥或要求统一提交。
+`DEFER_TO_ORCHESTRATOR` 不单独提问，把摘要交给需求开发清单统一确认。对话确认本身无需打开
+in-app 浏览器、注入 Shadow DOM、启动通知桥或要求统一提交；此前从原型读到的验收事实可直接复用。
 用户的增量修正只重开受影响项；没有冲突时不重复确认整份范围。
 
 ## 复杂需求：功能评审运行协议
 
-只有选择 `PANEL` 后，才按 [功能评审运行协议](references/feature-review-runtime.md) 打开 Codex in-app Browser、动态注入现有 Shadow DOM 面板、验证挂载并等待统一提交。选择 `DIALOGUE` 时禁止仅为形式完整而启动面板。
+只有选择 `PANEL` 后，才按 [功能评审运行协议](references/feature-review-runtime.md) 在 Codex in-app Browser 的目标原型页动态注入现有 Shadow DOM 面板、验证挂载并等待统一提交。选择 `DIALOGUE` 时禁止仅为形式完整而启动面板。
 
-原型来源可以是远程 HTTPS 页面、现有 loopback 页面或本地文件。远程原型直接在
-in-app Browser 打开；本地文件才启动临时 loopback 服务。使用运行协议中的来源
+原型来源可以是远程 HTTPS 页面、现有 loopback 页面或本地文件。远程原型沿用 in-app Browser 的目标页；
+本地文件才启动临时 loopback 服务。使用运行协议中的来源
 安全门禁、登录态恢复和跨域 iframe 降级规则，不得把原型 URL 写入 ReviewSession
 或 Plan。
 
-消费项目 dev server、build 和运行态验收不是功能评审前置条件。没有当前 Browser、host、Shadow Root、临时 API 和当前提交证据时，只能报告“评审阻塞”，不得用独立 HTML、静态代码评审、截图或文字结论替代面板。
+在当前 in-app 原型页验证 host、Shadow Root 和临时 API 后，向用户显示“面板已就绪，等待提交”。
+页面未接通或挂载失败时报告“评审阻塞”及具体原因。收到并核对用户本轮提交后才给出评审结果。
+消费项目 dev server、build 和运行态验收不是功能评审前置条件。
 
 挂载后在支持 `codex queue` 的本机环境默认连接 [自动通知桥](references/feature-review-runtime.md#连接自动通知)。
 面板统一提交、用户确认更新 Plan 时通知当前 Agent 任务继续；先检查连接成功，才能
@@ -280,8 +285,8 @@ in-app Browser 打开；本地文件才启动临时 loopback 服务。使用运�
 ## 统一提交评审
 
 `PANEL` 模式仅在用户统一提交后处理本轮输入；展示拟更新内容、保留评审状态且不写文件。
-`DIALOGUE` 的 `STANDALONE` 模式以用户对范围摘要的明确确认作为等价门禁；
-`DEFER_TO_ORCHESTRATOR` 由组合清单确认，不要求单独的统一提交按钮。两种模式均不得在范围确认前写 Plan。
+`DIALOGUE` 的 `STANDALONE` 模式由用户在对话中确认范围摘要，`DIALOGUE` 的
+`DEFER_TO_ORCHESTRATOR` 模式由编排的组合清单确认范围。面板提交不授权实施或保存 Plan。
 不得在确认前写 Plan。
 
 ## 开发分支与 Plan

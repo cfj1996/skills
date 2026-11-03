@@ -6,7 +6,7 @@ function unique(items, message) {
   return items[0];
 }
 
-export function resolveBugWorkflow(statusMap, transitions, input = {}) {
+export function resolveBugStatusCodes(statusMap, input = {}) {
   if (!statusMap || typeof statusMap !== 'object' || Array.isArray(statusMap) ||
       Object.values(statusMap).some(value => typeof value !== 'string')) throw new Error('状态映射格式不可识别');
   const find = label => unique(Object.entries(statusMap).filter(([, value]) => text(value) === label),
@@ -16,6 +16,11 @@ export function resolveBugWorkflow(statusMap, transitions, input = {}) {
   if (activeStatus === waitingStatus ||
       (input.activeStatus && input.activeStatus !== activeStatus) ||
       (input.waitingStatus && input.waitingStatus !== waitingStatus)) throw new Error('已提供状态代码与实际工作流不一致');
+  return { activeStatus, waitingStatus };
+}
+
+export function resolveBugWorkflow(statusMap, transitions, input = {}) {
+  const { activeStatus, waitingStatus } = resolveBugStatusCodes(statusMap, input);
   let matching;
   if (Array.isArray(transitions)) {
     matching = transitions.filter(row => row?.StepPrevious === activeStatus && row?.StepNext === waitingStatus);

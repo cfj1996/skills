@@ -18,6 +18,40 @@ not require another human turn when the main authorization already covers them.
 
 ## Compose stable checklist operations
 
+For a single Story, selected Task, or one completely reviewed single-repository Bug delivering to test, use the built-in
+[continuous submission request](../skills/submitting-for-test/references/continuous-submission.md)
+instead of writing per-run glue between merge, queue acceptance, Wiki and Task links.
+The session binds one reviewed plan in memory. New decisions supersede old drafts.
+Reconcile confirmed partial effects before opening any fresh execution session.
+
+## 开发前的只读采集
+
+需求开发、Bug 修复和准备技能缺少同一批原始事实时，在 workflow-session 发送一次
+`action=collect,phase=PLAN`。输入为 `{workspaceId,items,repositories?}`。
+`items` 只列实际选择的 `{entryType,entryId}`，类型为 stories/tasks/bug，完整 ID 用字符串。
+已有明确终点时可传 deliveryMode。BRANCH_ONLY 只取分支所需的工作项身份和标题。
+确需评论来源的条目可加 `comments:true`。结果按原顺序去重，每个 Task 的真实父 Story
+只返回一份。已选 Story 不会因为有兄弟 Task 就将其纳入开发。没有此缺口时复用原证据。
+
+已定位的仓库才传 `repositories:[{repositoryPath,originUrl,fixedBranch}]`。
+同一工作树核实一次根/远端身份，一起查询所需分支，保留各自的本地祖先关系。
+`NEEDS_REF_REFRESH` 表示跟踪引用不等于实际远端，刷新该仓再判断。`COLLECTED`
+是只读事实，不代表分支可创建、账号已核实、范围已授权或交接已就绪。若原会话已持有
+顶层 recorder 的 runId，传给脚本会话复用。可变状态、人员和 refs 仍在对应写入前刷新。
+为同一批 Bug 准备修复状态时，可在所选 Bug 上带
+`repair:{workMode,repairOwner}`，repairOwner 为原规则要求的已核实账号及空间成员依据。
+相同真实工作流类别共享一次状态映射查询。已待测试的 CONTINUE 保留处理人；
+修复人证据不足时只返回待补项。statusProposal 是只读提案，写前仍检查真实身份、授权、状态和处理人。
+
+正式任务按原 TAPD 方法创建/更新。完整或部分返回后，`action=task-readback,phase=PLAN`
+接受 `{proposal,idsByKey}`，其中 proposal 为原已审 TaskBreakdownProposal，idsByKey
+只映射实际已知的 key 与 ID。已知 ID 精确读回；缺 ID 的拟建项才分页检查准确父需求的
+稳定标记，再按所选 ID 读回字段。输出沿用 records、proposalFingerprint 和原校验，
+只有 `TASKS_READY` 能交给正式 Plan。`PARTIAL/BLOCKED` 保留真实结果，不能作为补写或重试授权。
+已读回项继续保留，issues 中无法核实的 ID 只补准确只读查询；发现阶段失败不报告“未创建”。
+会话关闭回执的 stageTimings 分别列本会话采集、任务准备、交付请求的次数与执行毫秒，
+模型调用间隔和用户等待不从这些数字推断。
+
 Use the current [execution checklist](execution-checklist.md#围绕同一清单编排)
 and existing handoffs as scope/authority. Prepare the exact technical inputs
 once, then compose a stable, already-authorized segment with the exported

@@ -1,6 +1,6 @@
 {
   "name": "zan-workflows",
-  "version": "0.4.12+codex.20261102-single-bug-repair-record",
+  "version": "0.4.14+codex.20261102-development-and-repair",
   "description": "TAPD Bug repair and requirement development with scoped plans, task links, verified implementation and explicit delivery.",
   "author": {
     "name": "Local developer"
@@ -20,6 +20,7 @@
       "Write"
     ],
     "defaultPrompt": [
+      "For requirement development and Bug repair, share missing item/branch facts with read-only collect, use task-readback for selected formal Tasks and batch stable local checks. Use workflow-session submit for one reviewed repository under matching authorization. A Bug publishes or reuses its one reviewed record only after Git/build/Wiki gates and before registration. Follow submitting-for-test/references/continuous-submission.md.",
       "Keep Mock out of business logic: pages, components, business hooks/stores and rules do not import fixtures/handlers or carry Mock flags/parameters. Use the existing stable data-access interface and one configuration/assembly boundary per applicable feature. Keep Mock data, minimal state, handlers and startup bindings independently removable; exit replaces the data source and removes those files/configuration without rewriting business callers or flows. Apply the source/artifact exit gates as before.",
       "Mock implementation follows references/mock-development.md: distinguish connected Query/Query Contract Mock, Query-only and non-Query projects, reuse the actual existing data path, and never equate an installed dependency with a working Mock binding. Default to normal business data only; simulated exceptions require explicit user, requirement or approved acceptance evidence. Keep fixtures, handlers, activation, data selection and reset in the data/configuration layer. Do not add product-page Mock markers, banners, debug panels, scenario selectors, reset controls or Mock branch suffixes by default. Retain product validation/error handling and real-call isolation; neither requires building an unrequested failure-scenario catalog. Plan/review and delivery records still disclose actual Mock scope.",
       "面向中文用户时，按 references/execution-checklist.md#限制与确认说明，用完整中文解释限制、上线门禁、确认要求、阻塞原因和清理约束，包括引用规则及脚本返回的英文原因。说明实际触发条件、受影响操作、缺少的证据或授权，以及恢复执行所需条件；只展示本轮适用的限制。解释本次确认来自哪个技能时，链接出处并引用该技能的中文确认条款，不照抄英文句子；用户未明确要求核对英文原文时，不附英文规则引文。机器字段、枚举、代码、命令、路径和链接保持原样，状态码须配中文含义。中文说明不改变规则含义、操作范围或确认复用，也不新增确认节点。",

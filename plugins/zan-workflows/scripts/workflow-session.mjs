@@ -15,7 +15,14 @@ import { markPendingMergeWiki, validatePendingWikiPlan } from './pending-merge-w
 import { performance } from 'node:perf_hooks';
 import { setTimeout as delay } from 'node:timers/promises';
 import { validateWait, waitForDeadline } from './workflow-runtime.mjs';
-import { sessionRecorder } from './execution-recorder.mjs';
+import { sessionRecorder, stageForAction } from './execution-recorder.mjs';
+import { TestSubmissions } from './test-submission.mjs';
+import { createMockInspectionCache } from './mock-revision.mjs';
+import { collectWorkInputs } from './collect-work-inputs.mjs';
+import { readTaskResults } from '../skills/breaking-down-requirement/scripts/read-task-results.mjs';
+
+const actions = ['collect', 'task-readback', 'submit', 'merge', 'release', 'wiki', 'registration', 'closeout', 'job'];
+const readOnlyActions = ['collect', 'task-readback', 'closeout', 'job'];
 
 const ordinaryTimeoutMs = 180000;
 const maxTimeoutMs = 43200000;
@@ -42,7 +49,7 @@ const progressRecovery = event => {
 
 export function requestBudget(request, io = {}, override) {
   if (override !== undefined) return override;
-  const waits = request.phase === 'EXECUTE' && (request.action === 'merge' ||
+  const waits = request.phase === 'EXECUTE' && (['merge', 'submit'].includes(request.action) ||
     request.action === 'release' && (request.input?.completionMode || 'BUILD_TERMINAL') === 'BUILD_TERMINAL');
   return waits ? Math.min(maxTimeoutMs, validateWait(io) + ordinaryTimeoutMs) : ordinaryTimeoutMs;
 }
@@ -56,7 +63,8 @@ export class WorkflowSession {
     this.allowExecute = allowExecute;
     this.pool = pool;
     this.reader = reader;
-    this.io = io;
+    this.io = { ...io, mockInspectionCache: io.mockInspectionCache || createMockInspectionCache() };
+    this.submissions = new TestSubmissions();
     this.executionBlocked = false;
     this.pendingMerges = new Map();
     this.ids = new Set();
@@ -69,6 +77,7 @@ export class WorkflowSession {
     this.clock = clock;
     this.startedAt = this.lastFinishedAt = clock();
     this.busyMs = 0; this.idleMs = 0; this.requestCount = 0;
+    this.stageTimings = {};
     this.executions = new Set();
     this.events = new Set();
   }
@@ -103,7 +112,7 @@ export class WorkflowSession {
     let markDone;
     const context = { controller, done: new Promise(resolve => { markDone = resolve; }),
       id: typeof request?.id === 'string' && request.id.length <= 128 ? request.id : null,
-      action: ['merge', 'release', 'wiki', 'registration', 'closeout', 'job'].includes(request?.action) ? request.action : null,
+      action: actions.includes(request?.action) ? request.action : null,
       phase: ['PLAN', 'EXECUTE'].includes(request?.phase) ? request.phase : null,
       recovery: {}, observedIdentifiers: {} };
     const idleBeforeMs = startedAt - this.lastFinishedAt;
@@ -186,6 +195,10 @@ export class WorkflowSession {
       clearTimeout(timer); controller.signal.removeEventListener('abort', abort);
       const elapsedMs = this.clock() - startedAt;
       this.busyMs += elapsedMs; this.lastFinishedAt = this.clock(); this.active = null;
+      if (context.action) {
+        const timing = this.stageTimings[stageForAction(context.action)] ??= { requests: 0, elapsedMs: 0 };
+        timing.requests++; timing.elapsedMs += Math.round(elapsedMs);
+      }
       this.emit({ state: 'REQUEST_FINISHED', requestId: context.id, action: context.action, phase: context.phase,
         resultState: state, ...(reason ? { reason } : {}), elapsedMs: Math.round(elapsedMs) });
       markDone();
@@ -193,6 +206,7 @@ export class WorkflowSession {
       if (controller.signal.aborted || reason === 'MCP_TIMEOUT') await this.close(reason || controller.signal.reason?.code);
       // Bounded close may settle the helper after the outer deadline; keep its known identities.
       if (interrupted) interrupted.result = {
+        ...(request.action === 'submit' ? { receipts: structuredClone(this.submissions.plans.get(request.input?.planId)?.receipts || {}) } : {}),
         ...(Object.keys(context.observedIdentifiers).length ? { observedIdentifiers: context.observedIdentifiers } : {}),
         ...context.recovery, ...interrupted.result };
     }
@@ -203,60 +217,82 @@ export class WorkflowSession {
     if (!request || typeof request.id !== 'string' || !request.id || request.id.length > 128 ||
         this.ids.has(request.id) || !['PLAN', 'EXECUTE'].includes(request.phase) ||
         !request.input || typeof request.input !== 'object' || Array.isArray(request.input) ||
-        !['merge', 'release', 'wiki', 'registration', 'closeout', 'job'].includes(request.action)) {
+        !actions.includes(request.action)) {
       throw new Error('请求身份、阶段、动作或输入无效；请求 ID 不可重复');
     }
     this.ids.add(request.id);
     const execute = request.phase === 'EXECUTE';
-    if (execute && (!this.allowExecute || this.executionBlocked || ['closeout', 'job'].includes(request.action))) {
+    if (execute && (!this.allowExecute || this.executionBlocked || readOnlyActions.includes(request.action))) {
       throw new Error('当前会话不允许此写操作；关闭会话并重新核实实际状态');
     }
     if (execute && this.pendingMerges.size) throw new Error('存在待人工合并 MR；先用 PLAN 和 VERIFY_ONLY 核验原 MR，后续写入暂不执行');
     const input = { ...request.input, execute };
     if (execute && input.confirmed !== true) throw new Error('执行缺少已展示清单的明确确认');
-    if (request.action === 'merge' && input.pendingWiki) validatePendingWikiPlan(input.pendingWiki, input);
-    if (request.action === 'merge' && input.mergeMode === 'VERIFY_ONLY') {
-      const pending = this.pendingMerges.get(`${input.projectId}:${input.mrIid}`);
-      if (pending && !['originUrl', 'repositoryPath', 'sourceBranch', 'targetBranch', 'sourceSha',
-        'targetSha', 'pipelineRequired', 'reviewPassed'].every(field => pending[field] === input[field])) {
-        throw new Error('待合并清单身份或校验要求已变化；需重新评审和确认');
-      }
-    }
+    if (request.action === 'merge') this.#validateMerge(input);
+    if (execute && request.action === 'submit') this.submissions.assertReviewed(request.input);
     try {
-      let result;
-      switch (request.action) {
-        case 'merge': result = await mergeReviewedBranch(call('gitlab-mcp'), input, io); break;
-        case 'release': result = await runJenkinsRelease(call('jenkins-mcp'), reader(input), input, io); break;
-        case 'registration': result = await registerTestSubmission(call('tapd-mcp'), input, io); break;
-        case 'wiki': result = await ensureTestWiki(call('tapd-mcp'), input, new Date(), io); break;
-        case 'closeout': result = await checkLocalCloseout(input, io); break;
-        case 'job': result = await resolveJenkinsJob(call('jenkins-mcp'), input); break;
-      }
-      if (request.action === 'merge' && result.state === 'AWAITING_MERGE') {
-        this.pendingMerges.set(`${result.projectId}:${result.mrIid}`, result.resumePlan);
-        if (execute && input.pendingWiki) {
-          try {
-            result.pendingWiki = await markPendingMergeWiki(call('gitlab-mcp'), call('tapd-mcp'), { ...input.pendingWiki,
-              mockSafety: input.mockSafety, mockSafeties: input.mockSafeties, mockRepositories: input.mockRepositories },
-              result, { execute: true, confirmed: input.confirmed, io });
-          } catch (error) {
-            this.executionBlocked = true;
-            result.pendingWiki = error.result || { state: 'BLOCKED', writes: 0, error: error.message };
-          }
-        }
-      }
-      if (request.action === 'merge' && input.mergeMode === 'VERIFY_ONLY' && result.state === 'MERGED') {
-        const key = `${result.projectId}:${result.mrIid}`;
-        const pending = this.pendingMerges.get(key);
-        if (pending && ['originUrl', 'repositoryPath', 'sourceBranch', 'targetBranch', 'sourceSha']
-          .every(field => pending[field] === result[field])) this.pendingMerges.delete(key);
-      }
+      const steps = { call, io, run: (action, data, write) => {
+        if (action === 'merge') this.#validateMerge(data);
+        return this.#runAction(action, { ...data, execute: write, confirmed: write && input.confirmed === true }, { call, reader, io });
+      } };
+      const result = request.action === 'submit'
+        ? await (execute ? this.submissions.execute(request.input, steps) : this.submissions.prepare(request.input, steps))
+        : await this.#runAction(request.action, input, { call, reader, io });
       if (execute && ['BLOCKED', 'FAILED', 'UNKNOWN'].includes(result?.state)) this.executionBlocked = true;
       return result;
     } catch (error) {
       if (execute) this.executionBlocked = true;
       throw error;
     }
+  }
+
+  #validateMerge(input) {
+    if (input.pendingWiki) validatePendingWikiPlan(input.pendingWiki, input);
+    if (input.mergeMode === 'VERIFY_ONLY') {
+      const pending = this.pendingMerges.get(`${input.projectId}:${input.mrIid}`);
+      if (pending && !['originUrl', 'repositoryPath', 'sourceBranch', 'targetBranch', 'sourceSha',
+        'targetSha', 'pipelineRequired', 'reviewPassed'].every(field => pending[field] === input[field])) {
+        throw new Error('待合并清单身份或校验要求已变化；需重新评审和确认');
+      }
+    }
+  }
+
+  async #runAction(action, input, { call, reader, io }) {
+    const execute = input.execute;
+    if (execute && (!this.allowExecute || this.executionBlocked || this.pendingMerges.size || !input.confirmed)) {
+      throw new Error('交付操作未获准或存在必须先核实的写入结果');
+    }
+    let result;
+    switch (action) {
+      case 'task-readback': result = await readTaskResults(call('tapd-mcp'), input); break;
+      case 'collect': result = await collectWorkInputs(call('tapd-mcp'), input, io); break;
+      case 'merge': result = await mergeReviewedBranch(call('gitlab-mcp'), input, io); break;
+      case 'release': result = await runJenkinsRelease(call('jenkins-mcp'), reader(input), input, io); break;
+      case 'registration': result = await registerTestSubmission(call('tapd-mcp'), input, io); break;
+      case 'wiki': result = await ensureTestWiki(call('tapd-mcp'), input, new Date(), io); break;
+      case 'closeout': result = await checkLocalCloseout(input, io); break;
+      case 'job': result = await resolveJenkinsJob(call('jenkins-mcp'), input); break;
+    }
+    if (action === 'merge' && result.state === 'AWAITING_MERGE') {
+      this.pendingMerges.set(`${result.projectId}:${result.mrIid}`, result.resumePlan);
+      if (execute && input.pendingWiki) {
+        try {
+          result.pendingWiki = await markPendingMergeWiki(call('gitlab-mcp'), call('tapd-mcp'), { ...input.pendingWiki,
+            mockSafety: input.mockSafety, mockSafeties: input.mockSafeties, mockRepositories: input.mockRepositories },
+            result, { execute: true, confirmed: input.confirmed, io });
+        } catch (error) {
+          this.executionBlocked = true;
+          result.pendingWiki = error.result || { state: 'BLOCKED', writes: 0, error: error.message };
+        }
+      }
+    }
+    if (action === 'merge' && input.mergeMode === 'VERIFY_ONLY' && result.state === 'MERGED') {
+      const key = `${result.projectId}:${result.mrIid}`;
+      const pending = this.pendingMerges.get(key);
+      if (pending && ['originUrl', 'repositoryPath', 'sourceBranch', 'targetBranch', 'sourceSha']
+        .every(field => pending[field] === result[field])) this.pendingMerges.delete(key);
+    }
+    return result;
   }
 
   close(reason = 'FINISHED') {
@@ -287,7 +323,7 @@ export class WorkflowSession {
       const receipt = { state: cleanupComplete ? 'SESSION_CLOSED' : 'CLEANUP_FAILED', reason,
         cleanupComplete, executionSettled, localProcessesClosed: pendingChildren.length === 0,
         pendingLocalPids: pendingChildren.map(({ child }) => child.pid ?? null), clients: result?.clients || [],
-        requestCount: this.requestCount, busyMs: Math.round(this.busyMs), idleMs: Math.round(this.idleMs),
+        requestCount: this.requestCount, stageTimings: structuredClone(this.stageTimings), busyMs: Math.round(this.busyMs), idleMs: Math.round(this.idleMs),
         shutdownMs: Math.round(this.clock() - shutdownStartedAt), lifetimeMs: Math.round(this.clock() - this.startedAt) };
       if (this.outputFailed) receipt.reason = 'OUTPUT_ERROR';
       if (!(await waitForDeadline(this.emit(receipt), closeDeadline)).settled) this.outputFailed = true;

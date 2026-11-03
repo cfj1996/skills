@@ -6,6 +6,8 @@ import { checkMockSafetySet, mockSafetyPreview } from './mock-safety.mjs';
 import { assertTransitionFields, resolveBugWorkflow, resolveVersionField } from './tapd-mappings.mjs';
 import { readCliPlan, sha256, stableJson, requireText, repositoryKey } from './workflow-runtime.mjs';
 
+import { hasBugRepairTitle } from './bug-record-content.mjs';
+
 export function apiData(result, name) {
   if (result?.isError) throw new Error(`${name} 调用失败`);
   let value = result;
@@ -43,7 +45,7 @@ const ownerNames = value => typeof value === 'string'
   ? [...new Set(value.split(';').map(name => name.trim()).filter(Boolean))].sort().join(';') : '';
 const assigneeFields = item => Object.fromEntries(['current_owner', 'te', 'reporter'].map(name => [name, item[name] ?? null]));
 
-function checkPrerequisites(input) {
+export function checkDeliveryPrerequisites(input) {
   const gates = input.prerequisites;
   if (!gates || gates.git !== 'VERIFIED' || !['BUILD_SUBMITTED', 'DEPLOYED', 'RELEASED', 'SKIPPED_BY_INTENT'].includes(gates.deployment)) {
     throw new Error('登记前必须有 Git 交付和构建提交/部署/跳过部署的成功证据');
@@ -78,7 +80,12 @@ function checkPrerequisites(input) {
     : gates.profile !== 'STANDARD' || !['VERIFIED', 'SKIPPED_NON_FUNCTIONAL'].includes(gates.wiki)) {
     throw new Error('登记前的 Wiki/评论或政策跳过证据不完整');
   }
+}
+
+function checkPrerequisites(input) {
+  checkDeliveryPrerequisites(input);
   if (input.entryType === 'bug') {
+    const gates = input.prerequisites;
     const record = gates.repairRecord;
     if (!record || typeof record.commentId !== 'string' || !/^\d+$/.test(record.commentId) ||
         typeof record.author !== 'string' || !record.author.trim() ||
@@ -105,7 +112,7 @@ async function verifyRepairRecord(call, input) {
       throw new Error('修复记录评论作者与已确认账号不一致');
     }
     if (typeof comment.description !== 'string' ||
-        !comment.description.includes('【Bug 溯源与修复记录】') ||
+        !hasBugRepairTitle(comment.description) ||
         sha256(comment.description) !== expected.bodySha256.toLowerCase()) {
       throw new Error('修复记录正文缺失、不是完整修复记录或已发生变化');
     }
@@ -125,6 +132,12 @@ export async function registerTestSubmission(call, input, io = {}) {
     throw new Error('登记身份、工作模式或动作无效');
   }
   requireText(input.purpose, '登记目的');
+  if (input.entryType !== 'bug' && input.statusAction === 'NONE' && input.versionAction === 'NONE') {
+    // There is no registration operation to authorize or verify. Do not
+    // invent an actualStatus or turn this into a delivery/Mock receipt.
+    return { state: 'NOT_APPLICABLE', workspaceId: input.workspaceId, entryType: input.entryType,
+      entryId: input.entryId, statusAction: 'NONE', versionAction: 'NONE', execute: false, writes: 0 };
+  }
   if (input.statusAction === 'WAITING_TEST') {
     if (input.entryType !== 'bug') throw new Error('只有已验证 Bug 工作流可以写待测试状态');
   }
@@ -270,15 +283,18 @@ export async function registerTestSubmission(call, input, io = {}) {
 
 async function main() {
   const input = await readCliPlan();
-  const client = clientFor('tapd-mcp');
+  let client, ready;
   try {
-    await client.initialize();
-    const result = await registerTestSubmission((name, args) => client.call(name, args), input);
+    const result = await registerTestSubmission(async (name, args) => {
+      client ??= clientFor('tapd-mcp');
+      await (ready ??= client.initialize());
+      return client.call(name, args);
+    }, input);
     process.stdout.write(JSON.stringify(result, null, 2) + '\n');
   } catch (error) {
     process.stdout.write(JSON.stringify(error.result || { state: 'BLOCKED', error: error.message, writes: 0 }, null, 2) + '\n');
     process.exitCode = 1;
-  } finally { client.close(); }
+  } finally { client?.close(); }
 }
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
   main().catch(() => { process.stderr.write('无法读取登记计划\n'); process.exitCode = 1; });

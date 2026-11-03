@@ -193,7 +193,7 @@ export function totalCount(result) {
   return count;
 }
 
-function assertSuccess(result, tool) {
+export function assertSuccess(result, tool) {
   if (result?.isError) throw new Error(`${tool} 调用失败`);
   let failed = false;
   walk(result, value => {
@@ -243,14 +243,36 @@ export function wikiIdsFromComments(comments, workspaceId) {
   return [...ids];
 }
 
-async function listAllComments(call, workspaceId, entryType, entryId) {
+// A scoped continuation may retain the old link for history. Only a pinned
+// notice on the actual owner naming both the active page and the retired ID
+// can resolve that one ambiguity; any third ID still blocks.
+const wikiReviewError = message => Object.assign(new Error(message), { code: 'WIKI_REVIEW_REQUIRED' });
+
+function activeWikiLinks(input, owner) {
+  const proof = input.supersededWiki;
+  if (!proof) return ids => ids;
+  const current = String(input.expectedWikiId || '');
+  const notice = owner.comments?.find(row => String(row.id) === proof.noticeCommentId);
+  const body = notice?.description;
+  const retired = typeof body === 'string' && body.replace(/<[^>]+>/g, '').replace(/&nbsp;/gi, ' ')
+    .match(/(?:^|[（(\n])\s*作废旧页\s*[#＃]\s*(\d+)\s*(?=[）)\n]|$)/u)?.[1];
+  if (owner.entryType !== 'stories' || input.expectedOwnerType !== owner.entryType ||
+      String(input.expectedOwnerId) !== owner.entryId || !/^\d+$/.test(current) ||
+      !/^\d+$/.test(proof.wikiId) || proof.wikiId === current || retired !== proof.wikiId ||
+      contentHash(body) !== proof.noticeBodySha256 || !wikiIdsFromComments([notice], input.workspaceId).includes(current)) {
+    throw wikiReviewError('替代 Wiki 缺少同一需求上可读回的新页链接、准确作废旧页编号及已审评论指纹');
+  }
+  return ids => ids.filter(id => id !== proof.wikiId);
+}
+
+export async function listAllComments(call, workspaceId, entryType, entryId, fields = 'id,description,created') {
   const all = [];
   const seenIds = new Set();
   for (let page = 1; page <= 20; page++) {
     const result = assertSuccess(await call('get_comments', {
       workspace_id: workspaceId,
       options: { entry_type: entryType, entry_id: entryId, limit: PAGE_SIZE, page,
-        fields: 'id,description,created', order: 'created ASC' },
+        fields, order: 'created ASC' },
     }), 'get_comments');
     const rows = checkedRecords(result, 'Comment', 'get_comments');
     for (const row of rows) {
@@ -264,7 +286,7 @@ async function listAllComments(call, workspaceId, entryType, entryId) {
     }
     if (count !== undefined ? all.length >= count : rows.length < PAGE_SIZE) return all;
   }
-  throw new Error('评论超过 20 页，停止自动创建 Wiki');
+  throw new Error('评论超过 20 页，无法核实完整评论列表');
 }
 
 async function wikiById(call, workspaceId, id) {
@@ -439,6 +461,26 @@ async function createAndReadWiki(call, workspaceId, options, parentId, onCreated
   return wiki;
 }
 
+// Inspect the actual selected Tasks, including old links in their descriptions
+// and paginated comments, before an unrelated Git/build write can take place.
+export async function inspectSelectedWikiLinks(call, input, taskIds) {
+  if (!taskIds.length) return;
+  if (input.expectedOwnerType !== 'stories') throw wikiReviewError('Task 回链缺少父 Story 的准确归属');
+  const owner = await workWithComments(call, input.workspaceId, 'stories', input.expectedOwnerId);
+  const active = activeWikiLinks(input, owner);
+  const target = input.expectedWikiId ? String(input.expectedWikiId) : null;
+  const verify = work => {
+    const ids = active(workWikiIds(work, input.workspaceId));
+    if (ids.some(value => value !== target)) throw wikiReviewError('所选项目或任务已有其他提测 Wiki 链接');
+  };
+  verify(owner);
+  await Promise.all(taskIds.map(async id => {
+    const task = await workWithComments(call, input.workspaceId, 'tasks', id);
+    if (String(task.item.story_id) !== owner.entryId) throw wikiReviewError('回链 Task 不属于已核实的父需求');
+    verify(task);
+  }));
+}
+
 export async function ensureTestWiki(call, input, now = new Date(), io = {}) {
   const { workspaceId, entryType, entryId, sourceBranch, execute } = input;
   const mode = input.mode || 'ensure';
@@ -454,14 +496,25 @@ export async function ensureTestWiki(call, input, now = new Date(), io = {}) {
     input.bodyFile ? readFile(input.bodyFile, 'utf8') : undefined,
     input.expectedWikiId ? wikiById(call, workspaceId, input.expectedWikiId) : undefined,
   ]);
+  if (input.expectedApprovedBodySha256 != null && (approvedBody === undefined ||
+      contentHash(approvedBody) !== input.expectedApprovedBodySha256)) throw wikiReviewError('拟写 Wiki 正文已变化，需刷新受影响的文档评审');
   const { comments, item } = current;
   // Story owns all its Tasks; a Bug always owns its own cross-project submission.
   const owner = mode !== 'update' && entryType === 'tasks' && String(item.story_id) !== '0'
     ? await workWithComments(call, workspaceId, 'stories', String(item.story_id)) : current;
   const wikiOwner = { entryType: owner.entryType, entryId: owner.entryId };
   if (input.expectedOwnerId && (input.expectedOwnerType !== wikiOwner.entryType ||
-      String(input.expectedOwnerId) !== wikiOwner.entryId)) throw new Error('Wiki 归属与确认计划不一致');
-  const ownerIds = workWikiIds(owner, workspaceId);
+      String(input.expectedOwnerId) !== wikiOwner.entryId)) throw wikiReviewError('Wiki 归属与确认计划不一致');
+  const activeIds = activeWikiLinks(input, owner);
+  const currentActiveIds = async () => {
+    if (!input.supersededWiki) return activeIds;
+    const latest = await workWithComments(call, workspaceId, owner.entryType, owner.entryId);
+    const filter = activeWikiLinks(input, latest);
+    const ids = filter(workWikiIds(latest, workspaceId));
+    if (ids.length !== 1 || ids[0] !== String(input.expectedWikiId)) throw wikiReviewError('替代 Wiki 归属证明已变化');
+    return filter;
+  };
+  const ownerIds = activeIds(workWikiIds(owner, workspaceId));
   const related = [owner, ...(owner === current ? [] : [current])];
   // Old submissions may only be linked from a sibling Task. Never create another
   // page just because the current Task or parent has no comment yet.
@@ -470,10 +523,10 @@ export async function ensureTestWiki(call, input, now = new Date(), io = {}) {
   }
   const commentIds = wikiIdsFromComments(comments, workspaceId);
   const detailIds = wikiIdsFromComments([{ description: item.description }], workspaceId);
-  const linkedIds = [...new Set(related.flatMap(work => workWikiIds(work, workspaceId)))];
-  if (linkedIds.length > 1) throw new Error('同一需求或 Bug 的详情或评论存在多个不同的提测 Wiki 链接，停止自动选择');
+  const linkedIds = activeIds([...new Set(related.flatMap(work => workWikiIds(work, workspaceId)))]);
+  if (linkedIds.length > 1) throw wikiReviewError('同一需求或 Bug 的详情或评论存在多个不同的提测 Wiki 链接，停止自动选择');
   if (input.expectedWikiId && linkedIds.length && linkedIds[0] !== String(input.expectedWikiId)) {
-    throw new Error('当前 Wiki ID 与确认计划不一致');
+    throw wikiReviewError('当前 Wiki ID 与确认计划不一致');
   }
   const date = chinaDate(now);
   const month = input.month || date.month;
@@ -501,9 +554,9 @@ export async function ensureTestWiki(call, input, now = new Date(), io = {}) {
     if (String(child.id) === String(rootWikiId) || /^\d{4}-\d{2}$/.test(child.name)) {
       throw new Error('Wiki 目标是根页或月份目录，不能作为提测子页');
     }
-    if (input.wikiTitle && child.name !== input.wikiTitle) throw new Error('Wiki 标题与确认计划不一致');
+    if (input.wikiTitle && child.name !== input.wikiTitle) throw wikiReviewError('Wiki 标题与确认计划不一致');
     if (input.expectedMonthId && String(child.parent_wiki_id) !== String(input.expectedMonthId)) {
-      throw new Error('月份 Wiki ID 与确认计划不一致');
+      throw wikiReviewError('月份 Wiki ID 与确认计划不一致');
     }
     // Titles and repository/branch entries identify a delivery entry, not its
     // TAPD owner. Different Bugs may deliberately use the same repair branch.
@@ -535,11 +588,11 @@ export async function ensureTestWiki(call, input, now = new Date(), io = {}) {
     let prefix = 0;
     while (prefix < before.length && before[prefix] === approvedBody[prefix]) prefix++;
     if (approvedBody.length <= before.length || !approvedBody.endsWith(before.slice(prefix))) {
-      throw new Error('追加项目条目必须保留已有 Wiki 全部正文，只允许在一个位置插入新条目');
+      throw wikiReviewError('追加项目条目必须保留已有 Wiki 全部正文，只允许在一个位置插入新条目');
     }
   }
   if (input.expectTarget && input.expectTarget !== target) {
-    throw new Error(`Wiki 目标动作变为 ${target}，与确认计划不一致`);
+    throw wikiReviewError(`Wiki 目标动作变为 ${target}，与确认计划不一致`);
   }
   const beforeBody = child?.markdown_description;
   if (child && typeof beforeBody !== 'string') throw new Error('已有 Wiki 缺少可验证的 Markdown 正文');
@@ -562,7 +615,7 @@ export async function ensureTestWiki(call, input, now = new Date(), io = {}) {
   const noWrite = wikiOperation === 'NONE' && commentOperation === 'NONE';
   if (input.expectedBodySha256 && input.expectedBodySha256.toLowerCase() !== beforeBodySha256 &&
       !(noWrite && approvedBody === beforeBody)) {
-    throw new Error('Wiki 原正文已变化，与确认计划的 SHA-256 不一致');
+    throw wikiReviewError('Wiki 原正文已变化，与确认计划的 SHA-256 不一致');
   }
   const plan = {
     workspaceId, entryType, entryId, sourceBranch, wikiOwner,
@@ -618,6 +671,7 @@ export async function ensureTestWiki(call, input, now = new Date(), io = {}) {
     targetEnvironment: productionWiki ? 'production' : (input.targetEnvironment || 'test'), targetBranch: input.targetBranch, requireCommitted: true }, io);
   let phase;
   try {
+    if (!noWrite && input.supersededWiki) await currentActiveIds();
     let parent = monthWiki;
     if (!child && !parent) {
       phase = 'CREATE_MONTH';
@@ -644,7 +698,7 @@ export async function ensureTestWiki(call, input, now = new Date(), io = {}) {
       if (current.name !== child.name || String(current.parent_wiki_id) !== String(child.parent_wiki_id) ||
           typeof current.markdown_description !== 'string' ||
           contentHash(current.markdown_description) !== input.expectedBodySha256.toLowerCase()) {
-        throw new Error('Wiki 在执行期间发生变化，停止补充');
+        throw wikiReviewError('Wiki 在执行期间发生变化，停止补充');
       }
       phase = 'UPDATE_WIKI';
       result.wikiState = 'UNKNOWN';
@@ -668,9 +722,10 @@ export async function ensureTestWiki(call, input, now = new Date(), io = {}) {
       // the Wiki body is unchanged and only the Task comment is missing.
       const latestComments = wikiOperation === 'NONE' && owner === current ? work.comments
         : await listAllComments(call, workspaceId, work.entryType, work.entryId);
-      const latestIds = wikiIdsFromComments(latestComments, workspaceId);
+      const liveIds = await currentActiveIds();
+      const latestIds = liveIds(wikiIdsFromComments(latestComments, workspaceId));
       if (latestIds.length > 1 || (latestIds.length === 1 && latestIds[0] !== String(child.id))) {
-        throw new Error('发现另一条提测 Wiki 评论；保留已完成的 Wiki 操作，不写冲突评论');
+        throw wikiReviewError('发现另一条提测 Wiki 评论；保留已完成的 Wiki 操作，不写冲突评论');
       }
       if (latestIds.length === 1) {
         result.links.push({ entryType: work.entryType, entryId: work.entryId, state: 'ALREADY_LINKED' });
@@ -687,7 +742,7 @@ export async function ensureTestWiki(call, input, now = new Date(), io = {}) {
       result.writes++;
       phase = 'READ_COMMENT';
       const readback = await listAllComments(call, workspaceId, work.entryType, work.entryId);
-      const readbackIds = wikiIdsFromComments(readback, workspaceId);
+      const readbackIds = liveIds(wikiIdsFromComments(readback, workspaceId));
       result.commentEvidence = { checkedCount: readback.length, wikiIds: readbackIds, detailWikiIds: detailIds };
       if (readbackIds.length !== 1 || readbackIds[0] !== String(child.id)) {
         throw new Error('评论读回缺少目标链接或出现冲突；不要盲目重试');

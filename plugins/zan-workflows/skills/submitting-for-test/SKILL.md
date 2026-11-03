@@ -207,6 +207,14 @@ requires a refreshed confirmation. Never rebuild on the test target or use
 
 ## Procedure
 
+普通单仓 Story/Task 或完整单仓 Bug 的已审测试交付优先使用 [连续提测入口](references/continuous-submission.md)。
+同一份清单给用户和整体评审者，传入最新已确认的字段、配置项及交付终点。
+一条只读 PLAN 绑定实际参数、Wiki 补丁和所选任务，一条匹配确认的 EXECUTE 按真实回执推进。
+遇到目标增量或 Wiki 替换只补受影响的评审，沿用已取得的 Git、队列回执。
+Story/Task 无状态及版本动作时在计划中标为不适用。Bug 绑定已审的最终记录草稿，在 Git、
+所选构建及 Wiki/回链通过后发表或复用并精确读回，随后登记待测试。跨仓共享交付、包发布、
+人工合并和冲突处理继续使用下方专用步骤。
+
 Use the [whole-plan review](references/submission-rules.md#whole-plan-review):
 one independent `PRE_SUBMISSION_PLAN` covers the complete plan and its prepared
 Wiki. The lead and executors own subsequent fresh checks/readbacks; routine

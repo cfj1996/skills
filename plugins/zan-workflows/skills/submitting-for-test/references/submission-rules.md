@@ -21,6 +21,11 @@ external write inside that unchanged authorized plan:
 
 ## Whole-plan review
 
+Pass the latest business decisions with the plan, including any resolved configuration conflict.
+For continuous submission, bind the independent result to the returned planId. A result for a
+superseded plan cannot release the current one. When only the Wiki changes, review its owner,
+target and patch against the preserved Git/build receipts.
+
 Before the first delivery write, give the complete `SubmissionPlan` to the
 private submission validator once with `PRE_SUBMISSION_PLAN`: all repository
 reviews, authority, Git actions, exact deployment selections, complete Wiki

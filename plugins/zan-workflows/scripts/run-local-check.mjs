@@ -5,9 +5,17 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setPriority, constants } from 'node:os';
 import { processGroup, signalGroup } from './process-group.mjs';
+import { readCliPlan, stableJson } from './workflow-runtime.mjs';
+import { recordEvent } from './execution-recorder.mjs';
 
 const deadlines = { lint: 120, type: 180, test: 120, build: 300 };
 const tailBytes = 16 * 1024;
+
+function recordCheck(event) {
+  const runId = process.env.ZAN_WORKFLOWS_RUN_ID;
+  if (!runId || process.env.ZAN_WORKFLOWS_RECORDING === 'off') return;
+  try { recordEvent(runId, { ...event, stage: 'verification', source: 'executor' }); } catch { /* diagnostics are optional */ }
+}
 
 // Bounds this invocation and its process group, not unrelated user processes.
 export async function runLocalCheck({ command, args = [], cwd = process.cwd(), kind,
@@ -135,6 +143,64 @@ export async function runLocalCheck({ command, args = [], cwd = process.cwd(), k
   });
 }
 
+// One approved, stable working tree. Coalesce identical checks selected by
+// multiple Tasks before running anything. Results are local to this batch.
+export async function runVerificationBatch({ checks }, { run = runLocalCheck, signal, onProgress } = {}) {
+  if (!Array.isArray(checks) || !checks.length || checks.length > 50) throw new Error('验证批次需要 1～50 个已经选定的检查');
+  const ids = new Set(), groups = new Map();
+  const fields = new Set(['id', 'covers', 'cwd', 'command', 'args', 'kind', 'timeoutMs', 'maxRssMb', 'fullScope', 'fullScopeReason']);
+  for (const check of checks) {
+    if (!check || Object.keys(check).some(key => !fields.has(key)) ||
+        typeof check.id !== 'string' || !check.id.trim() || ids.has(check.id) ||
+        !Object.hasOwn(deadlines, check.kind) || typeof check.command !== 'string' || !check.command ||
+        !Array.isArray(check.args) || !check.args.every(arg => typeof arg === 'string') ||
+        typeof check.cwd !== 'string' || !check.cwd || !Array.isArray(check.covers) || !check.covers.length ||
+        !check.covers.every(item => typeof item === 'string' && item.trim()) ||
+        check.fullScope !== undefined && typeof check.fullScope !== 'boolean' ||
+        check.fullScope === true && (typeof check.fullScopeReason !== 'string' || !check.fullScopeReason.trim())) {
+      throw new Error('检查需要准确目录、命令及覆盖项；全量检查需说明实际触发原因');
+    }
+    for (const key of ['timeoutMs', 'maxRssMb']) if (check[key] !== undefined &&
+      (!Number.isFinite(check[key]) || check[key] <= 0)) throw new Error('检查资源预算无效');
+    ids.add(check.id);
+    const options = { kind: check.kind, command: check.command, args: check.args, cwd: resolve(check.cwd),
+      timeoutMs: check.timeoutMs ?? deadlines[check.kind] * 1000, maxRssMb: check.maxRssMb ?? 2048 };
+    const identity = stableJson(options);
+    if (!groups.has(identity)) groups.set(identity, { options, ids: [], covers: new Set(), fullScopeReasons: new Set() });
+    const group = groups.get(identity);
+    group.ids.push(check.id);
+    if (check.fullScope) group.fullScopeReasons.add(check.fullScopeReason);
+    for (const covered of check.covers) group.covers.add(covered);
+  }
+  const receipts = [], started = Date.now();
+  for (const group of groups.values()) {
+    signal?.throwIfAborted();
+    const action = group.options.kind, operationId = 'check-' + (receipts.length + 1);
+    const before = Date.now();
+    recordCheck({ type: 'action_started', action, operationId });
+    let result;
+    try { result = await run({ ...group.options, signal, onProgress }); }
+    catch (error) {
+      recordCheck({ type: 'action_finished', action, operationId, state: 'BLOCKED', elapsedMs: Date.now() - before });
+      throw error;
+    }
+    const passed = result.status === 'PASSED' && result.cleanupComplete === true;
+    recordCheck({ type: 'action_finished', action, operationId, state: passed ? 'PASSED' :
+      result.status === 'PASSED' ? 'CLEANUP_FAILED' : result.status, elapsedMs: result.elapsedMs });
+    receipts.push({ ids: group.ids, covers: [...group.covers], ...group.options, status: result.status,
+      ...(group.fullScopeReasons.size ? { fullScopeReasons: [...group.fullScopeReasons] } : {}),
+      cleanupComplete: result.cleanupComplete, elapsedMs: result.elapsedMs, exitCode: result.exitCode,
+      ...(!passed ? { stdoutTail: result.stdoutTail, stderrTail: result.stderrTail, backgroundPids: result.backgroundPids } : {}) });
+    if (!passed) {
+      const ran = new Set(receipts.flatMap(row => row.ids));
+      return { status: result.status === 'PASSED' ? 'CLEANUP_FAILED' : result.status,
+        elapsedMs: Date.now() - started, requestedChecks: ids.size, executedCommands: receipts.length,
+        receipts, notRun: [...ids].filter(id => !ran.has(id)) };
+    }
+  }
+  return { status: 'PASSED', elapsedMs: Date.now() - started, requestedChecks: ids.size, executedCommands: receipts.length, receipts, notRun: [] };
+}
+
 async function main(argv) {
   const controller = new AbortController();
   const outputError = () => {
@@ -144,6 +210,13 @@ async function main(argv) {
   // Stream write errors arrive asynchronously, outside the progress callback's
   // try/catch. Keep these handlers until process exit, including receipt writes.
   process.stdout.on('error', outputError); process.stderr.on('error', outputError);
+  if (argv.length === 1 && argv[0] === '--batch') {
+    const result = await runVerificationBatch(await readCliPlan([]), { signal: controller.signal,
+      onProgress: state => process.stderr.write('本地 ' + state.kind + ' 检查已运行 ' + Math.round(state.elapsedMs / 1000) + 's\n') });
+    process.stdout.write(JSON.stringify(result) + '\n');
+    process.exitCode = controller.signal.aborted ? 1 : result.status === 'PASSED' ? 0 : result.status === 'TIMEOUT' ? 124 : 1;
+    return;
+  }
   const split = argv.indexOf('--');
   if (split < 0 || !argv[split + 1]) throw new Error('用法：--kind lint|type|test|build [--cwd PATH] [--timeout-seconds N] [--max-rss-mb N] -- COMMAND ARGS...');
   const options = {};

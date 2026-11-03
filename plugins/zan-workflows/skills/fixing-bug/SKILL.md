@@ -12,9 +12,8 @@ Preferred lead model profile: `CRITICAL`。可选模型时使用
 按 [同一清单编排](../../references/execution-checklist.md#围绕同一清单编排)
 选择当前已授权、依赖就绪且未完成的节点。各能力结果回到同一清单，不另起
 范围/确认或把同一 Bug 的共享操作复制到每个仓库。
-读取 [交接约定](references/contracts.md)，异常或回归检查时再读
-[验收场景](references/acceptance-scenarios.md)。不在入口复制下游写入流程。
-读取或写入外部系统时沿用 [工具路由](../../references/tool-routing.md)。
+交接字段有缺口时查 [交接约定](references/contracts.md) 对应部分，异常或回归检查时查
+[验收场景](references/acceptance-scenarios.md)。实际使用外部能力时沿用 [工具路由](../../references/tool-routing.md)。
 
 首次修复、测试反馈和后续人工修改统一遵循
 [变更与文档一致性](../../references/change-consistency.md)：核对修改依据、完整待交付
@@ -54,8 +53,13 @@ Wiki 链接不能进入“需求待确认”。只修复时不解析、不询问
 
 ## 2. 只读定位与确定清单
 
-1. 为每个 Bug 的每个必要项目调用 `zan-workflows:preparing-work` 只读预检，
-   每次仍返回单项目定义。同仓库子项目可保留多份定义，合并执行时保留全部
+已有原始事实可直接复用。并列 Bug、同仓子项目或多个分支缺少事实时，一次
+[只读采集](../../references/scripted-delivery.md#开发前的只读采集)按 Bug 取条目、按仓库取 refs，
+需要测试反馈才取相关评论。需看原型或复现页面时按[标签页复用规则](../../references/tool-routing.md#原型读取与标签页复用)接回目标页。
+先用实际入口与复现确认最小修复面。列表布局错位先核对现有列、
+样式和容器宽度；只有具体缺陷涉及数值语义或多个消费者时才扩到格式化工具、共享组件或更多页面。
+1. 用 `zan-workflows:preparing-work` 的只读预检为每个必要项目形成单项目定义。
+   一次取得本 Bug 的共享事实，再补各项目独有的范围、约束和验收。同仓库子项目可保留多份定义，合并执行时保留全部
    原范围和验收，分支事实必须一致，不能按仓库键覆盖掉其中一份。
    复用同一 Bug 的 TAPD、项目、代码和分支证据；
    全部条目预检完成后再合并展示，不逐个确认。
@@ -141,6 +145,8 @@ A → C → B 处理，不因换技能或进入提交、构建、Wiki、登记�
 ## 4. 按请求交付
 
 仅 `SUBMIT|GO_LIVE` 进入 `zan-workflows:submitting-for-test`。
+单仓单 Bug 的完整 ReviewedChange、记录草稿和当前决定可用[连续提测](../submitting-for-test/references/continuous-submission.md)，
+一次执行至最终待测试读回。IMPLEMENT 仍在实施终点发表记录；多仓和上线仍按下文聚合与单独授权。
 将同一 Bug 的全部 `work_definitions` 与 `reviewed_changes` 按仓库准确配对，
 单仓库仍传原对象。先用 `submission_phase=PLAN` 准备完整 `SubmissionPlan`，在确认前不提交、
 推送、创建 MR、部署或更新 Wiki/TAPD。这里的确认可以来自完整执行清单：

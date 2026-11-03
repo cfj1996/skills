@@ -22,7 +22,10 @@ Preferred lead model profile: `CRITICAL`。可选模型时使用
 
 ## 1. 读取需求与交付边界
 
-要求准确 TAPD Story 或 Task URL，读取相关 PRD、原型、附件和评论。
+要求准确 TAPD Story 或 Task URL，经 TAPD MCP 读取相关正文、Wiki、附件和评论，核对关联 PRD。
+需要从原型核对交互时按[原型读取与标签页复用](../../references/tool-routing.md#原型读取与标签页复用)在同一页取证，后续阶段沿用结果。
+已有原文与当前项目证据就直接使用。缺少条目、父需求或多个仓库的固定分支事实时，
+用一次[只读采集](../../references/scripted-delivery.md#开发前的只读采集)补缺。仅分支终点到分支准备为止。
 Task 输入先核实真实父需求，只实施选定任务，不默认扩展到兄弟任务。
 只有 PRD/原型时可交 `writing-plans phase=SCOPE_REVIEW` 分析，进入分支绑定或
 实施前返回 `PENDING_TAPD_STORY_OR_TASK`，不编造 TAPD 身份。
@@ -51,15 +54,21 @@ Bug 使用 `zan-workflows:fixing-bug`。
 ## 2. 查清范围，准备必要产物
 
 先核对已有清单、brief 或 Plan 是否完整覆盖同一需求/所选 Task、远程基准、
-范围/排除项、来源、验收、依赖及阻塞。仍有效时由编排按相同就绪规则复核复用，
-不再次调用 `SCOPE_REVIEW`；不能只凭摘要或已有通过标志清零缺口。
-需要新收敛范围、正式 Plan/协调、材料不足或实质变化时，再调用
+范围/排除项、来源、验收、依赖及阻塞，复用仍有效的事实和本轮评审结果。
+用户明确要可视化面板，或有业务决定需要在原型上逐项比较时，把范围证据交给
+`writing-plans` 显式进入 `SCOPE_REVIEW` 的 `PANEL`。仅有文字摘要不能替代本轮面板提交。
+普通的既有页面/接口小改动，已核实行为、落点、排除项及验收时，主代理直接形成
+implementationBrief 并核对就绪条件。需要正式 Plan/协调、材料不足或实质范围变化时，调用
 `zan-workflows:writing-plans phase=SCOPE_REVIEW`，传项目、基准、`delivery_mode` 与
 `confirmation_mode=DEFER_TO_ORCHESTRATOR`，只读补齐实际缺口，
 不在子阶段重复请求范围确认。语义/就绪检查始终保留。
 按 [需求就绪检查](../writing-plans/references/requirement-readiness-checklist.md)
 区分需求不完整与实施条件缺失，限定本轮范围，不能用假设填平缺口。
 界面/Mock 范围不自动扩大到后端实现；真实集成交付不能自行改成 Mock。
+“接口还没定”时先核实现有页面、接口和表单能力。尚需业务决定的 Mock 只作为候选。
+确认是已有页面加字段后，沿用同一清单，把当前步骤收敛到真实读写、空值和相关表单行为，
+撤下已失效的 Mock 方案；保留用户明确要求的 Task、Plan 和交付选择。已确认的接口/配置项
+直接随当前事实交给评审，旧方案的评审结论只在仍匹配的部分复用。
 
 需求待确认只包含业务范围、规则、语义、流程和验收决定；接口/传输字段、Key
 配置、环境和外部服务按 [外部数据与依赖](../../references/external-data-dependencies.md)
@@ -78,36 +87,19 @@ Mock 遵守 [跨项目规范](../../references/mock-development.md)，先发现�
 - 明确要求正式 Plan、Task 写入，确需多人/跨模块协调，或继续已有正式 Plan
   时，使用原任务与 Plan 能力。任务存在时读取其真实责任范围与负责人，
   不因展示关联而修改旧任务、补估时或制造正式任务结果。
-- 只有实际需要逐项复杂交互或用户选择时才使用 PANEL；其他范围用 DIALOGUE，
-  不加载未采用的面板运行时。风险直接落实到验证场景，不另分流程等级。
+- 在范围确认时按[评审模式选择](../writing-plans/SKILL.md#评审模式选择)确定面板或对话。
+  对话模式不加载未采用的面板运行时。风险直接落实到验证场景。
 
-准备本轮实施时，按上述规则先判断完整所选范围：多页面各有业务/依赖/验收，或跨仓责任需
-分别交付衔接时，准备 Task 和模块 Plan，不因现有静态页、单人、成熟复用或
-先做 Mock 而降为“小增量”。首次用于实施的完整清单应已有真实/拟建 Task、核实负责人、
-校准后的最终工时及各模块 Plan 拟写内容；缺项保留草稿，不先发执行确认。
-同一小改动批量应用和仅选一个 Task 的边界保持不变。
+准备正式 Task/Plan 的条件按本轮责任范围判断。多页面有独立业务/依赖/验收，或跨仓需分别交付时，
+即便有静态页、现成组件或先做 Mock，也应按内聚模块准备正式 Plan。Task 输入只检查或调整所选 Task，不扩到兄弟任务。
+每个模块可关联多个 Task，未来接口接入与当前已批准 Mock 分开计入范围和工时。
 
-需要任务准备时，调用 `zan-workflows:breaking-down-requirement phase=PLAN`，
-并传 `confirmation_mode=DEFER_TO_ORCHESTRATOR`。核实新建/复用/更新、负责人、
-最终预估工时、范围、依赖和验收。Task 输入只检查或调整所选 Task。
-工时按 [增量估算与独立评审](../breaking-down-requirement/references/effort-estimation.md)
-执行：先核实所选责任、当前可复用能力和实际新增/适配/验证工作，公共成本不重复计算。
-用户提供的可比吞吐参考须参与本次校准，保留来源和适用边界；不能只核对算术和
-复用存在就视为充分。页面开发与正式接口对接分别设计任务和验收；仅批准 Mock 时
-本轮不含真实接入，未来任务候选与依赖单独说明，不把未来工时算进当前开发。
-新建或重估任务的独立评审须在完整确定清单前通过；旧任务范围和工时未变时保留读回值。
-估算者不能自填通过；只刷新失效证据和受影响评审，不增加一轮人类确认，仍只展示小时数。
-任务创建路线固定指向共享 [TAPD MCP 方法](../../references/tool-routing.md#tapd-任务创建)：
-单个 `create_task`、同需求批量 `create_tasks`，统一交任务模块执行，本入口不另建创建路径。
-保留完整写入内容、旧/新差异和 proposal fingerprint；不展示内部工时算法。
-需要正式 Plan 时先准备拟写正文/差异与准确目标，保留稳定任务 key。
-每个页面/可独立开发验收的内聚模块一份 Plan，可关联多个 Task；大需求总览只作
-索引与依赖说明，不承载全部实施设计。旧单文件路径不能区分模块时，按 writing-plans
-产物位置门禁预览规则调整，不能先把全需求写进该文件。
-任务未创建只显示提案，不伪造 ID 或 TASKS_READY。
-
-需求和任务依照 [任务关联](references/task-linked-delivery.md) 连接项目/分支、
-Plan 步骤、接口/依赖、缺口、验收及实际交付结果，不建立额外任务台账。
+只在需要任务准备时调用 `zan-workflows:breaking-down-requirement phase=PLAN`，
+传 `confirmation_mode=DEFER_TO_ORCHESTRATOR`。按[估算与独立评审](../breaking-down-requirement/references/effort-estimation.md)
+核实负责人、复用能力、实际增量、验证和可比吞吐参考；共享成本只算一次，未改工时用实际读回。
+首次实施清单列真实/拟建任务、最终工时、模块 Plan 的准确位置与拟写正文。缺项保持草稿，不伪造 ID。
+[任务关联](references/task-linked-delivery.md)约束选定边界、每步 tapdTaskKey 和跨模块隔离；
+单个 `create_task`、同需求批量 `create_tasks` 由[任务模块](../../references/tool-routing.md#tapd-任务创建)按已确认操作执行。
 
 ## 3. 准备分支与一次执行确认
 
@@ -119,29 +111,16 @@ Plan 步骤、接口/依赖、缺口、验收及实际交付结果，不建立�
 先完成 [确认前准备](../../references/execution-checklist.md#确认前准备)，再按
 [完整展示模板](../../references/execution-checklist.md#完整展示模板) 展示 `确定清单`；
 以下六列仅是主表定义，不能当成整份模板：
-先列执行项目名称（可多个）、关联需求及本轮交付。有 Task 时在执行内容前
-放三列 `序号 | 标题 | 工时` 的 TAPD 任务表；标题前显示本轮【新建】【复用】
-或【调整】，保留真实链接。工时格只显示一个 `N 小时`，不展示预估/剩余标签、
-多组时间或变更箭头；取值按共享工时口径。任务表后直接进入执行内容，不追加
-工时汇总。内部续修预测不替代任务工时，未知不按零算，不默认写回或触发排期。
-任务序号用跨项目唯一的 `#F01`、`#F02`，后续主表只用该序号关联：
+先列执行项目、关联需求及终点。有 Task 则在执行内容前列 `序号 | 标题 | 工时`，
+用【新建】【复用】【调整】及单个 `N 小时` 表明真实操作。再展示：
 
 | 项目 | 分支 | 交付范围 | 实施方案 | 验收标准 | 需求待确认 |
 | --- | --- | --- | --- | --- | --- |
 
-主表后展示“外部数据与依赖”；含 Mock 时再展示“Mock 范围与测试授权”，列明
-`MOCK-*`/`MOCK_ONLY`、路径、场景、真实调用边界、准确测试目标、用途及退出
-条件。默认仅本地；普通开发/直接提测默认不包含 Mock 测试交付。只有当前完整
-清单明确展示并获人类批准才允许带入测试分支/环境、Wiki和登记。生产禁止携带
-Mock 模块及数据、handler、runtime、启用入口，不能通过关闭开关或删标签放行。
-
-长内容按全清单 `#01` 备注关联实际 Plan 或同一范围说明，不再把任务表藏到
-备注中。任务 `#F01` 和详情 `#01` 分开，真实 key/ID/Plan 步骤映射保持不变。
-保留父需求与所选任务，不能只确认数量或 Plan 路径。
-本轮 Task 创建/更新、人员、最终工时、Plan 内容/位置放在同一实际写入区块。
-合并与测试环境沿用共享规范：普通开发三项默认都需要，确认前展示本次 Wiki 模板；
-明确只开发、仅计划、仅建分支时不执行交付，显式关闭某项则只覆盖该项。
-不查询未选择的 Jenkins/Wiki，也不单独再问 Wiki 选项。
+表后列外部依赖、本轮实际写入、合并和测试环境意图。Task `#F01` 与长备注 `#01` 分开，
+编号关联真实 Task、Plan 和步骤。适用时展示具体 Mock 标识、源码、启用、真实调用、
+测试范围/用途、退出条件及 Wiki 模板。普通直接提测不自动授权 Mock 或生产发布。
+明确只实施、仅计划、仅建分支时不准备测试交付；不查询未选择的 Jenkins/Wiki。
 
 `requirement_blocker_count=0` 才可确认需求；IMPLEMENT/SUBMIT/GO_LIVE 还需
 本轮选定步骤必需的 `implementation_blocker_count=0`，且外部依赖审查有证据。
@@ -177,6 +156,8 @@ Task/Plan 内容合并确认，不另问一轮范围或分支；任务写入须�
 通过上述 MCP 方法执行已确认任务操作；REUSE 只准确读回，不重写描述。要求所选任务全部
 `TaskBreakdownResult.terminal_state=TASKS_READY`。失败/不明或部分写入保留
 已成功 ID，核查原记录后补缺，禁止直接重试创建。任务创建不改变原分支身份。
+批量写入后用同一次 [task-readback](../../references/scripted-delivery.md#开发前的只读采集)
+把实际 ID 和字段读回给 Plan，已有任务不因人员分隔符或能力切换被重新创建。
 PLAN_ONLY 只有 Task 写入也已明确获准时才执行，未授权则保留任务提案。
 
 本轮需要正式 Plan 时，调用 `writing-plans phase=PLAN_WRITE` 保存并读回，绑定
@@ -233,6 +214,7 @@ Mock 完成、正式接口补齐时续接原分支、Task和Plan。先刷新契�
 `submission_profile=AUTO|STANDARD|NO_WIKI` 与 `deployment_mode=AUTO|DEPLOY|SKIP`。
 沿用当前清单的明确选择；未关闭时含 AUTO 默认 STANDARD 和 DEPLOY，不能覆盖明确的 NO_WIKI/SKIP。
 先 `submission_phase=PLAN` 准备各项目准确提测计划；与完整执行清单逐项核对
+时，普通单仓需求优先用[连续提测](../submitting-for-test/references/continuous-submission.md)带入当前决定和同一份评审；
 仍在原授权范围内，就直接 `submission_phase=EXECUTE`，不再次询问提交/推送/
 MR/部署确认。首轮未覆盖或实质变化才补充授权；单独执行技能仍先确认其具体计划。
 提测构建统一使用 `completionMode=TRIGGER_ACCEPTED`：确认 Jenkins 已接受确切队列，

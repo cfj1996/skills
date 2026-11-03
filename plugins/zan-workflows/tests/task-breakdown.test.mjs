@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
+import { readTaskResults } from '../skills/breaking-down-requirement/scripts/read-task-results.mjs';
 
 const require = createRequire(import.meta.url);
 const { estimateHours, fingerprintProposal, fingerprintEstimate, fingerprintTaskWork, validateTaskBreakdown, validateConfirmation, validateTaskReadbacks, validatePlanTaskBindings } = require('../skills/breaking-down-requirement/scripts/validate-task-breakdown.js');
@@ -62,6 +63,40 @@ function binding(input = proposal()) {
   reviewed(input);
   return { proposal: input, proposalFingerprint: fingerprintProposal(input), records: records(input), project: 'sample', deliveryUnitKey: 'login' };
 }
+
+test('partial Task responses recover stable identities read-only and tolerate TAPD owner delimiters only', async () => {
+  const p = proposal(), task = p.tasks[0], row = { ...task.payload, id: '111230020000001',
+    workspace_id: p.requirement.workspaceId, owner: 'alice; ', effort: '6.0' };
+  const calls = [], api = rows => ({ status: 1, data: rows.map(Task => ({ Task })) });
+  const call = async (name, args) => { assert.equal(name, 'get_stories_or_tasks'); calls.push(args.options); return api([row]); };
+  const recovered = await readTaskResults(call, { proposal: p });
+  assert.equal(recovered.state, 'TASKS_READY');
+  assert.deepEqual(calls.map(r => r.id || r.story_id), [p.requirement.id, row.id]);
+  assert.equal(recovered.records[0].readback.ownerAccount, 'alice; ');
+  row.owner = 'alice;bob;'; assert.equal((await readTaskResults(call, { proposal: p, idsByKey: { 'DT-001': row.id } })).state, 'BLOCKED');
+  const absent = await readTaskResults(async () => api([]), { proposal: p });
+  assert.equal(absent.state, 'PARTIAL'); assert.deepEqual(absent.missingKeys, [task.key]);
+  const conflict = await readTaskResults(async () => api([row, { ...row, id: '111230020000002' }]), { proposal: p });
+  assert.equal(conflict.state, 'BLOCKED'); assert.match(conflict.issues[0].message, /多个已有任务/);
+  assert.deepEqual(conflict.missingKeys, []);
+});
+
+test('a failed exact Task read preserves the sibling readback and both known IDs without treating either as missing', async () => {
+  const p = proposal(), second = structuredClone(p.tasks[0]);
+  second.key = 'DT-002'; second.name = second.payload.name = '第二项';
+  second.payload.description = second.payload.description.replace('DT-001', 'DT-002');
+  p.tasks.push(second); reviewed(p);
+  const idsByKey = { 'DT-001': '21', 'DT-002': '22' };
+  const call = async (name, { options }) => {
+    assert.equal(name, 'get_stories_or_tasks');
+    if (options.id === '22') throw new Error('503');
+    return { status: 1, data: [{ Task: { ...p.tasks[0].payload, workspace_id: '123', id: '21' } }] };
+  };
+  const result = await readTaskResults(call, { proposal: p, idsByKey });
+  assert.equal(result.state, 'PARTIAL');
+  assert.equal(result.records[0].readback.id, '21'); assert.equal(result.records[1].id, '22');
+  assert.match(result.issues[0].message, /503/); assert.deepEqual(result.missingKeys, []);
+});
 function model() {
   const value = JSON.parse(readFileSync(new URL('../skills/writing-plans/tests/fixtures/page-plan-model.json', import.meta.url), 'utf8'));
   value.deliveryUnit.key = 'login';

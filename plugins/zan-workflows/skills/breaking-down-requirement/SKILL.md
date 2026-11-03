@@ -175,6 +175,9 @@ CREATE 按上述共享路由调用 `create_task` 或 `create_tasks`，参数绑�
 payload；UPDATE 使用准确现有 ID 的 `update_story_or_task`，REUSE 只读。
 读回使用 `get_stories_or_tasks`。创建结果仍进入原 `TaskBreakdownResult`，
 不新增另一份任务结果或台账。
+已有稳定提案时，用[只读 task-readback](../../references/scripted-delivery.md#开发前的只读采集)
+一次恢复缺 ID 的所选任务并校验准确读回。只规范 TAPD 单一账号的空白和分号，
+额外账号、真实工时或范围漂移仍需处理。
 
 批量调用不是事务。按返回的 index 在本批发送列表中绑定稳定 key 和实际 ID；
 逐项检查 state、id、task 与全部获准字段，尤其 description 中的范围和完整

@@ -218,6 +218,21 @@ Mock 默认仅本地使用。普通“开发”“直接提测”和测试构建
 清单、入口/引用和启用路径的查证依据。无 Mock 的项目也需明确清查，缺记录
 不能按空清单放行。
 
+已有项目库存时，先用 helper 的 `action=baseline` 读取已评审提交中的库存文件。
+传 `repositoryPath/sourceRepository/baseSha`、库存的准确 `inventoryPath/inventorySha256`、
+`projectPath`（子应用目录，默认仓库根）、`runtimePaths/mockBindingPaths` 和 `evidenceRefs`，
+比对已知版本可传 `revisionSha`，否则检查当前工作树。复用既有项目的
+`modules[].{id,marker,sourcePaths,activation}`，sourcePaths 相对 projectPath。
+结果列出历史模块、实际变化路径和受影响 ID，只作为增量审查的起点。
+新增路径、配置和库存漂移需核实；缺可信基线时仍做首次清查。它不授予 Mock 测试权限。
+
+同一会话按仓库、不可变版本和范围复用已读 Git 对象，工作树、目标 ref 和操作授权仍在写前核对。
+仅当有证据证明准确的生成 Plan 不属于运行、构建或 Mock 入口时，可在 inspect 和之后的
+mockSafety 中携带 `nonRuntimePlanPaths` 和 `nonRuntimePlanEvidenceRefs`。
+目前支持需求目录 `docs/stories/item-<id>/…/task-plan.md`；改变目录中其他文件不会获得例外。
+`auditContentFingerprint` 和完整文件差异仍记录 Plan 内容，Mock 指纹只排除这些明确路径。
+使用项目真实运行、配置和本轮差异选择 inspectedPaths，避免把未参与交付的图谱缓存当成运行输入。
+
 源版本提交/合并后若目标带有额外内容，须针对准确不可变目标 revision 重做
 清查并绑定 Git 交付回执；核对已批准源码和 Mock 配置未被改变，以及目标新增
 内容的依赖/Mock 影响。仅有祖先包含关系不等于内容等价或授权仍有效。

@@ -47,6 +47,22 @@ typecheck、test 或 build。把选择及原因放在原验证安排中，不另
 
 ## 限制本机开销
 
+### 已选检查合批
+
+在源码和依赖输入稳定、实际命令已经选好时，将同一批本地检查通过 stdin 交给
+`node "$PLUGIN_ROOT/scripts/run-local-check.mjs" --batch`。例如以下两个 Task
+共用同一条接口行为测试（cwd 替换为已核实的实际目录）：
+
+~~~json
+{"checks":[{"id":"page","kind":"test","cwd":"/project/app","command":"pnpm","args":["exec","vitest","run","display-settings.test.ts"],"covers":["页面保存"]},{"id":"api","kind":"test","cwd":"/project/app","command":"pnpm","args":["exec","vitest","run","display-settings.test.ts"],"covers":["maxvalue 请求映射"]}]}
+~~~
+
+相同目录、命令、参数、检查类别和预算在本批只执行一次，逐项保留其实际结果；
+covers 说明选取目的，不能代替验证事实。全量命令声明 `fullScope:true` 并给出
+`fullScopeReason`（硬性要求、明确请求或局部证据未覆盖的实际风险）。每条命令仍受
+原超时、内存、取消及进程清理约束；首个失败后逐项列出 notRun。不同变更版本、手工操作、
+需要刻意重复的稳定性试验和共享环境变化不能作为同批重复项。
+
 - 同机重型 lint/类型检查/测试/build 串行，跨仓库、主/子代理合计同时最多一个。
   实施可以并行，重检查交主代理排队；不要用 `Promise.all` 同时启动这几类命令。
 - 工具原生支持时限制 worker 为 1–2，并复用增量缓存。先检查真实参数，禁止

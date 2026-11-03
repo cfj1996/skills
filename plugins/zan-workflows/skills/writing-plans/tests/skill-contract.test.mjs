@@ -704,8 +704,10 @@ test("feature review runtime is ordered and fail-closed", async () => {
     "展示结果",
   ].map((heading) => runtime.indexOf(`## ${heading}`));
   assert.ok(ordered.every((offset, index) => offset >= 0 && (index === 0 || ordered[index - 1] < offset)));
+  assert.match(sectionContaining(runtime, "## 挂载验证"),
+    /browserOpened\s*&&\s*hostExists\s*&&\s*shadowRootExists\s*&&\s*reviewApiExists\s*```/);
   assert.match(
-    runtime,
+    sectionContaining(runtime, "## 展示结果"),
     /browserOpened\s*&&\s*hostExists\s*&&\s*shadowRootExists\s*&&\s*reviewApiExists\s*&&\s*currentSubmissionReceived/,
   );
 

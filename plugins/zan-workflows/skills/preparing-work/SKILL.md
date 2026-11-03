@@ -13,10 +13,12 @@ Resolve one TAPD item into one validated `TapdWorkDefinition`. This skill is
 read-only: it does not edit source, create branches/worktrees, change TAPD, or
 write workflow records.
 
-Read [contracts.md](references/contracts.md),
-[collection-and-branch.md](references/collection-and-branch.md), plus the shared
-[tool-routing policy](../../references/tool-routing.md) before acting. Fetch
+For a standalone input or missing handoff fields use the relevant parts of
+[contracts.md](references/contracts.md) and [branch rules](references/collection-and-branch.md).
+Reuse already verified project rules. Read the [tool-routing policy](../../references/tool-routing.md)
+for the external operation in use. Fetch
 TAPD through `tapd-mcp`; do not open a browser merely because a TAPD page is available.
+When a prototype is needed, [reuse the target tab](../../references/tool-routing.md#原型读取与标签页复用) and pass on what was actually observed.
 Read [acceptance-scenarios.md](references/acceptance-scenarios.md) only for an
 ambiguous case or regression check.
 Use the [same checklist](../../references/execution-checklist.md#围绕同一清单编排)
@@ -30,6 +32,10 @@ history. Fetch remote refs once for the preflight and refresh them only before
 branch creation or after an observed change. The read-only preflight and later
 authorized handoff reuse the same evidence set; the second pass checks only
 mutable facts and confirmation binding.
+Use [one read-only collection](../../references/scripted-delivery.md#开发前的只读采集)
+when the intake actually lacks several shared item/branch facts. A COLLECTED result
+has no authority to edit code or create a branch. An outdated tracking ref still needs
+refresh; scope, remote base, working location and authorization must be verified.
 
 ## Inputs
 

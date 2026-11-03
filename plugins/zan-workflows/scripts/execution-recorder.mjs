@@ -200,6 +200,8 @@ export function listRuns(options = {}) {
 }
 
 // Deliberately separate from WorkflowSession.onEvent: diagnostics must never poison delivery.
+export const stageForAction = action => action === 'collect' ? 'collection' : action === 'task-readback' ? 'planning' : 'delivery';
+
 export function sessionRecorder(options = {}) {
   const observer = () => {};
   observer.status = { state: 'UNAVAILABLE' };
@@ -217,7 +219,8 @@ export function sessionRecorder(options = {}) {
         const type = { REQUEST_STARTED: 'action_started', REQUEST_FINISHED: 'action_finished',
           SESSION_CLOSED: 'session_closed', CLEANUP_FAILED: 'session_closed' }[event.state];
         if (type) {
-          const result = recordEvent(runId, { type, source: 'executor', stage: 'delivery',
+          const stage = stageForAction(event.action);
+          const result = recordEvent(runId, { type, source: 'executor', stage,
           action: event.action, operationId: event.requestId, phase: event.phase,
           state: event.resultState || event.state, code: event.reason,
           elapsedMs: event.elapsedMs, idleBeforeMs: event.idleBeforeMs,

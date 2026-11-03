@@ -6,6 +6,12 @@ const texts = (value, nonempty = true) => Array.isArray(value) && (!nonempty || 
 const canonical = value => Array.isArray(value) ? value.map(canonical) : object(value)
   ? Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])])) : value;
 const equal = (a, b) => JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
+// TAPD serializes owner as a semicolon-separated list, even for one owner.
+// Compare the single approved account; another account must still block.
+const sameTaskOwner = (actual, expected) => {
+  const accounts = typeof actual === 'string' ? [...new Set(actual.split(';').map(value => value.trim()).filter(Boolean))] : [];
+  return accounts.length === 1 && accounts[0] === expected;
+};
 const fingerprintProposal = proposal => createHash('sha256').update(JSON.stringify(canonical(proposal))).digest('hex');
 const ESTIMATE_CHECKS = ['scope', 'reuse', 'increment', 'shared', 'verification', 'risk'];
 const PART_TYPES = ['analysis', 'implementation', 'integration', 'verification', 'investigation'];
@@ -231,10 +237,13 @@ function validateTaskReadbacks(proposal, records) {
     ids.add(record.id); keys.add(record.key);
     if (task.action !== 'CREATE' && record.id !== task.id) fail(`${task.key}: readback task ID changed`);
     const readback = record.readback || {};
-    if (readback.id !== record.id || readback.workspaceId !== proposal.requirement.workspaceId || readback.storyId !== proposal.requirement.id || readback.ownerAccount !== task.owner?.account || readback.estimateHours !== task.estimate?.hours) fail(`${task.key}: readback Task, Story, developer or hours mismatch`);
-    for (const [key, value] of Object.entries(task.payload || {})) if (!equal(readback.payload?.[key], value)) fail(`${task.key}: readback approved payload mismatch for ${key}`);
+    if (readback.id !== record.id || readback.workspaceId !== proposal.requirement.workspaceId || readback.storyId !== proposal.requirement.id || !sameTaskOwner(readback.ownerAccount, task.owner?.account) || readback.estimateHours !== task.estimate?.hours) fail(`${task.key}: readback Task, Story, developer or hours mismatch`);
+    for (const [key, value] of Object.entries(task.payload || {})) {
+      const matches = key === proposal.fieldBinding.ownerField ? sameTaskOwner(readback.payload?.[key], value) : equal(readback.payload?.[key], value);
+      if (!matches) fail(`${task.key}: readback approved payload mismatch for ${key}`);
+    }
   }
-  if (keys.size !== proposal?.tasks?.length) fail('not every task has an exact readback');
+  if (keys.size !== proposal?.tasks?.length) result.errors.push({ code: 'task-readback', reason: 'missing-rows', message: 'not every task has an exact readback' });
   result.valid = result.errors.length === 0;
   return result;
 }
@@ -273,7 +282,7 @@ function validatePlanTaskBindings(model, { implementationStage = false } = {}) {
   return result;
 }
 
-module.exports = { estimateHours, fingerprintProposal, fingerprintEstimate, fingerprintTaskWork,
+module.exports = { estimateHours, fingerprintProposal, fingerprintEstimate, fingerprintTaskWork, hasTaskMarker,
   validateTaskBreakdown, validateConfirmation, validateTaskReadbacks, validatePlanTaskBindings };
 
 if (require.main === module) {

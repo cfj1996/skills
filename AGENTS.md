@@ -112,6 +112,10 @@ with an independent evaluator under its read-only constraints. The existing
 normal scenario and configuration activation work through Plan/session persistence
 and authorized delivery checks; no page debug controls or company writes are needed.
 
+For prototype intake, tab reuse after an interrupted open, and transfer to a Plan
+panel, use `plugins/zan-workflows/skills/writing-plans/tests/scenarios/review-prototype-tabs.md`
+with a read-only evaluator. All browser inventories and page observations are simulated.
+
 For the approved pending-merge Wiki patch, shared-page entry isolation,
 permission handoff, readback failure and workflow-session write barriers, run
 `node --test plugins/zan-workflows/tests/pending-merge-wiki.test.mjs`.
@@ -187,6 +191,17 @@ simulated publication on check failure, and verify exact build-bound receipts.
 arguments through real local source inspection and simulated TAPD writes.
 
 ## Coding Style & Naming Conventions
+
+For the single-repository Story/Task submission entry, Wiki-only continuation,
+reviewed inventory/delta lookup, Git snapshot reuse and no-action registration, run
+`node --test plugins/zan-workflows/tests/continuous-test-submission.test.mjs plugins/zan-workflows/tests/mock-revision.test.mjs`.
+These tests use simulated GitLab/Jenkins/TAPD and disposable local Git repositories,
+including a local bare remote for commit Hook and exact push readback.
+
+For requirement/Bug intake, selected-Task recovery, bounded verification batches and
+ordered single-Bug record publication and registration, run
+`node --test plugins/zan-workflows/tests/workflow-preparation.test.mjs plugins/zan-workflows/tests/task-breakdown.test.mjs plugins/zan-workflows/tests/continuous-test-submission.test.mjs`.
+The fixtures include stale refs, partial Task reads, stopped checks and uncertain comment writes.
 
 For frozen Jenkins parameter preparation and deployments that never query live
 parameter definitions, run

@@ -3,6 +3,7 @@ import { readFile, lstat, realpath } from 'node:fs/promises';
 import { resolve, relative, isAbsolute, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readCliPlan, repositoryKey, sha256, stableJson, runScopedCommand } from './workflow-runtime.mjs';
+import { createMockInspectionCache, inspectRevisionFiles, remember } from './mock-revision.mjs';
 
 const SHA = /^[a-f\d]{40}(?:[a-f\d]{24})?$/i;
 const HASH = /^[a-f\d]{64}$/i;
@@ -28,15 +29,70 @@ function declarations(path, body) {
 const CODE = new Set(['.js', '.mjs', '.cjs', '.jsx', '.ts', '.tsx', '.vue', '.svelte', '.json', '.yaml', '.yml', '.html']);
 const nonRuntime = path => /(?:^|\/)(?:tests?|__tests__|docs|node_modules|dist|\.git|\.query-contract\/cache)(?:\/|$)/.test(path) || /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(path);
 const unique = values => [...new Set(values)].sort();
+function reviewedDocuments(input) {
+  const paths = input.nonRuntimePlanPaths ?? [];
+  const protectedPaths = [...input.runtimePaths, ...input.mockBindingPaths,
+    ...(input.mockModules || []).flatMap(module => module.paths || []),
+    ...(input.productionIsolation?.configPaths || []), ...(input.productionSourceEvidence?.configPaths || [])];
+  if (!Array.isArray(paths) || paths.some(path => !relpath(path) ||
+      !/(?:^|\/)docs\/stories\/item-\d+\/(?:[^/]+\/)*task-plan\.md$/.test(path) ||
+      !covered(path, input.inspectedPaths) || covered(path, protectedPaths)) ||
+      paths.length && !texts(input.nonRuntimePlanEvidenceRefs)) {
+    throw new Error('只可声明已核实在运行、构建及 Mock 配置边界之外的准确需求 Plan');
+  }
+  return unique(paths);
+}
 const gitReader = io => async (root, args) => (await runScopedCommand('git', args,
   { cwd: root, timeout: 30000, maxBuffer: 16 * 1024 * 1024 }, io)).stdout;
+
+// Read an already reviewed, project-owned inventory as a starting point for
+// semantic review. This result cannot authorize a test or production write.
+export async function inspectMockBaseline(input, io = {}) {
+  const { repositoryPath, sourceRepository, baseSha, inventoryPath, inventorySha256, projectPath = '.' } = input;
+  if (!text(repositoryPath) || !SHA.test(baseSha || '') || !HASH.test(inventorySha256 || '') ||
+      !relpath(inventoryPath) || !relpath(projectPath) || !covered(inventoryPath, [projectPath]) ||
+      !texts(input.evidenceRefs) || !texts(input.runtimePaths) || !texts(input.mockBindingPaths) ||
+      ![...input.runtimePaths, ...input.mockBindingPaths].every(relpath)) throw new Error('项目库存需受审版本、文件指纹、运行/配置路径和评审依据');
+  const root = await realpath(repositoryPath), git = gitReader(io);
+  const [actualRoot, origin, sha] = await Promise.all([git(root, ['rev-parse', '--show-toplevel']),
+    git(root, ['remote', 'get-url', 'origin']), git(root, ['rev-parse', 'HEAD'])]);
+  if (await realpath(actualRoot.trim()) !== root || repositoryKey(origin.trim()) !== repositoryKey(sourceRepository)) {
+    throw new Error('项目库存仓库不匹配');
+  }
+  const revision = input.revisionSha || sha.trim();
+  if (!SHA.test(revision) || (await git(root, ['rev-parse', revision + '^{commit}'])).trim() !== revision) throw new Error('清查版本无效');
+  await git(root, ['merge-base', '--is-ancestor', baseSha, revision]);
+  const tree = await git(root, ['--no-replace-objects', 'ls-tree', '-lz', baseSha, '--', inventoryPath]);
+  const header = tree.slice(0, tree.indexOf('\t')).trim().split(/\s+/);
+  if (!['100644', '100755'].includes(header[0]) || header[1] !== 'blob' || Number(header[3]) > 1024 * 1024 ||
+      tree.slice(tree.indexOf('\t') + 1) !== inventoryPath + '\0') throw new Error('项目库存必须是已核实的普通 JSON 文件');
+  const data = (await runScopedCommand('git', ['--no-replace-objects', 'cat-file', 'blob', header[2]],
+    { cwd: root, timeout: 30000, encoding: 'buffer', maxBuffer: 1024 * 1024 }, io)).stdout;
+  if (sha256(data) !== inventorySha256) throw new Error('项目库存与已审指纹不符');
+  const modules = JSON.parse(data).modules;
+  if (!Array.isArray(modules) || new Set(modules.map(row => row?.id)).size !== modules.length) throw new Error('库存模块列表无效');
+  const historicalModules = modules.map(row => {
+    if (row?.marker !== 'MOCK_ONLY' || !/^MOCK-[A-Za-z0-9-]+$/.test(row.id) || !text(row.activation) ||
+        !texts(row.sourcePaths) || !row.sourcePaths.every(relpath)) throw new Error('历史模块缺少标识、源路径或启用条件');
+    return { id: row.id, activation: row.activation,
+      paths: row.sourcePaths.map(path => projectPath === '.' ? path : projectPath + '/' + path) };
+  });
+  const roots = unique([projectPath, inventoryPath, ...input.runtimePaths, ...input.mockBindingPaths]);
+  const changes = [git(root, ['diff', '--no-renames', '--name-only', '-z', baseSha, ...(input.revisionSha ? [revision] : []), '--', ...roots])];
+  if (!input.revisionSha) changes.push(git(root, ['ls-files', '--others', '--exclude-standard', '-z', '--', ...roots]),
+    git(root, ['ls-files', '--others', '--ignored', '--exclude-standard', '-z', '--', ...input.runtimePaths]));
+  const changedPaths = unique((await Promise.all(changes)).flatMap(list => list.split('\0').filter(Boolean)));
+  const configChanged = changedPaths.some(path => path === inventoryPath || covered(path, input.mockBindingPaths));
+  const affectedModuleIds = historicalModules.filter(row => configChanged || changedPaths.some(path => covered(path, row.paths))).map(row => row.id);
+  return { state: changedPaths.length ? 'REVIEW_DELTA' : 'BASELINE_UNCHANGED', sourceRepository, baseSha, sourceSha: revision,
+    inventoryPath, inventorySha256, historicalModules, changedPaths, configChanged, affectedModuleIds, writes: 0 };
+}
 
 // This snapshot proves revision/content binding, not the semantic absence of all
 // possible mocks. evidenceRefs must identify the project's inventory/import/
 // activation review; marker discoveries are additionally reconciled below.
 export async function inspectMockSource(input, io = {}) {
   const git = gitReader(io);
-  const run = (command, args, options) => runScopedCommand(command, args, options, io);
   if (!text(input.repositoryPath) || !SHA.test(input.baseSha || '') ||
       !texts(input.inspectedPaths) || !input.inspectedPaths.every(relpath) ||
       !texts(input.mockBindingPaths) || !input.mockBindingPaths.every(relpath) || !texts(input.runtimePaths) || !input.runtimePaths.every(relpath)) {
@@ -54,15 +110,21 @@ export async function inspectMockSource(input, io = {}) {
   if (revision && (!SHA.test(revision) || (await git(root, ['rev-parse', `${revision}^{commit}`])).trim() !== revision)) throw new Error('指定清查 revision 不是已核实的不可变提交');
   const sourceSha = revision || head.trim();
   if (base.trim() !== input.baseSha || !SHA.test(sourceSha)) throw new Error('Mock 清查基准或当前 HEAD 不可核实');
+  const inspectedPaths = unique(input.inspectedPaths), planPaths = reviewedDocuments(input);
+  const cacheKey = stableJson({ root, origin: actualOrigin.trim(), base: input.baseSha, revision, inspectedPaths,
+    runtimePaths: input.runtimePaths, mockBindingPaths: input.mockBindingPaths, planPaths });
+  const cache = io.mockInspectionCache?.snapshots;
+  if (revision && cache?.has(cacheKey)) return structuredClone(cache.get(cacheKey));
   const changed = unique((await git(root, ['diff', '--name-only', '-z', input.baseSha, ...(revision ? [revision] : []), '--'])).split('\0').filter(Boolean));
   const untracked = revision ? [] : (await git(root, ['ls-files', '--others', '--exclude-standard', '-z'])).split('\0').filter(Boolean);
   const ignoredRuntimePaths = revision ? [] : (await git(root, ['ls-files', '--others', '--ignored', '--exclude-standard', '-z', '--', ...input.runtimePaths])).split('\0').filter(Boolean);
-  const inspectedPaths = unique(input.inspectedPaths);
   if ([...changed, ...untracked].some(path => !covered(path, inspectedPaths)) ||
       [...input.mockBindingPaths, ...input.runtimePaths, ...ignoredRuntimePaths].some(path => !covered(path, inspectedPaths))) {
     throw new Error('Mock 清查范围未覆盖完整待交付差异/未跟踪文件及项目 Mock 配置入口');
   }
-  const currentNames = revision ? (await git(root, ['ls-tree', '-r', '--name-only', '-z', revision, '--', ...inspectedPaths])).split('\0').filter(Boolean)
+  const parseAs = path => !nonRuntime(path) && CODE.has(extname(path));
+  const committed = revision && await inspectRevisionFiles(root, revision, inspectedPaths, parseAs, declarations, io);
+  const currentNames = revision ? [...committed.keys()]
     : (await git(root, ['ls-files', '--cached', '--others', '--exclude-standard', '-z', '--', ...inspectedPaths])).split('\0').filter(Boolean);
   const baseNames = (await git(root, ['ls-tree', '-r', '--name-only', '-z', input.baseSha, '--', ...inspectedPaths])).split('\0').filter(Boolean);
   const names = unique([...ignoredRuntimePaths, ...currentNames, ...baseNames]);
@@ -70,12 +132,10 @@ export async function inspectMockSource(input, io = {}) {
   for (const path of names) {
     const absolute = resolve(root, path);
     if (!covered(path, inspectedPaths) || relative(root, absolute).startsWith('..')) throw new Error('Mock 清查路径超出仓库');
-    let data;
+    let hash, declaration;
     if (revision) {
-      if (!currentNames.includes(path)) { files.push([path, null]); continue; }
-      const mode = (await git(root, ['ls-tree', revision, '--', path])).split(/\s+/)[0];
-      if (mode === '120000' || mode === '160000') throw new Error('Mock revision 清查不接受符号链接或未展开子模块');
-      data = (await run('git', ['show', `${revision}:${path}`], { cwd: root, encoding: 'buffer', timeout: 30000, maxBuffer: 8 * 1024 * 1024 })).stdout;
+      if (!committed.has(path)) { files.push([path, null]); continue; }
+      ({ hash, declaration } = committed.get(path));
     } else {
       let stat;
       try { stat = await lstat(absolute); } catch (error) {
@@ -85,10 +145,11 @@ export async function inspectMockSource(input, io = {}) {
       if (stat.isSymbolicLink() || !(await realpath(absolute)).startsWith(root + '/')) throw new Error('Mock 清查不接受符号链接或仓库外路径');
       if (!stat.isFile()) continue;
       if (stat.size > 8 * 1024 * 1024) throw new Error('Mock 清查文件过大，需项目提供受审查的定向检查绑定');
-      data = await readFile(absolute);
+      const data = await readFile(absolute);
+      hash = sha256(data);
+      declaration = parseAs(path) ? declarations(path, data.toString('utf8')) : null;
     }
-    files.push([path, sha256(data)]);
-    const declaration = !nonRuntime(path) && CODE.has(extname(path)) ? declarations(path, data.toString('utf8')) : null;
+    files.push([path, hash]);
     if (declaration?.detected) {
       markedPaths.push(path);
       markerBindings.push({ path, moduleIds: declaration.moduleIds });
@@ -97,31 +158,26 @@ export async function inspectMockSource(input, io = {}) {
   if (input.mockBindingPaths.some(path => !names.some(name => name === path || name.startsWith(path + '/')))) {
     throw new Error('声明的项目 Mock/启动配置绑定路径不存在或未纳入版本清查');
   }
-  const contentFingerprint = sha256(stableJson(files));
-  const scopeFingerprint = sha256(stableJson({ baseSha: input.baseSha, inspectedPaths, files }));
-  return { sourceSha, inspectionKind: revision ? 'revision' : 'working-tree', baseSha: input.baseSha, inspectedPaths, contentFingerprint, scopeFingerprint,
+  const runtimeFiles = planPaths.length ? files.filter(([path]) => !planPaths.includes(path)) : files;
+  const contentFingerprint = sha256(stableJson(runtimeFiles));
+  const scopeFingerprint = sha256(stableJson({ baseSha: input.baseSha, inspectedPaths, files: runtimeFiles,
+    ...(planPaths.length ? { nonRuntimePlanPaths: planPaths } : {}) }));
+  const snapshot = { sourceSha, inspectionKind: revision ? 'revision' : 'working-tree', baseSha: input.baseSha, inspectedPaths, contentFingerprint, scopeFingerprint,
+    auditContentFingerprint: planPaths.length ? sha256(stableJson(files)) : contentFingerprint,
     changedPaths: unique([...changed, ...untracked]), ignoredRuntimePaths, fileFingerprints: Object.fromEntries(files), markedPaths: markedPaths.sort(), markerBindings, writes: 0 };
+  if (revision) remember(cache, cacheKey, structuredClone(snapshot), 16);
+  return snapshot;
 }
 
 async function verifyCommittedContent(safety, revision, io = {}) {
   const git = gitReader(io);
-  const run = (command, args, options) => runScopedCommand(command, args, options, io);
   if (!SHA.test(revision || '')) throw new Error('派生源码缺少准确 SHA');
   try { await git(safety.repositoryPath, ['merge-base', '--is-ancestor', safety.sourceSha, revision]); }
   catch { throw new Error('交付版本不能验证为原已检查版本的后继；不能机械更新 Mock 授权'); }
-  const names = unique([...(await git(safety.repositoryPath, ['ls-tree', '-r', '--name-only', '-z', safety.baseSha, '--', ...safety.inspectedPaths])).split('\0').filter(Boolean),
-    ...(await git(safety.repositoryPath, ['ls-tree', '-r', '--name-only', '-z', revision, '--', ...safety.inspectedPaths])).split('\0').filter(Boolean)]);
-  const files = [];
-  for (const path of names) {
-    try {
-      const value = await run('git', ['show', `${revision}:${path}`], { cwd: safety.repositoryPath, encoding: 'buffer', timeout: 30000, maxBuffer: 8 * 1024 * 1024 });
-      files.push([path, sha256(value.stdout)]);
-    } catch (error) {
-      if (/does not exist|exists on disk, but not in|not exist in/.test(String(error.stderr))) files.push([path, null]);
-      else throw new Error('交付版本文件内容不可核实');
-    }
+  const snapshot = await inspectMockSource({ ...safety, revisionSha: revision }, io);
+  if (snapshot.scopeFingerprint !== safety.scopeFingerprint || snapshot.contentFingerprint !== safety.contentFingerprint) {
+    throw new Error('交付提交与已确认的工作区/Mock 清查内容不等价');
   }
-  if (sha256(stableJson(files)) !== safety.contentFingerprint) throw new Error('交付提交与已确认的工作区/Mock 清查内容不等价');
 }
 
 async function verifyDeliveredSource(safety, revision, sourceSnapshot, io) {
@@ -139,7 +195,8 @@ async function verifyDeliveredSource(safety, revision, sourceSnapshot, io) {
   const preserved = unique([...(sourceSnapshot.changedPaths || []),
     ...unique([...Object.keys(sourceSnapshot.fileFingerprints || {}), ...Object.keys(target.fileFingerprints || {})])
       .filter(path => covered(path, bindingRoots))]);
-  if (preserved.some(path => sourceSnapshot.fileFingerprints?.[path] !== target.fileFingerprints?.[path])) {
+  const documents = reviewedDocuments(safety);
+  if (preserved.some(path => !documents.includes(path) && sourceSnapshot.fileFingerprints?.[path] !== target.fileFingerprints?.[path])) {
     throw new Error('目标分支改变了已批准源码或 Mock 启动配置；不能机械沿用原授权');
   }
   validateModules({ ...safety, productionSourceEvidence: evidence.productionSourceEvidence || safety.productionSourceEvidence }, target);
@@ -217,6 +274,7 @@ function checkTestAuthorization(safety, context, fingerprint) {
 }
 
 export async function checkMockSafety(safety, context, io = {}) {
+  io = { ...io, mockInspectionCache: io.mockInspectionCache || createMockInspectionCache() };
   if (!safety || safety.schemaVersion !== 1 || !text(safety.repositoryPath) ||
       !text(safety.sourceRepository) || !SHA.test(safety.sourceSha || '') || !SHA.test(safety.baseSha || '') ||
       !HASH.test(safety.scopeFingerprint || '') || !HASH.test(safety.contentFingerprint || '') ||
@@ -323,7 +381,8 @@ export { verifyProjectMockArtifact as verifyProductionMockArtifact } from './pro
 async function main() {
   const input = await readCliPlan();
   const result = input.action === 'inspect' ? await inspectMockSource(input)
-    : input.action === 'check' ? await checkMockSafetySet(input, input.context) : (() => { throw new Error('action 必须为 inspect 或 check'); })();
+    : input.action === 'baseline' ? await inspectMockBaseline(input)
+    : input.action === 'check' ? await checkMockSafetySet(input, input.context) : (() => { throw new Error('action 必须为 baseline、inspect 或 check'); })();
   process.stdout.write(JSON.stringify(result, null, 2) + '\n');
 }
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) main().catch(error => {

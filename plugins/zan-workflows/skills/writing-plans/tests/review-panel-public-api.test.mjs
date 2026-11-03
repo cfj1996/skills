@@ -7,7 +7,7 @@ const source = readFileSync(new URL('../scripts/inject-review-panel.js', import.
 const fixture = JSON.parse(readFileSync(new URL('./fixtures/review-session.json', import.meta.url), 'utf8'));
 
 // Minimal DOM adapter for the mounted public API. Browser assertions cover actual DOM events.
-function mountHarness({ fetchImpl } = {}) {
+function mountHarness({ fetchImpl, resumeSubmission = true } = {}) {
   const hosts = [];
   const storage = new Map();
   let writes = 0;
@@ -77,7 +77,7 @@ function mountHarness({ fetchImpl } = {}) {
   const moduleApi = context.PageDeliveryReviewPanel;
   const session = { ...structuredClone(fixture), viewScope: 'all', reviewRound: 1 };
   const submitted = moduleApi.reduceReviewState(moduleApi.createReviewState(session), { type: 'SUBMIT' });
-  const api = moduleApi.mountReviewPanel(session, { resumeSubmission: submitted.lastSubmission });
+  const api = moduleApi.mountReviewPanel(session, resumeSubmission ? { resumeSubmission: submitted.lastSubmission } : {});
   const result = {
     ...submitted.lastSubmission,
     results: [{ id: 'result-1', cardIds: submitted.cards.map(card => card.id), conclusion: '已确认',
@@ -93,6 +93,17 @@ function mountHarness({ fetchImpl } = {}) {
     confirmationListener: () => hosts[0].shadowRoot.querySelector('[data-action="confirm-plan"]').listeners.get('click'),
   };
 }
+
+test('a fresh panel displays the review while waiting for the first submission', () => {
+  const h = mountHarness({ resumeSubmission: false });
+  assert.equal(h.context.__PAGE_DELIVERY_REVIEW__, h.api);
+  assert.match(h.html(), /功能评审/);
+  assert.equal(h.api.getState().mode, 'input');
+  assert.equal(h.api.getState().lastError, null);
+  assert.equal(h.api.exportSubmission(), null);
+  assert.equal(h.api.getPlanConfirmationRequest(), null);
+  h.api.destroy();
+});
 
 test('mounted result API cannot select an action or expose mutable review state', () => {
   const h = mountHarness();

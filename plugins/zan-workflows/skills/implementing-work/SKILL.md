@@ -27,12 +27,12 @@ Consume the [same execution checklist](../../references/execution-checklist.md#�
 and existing definitions/brief/Plan. Return actual results to their bound scope;
 do not repeat global collection, ordinary preparation validation or user confirmation.
 
-Read [contracts.md](references/contracts.md),
-[development-rules.md](references/development-rules.md) and
-[变更与文档一致性](../../references/change-consistency.md), plus the
-[tool-routing policy](../../references/tool-routing.md) before editing.
-For Bugs also load [status and repair owner](references/bug-repair-owner.md)
-and [repair records](references/bug-repair-record.md). Load
+Use the verified handoff. Resolve missing input/branch constraints in
+[contracts.md](references/contracts.md) and [development rules](references/development-rules.md).
+Use [change consistency](../../references/change-consistency.md) for the actual delta and
+[tool routing](../../references/tool-routing.md) for the selected external operation.
+For Bugs use [status and repair owner](references/bug-repair-owner.md) at the pre-edit boundary
+and [repair records](references/bug-repair-record.md) when drafting/finalizing the record. Load
 [acceptance-scenarios.md](references/acceptance-scenarios.md) only for an
 ambiguous case or regression check.
 
@@ -49,8 +49,9 @@ For grouped work, first verify all definitions, their confirmed complete scope,
 repository/branch bindings and the same Bug or verified parent Story identity.
 Bug definitions also agree on the common status/repair-account facts.
 Deduplicate subprojects sharing the same repository and fixed branch; conflicting
-bindings block. Re-read every repository path, Git root, origin, refs, HEAD and
-working-tree status before the first write. One invalid definition blocks the Bug.
+bindings block. Re-read each repository's path, Git root, origin, refs, HEAD and
+working-tree status at its write boundary. When input and branch checks share that boundary,
+consume the same readback. One invalid definition blocks the Bug.
 
 For each repository, immediately before its source work refresh mutable Git
 facts. For `CREATE`, create the exact approved branch from the verified base
@@ -62,23 +63,11 @@ overlapping pre-existing edits block; preserve unrelated changes.
 Work directly on the fixed branch. Do not create a temporary branch/worktree,
 move implementation elsewhere, or stash/reset unrelated work.
 
-Apply [external dependencies](../../references/external-data-dependencies.md)
-and [Mock development](../../references/mock-development.md). Keep business
-questions separate from contract/configuration/environment facts and internal
-implementation evidence. Validate the approved current steps and stage, not
-future integration prerequisites unrelated to those steps. Preserve future
-blockers and never describe a partial UI/Mock result as the whole Story done.
-Every Mock has a stable `MOCK-*`/`MOCK_ONLY` identity, paths, scenarios, real-call
-boundary, configuration activation/reset and exit conditions in the same Plan/brief.
-Reuse the existing Query/Query Contract data path when connected; otherwise use the
-existing Mock or nearest feature-data boundary. Default to normal business data only;
-exception simulation needs explicit user, requirement or approved acceptance evidence.
-Keep Mock selection and controls in data/configuration, with no default product-page
-markers, panels or controls and no Mock-specific branch naming. Business hooks/stores
-and rules must not import Mock implementations or carry Mock flags/parameters. Use
-stable data interfaces and removable data/configuration files so exit does not require
-rewriting business callers or flows. Unknown
-contracts permit only approved feature-data fixtures, never invented HTTP facts.
+Check [external dependencies](../../references/external-data-dependencies.md) for the selected steps,
+keeping future integration blockers on the same brief/Plan. When Mock is actually in scope,
+apply [Mock development](../../references/mock-development.md): reuse the project's data boundary,
+bind removable fixtures/activation and state the real-call limits. Unknown contracts allow
+approved feature data only. Active Mock needs its own test-delivery authority.
 
 ## 2. Check scope, task links and Bug records
 
@@ -87,18 +76,11 @@ Plan. A brief covers behavior, exclusions, current evidence, ordered steps and
 verification. Small changes need no formal Plan, Task creation or estimate;
 existing formal Plan/Task requirements and blockers remain binding.
 
-For formal requirement Task/Plan work, apply the
-[task contract](../breaking-down-requirement/references/contracts.md): require
-`TASKS_READY`, real selected Task IDs, verified owners, positive final estimates,
-dependencies, acceptance and Plan `tapdTaskKey` links. Check current readbacks;
-stale scope/owner/hours or unmapped steps return to task preparation. Execute
-only selected Tasks on the original branch. A completed step does not authorize
-a Task status write. Show only one `N 小时` value. New/revised estimates must
-carry the current independent review under the
-[effort rules](../breaking-down-requirement/references/effort-estimation.md);
-unchanged historical Task hours use their verified retained binding. New scope
-or a needed total-effort change returns to affected Task assessment/review and
-confirmation. Internal remaining-work changes alone never update TAPD effort.
+Formal Task/Plan work follows the [task contract](../breaking-down-requirement/references/contracts.md).
+Require TASKS_READY, exact selected IDs/owners, final estimates, dependencies, acceptance and
+Plan tapdTaskKey links. Reuse current readbacks, estimate review and confirmation; a changed
+owner, total estimate, scope or unmapped step reopens only the affected task preparation.
+Internal remaining-work predictions do not write Task effort, dates or status.
 
 Bug work does not acquire requirement-only Task/Plan gates. Run the following
 once per Bug before any repository's source edits, using the complete approved
@@ -172,6 +154,10 @@ the assumption most likely to invalidate the approach first, then verify each
 slice before expanding. Concrete risks such as permissions, amounts, data
 consistency and shared interfaces determine failure, regression and compatibility
 coverage; a small diff does not lower that coverage.
+For a narrow presentation fix, reproduce the reported layout using the affected container
+and its real viewport before changing shared behavior. If introducing a component or import,
+first verify it resolves in the actual app. Add another viewport, data variant, or consumer
+only when it can expose a different failure or is a required acceptance case.
 
 Before verification, apply [local verification budgets](../../references/local-verification.md):
 inspect the project's runtime and actual script scope, then select the smallest
@@ -189,6 +175,11 @@ public behavior rather than mirror private implementation. Reuse valid evidence;
 repeat only checks invalidated by later changes. Record actual scope, results and
 gaps in memory, without workflow evidence files. Never report unrun, timed-out or
 resource-limited checks as passed.
+Run a stable set of selected local commands together with
+[`run-local-check --batch`](../../references/local-verification.md#已选检查合批).
+Share a common command across Tasks in this batch and carry its receipt to review.
+Reviewers use the actual diff and outcome for the same inputs. Human edits, a changed
+consumer, command, environment or acceptance condition reopen only affected evidence.
 
 ## 4. Review, prepare the final record and return
 

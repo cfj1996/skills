@@ -1,6 +1,6 @@
 # 功能评审运行协议
 
-本协议是主动选择 `reviewing-page-delivery` 后的唯一功能评审运行路径。消费项目的运行态不能替代本协议，也不能改变既有 ReviewSession、产物位置门禁或面板 JavaScript API。
+需求开发或独立的 `writing-plans` 在范围评审阶段选定 `PANEL` 后，按本协议挂载原型面板并收集提交。选择条件见[评审模式选择](../SKILL.md#评审模式选择)。
 
 ## 选择评审页面
 
@@ -10,8 +10,8 @@
 
 原型来源按 `scripts/resolve-prototype-source.js` 的固定规则分类：
 
-- 远程原型只接受不含内嵌账号密码的 HTTPS URL，并直接在 in-app Browser 打开。
-- 已有 `localhost`、`*.localhost`、`127.0.0.0/8` 或 `[::1]` URL 作为 loopback 页面直接打开。
+- 远程原型只接受不含内嵌账号密码的 HTTPS URL，使用 in-app Browser。
+- 已有 `localhost`、`*.localhost`、`127.0.0.0/8` 或 `[::1]` URL 可直接作为 loopback 页面。
 - 本地原型只接受绝对文件路径或本地 `file:` URL；先转换为临时 loopback 页面，
   不直接用 `file:` URL 执行评审。
 - 非 loopback HTTP、相对文件路径、`javascript:`、`data:` 和其他协议均阻塞。
@@ -26,9 +26,9 @@ python3 -m http.server <discovered-loopback-port> --bind 127.0.0.1 --directory "
 
 ## 打开 in-app Browser
 
-使用当前环境的 in-app Browser 工具打开选定原型；`browser:control-in-app-browser` 若可用也可使用，它不是必装依赖。远程 HTTPS 原型直接导航；
-本地文件使用上一步得到的 loopback URL。`browserOpened` 仅在当前 Codex in-app
-Browser 已打开该评审页面时为真。
+按[原型读取与标签页复用](../../../references/tool-routing.md#原型读取与标签页复用)先接回 Codex in-app Browser 中的目标页；
+若范围核对已使用该页，在原页继续。确认其中没有目标页时才打开远程 HTTPS 或已解析的 loopback URL。
+`browser:control-in-app-browser` 若可用也可使用，它不是必装依赖。只有确认当前 Codex in-app Browser 的目标页后，`browserOpened` 才为真。
 
 需要认证的远程原型复用该 in-app Browser 的现有登录态。若页面停在登录页，
 保持同一浏览器和目标地址，请用户完成登录后继续；不得换用搜索结果、抓取副本或
@@ -47,8 +47,8 @@ Browser 已打开该评审页面时为真。
 控制器的方法：它可能支持导航、无障碍树读取和点击，却不提供页面脚本执行；这不能证明当前会话
 没有其他 CDP 页面执行工具。
 
-若当前会话提供 Chrome DevTools/CDP 工具，先读取它可见的页面列表，再将目标与刚打开的 Codex
-in-app Browser 原型页对应起来。可用当前最终 URL 和页面标题在内存中比对；不要把含凭据或敏感
+若当前会话提供 Chrome DevTools/CDP 工具，先读取它可见的页面列表，再将目标与本次评审使用的 Codex
+in-app Browser 原型页对应起来。当前最终 URL 和标题只用于筛选候选；来自另一浏览器或仍有多页无法区分时，不得据此注入，也不新建同 URL 副本来探测连接。不要把含凭据或敏感
 查询参数的 URL 写入评审数据、日志或面向用户的诊断。CUA tab ID 与 CDP page ID 属于不同工具的
 标识，不得直接互换或假设二者指向同一页面。确认目标匹配后，才在该 CDP page ID 上执行页面脚本，
 并继续在同一原型页完成注入、挂载和提交读取。
@@ -123,17 +123,19 @@ Badge 区分状态，右侧展示当前详情。列表点击与上一个/下一�
 
 ## 挂载验证
 
-在给出任何评审结果前，于同一页面验证：host 存在、`host.shadowRoot` 存在，并且 `window.__PAGE_DELIVERY_REVIEW__` 可调用。记录下列可观察谓词，全部为真才可继续：
+在当前 in-app 原型页核对挂载就绪条件。
 
 ```text
 browserOpened
 && hostExists
 && shadowRootExists
 && reviewApiExists
-&& currentSubmissionReceived
 ```
 
-其中 `hostExists` 是 `document.querySelector("[data-page-delivery-review-host]")` 返回当前 host，`shadowRootExists` 是该 `host.shadowRoot` 存在，`reviewApiExists` 是 `window.__PAGE_DELIVERY_REVIEW__` 存在。任一项为假即为“评审阻塞”。
+`hostExists` 表示 `document.querySelector("[data-page-delivery-review-host]")` 返回当前 host，
+`shadowRootExists` 表示能通过 `host.shadowRoot` 读取开放的 Shadow Root，`reviewApiExists` 表示当前页可调用
+`window.__PAGE_DELIVERY_REVIEW__.exportSubmission()`。缺一项就报告具体挂载阻塞。
+四项齐全即表示面板已显示。新面板此时返回 `null` 属于正常等待，保留原页让用户逐项填写。
 
 ## 连接自动通知
 
@@ -225,6 +227,16 @@ submission.sessionId === reviewSession.sessionId
 
 ## 展示结果
 
+给出评审结果前，在同一页核对以下条件。最后一项来自按上节核实的本轮用户提交。
+
+```text
+browserOpened
+&& hostExists
+&& shadowRootExists
+&& reviewApiExists
+&& currentSubmissionReceived
+```
+
 读取本轮提交后，由 Agent 逐卡核对意见与证据，再在同一页面调用现有 API。
 不要把提交快照直接当评审结果。`results` 可以按主题汇总，但其 `cardIds` 的并集
 必须覆盖提交中的全部卡片；结果 ID 必须唯一，禁止引用本轮之外的卡片。
@@ -249,11 +261,8 @@ const next = window.__PAGE_DELIVERY_REVIEW__.applyResult({
 `submissionId` 是脚本为每次提交生成的独立身份，必须原样回传，不能重算或省略。
 遇到 `stale-result` 重新读取当前提交并重新评审；遇到 `invalid-results` 补齐本轮
 卡片覆盖及具体摘要后重试，不自动确认。
-
-
-仅当全部可观察谓词为真时，基于 `exportSubmission()` 的当前结果展示本轮评审卡、拟更新和后续确认门禁。仍然不得在确认前写 Plan，也不得在 reviewing 阶段生成 Draft OpenAPI。
-
-若 Browser、host、Shadow Root、临时 API 或当前提交任一证据缺失，明确报告“评审阻塞”、说明缺失谓词和可执行的恢复动作；不得把阻塞说明写成最终评审结论。
+保留本轮评审卡和拟更新内容，正式保存仍需独立确认。用户尚未提交时继续等待。
+用户已提交但无法读回匹配的快照时，保留现场并报告提交核验缺口。不得在 reviewing 阶段生成 Draft OpenAPI。
 
 ## 从范围评审进入正式保存
 

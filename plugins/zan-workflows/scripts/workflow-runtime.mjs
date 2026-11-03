@@ -7,8 +7,16 @@ const exec = promisify(execFile);
 // Cancellation and close verification belong to the caller's current request.
 export function runScopedCommand(command, args, options = {}, io = {}) {
   io.signal?.throwIfAborted();
-  const pending = exec(command, args, { ...options, ...(io.signal ? { signal: io.signal } : {}) });
+  const { stdin, ...execOptions } = options;
+  const pending = exec(command, args, { ...execOptions, ...(io.signal ? { signal: io.signal } : {}) });
   io.trackLocalChild?.(pending.child);
+  if (stdin !== undefined) {
+    const sent = new Promise((resolve, reject) => {
+      pending.child.stdin.once('error', reject);
+      pending.child.stdin.end(stdin, resolve);
+    });
+    return Promise.all([pending, sent]).then(([result]) => result);
+  }
   return pending;
 }
 
