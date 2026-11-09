@@ -35,11 +35,11 @@ Validate these invariants in order:
    `MM-DD: 中文简述`. Ambiguous/inaccessible existing evidence is blocked rather
    than delegated to the user as a required URL.
 2. Every canonical value has one cited, mutually consistent read-only source;
-   the successful body contains no `待补充`. The rendered link is derived from
-   the exact evidenced Jenkins Job name, not a repository name or alias. New
-   entry headings use `{序号}. Job：` before the link. Link text hides only
-   environment tokens such as `test` and `master` and their adjoining separator,
-   preserving business-name substrings. The full evidenced Job URL and original
+   the successful body contains no `待补充`. Apply the
+   [Job heading rules](../references/wiki-template.md#job-heading) per entry.
+   A linked heading uses `{序号}. Job：` and the exact evidenced Jenkins Job.
+   Link text hides only environment tokens such as `test` and `master` and
+   their adjoining separator, preserving business-name substrings. The full evidenced Job URL and original
    lookup name remain unchanged; for example, `front-vantix-system-test` is
    displayed as `front-vantix-system` while its URL still ends with
    `/job/front-vantix-system-test/`. After the display name, the link text
@@ -52,8 +52,11 @@ Validate these invariants in order:
    or a standalone Wiki-only request, absent deployment selections are valid;
    only already-evidenced parameters may be shown, with no parameter/build
    queries or deployment-only input requests. Permit only exact read-only Job
-   metadata lookup when its canonical URL is absent. Job name/URL and other canonical fields
-   remain required. Apply the `instant-apps/web/live-app` supplemental Job rule
+   metadata lookup for a known Job when its canonical URL is absent. When
+   no primary Job is mapped or its exact URL remains unverified under `SKIP`,
+   accept `{序号}. **!!#ff0000 {服务类型}!!**` and still require the other
+   canonical fields. `DEPLOY` requires the exact primary Job name and URL.
+   Apply the `instant-apps/web/live-app` supplemental Job rule
    in `wiki-template.md`: require one evidenced `front-jzan` link inside the same
    repository/branch entry, preserving its main Job heading and sequence. Do not
    require this link for unrelated apps or create another entry for it. A missing
@@ -89,9 +92,10 @@ Validate these invariants in order:
    and retained target/body readback whose material claims remain accurate;
    otherwise validate its normal creation, append or current-entry correction plan.
 5. A successful new entry contains every canonical field from
-   `references/wiki-template.md`, including `项目名称`, the exact Jenkins Job
-   link, and exactly one valid type-specific status: `是否上线：未合并` for a
-   business project at test submission; `当前版本：canary` for
+   `references/wiki-template.md`, including `项目名称`, the applicable Job
+   heading from step 2, and exactly one valid type-specific status. Use
+   `是否上线：未合并` for a business project at test submission,
+   `当前版本：canary` for
    tooling `canary` or `当前版本：latest` for tooling `official`. Tooling
    has no `是否上线` line. Under `TRIGGER_ACCEPTED`, preserve an evidenced prior
    channel or use `当前版本：待发布` when no publication is evidenced; this pending

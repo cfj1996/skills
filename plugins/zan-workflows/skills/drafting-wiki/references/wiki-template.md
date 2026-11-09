@@ -19,6 +19,20 @@ target-location, Wiki-ID, TAPD-comment, writeback, merge, or release narration.
 {项目状态行}
 ```
 
+## Job heading
+
+For a new entry, use the verified primary Job link when available. Under
+`SKIP` (including Wiki-only requests), a project with no mapped Job or no
+verifiable Job URL uses `{序号}. **!!#ff0000 {服务类型}!!**`. This is a complete
+heading with the same sequence and service marker. The other entry fields
+and any required supplemental Job links still apply. Preserve existing
+headings when reusing or patching an entry.
+
+Under `DEPLOY`, require the exact primary Job name and URL and the required
+build/release selections. For a known Job, use the exact URL from workspace
+knowledge, including a ready frozen contract matching the project and Job,
+or the exact read-only Job metadata lookup. Use only evidenced URLs.
+
 ## Preview boundary
 
 有实际交付限制时在验证结果后增加 `- 交付条件：…`，说明具体条件、依据和未完成项；
@@ -44,6 +58,7 @@ preview as a validated body.
 - 明确标注“执行前模板预览，尚未写入 Wiki”。已核实的项目、仓库、负责人、
   计划分支、影响范围和 Job 信息填实际值；分支未创建时在正文外说明计划动作。
   不把已有 Wiki/已完成登记当成尚未执行的新写入，也不改变其历史条目。
+  本轮不部署且没有已核实的主 Job 链接时，使用无 Job 链接的编号标题。
 - 最终序号、页面地址或字段尚未核实，写 `〈定位后确定〉` 或 `〈待核实：字段〉`；
   不猜 URL、人员、参数、状态或版本。模板预览不要求先有 `ReviewedChange`，
   不为填完模板提前调用正式提测流程或定位/创建月份页。
@@ -88,11 +103,9 @@ preview as a validated body.
   `SKIP`, render only parameters already evidenced in the current work context;
   missing build/release selections do not block the Wiki. Do not query build
   parameters/status or request deployment-only selections for skipped deployment.
-  A missing canonical Job URL may be resolved by the exact read-only Job
-  metadata lookup; that lookup must not trigger any build/deploy operation.
-  Still require an evidenced Job name/URL and the other canonical Wiki fields.
-  This query-like text is
-  only a display label, never a modification to the actual Job URL.
+  Apply the [Job heading](#job-heading) rules to resolve or omit the primary
+  link. Keep the query-like text in the display label and preserve the actual
+  Job URL.
   Examples:
   - `Job：[front-suppliers?platform=--suppliers](http://ops.jubaozan.cn/jenkins/job/front-suppliers-test/)`
   - `Job：[npm-tools?PROJECT_NAME=zan-lib&RELEASE_TYPE=release:canary](http://ops.jubaozan.cn/jenkins/job/npm-tools-test/)`

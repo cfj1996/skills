@@ -121,6 +121,29 @@ test('one authorized request carries the merged SHA, accepted queue and verified
   assert.equal(f.calls.length, count);
 });
 
+test('STANDARD with no Jenkins binding writes the Wiki and Task links without calling Jenkins', async t => {
+  const f = await fixture(t);
+  await assert.rejects(f.request('PLAN', {
+    ...f.input, release: { ...f.input.release, jobName: '', jobUrl: '' },
+  }), /准确 Job/);
+  assert.deepEqual(f.calls, []);
+
+  f.input.release = null;
+  const heading = '1. **!!#ff0000 更新服务!!**';
+  const body = f.oldBody + heading + entry.slice(entry.indexOf('\n'));
+  await writeFile(f.bodyFile, body);
+
+  const plan = await f.request('PLAN', f.input);
+  assert.equal(plan.state, 'AWAITING_CONFIRMATION');
+  const result = await f.run(plan);
+
+  assert.equal(result.state, 'SUBMITTED');
+  assert.deepEqual(result.receipts.release, { state: 'SKIPPED_BY_INTENT', writes: 0 });
+  assert.equal(f.pages.get('20').markdown_description, body);
+  assert.deepEqual(result.receipts.links.map(r => r.entryId), ['2', '3']);
+  assert.equal(f.calls.some(name => name.startsWith('jenkins_')), false);
+});
+
 test('a replaced Wiki pauses only the document and resumes on a newly reviewed patch without another merge or build', async t => {
   const f = await fixture(t, { replace: true });
   const plan = await f.request('PLAN', f.input), paused = await f.run(plan);

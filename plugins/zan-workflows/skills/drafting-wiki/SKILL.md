@@ -96,23 +96,20 @@ invent a value or render a placeholder.
    enumerate every Wiki page, or retry an unchanged query with a new limit or
    sort order. An ambiguous or unavailable result blocks instead of widening
    the search. Never ask the user for a Wiki target.
-4. Resolve and reconcile the current TAPD/change, repository, exact Jenkins
-   Job name and URL, selected build/release parameter names and values verified against
-   Jenkins definitions, project name, project category/service type, package
-   classification, developer, tester, description, scope, and original source
-   branch from current read-only evidence. Resolve applicable supplemental Wiki
-   Jobs separately under `wiki-template.md`; they do not expand the test-build
-   list or require deployment parameters or build receipts. Retain conflicts and block
-   unresolved required fields. Under `SKIP` (including a standalone Wiki-only
-   request), use only existing parameter evidence and omit unknown selections;
-   do not query Jenkins parameters/builds or ask for deployment-only inputs.
-   If the canonical Job URL is missing from knowledge, use the exact read-only
-   [Job lookup](../../scripts/resolve-jenkins-job.mjs), or the session's `job`
-   PLAN action. This metadata lookup is not a deployment. Missing selections
-   are allowed under `SKIP`, but the Job name/URL and other Wiki facts remain
-   required. An exact developer name already present in TAPD or the reviewed
-   handoff needs no team-roster or GitLab identity lookup; use the identity
-   skill only to resolve an actual missing or conflicting mapping.
+4. Resolve and reconcile the current TAPD/change, repository, project name,
+   project category/service type, package classification, developer, tester,
+   description, scope, and original source branch from current read-only
+   evidence. Apply the [Job heading rules](references/wiki-template.md#job-heading)
+   per entry. Under `SKIP` (including a standalone Wiki-only request), keep the
+   verified Job link when available and use the numbered heading without it
+   otherwise. Use only existing parameter evidence under `SKIP`. For an exact
+   mapped Job with no URL in knowledge, use the read-only
+   [Job lookup](../../scripts/resolve-jenkins-job.mjs) or the session's `job`
+   PLAN action. Resolve applicable supplemental Wiki Jobs separately. Retain
+   conflicts and block unresolved required fields. An exact developer name
+   already present in TAPD or the reviewed handoff needs no team-roster or
+   GitLab identity lookup; use the identity skill only for a missing or
+   conflicting mapping.
 5. Each project entry uses exactly one evidenced original `feature/*` or
    `fixbug/*` branch, paired with its verified repository (`entryRepoUrl`).
    Never use `merge/*`. The page may contain multiple branches and the same

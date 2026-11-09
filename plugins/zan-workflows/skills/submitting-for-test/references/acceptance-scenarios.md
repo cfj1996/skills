@@ -45,7 +45,8 @@
 | Month does not exist | Create/read the `YYYY-MM` month under root `1150372234001008260`, then derive/create/read the child under the same consolidated authorization. |
 | Planned payload writes entry body to the month page | Block before write; canonical content belongs only in the child Wiki. |
 | Existing child has front-end entries | Calculate maximum canonical sequence plus one without asking the user for the sequence. |
-| Jenkins Job name or URL is unresolved | Block the Wiki draft; never use a repository name, alias, or guessed URL. |
+| `STANDARD` with `SKIP` and no verified primary Jenkins Job link | Create or update the Wiki with its required project, branch and status fields. New entries use a numbered heading without the primary Job link. |
+| Selected deployment with no verified Jenkins Job name/URL | Block the selected delivery plan before writes. |
 | The submitted tooling/library project has a verified canary release | Write/read back `当前版本：canary`; omit `是否上线`. |
 | The submitted tooling/library project has a verified official release | Write/read back `当前版本：latest`; omit `是否上线`. |
 | Tooling submission accepted without actual publication | Preserve an evidenced current channel or use 当前版本：待发布; never treat queue acceptance as canary publication. |
