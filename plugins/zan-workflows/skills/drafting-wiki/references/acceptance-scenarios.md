@@ -27,8 +27,10 @@
 | `SKIP` for a tooling library, only `PROJECT_NAME=zan-lib` is evidenced and a valid prior current-version field exists | Render `npm-tools?PROJECT_NAME=zan-lib` and preserve `当前版本`; do not invent or require `RELEASE_TYPE`. |
 | `DEPLOY` for a tooling library with unresolved required `RELEASE_TYPE` | Block; the `SKIP` exception must not weaken deployment validation. |
 | Only a branch parameter is evidenced under `SKIP` | Omit that parameter and the empty `?` suffix; retain the original source branch in its dedicated field. |
-| Jenkins Job name or URL cannot be resolved from evidence | Block and emit no final body; never substitute a repository name, alias, or guessed URL. |
-| Create or append an entry covering `instant-apps/web/live-app` | Keep the main test Job and include one evidenced `front-jzan` associated Job link in the same entry; no extra test build or deployment inputs. |
+| Wiki-only or `SKIP`, no project Job binding | Validate the numbered heading with the service marker and all other required fields. Create or append the entry without a primary Job link or a Jenkins call for that Job. |
+| `SKIP`, exact configured Job URL unavailable after lookup | Use the numbered heading without the primary link; report the URL as unverified in the draft's evidence. |
+| `DEPLOY`, Job name or URL cannot be resolved from evidence | Block and emit no final body; require the exact configured Job. |
+| Create or append an entry covering `instant-apps/web/live-app` | Use the applicable primary heading and include one evidenced `front-jzan` associated Job link in the same entry; no extra test build or deployment inputs. |
 | Reuse a live-app entry missing `front-jzan`, including a non-functional continuation | Add only the required associated Job line with its evidenced URL; preserve the heading, sequence, repository/branch and unrelated entries. A complete existing link is reused without duplication. |
 | Only another `instant-apps` app is in scope | Do not add `front-jzan` solely because the repository matches. |
 | The project is a business project at test submission | Render `是否上线：未合并`. |

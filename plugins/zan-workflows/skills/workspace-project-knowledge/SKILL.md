@@ -358,14 +358,13 @@ Workflow:
    resolver checks actual submitted values, not just labels. Missing/unavailable records
    or ambiguous profiles block deployment until the separate maintenance sync succeeds;
    do not query Jenkins parameters, parse them from XML or auto-refresh at execution.
-3. When an indexed URL is absent, use the read-only
+3. Resolve the URL from `jenkins_job_urls` or the ready frozen contract for
+   the exact mapped project and Job. If knowledge lacks it, use the read-only
    [Job resolver](../../scripts/resolve-jenkins-job.mjs) or session `job` PLAN
-   action: query the selected instance and exact Job name, restricted to its
-   known folder with no recursive traversal. Missing `jenkins_job_urls` is
-   a lookup task, not proof the URL is unavailable. Return the exact Job name
-   and the exact Job URL indexed under that Job name or read back from
-   Jenkins, and the routing evidence. A consumer that needs a clickable Job
-   link must block when the URL cannot be evidenced; it must not derive one.
+   action: query the selected instance and exact Job name in its known folder,
+   without recursive traversal. Return the evidenced Job name, URL and routing evidence. A consumer
+   requiring a clickable Job link blocks if the URL cannot be verified. For
+   Wiki consumers, apply the [Job heading rules](../drafting-wiki/references/wiki-template.md#job-heading).
 4. If a project is not listed in `jenkins_jobs`, say it is not listed in the workspace index; do not guess a `front-*-test` name.
 5. For public libraries and tooling packages, check whether they map to the shared `npm-tools-test` job.
 6. For Wiki consumers, apply the scoped supplemental Job rules in

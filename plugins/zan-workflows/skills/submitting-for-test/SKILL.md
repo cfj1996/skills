@@ -235,8 +235,10 @@ stage transitions do not start new private validators.
    Job/environment/channel/parameters and availability readback in this plan.
    Missing or drifted facts reopen only affected checks; UNKNOWN is not replayable.
 3. Under `STANDARD`, pass the resolved `DEPLOY|SKIP` and available parameter
-   evidence to `zan-workflows:drafting-wiki`, invoke it read-only, and require
-   either one complete prepared target/body plan for the joint review in step 4 or a
+   evidence to `zan-workflows:drafting-wiki`. For a `SKIP` row without a
+   verified primary Job link, use the [numbered Wiki heading without a link](../drafting-wiki/references/wiki-template.md#job-heading).
+   Invoke the drafter read-only and require either one complete prepared
+   target/body plan for the joint review in step 4 or a
    `SKIPPED_BY_POLICY` result proven to be `NON_FUNCTIONAL_CONTINUE` with a
    verified owner page/current repository+branch entry and retained exact
    target/body readback. No historical page/entry uses the normal draft path. Under
@@ -336,9 +338,9 @@ stage transitions do not start new private validators.
      or retrigger a build to correct a displayed link. Queue acceptance proves neither
      deployment nor publication, and supplies no actual npm version;
    - `SKIP`: make no Jenkins build/deploy/parameter/queue/log call and record
-     `SKIPPED_BY_INTENT`. Only a STANDARD Wiki's missing canonical Job URL
-     permits the earlier exact read-only metadata lookup. NO_WIKI+SKIP has no
-     reason to load or call Jenkins.
+     `SKIPPED_BY_INTENT`. Only a STANDARD Wiki with a known Job and missing
+     canonical URL permits the earlier exact read-only metadata lookup.
+     NO_WIKI+SKIP has no reason to load or call Jenkins.
    `FAILED|UNKNOWN` blocks every later Wiki/TAPD write.
 8. Only after every required repository passes Git containment and
    `BUILD_SUBMITTED|DEPLOYED|RELEASED|SKIPPED_BY_INTENT`, execute the authorized Wiki plan under

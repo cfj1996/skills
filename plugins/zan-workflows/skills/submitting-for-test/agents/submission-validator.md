@@ -118,7 +118,9 @@ each repository's code review, explicit human authority or final readbacks.
   business project, or `当前版本：canary|latest|待发布` for a
   tooling/library project. With `BUILD_SUBMITTED`, preserve an evidenced prior
   channel or use `当前版本：待发布` when absent. Queue acceptance must not be
-  converted into publication evidence. `SKIP` keeps its existing evidence rules.
+  converted into publication evidence. Under `SKIP`, accept the [Wiki heading without
+  a primary Job link](../../drafting-wiki/references/wiki-template.md#job-heading)
+  for an entry without a verified link.
   The final result retains the
   actual child ID/URL plus source-branch identity for `going-live`.
 - Under `STANDARD`, a drafter result with

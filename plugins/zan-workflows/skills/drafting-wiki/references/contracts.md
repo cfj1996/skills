@@ -10,9 +10,9 @@
 | Target plan | For `VALIDATED`, `REUSE_EXISTING|CREATE_CHILD|CREATE_MONTH_AND_CHILD`, workspace, root/month/child identity, title, creator, and evidence; exact URL/ID/body/hash when reusing. A policy skip requires the verified owner page, matching repository/branch entry and exact target/body readback for `going-live`. |
 | Claims | resolved value and read-only source for each material field |
 | Conflicts | competing values, sources, criticality |
-| Deployment context | Resolved `DEPLOY|SKIP`; a standalone Wiki-only request uses `SKIP` for parameter requirements. |
+| Deployment context | Resolved `DEPLOY|SKIP`; a standalone Wiki-only request uses `SKIP` for the Job heading and parameter rules. |
 | Shared ownership | owner Story/Bug type/ID/workspace, Task parent readback, ownership discovery evidence, included repository/branch entries, one target/body and all owner/Task comment targets; see [shared-test-wiki.md](../../../references/shared-test-wiki.md) |
-| Current entry | sequence, Jenkins Job name/URL, applicable Wiki-only supplemental Job names/URLs, selected build/release parameter names and values (only already-evidenced selections required under `SKIP`), project name, project category/service type, repository, developer, description, branch, scope, tester, business merge status or tooling current-version channel and release evidence |
+| Current entry | sequence, primary Job evidence per the heading rules, applicable Wiki-only supplemental Job names/URLs, selected build/release parameter evidence, project name, project category/service type, repository, developer, description, branch, scope, tester, business merge status or tooling current-version channel and release evidence |
 | Work mode | `INITIAL|CONTINUE`, impact classification, and incremental-scope evidence when continuing |
 | Wiki decision | `UPDATE|SKIP_NON_FUNCTIONAL` and normalized reason |
 | Placement | For `VALIDATED`, `NEW_FRONTEND_SECTION|APPEND_ENTRY|UPDATE_ENTRY` (legacy `APPEND_IMPACT_SCOPE` only for a genuinely append-only patch), `# 前端` evidence, matching-entry evidence, and sequence calculation; for a policy skip, the skip decision evidence |
@@ -64,13 +64,11 @@
   names and values according to `wiki-template.md`, and preserve the exact Job URL.
   Never substitute a repository name or alias. The red service marker is `更新服务` for business projects
   and `工具服务-无需上线` for tooling/library projects.
-- Under `SKIP`, absent build/release selections do not block validation. Render
-  only already-evidenced parameters, omitting the `?` suffix when none remain.
-  Do not query Jenkins parameters/builds or require deployment-only inputs;
-  exact read-only Job metadata lookup is permitted solely to evidence the
-  required canonical URL when knowledge lacks it. No build/deploy is triggered;
-  Job name/URL and other canonical facts remain required. Under `DEPLOY`,
-  required selections must still be resolved and checked against definitions.
+- Apply the [Job heading rules](wiki-template.md#job-heading) to each new
+  entry. Under `SKIP`, the primary link may be omitted when no Job is mapped
+  or no exact URL is verified. Use only already-evidenced parameters and
+  exact Job metadata reads when needed. Under `DEPLOY`, require the exact
+  Job name/URL and resolve the required selections against fixed definitions.
 - For `CONTINUE`, classify the current-round change from reviewed diff and
   implementation/verification evidence as `FUNCTIONAL_IMPACT` or
   `NON_FUNCTIONAL`. Ambiguous classification blocks.

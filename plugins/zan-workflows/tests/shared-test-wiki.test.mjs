@@ -15,7 +15,7 @@ const title = '10-20: 直播间按钮调整', month = '2026-10';
 const url = id => `https://www.tapd.cn/${workspaceId}/markdown_wikis/show/#${id}`;
 const response = (kind, rows) => ({ content: [{ type: 'text', text: JSON.stringify({ status: 1,
   data: rows.map(row => ({ [kind]: row })) }) }] });
-const entry = (n, repo, branch) => `${n}. Job：[live](https://jenkins.example.com/job/live/)\n- 项目名称：[live](${repo})\n- 代码分支名：${branch}\n- 影响范围：\n  1. 保留当前项目范围\n- 是否上线：未合并\n`;
+const entry = (n, repo, branch, heading = 'Job：[live](https://jenkins.example.com/job/live/)') => `${n}. ${heading}\n- 项目名称：[live](${repo})\n- 代码分支名：${branch}\n- 影响范围：\n  1. 保留当前项目范围\n- 是否上线：未合并\n`;
 const bodyA = `# 前端\n\n${entry(1, repoA, branchA)}`;
 
 function fixture() {
@@ -71,26 +71,35 @@ async function withBody(body, fn) {
   finally { await rm(dir, { recursive: true, force: true }); }
 }
 
-test('two sibling Tasks create one Story Wiki, append per project and link the same page idempotently', async () => {
+test('sibling Tasks with and without Jenkins share one created Wiki and link it idempotently', async () => {
   const f = fixture();
-  const first = await ensureTestWiki(f.call, input());
+  const headingWithoutJob = '**!!#ff0000 更新服务!!**';
+  const firstInput = { ...input(), entryHeading: `1. ${headingWithoutJob}` };
+  const firstBody = `# 前端\n\n${entry(1, repoA, branchA, headingWithoutJob)}`;
+  const first = await ensureTestWiki(f.call, firstInput);
   assert.equal(first.wikiTitle.replace(/^\d\d-\d\d: /, ''), '直播间按钮调整');
   assert.deepEqual(first.wikiOwner, { entryType: 'stories', entryId: story });
   assert.equal(first.commentOperations.length, 2);
-  await withBody(bodyA, bodyFile => ensureTestWiki(f.call, { ...input(), ...binding(first), bodyFile }));
+  assert.equal(first.state, 'PLANNED_CREATE_CHILD');
+  const created = await withBody(firstBody, bodyFile =>
+    ensureTestWiki(f.call, { ...firstInput, ...binding(first), bodyFile }));
+  assert.equal(created.wikiState, 'CREATED');
   const second = await ensureTestWiki(f.call, input(taskB, branchB, repoB));
   assert.equal(second.target, 'REUSE_EXISTING');
   assert.equal(second.entryOperation, 'APPEND_ENTRY');
   assert.equal(second.state, 'PLANNED_APPEND_ENTRY');
-  assert.equal(second.beforeBody, bodyA);
+  assert.equal(second.beforeBody, firstBody);
   await assert.rejects(ensureTestWiki(f.call, { ...input(taskB, branchB, repoB), ...binding(second) }), /完整正文/);
-  const combined = `${bodyA}\n${entry(2, repoB, branchB)}`;
+  const combined = `${firstBody}\n${entry(2, repoB, branchB)}`;
   await withBody(combined, async bodyFile => {
     const result = await ensureTestWiki(f.call, { ...input(taskB, branchB, repoB), ...binding(second), bodyFile });
     assert.equal(result.wikiId, wikiId);
     const repeated = await ensureTestWiki(f.call, { ...input(taskB, branchB, repoB), ...binding(second), bodyFile });
     assert.equal(repeated.writes, 0);
   });
+  const reused = await ensureTestWiki(f.call, { ...firstInput, execute: true });
+  assert.equal(reused.writes, 0);
+  assert.equal(reused.entryOperation, 'REUSE_ENTRY');
   assert.equal(f.wikis.get(wikiId).markdown_description, combined);
   assert.equal(f.writes().filter(c => c.name === 'create_wiki').length, 1);
   for (const key of [`stories:${story}`, `tasks:${taskA}`, `tasks:${taskB}`]) {
