@@ -232,10 +232,13 @@ export function wikiIdsFromComments(comments, workspaceId) {
       if (marker < 0) continue;
       let marked = lines[i].slice(marker);
       if (/^提测\s*(?:wiki|文档)\s*[:：]?\s*$/i.test(marked)) marked += lines[i + 1] || '';
-      const pattern = /https?:\/\/(?:www\.)?tapd\.cn\/(\d+)\/markdown_wikis\/show\/(?:#|%23)(\d+)/gi;
-      for (const match of marked.matchAll(pattern)) {
-        if (match[1] === String(workspaceId)) ids.add(match[2]);
-        else otherWorkspace.add(match[1]);
+      const pattern = /https?:\/\/(?:www\.)?tapd\.cn\/(\d+)\/markdown_wikis\/show\/(\d+)?(?:#|%23)(\d+)/gi;
+      for (const [, linkWorkspaceId, pathWikiId, wikiId] of marked.matchAll(pattern)) {
+        if (pathWikiId && pathWikiId !== wikiId) {
+          throw new Error('提测 Wiki 链接的路径 ID 与锚点 ID 不一致');
+        }
+        if (linkWorkspaceId === String(workspaceId)) ids.add(wikiId);
+        else otherWorkspace.add(linkWorkspaceId);
       }
     }
   }

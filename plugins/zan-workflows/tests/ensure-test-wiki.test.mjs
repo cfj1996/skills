@@ -20,6 +20,7 @@ const childId = '1150372234001015611';
 const month = '2026-09';
 const title = '09-24: 门店发货单前端适配';
 const url = `https://www.tapd.cn/${workspaceId}/markdown_wikis/show/#${childId}`;
+const copiedUrl = url.replace('/#', `/${childId}#`);
 const originalBody = `# 前端\n- 代码分支名：${branch}`;
 
 function plainResponse(kind, rows) {
@@ -288,6 +289,36 @@ test('reuses an owner-linked existing child and blocks a conflicting linked Wiki
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
+test('preflight reuses a copied TAPD Wiki URL and skips a duplicate backlink', async () => {
+  const fake = makeFake({ childExists: true });
+  fake.comments.push({ id: '1', description: `<p>后端提测。提测文档：<a href="${copiedUrl}">Wiki</a></p>` });
+  const runInput = { ...existingInput(undefined), sourceBranch: 'feature/alice.frontend', execute: false };
+  const preview = await ensureTestWiki(fake.call, runInput);
+  assert.equal(preview.state, 'PLANNED_APPEND_ENTRY');
+  assert.equal(preview.target, 'REUSE_EXISTING');
+  assert.equal(preview.wikiUrl, url);
+  assert.equal(preview.commentOperation, 'NONE');
+
+  fake.comments.push({ id: '2', description: `提测wiki：${url}` });
+  const mixed = await ensureTestWiki(fake.call, runInput);
+  assert.deepEqual(mixed.commentEvidence.wikiIds, [childId]);
+  assert.equal(mixed.commentOperation, 'NONE');
+  assert.equal(writes(fake).length, 0);
+});
+
+test('preflight blocks copied Wiki URLs with conflicting IDs or a different workspace', async () => {
+  const invalidLinks = [
+    [copiedUrl.replace(`#${childId}`, '#2002'), /路径 ID 与锚点 ID 不一致/],
+    [copiedUrl.replace(`/${workspaceId}/`, '/999/'), /其他 TAPD 空间/],
+  ];
+  for (const [invalidUrl, message] of invalidLinks) {
+    const fake = makeFake({ linked: true });
+    fake.comments.push({ id: '2', description: `提测文档：${invalidUrl}` });
+    await assert.rejects(ensureTestWiki(fake.call, { ...existingInput(undefined), execute: false }), message);
+    assert.equal(writes(fake).length, 0);
+  }
+});
+
 test('requires an evidenced root Wiki for another workspace before creating', async () => {
   const fake = makeFake();
   await assert.rejects(
@@ -343,7 +374,7 @@ test('discovers an existing Wiki without creation inputs', async () => {
 });
 
 test('reuses a detail-only Wiki from a prior month and writes only its comment', async () => {
-  const fake = makeFake({ childExists: true, description: `提测wiki：[${url}](${url})` });
+  const fake = makeFake({ childExists: true, description: `提测wiki：[${copiedUrl}](${copiedUrl})` });
   fake.wikis.get(childId).name = '08-24: 门店发货单前端适配';
   const runInput = { ...existingInput(undefined), wikiTitle: fake.wikis.get(childId).name, month: '2026-10' };
   const result = await ensureTestWiki(fake.call, runInput);
@@ -351,6 +382,7 @@ test('reuses a detail-only Wiki from a prior month and writes only its comment',
   assert.equal(result.wikiState, 'UNCHANGED');
   assert.equal(result.commentState, 'LINKED');
   assert.deepEqual(writes(fake).map(call => call.name), ['create_comments']);
+  assert.equal(fake.comments[0].description, `提测wiki：[${url}](${url})`);
   assert.ok(fake.calls.filter(call => call.name === 'get_wiki').every(call => call.args.options.id === childId));
 });
 
