@@ -27,7 +27,9 @@ export async function inspectTargetContainment(input, io = {}) {
     const target = await run('git', ['rev-parse', `refs/remotes/origin/${input.targetBranch}`], { cwd: input.repositoryPath });
     const targetSha = target.stdout.trim();
     try {
-      await run('git', ['merge-base', '--is-ancestor', input.sourceSha, targetSha], { cwd: input.repositoryPath });
+      for (const revision of new Set([input.sourceSha, input.expectedDeliveredSha].filter(Boolean))) {
+        await run('git', ['merge-base', '--is-ancestor', revision, targetSha], { cwd: input.repositoryPath });
+      }
       return { contained: true, targetSha };
     } catch (error) {
       if (error.code === 1) {
@@ -123,6 +125,10 @@ function checkDefaultTarget(project, input) {
 
 export function mergeRequiredTools(input) {
   const mode = mergeMode(input);
+  if (input.expectedDeliveredSha !== undefined &&
+      (mode !== 'VERIFY_ONLY' || !SHA.test(input.expectedDeliveredSha))) {
+    throw new Error('固定历史交付 SHA 只适用于原 MR 的只读核验');
+  }
   if (mode === 'CONTAINMENT_ONLY') return ['get_branch', 'get_project'];
   return ['get_branch', 'get_project', 'get_merge_request', 'list_merge_requests',
     ...(input.execute && !input.mrIid ? ['create_merge_request'] : []),
@@ -294,13 +300,17 @@ export async function mergeReviewedBranch(call, input, io = {}) {
     const pipeline = merged.head_pipeline || merged.pipeline;
     if ((plan.pipelineRequired && pipeline?.status !== 'success') ||
         (pipeline && !['success', 'skipped'].includes(pipeline.status))) throw new Error('已合并 MR 的当前 CI 未验证通过');
+    const deliveredSha = merged.merge_commit_sha || plan.sourceSha;
+    if (plan.expectedDeliveredSha && deliveredSha !== plan.expectedDeliveredSha) {
+      throw new Error('原 MR 的实际交付 SHA 与回执不一致');
+    }
     phase = 'VERIFY_CONTAINMENT';
     const proof = await (io.containsSource || containsSource)(plan, io);
     if (proof?.contained !== true || !SHA.test(proof.targetSha || '')) throw new Error('源提交未验证包含在目标分支');
     result.containment = true;
     return { ...result, state: 'MERGED', observedTargetSha: proof.targetSha,
       defaultBranch: project.default_branch, defaultTargetVerified: project.default_branch === input.targetBranch,
-      deliveredSha: merged.merge_commit_sha || plan.sourceSha, mergeCommitSha: merged.merge_commit_sha || null };
+      deliveredSha, mergeCommitSha: merged.merge_commit_sha || null };
   } catch (error) {
     error.result = { ...result, phase, error: error.message };
     throw error;

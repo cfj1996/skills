@@ -9,6 +9,7 @@ import { createHash, randomUUID } from 'node:crypto';
 export const pluginRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export const limits = Object.freeze({ runs: 100, bytes: 1048576, revisions: 10, input: 32768 });
 const runPattern = /^run-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const feedbackSlot = 'feedback-overflow';
 const types = new Set(['stage_started', 'stage_finished', 'action_started', 'action_finished',
   'confirmation_requested', 'user_correction', 'wait_started', 'wait_finished',
   'session_closed', 'coverage_gap', 'interrupted', 'run_finished', 'retry']);
@@ -83,8 +84,15 @@ export function runDirectory(runId, options = {}) {
   const root = privateDirectory(dataDirectory(options));
   const runs = privateDirectory(join(root, 'runs'));
   const path = join(runs, runId);
-  const stat = fs.lstatSync(path);
-  if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error('运行目录无效');
+  try { return checkedDirectory(path); }
+  catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+    return checkedDirectory(join(checkedDirectory(join(root, feedbackSlot)), runId));
+  }
+}
+
+function checkedDirectory(path) {
+  if (!fs.lstatSync(path).isDirectory()) throw new Error('运行目录无效');
   return path;
 }
 
@@ -116,24 +124,50 @@ export function pluginIdentity(root = pluginRoot) {
 export function startRun(input = {}, options = {}) {
   if (process.env.ZAN_WORKFLOWS_RECORDING === 'off' && !options.force) return { state: 'DISABLED' };
   if (!/^[a-z][a-z0-9-]{0,63}$/.test(input.skill || '')) throw new Error('需要准确技能名称');
+  const feedbackOnly = input.feedbackOnly === true;
+  if (input.feedbackOnly !== undefined && (!feedbackOnly || input.skill !== 'report-execution')) {
+    throw new Error('备用记录仅供显式的 report-execution 反馈使用');
+  }
   if (input.parentRunId !== undefined) runDirectory(input.parentRunId, options);
-  const runs = privateDirectory(join(privateDirectory(dataDirectory(options)), 'runs'));
-  if (fs.readdirSync(runs).filter(name => runPattern.test(name)).length >= limits.runs) {
+  const root = privateDirectory(dataDirectory(options)), runs = privateDirectory(join(root, 'runs'));
+  const full = fs.readdirSync(runs).filter(name => runPattern.test(name)).length >= limits.runs;
+  if (full && !feedbackOnly) {
     throw new Error('本地已保留 100 次运行；请先导出并清理不再需要的诊断记录');
   }
-  const runId = 'run-' + randomUUID(), dir = join(runs, runId);
+  const runId = 'run-' + randomUUID(), parent = full ? join(root, feedbackSlot) : runs, dir = join(parent, runId);
   const metadata = { schemaVersion: 1, runId, startedAt: new Date().toISOString(),
     plugin: pluginIdentity(options.pluginRoot || pluginRoot), skill: input.skill,
     goal: redactText(input.goal), project: redactText(input.project, 100),
     ...(input.parentRunId ? { parentRunId: input.parentRunId } : {}),
-    coverage: input.coverage === 'DELIVERY_ONLY' ? 'DELIVERY_ONLY' : 'PARTIAL',
+    ...(feedbackOnly ? { feedbackOnly: true } : {}),
+    coverage: !feedbackOnly && input.coverage === 'DELIVERY_ONLY' ? 'DELIVERY_ONLY' : 'PARTIAL',
     host: { name: redactText(input.host?.name || 'unknown', 60),
       version: redactText(input.host?.version || 'unknown', 80), model: redactText(input.host?.model || 'unknown', 100) },
     runtime: { node: process.version, platform: process.platform, arch: process.arch } };
-  fs.mkdirSync(dir, { mode: 0o700 });
-  writePrivateFile(join(dir, 'run.json'), JSON.stringify(metadata) + '\n', { exclusive: true });
-  writePrivateFile(join(dir, 'events.jsonl'), '', { exclusive: true });
-  return { state: 'RECORDING', runId };
+  if (full) {
+    // Claim one reserved slot atomically; it never replaces an older report.
+    try { fs.mkdirSync(parent, { mode: 0o700 }); }
+    catch (error) {
+      if (error.code === 'EEXIST') throw new Error('反馈备用槽已占用；请先导出并清理不再需要的备用记录目录');
+      throw error;
+    }
+  }
+  let created = false;
+  try {
+    fs.mkdirSync(dir, { mode: 0o700 });
+    created = true;
+    writePrivateFile(join(dir, 'run.json'), JSON.stringify(metadata) + '\n', { exclusive: true });
+    const gap = feedbackOnly ? JSON.stringify({ schemaVersion: 1, at: metadata.startedAt, type: 'coverage_gap',
+      source: 'agent_summary', stage: 'collection', code: full ? 'RUN_CAPACITY_REACHED' : 'ORIGINAL_RUN_MISSING',
+      summary: full ? '常规诊断记录已满。本记录只保留脱敏反馈摘要，原流程的执行器耗时未采集。'
+        : '本记录只保留脱敏反馈摘要，原流程的执行器耗时未采集。' }) + '\n' : '';
+    writePrivateFile(join(dir, 'events.jsonl'), gap, { exclusive: true });
+  } catch (error) {
+    if (created) fs.rmSync(dir, { recursive: true });
+    if (full) fs.rmdirSync(parent);
+    throw error;
+  }
+  return { state: 'RECORDING', runId, ...(feedbackOnly ? { feedbackOnly } : {}) };
 }
 
 export function recordEvent(runId, input, options = {}) {
@@ -141,6 +175,10 @@ export function recordEvent(runId, input, options = {}) {
   if (!types.has(input?.type) || !sources.has(input?.source)) throw new Error('事件类型或证据来源无效');
   if (input.type === 'run_finished' && !outcomes.has(input.outcome)) throw new Error('运行结局无效');
   const dir = runDirectory(runId, options);
+  const { feedbackOnly } = readPrivateJson(join(dir, 'run.json'), 32768);
+  if (feedbackOnly && (input.source === 'executor' || input.type === 'run_finished' && input.outcome !== 'UNKNOWN')) {
+    throw new Error('备用反馈只接受摘要与用户反馈，原流程结局保持 UNKNOWN');
+  }
   // Enforce an explicit terminal event; a process close does not finish the user's task.
   if (fs.existsSync(join(dir, 'finished.json'))) throw new Error('运行已结束；请新建关联运行记录后续工作');
   const event = { schemaVersion: 1, at: new Date().toISOString(), type: input.type, source: input.source };
@@ -153,7 +191,7 @@ export function recordEvent(runId, input, options = {}) {
     event.artifactUrl = redactText(url.href, 2000);
   }
   for (const field of ['elapsedMs', 'idleBeforeMs', 'busyMs', 'idleMs', 'requestCount']) {
-    if (Number.isSafeInteger(input[field]) && input[field] >= 0) event[field] = input[field];
+    if (!feedbackOnly && Number.isSafeInteger(input[field]) && input[field] >= 0) event[field] = input[field];
   }
   const path = join(dir, 'events.jsonl'), line = JSON.stringify(event) + '\n';
   const fd = fs.openSync(path, constants.O_WRONLY | constants.O_APPEND | (constants.O_NOFOLLOW || 0));
@@ -188,9 +226,12 @@ export function readRun(runId, options = {}) {
 }
 
 export function listRuns(options = {}) {
-  const path = join(dataDirectory(options), 'runs');
-  if (!fs.existsSync(path)) return [];
-  return fs.readdirSync(privateDirectory(path)).filter(name => runPattern.test(name)).map(runId => {
+  const root = dataDirectory(options);
+  const ids = ['runs', feedbackSlot].flatMap(name => {
+    const path = join(root, name);
+    return fs.existsSync(path) ? fs.readdirSync(checkedDirectory(path)).filter(value => runPattern.test(value)) : [];
+  });
+  return [...new Set(ids)].map(runId => {
     try {
       const { metadata, events, incomplete } = readRun(runId, options);
       return { runId, skill: metadata.skill, startedAt: metadata.startedAt, goal: metadata.goal,
@@ -213,7 +254,7 @@ export function sessionRecorder(options = {}) {
     const runId = options.runId || process.env.ZAN_WORKFLOWS_RUN_ID ||
       startRun({ skill: 'scripted-delivery', coverage: 'DELIVERY_ONLY' }, options).runId;
     if (!runId) return observer;
-    runDirectory(runId, options);
+    if (readPrivateJson(join(runDirectory(runId, options), 'run.json'), 32768).feedbackOnly) return observer;
     const record = event => {
       try {
         const type = { REQUEST_STARTED: 'action_started', REQUEST_FINISHED: 'action_finished',

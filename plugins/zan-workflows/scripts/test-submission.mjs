@@ -2,6 +2,8 @@ import { readFile } from 'node:fs/promises';
 import { inspectSelectedWikiLinks } from '../skills/submitting-for-test/scripts/ensure-test-wiki.mjs';
 import { prepareSubmissionGit, executeSubmissionGit } from './submission-git.mjs';
 import { validateReviewedBugRecord, publishSubmissionBugRecord } from './submit-bug-record.mjs';
+import { verifyAcceptedTestBuild } from './jenkins-readonly.mjs';
+import { loadFrozenJenkinsContract, verifyFrozenJenkinsReceiptParameters } from './frozen-jenkins-contracts.mjs';
 import { readTool, repositoryKey, sha256, stableJson } from './workflow-runtime.mjs';
 
 const sha = value => typeof value === 'string' && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(value);
@@ -10,6 +12,13 @@ const workKey = plan => stableJson([plan.registration.workspaceId, plan.registra
   plan.registration.entryId, repositoryKey(plan.merge.originUrl)]);
 const testBranch = name => ['dev', 'develop'].includes(name);
 const snapshot = value => structuredClone(value);
+
+function planFingerprint(plan) {
+  if (!plan.wiki) return sha256(stableJson(plan));
+  const { bodyFile, ...wiki } = plan.wiki;
+  // The approved bytes, target and scope are bound separately from their temporary carrier.
+  return sha256(stableJson({ ...plan, wiki }));
+}
 
 function validatePlan(input) {
   const { merge, release, wiki, registration, linkTaskIds = [] } = input;
@@ -76,6 +85,74 @@ async function prepareLocalMerge(merge, { call }) {
   return { ...merge, pipelineRequired: merge.pipelineRequired || project.only_allow_merge_if_pipeline_succeeds === true };
 }
 
+async function recheckWikiDelivery(plan, steps) {
+  const { merge, wikiRecovery: { releaseReceipt } } = plan;
+  const contract = await loadFrozenJenkinsContract({ ...releaseReceipt, repositoryPath: merge.repositoryPath }, steps.io);
+  const reader = steps.reader(releaseReceipt);
+  if (reader.instanceUrl !== contract.instance.url.replace(/\/$/, '') || contract.profile.environmentKind !== 'test') {
+    throw new Error('原测试构建的 Jenkins 实例或环境与已核实约定不一致');
+  }
+  verifyFrozenJenkinsReceiptParameters(contract, releaseReceipt);
+  const [git, verification] = await Promise.all([
+    steps.run('merge', { ...merge, mergeMode: 'VERIFY_ONLY', expectedDeliveredSha: releaseReceipt.expectedSha }, false),
+    verifyAcceptedTestBuild(reader, releaseReceipt),
+  ]);
+  if (git.state !== 'MERGED' || git.writes !== 0 || git.containment !== true ||
+      git.mrIid !== merge.mrIid || git.deliveredSha !== releaseReceipt.expectedSha) {
+    throw new Error('未只读核实原 MR 及队列回执对应的实际交付 SHA');
+  }
+  return { git, release: { ...releaseReceipt, reused: true, verification: { ...verification, writes: 0 } } };
+}
+
+async function prepareWikiRecovery(input, steps) {
+  const { recoverWiki, merge, wiki, registration, decisions = [], linkTaskIds = [] } = input;
+  const receipt = recoverWiki?.releaseReceipt;
+  if (Object.keys(input).some(key => !['recoverWiki', 'merge', 'wiki', 'registration', 'decisions', 'linkTaskIds'].includes(key)) ||
+      Object.keys(recoverWiki || {}).some(key => !['previousWikiId', 'releaseReceipt', 'jenkinsProjectKey'].includes(key)) ||
+      !id(merge?.mrIid) || merge.mergeMode === 'CONTAINMENT_ONLY' ||
+      !['stories', 'tasks'].includes(registration?.entryType) || registration.versionAction !== 'NONE') {
+    throw new Error('跨会话续接限已有原 MR 的 Story/Task，仅处理 Wiki 及任务回链');
+  }
+  if (!id(recoverWiki?.previousWikiId) || wiki?.supersededWiki?.wikiId !== recoverWiki.previousWikiId ||
+      !id(wiki.expectedWikiId) || wiki.expectedWikiId === recoverWiki.previousWikiId ||
+      wiki.expectedOwnerType !== 'stories' || !id(wiki.expectedOwnerId) || !wiki.bodyFile) {
+    throw new Error('跨会话换页需要同一 Story 的准确新旧页、替代证明和已审正文');
+  }
+  if (receipt?.state !== 'BUILD_SUBMITTED' || receipt.writes !== 1 || !sha(receipt.expectedSha) ||
+      typeof receipt.jobName !== 'string' || !receipt.jobName.trim() || !receipt.queueUrl ||
+      typeof receipt.instance !== 'string' || !receipt.instance.trim() ||
+      typeof receipt.targetProject !== 'string' || !receipt.targetProject.trim() ||
+      (receipt.jenkinsProjectKey && recoverWiki.jenkinsProjectKey && receipt.jenkinsProjectKey !== recoverWiki.jenkinsProjectKey) ||
+      !Number.isSafeInteger(receipt.queueId) || receipt.queueId < 1 ||
+      !receipt.submittedParams || typeof receipt.submittedParams !== 'object' || Array.isArray(receipt.submittedParams) ||
+      !['parameterDefinitionsHash', 'jenkinsProfileHash', 'jenkinsParametersValueHash'].every(
+        key => typeof receipt[key] === 'string' && /^[a-f0-9]{64}$/.test(receipt[key]))) {
+    throw new Error('跨会话换页需要原测试构建的确切队列回执及提交参数');
+  }
+  validatePlan({ ...input, release: receipt });
+  const { jobName, jobUrl, instance, targetProject, releaseTarget, releaseKind, releaseRef, releaseChannel,
+    targetEnvironment, sourceRepository, expectedSha, queueId, queueUrl, submittedParams, jenkinsProfile,
+    parameterDefinitionsHash, jenkinsProfileHash, jenkinsParametersValueHash, refParameter } = receipt;
+  const plan = {
+    merge, localGit: null, release: null, decisions, linkTaskIds,
+    registration: { ...registration, state: 'NOT_APPLICABLE' },
+    wikiRecovery: { previousWikiId: recoverWiki.previousWikiId, releaseReceipt: {
+      state: 'BUILD_SUBMITTED', writes: 1, jobName, jobUrl, instance, targetProject, releaseTarget, releaseKind,
+      releaseRef, releaseChannel, targetEnvironment, sourceRepository, expectedSha, queueId, queueUrl, submittedParams,
+      jenkinsProjectKey: receipt.jenkinsProjectKey || recoverWiki.jenkinsProjectKey, jenkinsProfile,
+      parameterDefinitionsHash, jenkinsProfileHash, jenkinsParametersValueHash, refParameter,
+    } },
+  };
+  const [page, receipts] = await Promise.all([
+    wikiPlan({ ...wiki, expectTarget: 'REUSE_EXISTING' }, linkTaskIds, steps),
+    recheckWikiDelivery(plan, steps),
+  ]);
+  if (page.expectedWikiId !== wiki.expectedWikiId || page.expectTarget !== 'REUSE_EXISTING') {
+    throw new Error('跨会话续接只能使用已核实的现有替代 Wiki');
+  }
+  return { plan: { ...plan, wiki: page }, receipts };
+}
+
 // One session owns the plans and the actual effects. The public ID is not a
 // receipt, and callers cannot replace an earlier Git or queue result on resume.
 export class TestSubmissions {
@@ -84,7 +161,7 @@ export class TestSubmissions {
   async prepare(input, steps) {
     const previous = input.resumePlanId && this.plans.get(input.resumePlanId);
     const resumeState = previous?.state;
-    let plan, targetReceipt;
+    let plan, targetReceipt, recoveryReceipts;
     if (input.resumePlanId) {
       const affected = { NEEDS_WIKI_REVIEW: 'wiki', NEEDS_TARGET_REVIEW: 'targetEvidence', NEEDS_REPAIR_REVIEW: 'repairRecord' }[resumeState];
       if (!affected) throw new Error('没有可定向续接的提测计划');
@@ -127,6 +204,8 @@ export class TestSubmissions {
             targetReceipt.deliveredSha !== evidence.deliveredSha) throw new Error('增量评审目标与实时包含关系不一致');
         plan.merge.mockSafety.deliverySourceEvidence = evidence;
       }
+    } else if (input.recoverWiki !== undefined) {
+      ({ plan, receipts: recoveryReceipts } = await prepareWikiRecovery(input, steps));
     } else {
       if (input.registration?.entryType === 'bug' && input.repairRecord && input.registration.prerequisites?.repairRecord) {
         const prior = input.registration.prerequisites.repairRecord, declared = input.repairRecord.previousRecord;
@@ -151,17 +230,23 @@ export class TestSubmissions {
         mrIid: git.mrIid || merge.mrIid }, localGit: preparedLocal || null, release: build, wiki: page,
         registration: { ...registration, ...register }, ...(repairRecord ? { repairRecord } : {}), decisions, linkTaskIds };
     }
-    const hash = sha256(stableJson(plan)), key = workKey(plan);
+    const hash = planFingerprint(plan), key = workKey(plan);
     const prior = [...this.plans.values()].filter(record => record.key === key);
+    if (!previous && !recoveryReceipts && prior.some(record => record.plan.wikiRecovery && record.state !== 'SUPERSEDED')) {
+      throw new Error('此项交付已进入换页续接，只能沿用原回执');
+    }
     if (prior.some(record => record !== previous && record.started && record.state !== 'SUPERSEDED' &&
         !(record.hash === hash && record.state === 'AWAITING_CONFIRMATION'))) {
       throw new Error('此项交付已有实际执行；请沿用其回执，仅续接未完成动作');
     }
     for (const record of prior) {
-      if (record.hash === hash && record.state === 'AWAITING_CONFIRMATION') return this.preview(record);
+      if (record.hash === hash && record.state === 'AWAITING_CONFIRMATION') {
+        if (plan.wiki) record.plan.wiki.bodyFile = plan.wiki.bodyFile;
+        return this.preview(record);
+      }
       record.state = 'SUPERSEDED';
     }
-    const record = { hash, key, plan: snapshot(plan), receipts: previous ? snapshot(previous.receipts) : {},
+    const record = { hash, key, plan: snapshot(plan), receipts: snapshot(previous?.receipts || recoveryReceipts || {}),
       started: Boolean(previous), state: 'AWAITING_CONFIRMATION' };
     if (targetReceipt) record.receipts.target = targetReceipt;
     if (resumeState === 'NEEDS_WIKI_REVIEW' && record.receipts.wiki) {
@@ -178,6 +263,9 @@ export class TestSubmissions {
       localGit: p.localGit && { commit: p.localGit.commit, push: p.localGit.push, message: p.localGit.message, files: Object.keys(p.localGit.files) },
       mergeMode: p.merge.mergeMode || 'AUTO', purpose: p.merge.purpose,
       mockModules: p.merge.mockSafety.mockModules, release: p.release && { jobUrl: p.release.jobUrl, params: p.release.params },
+      ...(p.wikiRecovery ? { recoverWiki: { previousWikiId: p.wikiRecovery.previousWikiId, mrIid: p.merge.mrIid,
+        deliveredSha: p.wikiRecovery.releaseReceipt.expectedSha, jobUrl: p.wikiRecovery.releaseReceipt.jobUrl,
+        queueId: p.wikiRecovery.releaseReceipt.queueId } } : {}),
       wiki: p.wiki, linkTaskIds: p.linkTaskIds, ...(p.repairRecord ? { repairRecord: p.repairRecord } : {}),
       registration: { state: p.registration.state, entryType: p.registration.entryType, entryId: p.registration.entryId,
         statusAction: p.registration.statusAction, versionAction: p.registration.versionAction,
@@ -185,7 +273,7 @@ export class TestSubmissions {
   }
   assertReviewed(input) {
     const record = this.plans.get(input.planId);
-    if (!record || input.confirmed !== true || input.reviewedPlanHash !== record.hash || sha256(stableJson(record.plan)) !== record.hash ||
+    if (!record || input.confirmed !== true || input.reviewedPlanHash !== record.hash || planFingerprint(record.plan) !== record.hash ||
         Object.keys(input).some(key => !['planId', 'confirmed', 'reviewedPlanHash'].includes(key))) {
       throw new Error('执行必须引用当前会话已审、已确认的同一完整计划');
     }
@@ -201,8 +289,9 @@ export class TestSubmissions {
       record.state = state; record.detail = error.message;
       return summary(record);
     };
-    let phase = 'git';
+    let phase = plan.wikiRecovery ? 'wikiRecovery' : 'git';
     try {
+      if (plan.wikiRecovery) Object.assign(receipts, await recheckWikiDelivery(plan, steps));
       if (!receipts.git) {
         if (plan.wiki) {
           try {
@@ -223,7 +312,7 @@ export class TestSubmissions {
       if (!['MERGED', 'VERIFIED'].includes(git.state) || git.containment !== true || !sha(git.deliveredSha)) {
         throw new Error('缺少已核实的交付源码回执');
       }
-      if (git.observedTargetSha !== git.deliveredSha) return pause('NEEDS_TARGET_REVIEW',
+      if (!plan.wikiRecovery && git.observedTargetSha !== git.deliveredSha) return pause('NEEDS_TARGET_REVIEW',
         new Error('测试分支已前进，需核对目标增量及新的交付版本'));
       const binding = { ...immutableSource(plan.merge, git.sourceSha), requiredRepositories: [git.originUrl],
         gitDeliveryReceipts: [git], purpose: plan.merge.purpose, targetEnvironment: 'test', targetBranch: git.targetBranch };
@@ -284,12 +373,13 @@ export class TestSubmissions {
           (!step || step.writes === 0 && !['UNKNOWN'].includes(step.wikiState) && step.commentState !== 'UNKNOWN')) {
         return pause('NEEDS_WIKI_REVIEW', error);
       }
-      const uncertain = step?.state === 'UNKNOWN' || ['CREATE_MR', 'MERGE_MR', 'READ_MERGE', 'TRIGGER', 'UPDATE', 'READBACK', 'CREATE_MONTH', 'CREATE_WIKI',
+      const readOnly = phase === 'wikiRecovery';
+      const uncertain = !readOnly && (step?.state === 'UNKNOWN' || ['CREATE_MR', 'MERGE_MR', 'READ_MERGE', 'TRIGGER', 'UPDATE', 'READBACK', 'CREATE_MONTH', 'CREATE_WIKI',
         'UPDATE_WIKI', 'LINK_COMMENT', 'READ_COMMENT'].includes(step?.phase) ||
         step?.wikiState === 'UNKNOWN' || step?.commentState === 'UNKNOWN' ||
-        phase === 'git' && receipts.localGit?.state !== 'VERIFIED' && ['COMMIT', 'PUSH'].includes(receipts.localGit?.phase);
+        phase === 'git' && receipts.localGit?.state !== 'VERIFIED' && ['COMMIT', 'PUSH'].includes(receipts.localGit?.phase));
       record.state = uncertain ? 'UNKNOWN' : 'BLOCKED'; record.detail = error.message;
-      error.result = { ...summary(record), phase, writes: null, failedStep: error.result || null, error: error.message };
+      error.result = { ...summary(record), phase, writes: readOnly ? 0 : null, failedStep: step || null, error: error.message };
       throw error;
     }
   }

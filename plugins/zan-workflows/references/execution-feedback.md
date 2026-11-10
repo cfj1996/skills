@@ -17,6 +17,8 @@ agent_summary（观察到的阶段摘要）、user_feedback（同事评价）。
 最后使用 ~/.local/share/zan-workflows。不写安装缓存或业务仓库。最多保留
 100 个运行，每个事件文件 1 MiB，每次运行最多 10 个报告修订；达到上限停止
 采集并说明缺口，导出/检查后由用户清理不再需要的运行目录，不自动删除未提交数据。
+常规记录已满且用户明确要求反馈时，`report-execution` 可使用同一数据根下单个
+`feedback-overflow` 备用槽，先导出需保留的内容，再按用户意愿清理备用目录。
 ZAN_WORKFLOWS_RECORDING=off 关闭记录；DISABLED 时不再追加阶段事件。目录/文件
 分别按 0700/0600 创建。公共会话的 SESSION_READY 同时给出采集状态及关联 runId，
 采集不可用时如实说明，不将无日志当作未执行。
@@ -75,6 +77,18 @@ recorder 的 list --json 返回本地候选；坏行/日志截断保留完整性
 
 ## Export
 
+没有准确原 runId 且常规记录已满时，用户明确请求反馈后可执行：
+
+~~~bash
+node "$plugin_root/scripts/execution-recorder.mjs" start --json <<'JSON'
+{"skill":"report-execution","feedbackOnly":true,"goal":"原运行的用户反馈"}
+JSON
+~~~
+
+备用记录只接受脱敏摘要和用户反馈，自动标明原采集缺口并保留 UNKNOWN。沿用返回的
+runId 导出或按原授权提交。槽已占用时保留现有记录，请用户先检查并清理。关闭记录
+仍按原设置处理。
+
 ~~~bash
 node "$plugin_root/scripts/export-execution-report.mjs" --json <<'JSON'
 {"runId":"<准确运行编号>","feedback":{"goalReached":"PARTIAL","problem":"中途重复确认了三次","correction":"用户解释同一范围没有变化"}}
@@ -86,6 +100,8 @@ report.json、events.jsonl、execution-report.zip，按内容生成 revision；
 同内容和相同导出器重复导出一致；导出器/脱敏器升级形成新修订，保留原运行的
 插件版本与指纹。已导出文件被改动则拒绝覆盖/上传。ZIP 无外部依赖，只含
 固定报告文件，无任意路径附件。Issue 正文只展示末尾 60 条事件，完整记录见 ZIP。
+动作与空闲合计取执行器实测值，明确等待可取当时有计时的观测。无采集值在 JSON
+为 `null`，正文为“未知（未采集）”。实际测得的 0 保留，用户估计留在反馈文字。
 
 ## Fixed destination
 

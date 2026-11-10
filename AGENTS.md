@@ -247,3 +247,11 @@ repeat submission and unknown-write recovery checks, run
 `node --test plugins/zan-workflows/tests/execution-feedback.test.mjs`.
 These tests use disposable local data and simulated GitLab MCP responses; they never
 upload real files, create real Issues, read chat history or call company APIs.
+
+For cross-session Wiki replacement, a re-created approved body carrier and an
+expired Jenkins queue, run
+`node --test plugins/zan-workflows/tests/continuous-test-submission.test.mjs plugins/zan-workflows/tests/delivery-helpers.test.mjs`.
+The execution feedback suite also covers the bounded summary slot and unknown
+timing. For the small-layout and single-page requirement workflow choices, use
+`plugins/zan-workflows/skills/submitting-for-test/tests/scenarios/review-feedback-4-5.md`
+with an independent read-only evaluator. These fixtures perform no external writes.

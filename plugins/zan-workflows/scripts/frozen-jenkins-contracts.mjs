@@ -10,6 +10,7 @@ const own = (value, key) => Object.hasOwn(value, key);
 const TYPES = new Set(['string', 'text', 'choice', 'boolean', 'number', 'password']);
 const SECRET = /password|passwd|secret|token|credential|api[_-]?key/i;
 const RESERVED = new Set(['__proto__', 'prototype', 'constructor']);
+const sensitiveParameter = parameter => parameter.sensitive || parameter.type === 'password' || SECRET.test(parameter.name);
 
 export async function resolveJenkinsContractsPath(input = {}) {
   if (input.jenkinsContractsPath !== undefined) {
@@ -43,7 +44,7 @@ function validateDefinitions(job) {
     names.add(parameter.name);
     if (parameter.type === 'choice' && (!Array.isArray(parameter.choices) || !parameter.choices.length ||
         parameter.choices.some(value => typeof value !== 'string'))) throw new Error(`固定 choice 参数缺少准确选项：${parameter.name}`);
-    if ((parameter.sensitive || parameter.type === 'password' || SECRET.test(parameter.name)) &&
+    if (sensitiveParameter(parameter) &&
         (own(parameter, 'defaultValue') || own(parameter, 'choices'))) throw new Error('敏感 Jenkins 参数不得在知识库保存默认值或选项值');
   }
 }
@@ -91,7 +92,7 @@ export async function loadFrozenJenkinsContract(input, io = {}) {
   for (const key of [...Object.keys(profile.fixedParams), ...['refParameter', 'versionParameter', 'channelParameter', 'projectParameter'].flatMap(field => profile[field] ? [profile[field]] : [])]) {
     if (!job.parameters.some(parameter => parameter.name === key)) throw new Error('固定环境策略引用了未采集的构建参数；请先刷新维护');
     if (own(profile.fixedParams, key) && job.parameters.some(parameter => parameter.name === key &&
-      (parameter.sensitive || parameter.type === 'password' || SECRET.test(parameter.name)))) throw new Error('敏感 Jenkins 参数不能固化到环境策略');
+      sensitiveParameter(parameter))) throw new Error('敏感 Jenkins 参数不能固化到环境策略');
   }
   const definitions = { jobName: job.jobName, parameters: job.parameters };
   const parameterDefinitionsHash = sha256(stableJson(definitions));
@@ -121,12 +122,37 @@ function validateValue(parameter, value) {
   if (parameter.requiresValue && (value === '' || value === null || value === undefined)) throw new Error(`Jenkins 参数需要显式提供值：${parameter.name}`);
 }
 
+export function verifyFrozenJenkinsReceiptParameters(contract, receipt) {
+  const { definitions, profile } = contract, params = receipt.submittedParams;
+  if (!object(params) || Object.keys(params).length !== definitions.parameters.length ||
+      definitions.parameters.some(parameter => !own(params, parameter.name))) {
+    throw new Error('原队列回执缺少完整的已提交 Jenkins 参数');
+  }
+  const sensitive = definitions.parameters.filter(sensitiveParameter);
+  for (const parameter of definitions.parameters) {
+    const value = params[parameter.name];
+    if (sensitiveParameter(parameter) ? value !== '[REDACTED]' : value === '[REDACTED]') {
+      throw new Error(`原队列回执参数的脱敏状态不正确：${parameter.name}`);
+    }
+    if (!sensitiveParameter(parameter)) validateValue(parameter, value);
+  }
+  const refParameter = profile.refParameter || receipt.refParameter;
+  if (!refParameter || params[refParameter] !== receipt.releaseRef ||
+      profile.projectParameter && params[profile.projectParameter] !== receipt.targetProject ||
+      Object.entries(profile.fixedParams).some(([key, value]) => params[key] !== value)) {
+    throw new Error('原队列参数与已核实的分支、项目或固定测试环境不一致');
+  }
+  if (!sensitive.length && sha256(stableJson(params)) !== receipt.jenkinsParametersValueHash) {
+    throw new Error('原队列回执的提交参数指纹不匹配');
+  }
+}
+
 export function resolveFrozenJenkinsParameters(contract, input, io = {}) {
   const { definitions, profile } = contract;
   if (input.params !== undefined && !object(input.params)) throw new Error('Jenkins 参数必须是明确对象');
   const supplied = input.params || {};
   const known = new Set(definitions.parameters.map(parameter => parameter.name));
-  const sensitiveNames = definitions.parameters.filter(parameter => parameter.sensitive || parameter.type === 'password' || SECRET.test(parameter.name)).map(parameter => parameter.name);
+  const sensitiveNames = definitions.parameters.filter(sensitiveParameter).map(parameter => parameter.name);
   if (input.secretParameterEnv !== undefined && (!object(input.secretParameterEnv) ||
       Object.keys(input.secretParameterEnv).some(name => !sensitiveNames.includes(name)))) {
     throw new Error('secretParameterEnv 只能引用固定定义中的敏感参数');
@@ -134,7 +160,7 @@ export function resolveFrozenJenkinsParameters(contract, input, io = {}) {
   if (Object.keys(supplied).some(name => !known.has(name))) throw new Error('未确认的 Jenkins 参数；必须先刷新固定定义，不能临时联网添加');
   const params = {};
   for (const parameter of definitions.parameters) {
-    const sensitive = parameter.sensitive || parameter.type === 'password' || SECRET.test(parameter.name);
+    const sensitive = sensitiveParameter(parameter);
     if (sensitive) {
       const envName = input.secretParameterEnv?.[parameter.name];
       if (!text(envName) || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(envName) ||
@@ -177,7 +203,7 @@ export function resolveFrozenJenkinsParameters(contract, input, io = {}) {
   }
   for (const parameter of definitions.parameters) validateValue(parameter, params[parameter.name]);
   const publicParams = Object.fromEntries(definitions.parameters.map(parameter => [parameter.name,
-    parameter.sensitive || parameter.type === 'password' || SECRET.test(parameter.name) ? '[REDACTED]' : params[parameter.name]]));
+    sensitiveParameter(parameter) ? '[REDACTED]' : params[parameter.name]]));
   return { params, publicParams, refParameter, versionParameter, channelParameter: profile.channelParameter || input.channelParameter,
     version, environmentKind: profile.environmentKind, sensitiveParameterNames: sensitiveNames, parametersValueHash: sha256(stableJson(params)) };
 }

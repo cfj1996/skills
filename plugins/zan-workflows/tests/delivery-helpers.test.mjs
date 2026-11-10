@@ -5,7 +5,7 @@ import test from 'node:test';
 import { Readable } from 'node:stream';
 import { mergeReviewedBranch as originalMergeReviewedBranch } from '../scripts/merge-reviewed-branch.mjs';
 import { checkReleaseSource, runJenkinsRelease as originalRunJenkinsRelease } from '../scripts/run-jenkins-release.mjs';
-import { createJenkinsReader } from '../scripts/jenkins-readonly.mjs';
+import { createJenkinsReader, verifyAcceptedTestBuild } from '../scripts/jenkins-readonly.mjs';
 import { pollState, readCliPlan, repositoryKey, toolData } from '../scripts/workflow-runtime.mjs';
 
 const sourceSha = 'a'.repeat(40), targetSha = 'b'.repeat(40), otherSha = 'c'.repeat(40);
@@ -415,6 +415,35 @@ test('read-only API rejects a queue or build belonging to another Job', async ()
   }) }));
   await assert.rejects(reader.queue('https://ci.example.test/jenkins/queue/item/8/'), /归属不一致/);
   await assert.rejects(reader.build(12), /归属不一致/);
+});
+
+test('expired queue verification looks up the exact queue ID on the same Job and checks submitted parameters', async () => {
+  const queueUrl = 'https://ci.example.test/jenkins/queue/item/8';
+  const receipt = { jobUrl, queueUrl, queueId: 8, submittedParams: { branch: 'develop' } };
+  const calls = [];
+  const reader = createJenkinsReader(env, 'demo-test', jobUrl, async (url, options) => {
+    assert.equal(options.method, 'GET');
+    const path = new URL(url).pathname;
+    calls.push(path);
+    if (path.includes('/queue/')) {
+      assert.equal(new URL(url).searchParams.get('tree'), 'id,cancelled,task[url],actions[parameters[name,value]]');
+      return { ok: false, status: 404 };
+    }
+    if (path.endsWith('/demo-test/api/json')) {
+      assert.equal(new URL(url).searchParams.get('tree'), 'builds[number,queueId]{0,30}');
+      return { ok: true, json: async () => ({ builds: [{ number: 13, queueId: 9 }, { number: 12, queueId: 8 }] }) };
+    }
+    return { ok: true, json: async () => ({ number: 12, queueId: 8, url: jobUrl + '12/',
+      actions: [{ parameters: [{ name: 'branch', value: 'develop' }] }] }) };
+  });
+  assert.deepEqual(await verifyAcceptedTestBuild(reader, receipt), { matchedBy: 'BUILD_QUEUE_ID', queueId: 8, buildNumber: 12 });
+  assert.deepEqual(calls, ['/jenkins/queue/item/8/api/json', '/jenkins/job/demo-test/api/json', '/jenkins/job/demo-test/12/api/json']);
+  await assert.rejects(verifyAcceptedTestBuild(reader, { ...receipt, submittedParams: { branch: 'master' } }), /参数未读回或不一致/);
+  const forbidden = createJenkinsReader(env, 'demo-test', jobUrl, async url => {
+    assert.equal(new URL(url).pathname, '/jenkins/queue/item/8/api/json');
+    return { ok: false, status: 403 };
+  });
+  await assert.rejects(verifyAcceptedTestBuild(forbidden, receipt), /HTTP 403/);
 });
 
 test('CLI stdin preserves Chinese across chunks and cannot enable execution inside JSON', async () => {

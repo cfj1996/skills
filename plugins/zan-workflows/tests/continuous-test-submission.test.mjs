@@ -34,6 +34,12 @@ async function fixture(t, options = {}) {
   const release = { targetProject: 'factory', releaseTarget: 'factory', jobName: 'factory-test', jobUrl, sourceRepository: repo,
     releaseRef: 'develop', releaseChannel: 'canary', releaseKind: 'deployment', targetEnvironment: 'test',
     refParameter: 'branch', params: { branch: 'develop' }, jobAdapter: 'explicit-v1', jenkinsProfile: 'fixture' };
+  const parameters = [{ name: 'branch' }];
+  if (options.environmentParameter) parameters.push({ name: 'RELEASE_TYPE', choices: ['release:canary', 'release:prod'] });
+  const readback = () => [{ parameters: [
+    { name: 'branch', value: options.readbackBranch || 'develop' },
+    ...(options.environmentParameter ? [{ name: 'RELEASE_TYPE', value: 'release:canary' }] : []),
+  ] }];
   const wiki = { workspaceId: 123, entryType: 'stories', entryId: '1', sourceBranch: branch, entryRepoUrl: repo,
     creator: 'developer', bodyFile };
   const input = { merge, release, wiki, linkTaskIds: ['2', '3'], decisions: ['查询和保存均使用 maxvalue'],
@@ -87,19 +93,31 @@ async function fixture(t, options = {}) {
     }
     throw new Error('unexpected ' + name);
   } };
-  const session = new WorkflowSession({ allowExecute: true, pool, reader: () => ({ instanceUrl: ci, jobUrl,
-    job: async () => ({ name: release.jobName, url: jobUrl }), queueIdentity: url => ({ id: 42, url }) }),
+  const newSession = () => new WorkflowSession({ allowExecute: true, pool, reader: () => ({ instanceUrl: ci, jobUrl,
+    job: async () => ({ name: release.jobName, url: jobUrl }), queueIdentity: url => ({ id: 42, url }),
+    queue: async () => {
+      calls.push('read_queue');
+      if (options.expiredQueue) throw Object.assign(new Error('queue expired'), { httpStatus: 404 });
+      return { id: 42, actions: readback() };
+    },
+    buildForQueue: async () => {
+      calls.push('read_historical_queue');
+      return { number: 7, queueId: 42, actions: readback() };
+    },
+  }),
     io: { ...fixtureMockIo, checkRepository: async () => {}, inspectContainment: async () => ({ contained: merged, targetSha: merged ? delivered : target }),
-      containsSource: async () => ({ contained: true, targetSha: delivered }), checkSource: async request => {
+      containsSource: async request => ({ contained: !request.expectedDeliveredSha || !options.deliveryRemoved,
+        targetSha: request.expectedDeliveredSha && options.targetAdvanced ? target : delivered }), checkSource: async request => {
         if (options.requireTargetReview && !request.mockSafety.deliverySourceEvidence) throw new Error('目标分支包含额外内容，需要增量评审');
         sourceChecks.push(request.expectedSha); return { kind: 'branch', ref: 'refs/heads/develop',
           branch: 'develop', sourceRepository: repo, sourceSha: request.expectedSha };
-      }, readFrozenJenkinsContracts: async () => frozenJenkinsFixture(release, { parameters: [{ name: 'branch' }] }, ci) } });
-  let i = 0;
+      }, readFrozenJenkinsContracts: async () => frozenJenkinsFixture(release, { parameters }, ci) } });
+  let i = 0, session = newSession();
   const request = (phase, data) => session.dispatch({ id: 'request-' + ++i, action: 'submit', phase, input: data });
   const run = plan => request('EXECUTE', { confirmed: true, planId: plan.planId, reviewedPlanHash: plan.planId });
   t.after(async () => { await session.close(); await rm(dir, { recursive: true, force: true }); });
-  return { input, request, run, calls, sourceChecks, pages, comments, bodyFile, get oldBody() { return oldBody; } };
+  return { input, request, run, calls, sourceChecks, pages, comments, bodyFile,
+    restart: async () => { await session.close(); session = newSession(); }, get oldBody() { return oldBody; } };
 }
 
 test('one authorized request carries the merged SHA, accepted queue and verified Wiki into exactly the selected Task links', async t => {
@@ -163,6 +181,90 @@ test('a replaced Wiki pauses only the document and resumes on a newly reviewed p
   assert.equal(f.pages.get('20').markdown_description.includes(entry), false);
   assert.deepEqual(f.calls.filter(name => ['merge_merge_request', 'jenkins_trigger_build'].includes(name)),
     ['merge_merge_request', 'jenkins_trigger_build']);
+});
+
+test('a regenerated carrier with identical Wiki bytes retains the approval across and within sessions', async t => {
+  const f = await fixture(t);
+  const first = await f.request('PLAN', f.input);
+  await f.restart();
+  const makeCarrier = async name => {
+    const bodyFile = join(f.input.merge.repositoryPath, name);
+    await writeFile(bodyFile, f.oldBody + entry);
+    return f.request('PLAN', { ...f.input, wiki: { ...f.input.wiki, bodyFile } });
+  };
+  assert.equal((await makeCarrier('regenerated.md')).planId, first.planId);
+  assert.equal((await makeCarrier('latest.md')).planId, first.planId);
+  await Promise.all([rm(f.bodyFile), rm(join(f.input.merge.repositoryPath, 'regenerated.md'))]);
+  assert.equal((await f.run(first)).state, 'SUBMITTED');
+});
+
+async function closedWikiFixture(t, options) {
+  const f = await fixture(t, options);
+  const previous = await f.request('PLAN', f.input);
+  const paused = await f.run(previous);
+  assert.equal(paused.state, 'NEEDS_WIKI_REVIEW');
+  const notice = '提测wiki（新）：' + wikiUrl('21') + '（作废旧页 #20）';
+  const old = { id: 'old-link', description: '提测wiki：' + wikiUrl('20') };
+  f.comments.set('1', [old, { id: 'replacement', description: notice }]);
+  f.comments.set('3', [old]);
+  await writeFile(f.bodyFile, f.oldBody + entry);
+  await f.restart();
+  const { merge, wiki, registration, linkTaskIds } = f.input;
+  const recovery = { merge: { ...merge, mrIid: paused.receipts.git.mrIid }, registration, linkTaskIds,
+    recoverWiki: { previousWikiId: '20', releaseReceipt: paused.receipts.release },
+    wiki: { ...wiki, expectedWikiId: '21', expectedOwnerType: 'stories', expectedOwnerId: '1',
+      supersededWiki: { wikiId: '20', noticeCommentId: 'replacement', noticeBodySha256: sha256(notice) } } };
+  return { f, recovery, old };
+}
+
+test('a new session verifies the old MR and expired queue then updates only the exact replacement and selected Task links', async t => {
+  const { f, recovery, old } = await closedWikiFixture(t, { replace: true, expiredQueue: true, targetAdvanced: true });
+  const count = f.calls.length;
+  const plan = await f.request('PLAN', recovery);
+  assert.equal(plan.state, 'AWAITING_CONFIRMATION');
+  assert.equal(plan.receipts.git.deliveredSha, delivered);
+  assert.equal(plan.receipts.release.verification.matchedBy, 'BUILD_QUEUE_ID');
+  assert.equal(plan.receipts.release.verification.writes, 0);
+  assert.equal(f.calls.slice(count).some(name => /^(create_|merge_merge_|jenkins_trigger|update_)/.test(name)), false);
+  const result = await f.run(plan);
+  assert.equal(result.state, 'SUBMITTED');
+  assert.equal(result.receipts.wiki.wikiId, '21');
+  assert.deepEqual(result.receipts.links.map(link => link.entryId), ['2', '3']);
+  assert.equal(result.receipts.registration.state, 'NOT_APPLICABLE');
+  assert.equal(f.pages.get('20').markdown_description.includes(entry), false);
+  assert.equal(f.comments.get('3')[0], old);
+  assert.deepEqual(f.calls.slice(count).filter(name => /^(create_|merge_merge_|jenkins_trigger|update_)/.test(name)),
+    ['update_wiki', 'create_comments', 'create_comments']);
+  assert.equal(f.calls.slice(count).filter(name => name === 'read_historical_queue').length, 2);
+});
+
+test('cross-session recovery blocks an unrelated delivery or changed queue parameters before a Wiki write', async t => {
+  const options = { replace: true, deliveryRemoved: true };
+  const { f, recovery } = await closedWikiFixture(t, options);
+  const count = f.calls.length;
+  await assert.rejects(f.request('PLAN', recovery), /未验证包含/);
+  options.deliveryRemoved = false;
+  const plan = await f.request('PLAN', recovery);
+  options.readbackBranch = 'other';
+  await assert.rejects(f.run(plan), error => error.result?.state === 'BLOCKED' && error.result.writes === 0 &&
+    /原测试构建参数未读回或不一致/.test(error.message));
+  assert.equal(f.calls.slice(count).some(name => /^(create_|merge_merge_|jenkins_trigger|update_)/.test(name)), false);
+});
+
+test('a replacement Wiki cannot recover a partial, artificially masked or production-parameter receipt', async t => {
+  const { f, recovery } = await closedWikiFixture(t, { replace: true, environmentParameter: true });
+  const count = f.calls.length;
+  for (const [submittedParams, reason] of [
+    [{ branch: 'develop' }, /缺少完整/],
+    [{ branch: 'develop', RELEASE_TYPE: '[REDACTED]' }, /脱敏状态/],
+    [{ branch: 'develop', RELEASE_TYPE: 'release:prod' }, /固定测试环境/],
+  ]) {
+    const recoverWiki = { ...recovery.recoverWiki, releaseReceipt: { ...recovery.recoverWiki.releaseReceipt, submittedParams } };
+    await assert.rejects(f.request('PLAN', { ...recovery, recoverWiki }), reason);
+  }
+  assert.equal(f.calls.slice(count).includes('read_queue'), false);
+  assert.equal(f.calls.slice(count).some(name => /^(create_|merge_merge_|jenkins_trigger|update_)/.test(name)), false);
+  assert.equal((await f.request('PLAN', recovery)).state, 'AWAITING_CONFIRMATION');
 });
 
 test('a lost trigger response preserves Git evidence, stops dependent writes and cannot replay the trigger', async t => {

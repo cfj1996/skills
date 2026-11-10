@@ -132,7 +132,7 @@ test('session lifecycle recording preserves UNKNOWN, request timing and does not
   observe({ state: 'SESSION_CLOSED', reason: 'FINISHED', busyMs: 12, idleMs: 40, requestCount: 1 });
   const { report } = exportExecutionReport(input, options);
   assert.equal(report.outcome, 'UNKNOWN'); assert.equal(report.metrics.actionElapsedMs, 12);
-  assert.equal(report.metrics.precedingIdleMs, 40); assert.equal(report.metrics.explicitWaitMs, 0);
+  assert.equal(report.metrics.precedingIdleMs, 40); assert.equal(report.metrics.explicitWaitMs, null);
   assert.equal(report.events[1].state, 'UNKNOWN');
 });
 
@@ -157,6 +157,48 @@ test('missing linked run and capacity failures are isolated from delivery observ
   fs.writeFileSync(join(dir, 'events.jsonl'), ' '.repeat(limits.bytes));
   assert.equal(recordEvent(runId, { type: 'stage_started', source: 'agent_summary' }, options).state, 'CAPACITY_REACHED');
   assert.equal(readRun(runId, options).incomplete, true);
+});
+
+test('an explicit summary report still exports and submits with the regular recorder full', async t => {
+  const { options, runId, fake } = submissionFixture(t);
+  const original = readRun(runId, options);
+  const runs = join(options.dataDir, 'runs');
+  for (let i = 1; i < limits.runs; i++) fs.mkdirSync(join(runs, 'run-' + randomUUID()));
+  assert.throws(() => startRun({ skill: 'fixing-bug' }, options), /保留 100 次运行/);
+  assert.equal(sessionRecorder(options).status.state, 'UNAVAILABLE');
+  assert.throws(() => startRun({ skill: 'fixing-bug', feedbackOnly: true }, options), /仅供显式/);
+  const feedback = startRun({ skill: 'report-execution', feedbackOnly: true, goal: '原运行未录制' }, options);
+  assert.equal(fs.readdirSync(runs).length, limits.runs);
+  assert.deepEqual(readRun(runId, options), original);
+  assert.ok(listRuns(options).some(row => row.runId === feedback.runId));
+  assert.equal(sessionRecorder({ ...options, runId: feedback.runId }).status.state, 'UNAVAILABLE');
+  assert.throws(() => startRun({ skill: 'report-execution', feedbackOnly: true }, options), /备用槽已占用/);
+  assert.throws(() => recordEvent(feedback.runId, { type: 'action_finished', source: 'executor', elapsedMs: 12 }, options), /只接受摘要/);
+  recordEvent(feedback.runId, { type: 'wait_finished', source: 'user_feedback', elapsedMs: 1200000,
+    summary: '用户估计截图标记区间为 20 分钟' }, options);
+  const input = { runId: feedback.runId, feedback: { problem: '原运行耗时未记录' } };
+  const { report } = exportExecutionReport(input, options);
+  assert.equal(report.outcome, 'UNKNOWN');
+  assert.equal(report.events[0].code, 'RUN_CAPACITY_REACHED');
+  assert.equal(report.events[1].elapsedMs, undefined);
+  assert.equal(report.metrics.explicitWaitMs, null);
+  const submitted = await submitExecutionFeedback(fake.call, { ...input, execute: true, confirmed: true }, options);
+  assert.equal(submitted.state, 'VERIFIED');
+  assert.deepEqual(readRun(runId, options), original);
+});
+
+test('unmeasured or estimated durations stay unknown while a measured zero remains numeric', t => {
+  const { options, runId, input } = fixture(t);
+  recordEvent(runId, { type: 'action_finished', source: 'agent_summary', elapsedMs: 1000 }, options);
+  recordEvent(runId, { type: 'wait_finished', source: 'user_feedback', elapsedMs: 1200000 }, options);
+  const first = exportExecutionReport(input, options);
+  assert.equal(first.report.metrics.actionElapsedMs, null);
+  assert.equal(first.report.metrics.explicitWaitMs, null);
+  assert.match(fs.readFileSync(first.reportPath, 'utf8'), /已记录动作耗时：未知（未采集）/);
+  recordEvent(runId, { type: 'action_finished', source: 'executor', elapsedMs: 0 }, options);
+  const measured = exportExecutionReport(input, options);
+  assert.equal(measured.report.metrics.actionElapsedMs, 0);
+  assert.match(fs.readFileSync(measured.reportPath, 'utf8'), /已记录动作耗时：0 ms/);
 });
 
 test('damaged final JSON line is a coverage gap, while terminal outcomes remain explicit', t => {

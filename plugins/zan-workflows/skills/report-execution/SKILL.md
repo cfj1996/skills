@@ -19,6 +19,7 @@ Default model profile: BALANCED for export; CRITICAL for submission. Follow the 
 2. 旧版本或未接入步骤没有事件时，允许创建本次反馈记录并追加 coverage_gap；
    主动选取的已知过程标为 agent_summary，保持原流程结局 UNKNOWN，不补造时间、
    事件、模型名或成功状态。正在执行的工作也可提交，不要求先结束。
+   无准确原 runId 且常规记录满额时，按执行反馈参考使用备用摘要记录。
 3. 保存用户已给出的反馈。目标达成可选 REACHED/PARTIAL/NOT_REACHED/UNKNOWN，
    未评价保留 UNKNOWN，不为了填表阻塞提交。证据仅接收用户明确选择的最多
    5 段文本，不扫描源码、环境变量、凭据或会话目录。

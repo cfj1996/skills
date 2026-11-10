@@ -288,6 +288,8 @@ export async function runJenkinsRelease(call, reader, input, io = {}) {
     expectedSha: input.expectedSha, queueId: null, buildNumber: null, sourceVerified: false, writes: 0 };
   result.mockSafetyReceipts = mockSafetyReceipts;
   result.jenkinsContractHash = frozen.contractHash;
+  if (input.jenkinsProjectKey) result.jenkinsProjectKey = input.jenkinsProjectKey;
+  if (input.refParameter) result.refParameter = input.refParameter;
   result.jenkinsProfile = frozen.profileId;
   result.jenkinsProfileHash = frozen.profileHash;
   result.parameterDefinitionsHash = parameterDefinitionsHash;

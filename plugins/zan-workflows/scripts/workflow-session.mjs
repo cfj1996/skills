@@ -231,7 +231,7 @@ export class WorkflowSession {
     if (request.action === 'merge') this.#validateMerge(input);
     if (execute && request.action === 'submit') this.submissions.assertReviewed(request.input);
     try {
-      const steps = { call, io, run: (action, data, write) => {
+      const steps = { call, reader, io, run: (action, data, write) => {
         if (action === 'merge') this.#validateMerge(data);
         return this.#runAction(action, { ...data, execute: write, confirmed: write && input.confirmed === true }, { call, reader, io });
       } };

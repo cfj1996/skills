@@ -123,8 +123,11 @@ test('local Git containment refreshes the target ref and distinguishes ancestry 
     git(repo, 'rm', '-rf', '.');
     writeFileSync(join(repo, 'other.txt'), 'unrelated');
     git(repo, 'add', '.'); git(repo, 'commit', '-m', 'unrelated');
+    const unrelated = git(repo, 'rev-parse', 'HEAD');
     assert.deepEqual(await inspectTargetContainment({ repositoryPath: repo,
-      sourceSha: git(repo, 'rev-parse', 'HEAD'), targetBranch: 'develop' }), { contained: false, targetSha: target });
+      sourceSha: unrelated, targetBranch: 'develop' }), { contained: false, targetSha: target });
+    assert.deepEqual(await inspectTargetContainment({ repositoryPath: repo,
+      sourceSha: source, expectedDeliveredSha: unrelated, targetBranch: 'develop' }), { contained: false, targetSha: target });
     await assert.rejects(inspectTargetContainment({ repositoryPath: repo, sourceSha: 'd'.repeat(40), targetBranch: 'develop' }), /包含关系未能验证/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

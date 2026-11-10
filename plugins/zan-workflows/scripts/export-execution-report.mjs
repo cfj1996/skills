@@ -15,6 +15,12 @@ const textFields = ['stage', 'action', 'operationId', 'phase', 'state', 'code', 
 const numberFields = ['elapsedMs', 'idleBeforeMs', 'busyMs', 'idleMs', 'requestCount'];
 const safe = (object, fields, max = 1000) => Object.fromEntries(fields.filter(key =>
   typeof object?.[key] === 'string').map(key => [key, redactText(object[key], max)]));
+function measuredTotal(events, type, field, allowObservedWait = false) {
+  const measurements = events.filter(event => event.type === type && Object.hasOwn(event, field) &&
+    (event.source === 'executor' || allowObservedWait && event.source === 'agent_summary'));
+  return measurements.length ? measurements.reduce((sum, event) => sum + event[field], 0) : null;
+}
+const duration = value => typeof value === 'number' ? value + ' ms' : '未知（未采集）';
 const codeBlock = text => {
   const tick = String.fromCharCode(96);
   let longest = 2;
@@ -87,9 +93,9 @@ export function buildReport(run, input = {}) {
     metrics: { observedActions: actions.length, confirmationCount: confirmations.length,
       correctionCount: events.filter(e => e.type === 'user_correction').length,
       retryCount: events.filter(e => e.type === 'retry').length,
-      actionElapsedMs: actions.reduce((sum, e) => sum + (e.elapsedMs || 0), 0),
-      precedingIdleMs: events.filter(e => e.type === 'action_started').reduce((sum, e) => sum + (e.idleBeforeMs || 0), 0),
-      explicitWaitMs: events.filter(e => e.type === 'wait_finished').reduce((sum, e) => sum + (e.elapsedMs || 0), 0) },
+      actionElapsedMs: measuredTotal(events, 'action_finished', 'elapsedMs'),
+      precedingIdleMs: measuredTotal(events, 'action_started', 'idleBeforeMs'),
+      explicitWaitMs: measuredTotal(events, 'wait_finished', 'elapsedMs', true) },
     artifacts: [...new Set(events.map(event => event.artifactUrl).filter(Boolean))], events };
   report.revision = hash(JSON.stringify(report));
   return report;
@@ -102,9 +108,9 @@ export function renderReport(report, maxEvents = Infinity) {
     '人工纠正：' + (report.feedback.correction || '未补充'),
     '确认次数：' + report.metrics.confirmationCount, '人工纠正次数：' + report.metrics.correctionCount,
     '明确记录的重试：' + report.metrics.retryCount,
-    '已记录动作耗时：' + report.metrics.actionElapsedMs + ' ms',
-    '动作前空闲：' + report.metrics.precedingIdleMs + ' ms（不推断全部为用户等待）',
-    '明确记录的等待：' + report.metrics.explicitWaitMs + ' ms',
+    '已记录动作耗时：' + duration(report.metrics.actionElapsedMs),
+    '动作前空闲：' + duration(report.metrics.precedingIdleMs) + '（不推断全部为用户等待）',
+    '明确记录的等待：' + duration(report.metrics.explicitWaitMs),
     '记录范围：' + report.coverage.scope + '；日志损坏或截断：' + report.coverage.incomplete,
     '结束事件：' + (report.coverage.hasTerminalEvent ? '已记录' : '未记录')].join('\n');
   const selected = report.events.slice(-maxEvents);
