@@ -41,6 +41,26 @@ changed option as approval of an undisplayed operation set. Retain actual
 completed effects rather than replaying them. This uses the same confirmation
 question, not a separate deployment preference prompt.
 
+## Registered test Job
+
+For each `DEPLOY` row, use [workspace Job lookup](../../workspace-project-knowledge/SKILL.md#function-3---jenkins-job-lookup).
+Resolve an application deployment through its project/module mapping. Resolve a
+tooling package through its verified owner and configured package or shared
+release path. Select the registered test environment for an application and
+the canary channel for a tooling release. Read the applicable profile and
+parameters from the fixed Jenkins contracts.
+
+The selected Job defines its full build or publication. Show the project, Job,
+test ref, environment, channel, resolved parameters and purpose in the same
+submission checklist. Its authorization covers the configured full run. Treat
+a package name from the diff as change context. When the user explicitly
+restricts publication to a subset, require a Job that supports the restriction.
+
+For a pipeline-computed package version, bind the delivered SHA and the
+verified pipeline. Set the release target to the selected project for a
+project-wide Job. Derive `PROJECT` scope and the version identity from that
+binding for test submission.
+
 ## Consolidated submission authorization
 
 沿用[执行清单的确认复用](../../../references/execution-checklist.md#执行清单的确认复用)。
@@ -138,8 +158,9 @@ Use the [scripted delivery executors](../../../references/scripted-delivery.md)
 with `completionMode=TRIGGER_ACCEPTED` in both PLAN and EXECUTE, reusing the
 unchanged consolidated authority. The helper refreshes symbolic ref/SHA before
 triggering once; pin the delivered merge SHA when supported. A changed source
-blocks rather than silently including later commits. Package adapter/version/
-whole-project scope checks remain required before submission.
+blocks rather than silently including later commits. For tooling canary, use
+its adapter to bind the fixed parameters and pipeline-computed version policy
+when applicable. The Job's configured publication is part of the same operation.
 
 An accepted response must identify the exact Job and a valid queue URL/ID on
 the same instance. Retain the helper's `BUILD_SUBMITTED` receipt, including

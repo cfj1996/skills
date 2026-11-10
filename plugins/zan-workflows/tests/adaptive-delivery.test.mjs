@@ -267,8 +267,11 @@ function jenkins({ forbidden = false, packageJob = false, modifyIdentity, badPip
 
 test('computed canary submission returns before queue/build/publication reads without inventing a package version', async () => {
   const fake = jenkins({ packageJob: true });
-  const input = { ...fake.base, releaseChannel: 'canary', releaseRef: 'develop', completionMode: 'TRIGGER_ACCEPTED' };
+  const input = { ...fake.base, releaseScope: undefined, targetEnvironment: 'test', releaseChannel: 'canary',
+    releaseRef: 'develop', completionMode: 'TRIGGER_ACCEPTED' };
   const plan = await runJenkinsRelease(fake.call, fake.reader, input, fake.io);
+  assert.equal(plan.releaseScope, 'PROJECT');
+  assert.deepEqual(plan.params, { PROJECT_NAME: 'demo', RELEASE_TYPE: 'release:canary' });
   const reader = { ...fake.reader,
     queue: async () => assert.fail('must not wait for queue'),
     build: async () => assert.fail('must not wait for build'),
@@ -408,6 +411,9 @@ test('npm-tools computes canary ref/channel from verified pipeline source and re
 test('computed releases cannot widen a package request to project scope or guess a different source branch', async () => {
   const fake = jenkins({ packageJob: true });
   await assert.rejects(runJenkinsRelease(fake.call, fake.reader, { ...fake.base, releaseTarget: '@demo/core' }, fake.io), /整个项目/);
+  await assert.rejects(runJenkinsRelease(fake.call, fake.reader, { ...fake.base, releaseScope: undefined,
+    releaseTarget: '@demo/core', targetEnvironment: 'test', releaseRef: 'develop', releaseChannel: 'canary',
+    completionMode: 'TRIGGER_ACCEPTED' }, fake.io), /整个项目/);
   await assert.rejects(runJenkinsRelease(fake.call, fake.reader, { ...fake.base, releaseRef: 'develop' }, fake.io), /实际流水线/);
   assert.equal(fake.calls.some(row => row.name === 'jenkins_trigger_build'), false);
 });

@@ -195,10 +195,11 @@ SUCCESS/actual SCM proof is required before Wiki/TAPD. A result claiming
 `DEPLOYED` still requires terminal SUCCESS and actual SCM proof. Validate the full `run-jenkins-release.mjs`
 invocation once with exact instance/Job URL, ref/version/channel/parameters,
 config/definition or explicitly displayed metadata-only binding fingerprints,
-source repository and expected delivered SHA. Adapter-derived parameters and
-pipeline-computed version policy require the exact verified Jenkinsfile and
-whole-project scope. Check pipeline source before trigger, but do not wait for
-actual pipeline checkout or published package versions in submission mode;
+source repository and expected delivered SHA. For a pipeline-computed version,
+validate the exact Jenkinsfile binding and the resolved project/channel
+parameters. The selected Job defines the full test run and is authorized in
+this same checklist. Check pipeline source before trigger. In submission mode,
+continue on queue acceptance;
 a source identity is not a version and `BUILD_SUBMITTED` is not `RELEASED`.
 Its only write is through `jenkins-mcp`; the declared GET-only API read fallback
 must stay within that instance and Job. In `TRIGGER_ACCEPTED`, validate the

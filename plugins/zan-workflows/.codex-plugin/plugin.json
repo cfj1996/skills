@@ -1,6 +1,6 @@
 {
   "name": "zan-workflows",
-  "version": "0.4.18+codex.20261110-tapd-wiki-links",
+  "version": "0.4.19+codex.20261110-test-job-full-release",
   "description": "TAPD Bug repair and requirement development with scoped plans, task links, verified implementation and explicit delivery.",
   "author": {
     "name": "Local developer"

@@ -227,9 +227,10 @@ stage transitions do not start new private validators.
    Match the full pending delivery and continuation delta to the approved
    behavior, impact and verification facts. Stale evidence reopens affected
    checks before any delivery write, including developer edits on the same page.
-2. Resolve `deployment_mode` per repository and, for `DEPLOY`, resolve its exact Jenkins Job,
-   test environment, release channel, parameters/version identity, and purpose
-   through workspace project knowledge and release-safety rules.
+2. Resolve `deployment_mode` per repository. For `DEPLOY`, resolve the
+   [registered test Job](references/deployment-and-confirmation.md#registered-test-job)
+   and its frozen parameters for the delivery object. Application deployments and
+   tooling canaries both run the selected Job as configured.
    First check the same checklist's completed predecessor receipts under
    [delivery reuse](../../references/execution-checklist.md#已完成交付的复用).
    Bind each reusable receipt to its own row and current target/source,

@@ -61,8 +61,11 @@ export async function adaptJenkinsInput(definitions, input, io = {}) {
     result.version ||= input.expectedSha;
   } else if (adapter === 'npm-tools-v1') {
     if (input.releaseKind !== 'package' || !names.has('PROJECT_NAME') || !names.has('RELEASE_TYPE')) throw new Error('Job 不支持 npm-tools 参数');
-    if (input.releaseScope !== 'PROJECT' || input.releaseTarget !== input.targetProject) {
-      throw new Error('此 Job 会发布整个项目，必须在清单中明确 PROJECT 范围及项目目标');
+    const testCanary = input.completionMode === 'TRIGGER_ACCEPTED' &&
+      input.releaseChannel === 'canary' && input.targetEnvironment === 'test';
+    const releaseScope = input.releaseScope ?? (testCanary ? 'PROJECT' : null);
+    if (releaseScope !== 'PROJECT' || input.releaseTarget !== input.targetProject) {
+      throw new Error('此 Job 会发布整个项目，发布目标须匹配项目');
     }
     const body = await (io.readPipeline || readPipelineSource)(input.pipelineSource);
     const contract = npmToolsContract(body, input);
@@ -71,7 +74,7 @@ export async function adaptJenkinsInput(definitions, input, io = {}) {
       if (result.params[key] !== undefined && result.params[key] !== value) throw new Error('已提供参数与实际流水线规则不一致');
       result.params[key] = value;
     }
-    result = { ...result, refParameter: null, channelParameter: 'RELEASE_TYPE', versionParameter: null,
+    result = { ...result, releaseScope, refParameter: null, channelParameter: 'RELEASE_TYPE', versionParameter: null,
       versionStrategy: 'PIPELINE_COMPUTED', version: input.version || input.expectedSha, ...contract };
     // The displayed source SHA is an identity. It is not a predicted npm version.
     if (result.version !== input.expectedSha) throw new Error('此 Job 的计算版本计划使用源码 SHA 作为身份，实际包版本在构建后读回');

@@ -350,7 +350,11 @@ Use this when the user asks to run, trigger, deploy, package, test environment, 
 Workflow:
 
 1. Route the project with Function 1.
-2. Read `jenkins_jobs` and, when present, `jenkins_job_urls` from the centralized `${project_knowledge_root}/data/workspace/project-relations.yaml`, falling back to `references/project-relations.yaml`.
+2. In `${project_knowledge_root}/data/workspace/project-relations.yaml` (or the
+   bundled fallback), resolve the configured key for the delivery object. For an
+   application, use its project/module entry in `jenkins_jobs`. For a tooling
+   package, use its configured package Job or resolve the verified owner through
+   `release_workflows.public_libraries` and its shared `jenkins_jobs` key.
    For build/deployment consumers, resolve the exact Job/instance/URL, complete parameter
    definitions/defaults/choices and environment profile from
    `${project_knowledge_root}/data/workspace/jenkins-build-contracts.json` under
@@ -365,9 +369,8 @@ Workflow:
    without recursive traversal. Return the evidenced Job name, URL and routing evidence. A consumer
    requiring a clickable Job link blocks if the URL cannot be verified. For
    Wiki consumers, apply the [Job heading rules](../drafting-wiki/references/wiki-template.md#job-heading).
-4. If a project is not listed in `jenkins_jobs`, say it is not listed in the workspace index; do not guess a `front-*-test` name.
-5. For public libraries and tooling packages, check whether they map to the shared `npm-tools-test` job.
-6. For Wiki consumers, apply the scoped supplemental Job rules in
+4. If the applicable mapping is missing, report the exact unresolved entry.
+5. For Wiki consumers, apply the scoped supplemental Job rules in
    [wiki-template.md](../drafting-wiki/references/wiki-template.md#instant-apps-live-app-关联-job).
    Resolve those links separately; Wiki-only Jobs do not change `jenkins_jobs`
    or expand the selected test-environment build list.

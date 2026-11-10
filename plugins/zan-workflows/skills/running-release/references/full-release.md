@@ -63,10 +63,12 @@ another terminal to deliver a long plan.
    version parameter names; without a version parameter use the confirmed SHA
    as deployment identity. Let the Job adapter resolve actual parameter names.
    For a pipeline-computed package version, bind the verified Jenkinsfile
-   repository/ref/SHA/path, source identity and explicit whole-project release
-   scope. Test submission returns the source identity and accepted queue only;
-   `BUILD_TERMINAL` reads actual package versions after the build. Never expand a request
-   for one package to a whole project without displaying and confirming that scope.
+   repository/ref/SHA/path and source identity. For test submission, the selected
+   Job/project defines the full run in the same checklist. An explicit package
+   restriction requires a Job that supports it. Standalone project-wide
+   releases require explicit project-wide authorization. Test submission returns
+   the source identity and accepted queue only. `BUILD_TERMINAL` reads actual package versions
+   after the build.
    Package canary must bind a non-official channel
    parameter and cannot update `latest`/stable. Do not infer official intent.
 2. Reuse a complete current preview with Job identity, frozen-parameter and applicable

@@ -495,7 +495,8 @@ release intent stay with the producer; scripts do not guess a Job from cwd.
 后才可补充具体构建链接，不能从队列地址推导或预造。修正展示链接时复用原回执，
 不重新触发构建，也不为此增加队列、构建或日志查询。
 
-Required facts: `targetProject`, `releaseTarget` (package name for a package),
+Required facts: `targetProject`, `releaseTarget` (project for a project-wide Job,
+package name for a package-specific Job),
 `targetEnvironment`, `jobName`, evidenced `jobUrl`, `releaseRef`, `expectedSha`,
 `sourceRepository`, `version`, `releaseChannel=canary|official`,
 `releaseKind=deployment|package`, `purpose`, exact `params`, `refParameter` and
@@ -543,10 +544,12 @@ afterwards. `TRIGGER_ACCEPTED` returns before checkout/publication, with null
 `version`, source `versionIdentity`, and no `publishedPackages`.
 
 This pipeline publishes the whole selected project and computes versions.
-Require displayed `releaseScope=PROJECT`, `releaseTarget=targetProject` and
-`versionStrategy=PIPELINE_COMPUTED`; never widen a single-package request
-silently. Plan `version` is the confirmed source SHA as an identity, not a
-predicted npm version. In `BUILD_TERMINAL`, after SUCCESS parse the exact build's bounded
+Set `releaseTarget=targetProject`. For a test canary in `TRIGGER_ACCEPTED`, the
+adapter derives `releaseScope=PROJECT` from the selected Job when omitted.
+Standalone releases still specify `releaseScope=PROJECT`. A package-only target
+requires a package-specific Job. The adapter binds `versionStrategy=PIPELINE_COMPUTED`
+and uses the source SHA as the plan's version identity. In `BUILD_TERMINAL`,
+after SUCCESS parse the exact build's bounded
 publication summary (at most 2 MiB), matching project/channel and stable
 versus prerelease versions. Return actual `publishedPackages`, null `version`
 and source `versionIdentity`. Missing publication evidence cannot return
