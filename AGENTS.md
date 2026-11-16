@@ -225,6 +225,10 @@ tests cover the renamed CLI without central configuration, ordinary and Zan
 review modes, evidence-backed monorepo adoption scope, applicable documentation and revision-bound merge gates using
 local fixtures; no project allowlist, TAPD data or remote writes are required.
 
+For mp_log filter, pagination, credential loading, and error handling, run
+`node --test plugins/zan-workflows/tests/search-mp-logs.test.mjs`. The CLI
+fixture uses local credentials and a simulated TLS response.
+
 ## Commit & Pull Request Guidelines
 
 Before creating any new working branch, apply the workspace Git naming rule:

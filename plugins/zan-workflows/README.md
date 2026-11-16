@@ -173,7 +173,8 @@ MR 和已完成效果；清理按准确资源清单单独确认，不在主入�
 [Wiki 起草](skills/drafting-wiki/SKILL.md)、[补 Wiki 链接](skills/linking-tapd-wiki/SKILL.md)、
 [构建发布](skills/running-release/SKILL.md)、[合并请求 Review](skills/merge-request-review/SKILL.md)、
 [登录令牌](skills/login-token-workflow/SKILL.md)、[人员映射](skills/team-identity-map/SKILL.md)、
-[历史记忆](skills/project-memory-context/SKILL.md)。不要在开始时一并加载全部能力。
+[历史记忆](skills/project-memory-context/SKILL.md)、
+[mp_log 查询](skills/searching-mp-logs/SKILL.md)。不要在开始时一并加载全部能力。
 
 合并请求 Review 使用 `$merge-request-review`，面向具有合并权限的人员。可处理指定 GitLab MR、
 明确项目或经核实的当前用户待处理列表；合并权限和本人处理关系分别核实。
@@ -220,6 +221,7 @@ ZAN_WORKFLOWS_RECORDING=off 可关闭自动记录；旧运行没有日志时如�
 | GitLab | GITLAB_API_URL、GITLAB_PERSONAL_ACCESS_TOKEN |
 | Jenkins | MCP_JENKINS_URL、MCP_JENKINS_USER、MCP_JENKINS_API_TOKEN |
 | YApi | YAPI_BASE_URL，及项目 token 或用户名/密码 |
+| 火山 TLS | `volcengineTls` 中的 AK/SK、地域、Endpoint 和 Topic ID，临时凭证填写 Token |
 | Graphify Hub | 可访问配置中的公司内网服务；缺少能力时由知识入口按证据回退 |
 
 默认凭据文件为 `~/.config/zan-workflows/credentials.json`，Windows 对应

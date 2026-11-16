@@ -84,6 +84,8 @@ Windows 使用同一份 Node.js 脚本，直接启动 `volta.exe` / `uvx.exe`；
 - TAPD 使用原环境配置的三个字段。
 - YApi 显式提供用户名+密码；也支持 `YAPI_PROJECT_TOKEN` 替代账号登录。
   不依赖包内默认账号。目标包仍从公司 npm 源获取。
+- 火山 TLS 查询使用同一文件中的 `volcengineTls`。凭据示例预填广州 `mp_log` 的连接参数。
+  筛选条件和返回字段见 [mp_log 查询技能](../skills/searching-mp-logs/SKILL.md)。
 
 在插件目录执行只校验配置的命令，不启动服务或输出凭证：
 

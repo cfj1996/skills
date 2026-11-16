@@ -1,0 +1,4 @@
+interface:
+  display_name: "zan:查询前端日志"
+  short_description: "按时间范围和筛选条件从火山 TLS 查询 mp_log，并返回原始日志 JSON"
+  default_prompt: "使用 $searching-mp-logs 按我给的时间范围和筛选条件查询 mp_log，返回日志 JSON。"

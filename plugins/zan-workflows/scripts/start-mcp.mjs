@@ -45,6 +45,15 @@ export function readConfig(path) {
   }
 }
 
+export function credentialProcessEnv(inherited = process.env) {
+  const env = { ...inherited };
+  // Keep each service's credentials and auth settings in its own child process.
+  for (const key of Object.keys(env)) {
+    if (/^(GITLAB_|MCP_JENKINS_|TAPD_|YAPI_|VOLCENGINE_|ZAN_WORKFLOWS_CONFIG$)/i.test(key)) delete env[key];
+  }
+  return env;
+}
+
 export function buildLaunch(name, config, inherited = process.env, platform = process.platform) {
   const spec = Object.hasOwn(servers, name) && servers[name];
   if (!spec) throw new Error('未知 MCP；可用名称：gitlab-mcp、jenkins-mcp、tapd-mcp、yapi-mcp。');
@@ -58,11 +67,7 @@ export function buildLaunch(name, config, inherited = process.env, platform = pr
       throw new Error(`缺少 ${name} 的必填字段 ${key}。`);
     }
   }
-  const env = { ...inherited };
-  // Do not leak another service's credentials or stale auth mode to this child.
-  for (const key of Object.keys(env)) {
-    if (/^(GITLAB_|MCP_JENKINS_|TAPD_|YAPI_|ZAN_WORKFLOWS_CONFIG$)/i.test(key)) delete env[key];
-  }
+  const env = credentialProcessEnv(inherited);
   for (const key of [...spec.required, ...(spec.optional || [])]) {
     if (values[key] === undefined) continue;
     if (typeof values[key] !== 'string' || values[key].includes('\0')) {
@@ -81,7 +86,7 @@ export function buildLaunch(name, config, inherited = process.env, platform = pr
 
 export function redact(text, values) {
   const secrets = Object.entries(values)
-    .filter(([key, value]) => /TOKEN|PASSWORD|SECRET/i.test(key) && value)
+    .filter(([key, value]) => /TOKEN|PASSWORD|SECRET|ACCESS[_-]?KEY/i.test(key) && value)
     .map(([, value]) => value).sort((a, b) => b.length - a.length);
   for (const secret of secrets) text = text.split(secret).join('[REDACTED]');
   return text;
