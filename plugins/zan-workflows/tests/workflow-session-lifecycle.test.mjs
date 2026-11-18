@@ -264,6 +264,21 @@ test('MCP shutdown verifies its owned group, including TERM-resistant descendant
   assert.doesNotThrow(() => process.kill(other.pid, 0));
 });
 
+test('TAPD startup emits a typed TLS failure and shares it without a second launch', async t => {
+  let launches = 0;
+  const pool = new McpClientPool(() => {
+    launches++;
+    return new StdioMcpClient(process.execPath, ['-e',
+      'process.stderr.write("CERTIFICATE_"); setTimeout(() => { process.stderr.write("VERIFY_FAILED\\n"); process.exitCode = 1; }, 10);'],
+    'tapd-mcp');
+  });
+  t.after(() => pool.close());
+  const expected = error => error.code === 'MCP_TLS_FAILED' && /CA 信任配置/.test(error.message);
+  await assert.rejects(pool.get('tapd-mcp'), expected);
+  await assert.rejects(pool.get('tapd-mcp'), expected);
+  assert.equal(launches, 1);
+});
+
 test('Jenkins read fallback observes session cancellation instead of continuing its HTTP request', async () => {
   const controller = new AbortController();
   const reader = createJenkinsReader({ MCP_JENKINS_URL: 'https://ci.example.test/', MCP_JENKINS_USER: '', MCP_JENKINS_API_TOKEN: '' },

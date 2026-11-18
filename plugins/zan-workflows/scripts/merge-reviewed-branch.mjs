@@ -27,8 +27,12 @@ export async function inspectTargetContainment(input, io = {}) {
     const target = await run('git', ['rev-parse', `refs/remotes/origin/${input.targetBranch}`], { cwd: input.repositoryPath });
     const targetSha = target.stdout.trim();
     try {
-      for (const revision of new Set([input.sourceSha, input.expectedDeliveredSha].filter(Boolean))) {
-        await run('git', ['merge-base', '--is-ancestor', revision, targetSha], { cwd: input.repositoryPath });
+      const historicalSha = input.mergeMode === 'CONTAINMENT_ONLY' ? input.expectedDeliveredSha : undefined;
+      const ancestry = historicalSha
+        ? [[input.sourceSha, historicalSha], [historicalSha, targetSha]]
+        : [...new Set([input.sourceSha, input.expectedDeliveredSha].filter(Boolean))].map(revision => [revision, targetSha]);
+      for (const [ancestor, descendant] of ancestry) {
+        await run('git', ['merge-base', '--is-ancestor', ancestor, descendant], { cwd: input.repositoryPath });
       }
       return { contained: true, targetSha };
     } catch (error) {
@@ -49,7 +53,8 @@ async function containsSource(input, io) {
 }
 
 async function testTargetReceipt(input, targetSha, io) {
-  const proof = input.sourceSha === targetSha ? { contained: true, targetSha }
+  const deliveredSha = input.expectedDeliveredSha ?? targetSha;
+  const proof = input.sourceSha === targetSha && deliveredSha === targetSha ? { contained: true, targetSha }
     : await (io.inspectContainment || inspectTargetContainment)(input, io);
   if (typeof proof?.contained !== 'boolean' || !SHA.test(proof.targetSha || '')) {
     throw new Error('测试分支包含关系不可核实');
@@ -59,7 +64,7 @@ async function testTargetReceipt(input, targetSha, io) {
   return { state: 'VERIFIED', operation: 'VERIFY_CONTAINMENT_ONLY', projectId: input.projectId,
     repositoryPath: input.repositoryPath, originUrl: input.originUrl,
     sourceBranch: input.sourceBranch, targetBranch: input.targetBranch, sourceSha: input.sourceSha,
-    targetSha, observedTargetSha: targetSha, deliveredSha: targetSha, containment: true,
+    targetSha, observedTargetSha: targetSha, deliveredSha, containment: true,
     mrIid: null, mrUrl: null, mergeReadback: false, mergeCommitSha: null, writes: 0 };
 }
 
@@ -114,6 +119,10 @@ function mergeMode(input) {
       !['dev', 'develop'].includes(input.targetBranch) || !SHA.test(input.sourceSha || ''))) {
     throw new Error('只读包含关系核验必须绑定测试分支和已评审 source SHA，不能执行 MR 写入');
   }
+  if (input.expectedDeliveredSha !== undefined &&
+      (!['VERIFY_ONLY', 'CONTAINMENT_ONLY'].includes(mode) || !SHA.test(input.expectedDeliveredSha))) {
+    throw new Error('固定历史交付 SHA 只适用于原 MR 或测试分支包含关系的只读核验');
+  }
   return mode;
 }
 
@@ -125,10 +134,6 @@ function checkDefaultTarget(project, input) {
 
 export function mergeRequiredTools(input) {
   const mode = mergeMode(input);
-  if (input.expectedDeliveredSha !== undefined &&
-      (mode !== 'VERIFY_ONLY' || !SHA.test(input.expectedDeliveredSha))) {
-    throw new Error('固定历史交付 SHA 只适用于原 MR 的只读核验');
-  }
   if (mode === 'CONTAINMENT_ONLY') return ['get_branch', 'get_project'];
   return ['get_branch', 'get_project', 'get_merge_request', 'list_merge_requests',
     ...(input.execute && !input.mrIid ? ['create_merge_request'] : []),

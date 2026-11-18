@@ -12,6 +12,7 @@ import { repairRecordBody } from './helpers/bug-repair-record-fixture.mjs';
 const source = 'a'.repeat(40), target = 'b'.repeat(40), delivered = 'c'.repeat(40);
 const branch = 'feature/test.disclaimer', repo = 'https://git.example.test/team/factory.git';
 const ci = 'https://ci.example.test/jenkins', jobUrl = ci + '/job/factory-test/';
+const secondRepo = 'https://git.example.test/team/mobile.git', secondDelivered = 'f'.repeat(40);
 const wikiUrl = id => 'https://www.tapd.cn/123/markdown_wikis/show/#' + id;
 const entry = '1. Job：[factory](' + jobUrl + ')\n- 项目名称：[factory](' + repo + ')\n- 代码分支名：' + branch + '\n- 是否上线：未合并\n';
 const tapd = (key, values) => ({ content: [{ type: 'text', text: JSON.stringify({ status: 1, data: values.map(row => ({ [key]: row })) }) }] });
@@ -19,7 +20,7 @@ const tapd = (key, values) => ({ content: [{ type: 'text', text: JSON.stringify(
 async function fixture(t, options = {}) {
   const dir = await mkdtemp(join(tmpdir(), 'continuous-submission-')), calls = [], sourceChecks = [];
   const bodyFile = join(dir, 'approved.md');
-  let mr, merged = false, wikiId = '20', oldBody = '# 后端\n保留已有条目\n\n# 前端\n';
+  let wikiId = '20', oldBody = '# 后端\n保留已有条目\n\n# 前端\n';
   const pages = new Map(), comments = new Map();
   function replaceWiki(id, body) {
     wikiId = id; oldBody = body;
@@ -36,8 +37,8 @@ async function fixture(t, options = {}) {
     refParameter: 'branch', params: { branch: 'develop' }, jobAdapter: 'explicit-v1', jenkinsProfile: 'fixture' };
   const parameters = [{ name: 'branch' }];
   if (options.environmentParameter) parameters.push({ name: 'RELEASE_TYPE', choices: ['release:canary', 'release:prod'] });
-  const readback = () => [{ parameters: [
-    { name: 'branch', value: options.readbackBranch || 'develop' },
+  const readback = targetBranch => [{ parameters: [
+    { name: 'branch', value: options.readbackBranch || targetBranch },
     ...(options.environmentParameter ? [{ name: 'RELEASE_TYPE', value: 'release:canary' }] : []),
   ] }];
   const wiki = { workspaceId: 123, entryType: 'stories', entryId: '1', sourceBranch: branch, entryRepoUrl: repo,
@@ -53,23 +54,68 @@ async function fixture(t, options = {}) {
     input.repairRecord = { workspaceId: 123, entryId: '1', author: 'developer', body: repairRecordBody, previousRecord: null,
       requiredRepositories: [repo], reviewedSourceSha: source, contentFingerprint: merge.mockSafety.contentFingerprint };
   }
+  const first = { merge, release, delivered, queueId: 42, mrIid: 5, merged: options.alreadyContained };
+  if (options.alreadyContained) {
+    merge.mergeMode = 'CONTAINMENT_ONLY';
+    merge.targetSha = delivered;
+  }
+  const models = [first];
+  let second;
+  if (options.batch) {
+    const secondMerge = { ...merge, projectId: '10', originUrl: secondRepo, targetBranch: 'dev',
+      sourceSha: 'd'.repeat(40), targetSha: 'e'.repeat(40) };
+    secondMerge.mockSafety = noMockFixture(secondMerge);
+    const secondRelease = { ...release, targetProject: 'mobile', releaseTarget: 'mobile', jobName: 'mobile-test',
+      jobUrl: ci + '/job/mobile-test/', sourceRepository: secondRepo, releaseRef: 'dev', params: { branch: 'dev' } };
+    second = { merge: secondMerge, release: secondRelease, delivered: secondDelivered, queueId: 43, mrIid: 6 };
+    models.push(second);
+    input.repositories = [{ merge, release }, { merge: secondMerge, release: options.skipSecond ? null : secondRelease }];
+    delete input.merge;
+    delete input.release;
+    delete wiki.bodyFile;
+    wiki.entryMarkdown = [
+      { entryRepoUrl: repo, sourceBranch: branch, markdown: entry },
+      { entryRepoUrl: secondRepo, sourceBranch: branch, markdown: entry.replaceAll(repo, secondRepo).replaceAll('factory', 'mobile') },
+    ];
+    if (options.bug) {
+      input.repairRecord.requiredRepositories = [repo, secondRepo];
+      input.repairRecord.reviewedSources = models.map(({ merge: row }) => ({
+        originUrl: row.originUrl, sourceSha: row.sourceSha, contentFingerprint: row.mockSafety.contentFingerprint,
+      }));
+    }
+  }
+  const byProject = projectId => models.find(model => model.merge.projectId === String(projectId));
+  const byRepo = originUrl => models.find(model => model.merge.originUrl === originUrl);
+  const byJob = jobName => models.find(model => model.release.jobName === jobName);
+  const liveTarget = model => model.advancedTarget ?? (model.merged ? model.delivered : model.merge.targetSha);
+  const markMerged = model => {
+    model.merged = true;
+    return Object.assign(model.mr, { state: 'merged', merge_commit_sha: model.delivered });
+  };
   const pool = { close: async () => ({ cleanupComplete: true }), call: async (server, name, args) => {
     calls.push(name);
-    if (name === 'get_branch') return { commit: { id: args.branch_name === branch ? source : merged ? delivered : target } };
-    if (name === 'get_project') return { id: 9, default_branch: 'main', http_url_to_repo: repo };
-    if (name === 'list_merge_requests') return mr && !merged ? [mr] : [];
-    if (name === 'create_merge_request') return mr = { iid: 5, source_project_id: 9, target_project_id: 9, sha: source,
-      source_branch: branch, target_branch: 'develop', state: 'opened', detailed_merge_status: 'mergeable',
-      blocking_discussions_resolved: true, web_url: 'https://git.example.test/team/factory/-/merge_requests/5' };
-    if (name === 'get_merge_request') return mr;
-    if (name === 'get_merge_request_approval_state') return { rules: [] };
-    if (name === 'merge_merge_request') { merged = true; return Object.assign(mr, { state: 'merged', merge_commit_sha: delivered }); }
+    if (server === 'gitlab-mcp') {
+      const model = byProject(args.project_id), row = model.merge, id = Number(row.projectId);
+      if (name === 'get_branch') return { commit: { id: args.branch_name === row.sourceBranch ? row.sourceSha
+        : liveTarget(model) } };
+      if (name === 'get_project') return { id, default_branch: 'main', http_url_to_repo: row.originUrl };
+      if (name === 'list_merge_requests') return model.mr && !model.merged ? [model.mr] : [];
+      if (name === 'create_merge_request') return model.mr = { iid: model.mrIid, source_project_id: id, target_project_id: id,
+        sha: row.sourceSha, source_branch: row.sourceBranch, target_branch: row.targetBranch, state: 'opened',
+        detailed_merge_status: 'mergeable', blocking_discussions_resolved: true,
+        ...(options.manual && model === second ? { user: { can_merge: false } } : {}),
+        web_url: row.originUrl.replace(/\.git$/, '/-/merge_requests/') + model.mrIid };
+      if (name === 'get_merge_request') return model.mr;
+      if (name === 'get_merge_request_approval_state') return { rules: [] };
+      if (name === 'merge_merge_request') return markMerged(model);
+    }
     if (name === 'jenkins_list_instances') return [{ name: 'default', url: ci }];
     if (name === 'jenkins_trigger_build') {
-      if (options.unknown) throw new Error('lost trigger response');
+      const model = byJob(args.jobName);
+      if (options.unknown && (!second || model === second)) throw new Error('lost trigger response');
       if (options.replace) replaceWiki('21', '# 后端\n新版替代文档\n\n# 前端\n');
-      if (options.editBody) pages.get(wikiId).markdown_description += '后端并发补充\n';
-      return { jobName: release.jobName, queueUrl: ci + '/queue/item/42/' };
+      if (options.editBody && model === first) pages.get(wikiId).markdown_description += '后端并发补充\n';
+      return { jobName: args.jobName, queueUrl: ci + '/queue/item/' + model.queueId + '/' };
     }
     const o = args.options;
     if (name === 'get_bug') return tapd('Bug', [bug]);
@@ -93,30 +139,47 @@ async function fixture(t, options = {}) {
     }
     throw new Error('unexpected ' + name);
   } };
-  const newSession = () => new WorkflowSession({ allowExecute: true, pool, reader: () => ({ instanceUrl: ci, jobUrl,
-    job: async () => ({ name: release.jobName, url: jobUrl }), queueIdentity: url => ({ id: 42, url }),
-    queue: async () => {
-      calls.push('read_queue');
-      if (options.expiredQueue) throw Object.assign(new Error('queue expired'), { httpStatus: 404 });
-      return { id: 42, actions: readback() };
+  const newSession = () => new WorkflowSession({ allowExecute: true, pool, reader: request => {
+    const model = byJob(request.jobName);
+    return { instanceUrl: ci, jobUrl: model.release.jobUrl,
+      job: async () => ({ name: model.release.jobName, url: model.release.jobUrl }),
+      queueIdentity: url => ({ id: Number(new URL(url).pathname.match(/\d+(?=\/$|$)/)?.[0]), url }),
+      queue: async () => {
+        calls.push('read_queue');
+        if (options.expiredQueue) throw Object.assign(new Error('queue expired'), { httpStatus: 404 });
+        return { id: model.queueId, actions: readback(model.merge.targetBranch) };
+      },
+      buildForQueue: async () => {
+        calls.push('read_historical_queue');
+        return { number: 7, queueId: model.queueId, actions: readback(model.merge.targetBranch) };
+      },
+    };
+  },
+    io: { ...fixtureMockIo, checkRepository: async () => {}, inspectContainment: async request => {
+      const model = byRepo(request.originUrl);
+      return { contained: Boolean(model.merged), targetSha: liveTarget(model) };
     },
-    buildForQueue: async () => {
-      calls.push('read_historical_queue');
-      return { number: 7, queueId: 42, actions: readback() };
-    },
-  }),
-    io: { ...fixtureMockIo, checkRepository: async () => {}, inspectContainment: async () => ({ contained: merged, targetSha: merged ? delivered : target }),
-      containsSource: async request => ({ contained: !request.expectedDeliveredSha || !options.deliveryRemoved,
-        targetSha: request.expectedDeliveredSha && options.targetAdvanced ? target : delivered }), checkSource: async request => {
+    containsSource: async request => {
+      const model = byRepo(request.originUrl);
+      return { contained: !request.expectedDeliveredSha || !options.deliveryRemoved,
+        targetSha: request.expectedDeliveredSha && options.targetAdvanced ? model.merge.targetSha : liveTarget(model) };
+    }, checkSource: async request => {
         if (options.requireTargetReview && !request.mockSafety.deliverySourceEvidence) throw new Error('目标分支包含额外内容，需要增量评审');
-        sourceChecks.push(request.expectedSha); return { kind: 'branch', ref: 'refs/heads/develop',
-          branch: 'develop', sourceRepository: repo, sourceSha: request.expectedSha };
-      }, readFrozenJenkinsContracts: async () => frozenJenkinsFixture(release, { parameters }, ci) } });
+        sourceChecks.push(request.expectedSha);
+        return { kind: 'branch', ref: 'refs/heads/' + request.releaseRef,
+          branch: request.releaseRef, sourceRepository: request.sourceRepository, sourceSha: request.expectedSha };
+      }, readFrozenJenkinsContracts: async (_, __, request) => {
+        const model = request.jobName ? byJob(request.jobName)
+          : models.find(row => row.release.targetProject === request.jenkinsProjectKey);
+        return frozenJenkinsFixture(model.release, { parameters }, ci);
+      } } });
   let i = 0, session = newSession();
   const request = (phase, data) => session.dispatch({ id: 'request-' + ++i, action: 'submit', phase, input: data });
   const run = plan => request('EXECUTE', { confirmed: true, planId: plan.planId, reviewedPlanHash: plan.planId });
   t.after(async () => { await session.close(); await rm(dir, { recursive: true, force: true }); });
   return { input, request, run, calls, sourceChecks, pages, comments, bodyFile,
+    advanceFirstTarget: sha => { first.advancedTarget = sha; },
+    mergeSecondOutsideSession: () => markMerged(second),
     restart: async () => { await session.close(); session = newSession(); }, get oldBody() { return oldBody; } };
 }
 
@@ -137,6 +200,154 @@ test('one authorized request carries the merged SHA, accepted queue and verified
   const count = f.calls.length;
   assert.equal((await f.run(plan)).state, 'SUBMITTED');
   assert.equal(f.calls.length, count);
+});
+
+test('one batch preview binds both test Jobs and renders the selected entries into one shared Wiki', async t => {
+  const f = await fixture(t, { batch: true });
+  const secondary = f.input.repositories[1];
+  secondary.release = { jenkinsProjectKey: 'mobile', jobAdapter: 'explicit-v1' };
+  const annex = '\n# 附录\n保持原文\n';
+  const unrelated = entry.replace('1. Job', '2. Job').replaceAll(repo, 'https://git.example.test/team/other.git');
+  f.pages.get('20').markdown_description = f.oldBody + entry + unrelated + annex;
+  f.input.wiki.entryMarkdown[0].markdown = entry + '- 内容：更新展示设置\n';
+
+  const plan = await f.request('PLAN', f.input);
+  assert.equal(plan.review.repositories[1].release.jobUrl, ci + '/job/mobile-test/');
+  assert.deepEqual(plan.review.repositories.map(row => row.release.params), [{ branch: 'develop' }, { branch: 'dev' }]);
+  assert.equal(f.calls.filter(name => name === 'jenkins_list_instances').length, 1);
+  assert.equal(f.calls.filter(name => name === 'get_stories_or_tasks').length, 3);
+  assert.match(plan.review.approvedWikiBody, /3\. Job：\[mobile\]/);
+  assert.ok(plan.review.approvedWikiBody.includes(unrelated));
+  assert.ok(plan.review.approvedWikiBody.endsWith(annex.trimStart()));
+  assert.equal(f.calls.filter(name => /^(create_|merge_merge_|jenkins_trigger|update_)/.test(name)).length, 0);
+
+  const result = await f.run(plan);
+  assert.equal(result.state, 'SUBMITTED');
+  assert.deepEqual(result.receipts.repositories.map(row => [row.git.deliveredSha, row.release.queueId]),
+    [[delivered, 42], [secondDelivered, 43]]);
+  assert.equal(f.pages.get('20').markdown_description, plan.review.approvedWikiBody);
+  assert.deepEqual(f.calls.filter(name => /^(create_|merge_merge_|jenkins_trigger|update_)/.test(name)),
+    ['create_merge_request', 'merge_merge_request', 'jenkins_trigger_build', 'create_merge_request', 'merge_merge_request',
+      'jenkins_trigger_build', 'update_wiki', 'create_comments', 'create_comments']);
+});
+
+test('a batch reports independent preflight failures before any merge or build', async t => {
+  const f = await fixture(t, { batch: true });
+  f.input.repositories[1].release.params = { branch: 'develop' };
+  f.input.wiki.entryMarkdown[0].markdown = '无项目条目的正文';
+  await assert.rejects(f.request('PLAN', f.input), error => {
+    assert.equal(error.result.writes, 0);
+    assert.deepEqual(error.result.checks.map(check => check.phase), ['repository', 'wiki']);
+    assert.match(error.result.checks[0].error, /参数.*不一致/);
+    return true;
+  });
+  assert.equal(f.calls.filter(name => /^(create_|merge_merge_|jenkins_trigger|update_)/.test(name)).length, 0);
+});
+
+test('a second repository awaiting manual merge continues the exact batch plan without replaying the first delivery', async t => {
+  const f = await fixture(t, { batch: true, manual: true, bug: true, skipSecond: true });
+  const plan = await f.request('PLAN', f.input);
+  const paused = await f.run(plan);
+  assert.equal(paused.state, 'AWAITING_MERGE');
+  assert.equal(paused.repository, secondRepo);
+  assert.equal(paused.receipts.repositories[0].release.queueId, 42);
+  assert.equal(f.calls.includes('update_wiki'), false);
+  assert.equal((await f.request('PLAN', { resumePlanId: plan.planId })).state, 'AWAITING_MERGE');
+
+  f.mergeSecondOutsideSession();
+  const ready = await f.request('PLAN', { resumePlanId: plan.planId });
+  assert.equal(ready.planId, plan.planId);
+  const result = await f.run(ready);
+  assert.equal(result.state, 'SUBMITTED');
+  assert.equal(result.receipts.repositories[1].release.state, 'SKIPPED_BY_INTENT');
+  assert.equal(result.receipts.registration.state, 'REGISTERED');
+  assert.deepEqual(f.calls.filter(name => /^(create_|merge_merge_|jenkins_trigger|update_)/.test(name)),
+    ['create_merge_request', 'merge_merge_request', 'jenkins_trigger_build', 'create_merge_request',
+      'update_wiki', 'create_comments', 'update_bug']);
+});
+
+test('a fresh session resumes the shared Wiki after only rechecking both original MRs and Jenkins queues', async t => {
+  const f = await fixture(t, { batch: true, editBody: true });
+  const blocked = await f.run(await f.request('PLAN', f.input));
+  assert.equal(blocked.state, 'NEEDS_WIKI_REVIEW');
+  assert.equal(blocked.receipts.repositories[1].release.queueId, 43);
+  await f.restart();
+  const recoverDelivery = structuredClone(blocked.receipts);
+  delete recoverDelivery.repositories[1].release;
+  await assert.rejects(f.request('PLAN', { ...f.input, recoverDelivery }), /确切回执/);
+  const plan = await f.request('PLAN', { ...f.input, recoverDelivery: blocked.receipts });
+  assert.deepEqual(plan.review.repositories.map(row => row.recoveredDelivery.queueId), [42, 43]);
+  const before = f.calls.length;
+  const result = await f.run(plan);
+  assert.equal(result.state, 'SUBMITTED');
+  assert.equal(f.calls.slice(before).filter(name => name === 'read_queue').length, 2);
+  assert.equal(f.calls.filter(name => name === 'merge_merge_request').length, 2);
+  assert.equal(f.calls.filter(name => name === 'jenkins_trigger_build').length, 2);
+  assert.equal(f.calls.filter(name => name === 'update_wiki').length, 1);
+  assert.ok(f.pages.get('20').markdown_description.includes('后端并发补充'));
+});
+
+test('an already contained delivery resumes without an MR or a rebuild after the test branch advances', async t => {
+  const f = await fixture(t, { alreadyContained: true, editBody: true });
+  const paused = await f.run(await f.request('PLAN', f.input));
+  assert.equal(paused.state, 'NEEDS_WIKI_REVIEW');
+  assert.equal(paused.receipts.git.mrIid, null);
+  assert.equal(paused.receipts.git.deliveredSha, delivered);
+  const latest = 'd'.repeat(40);
+  f.advanceFirstTarget(latest);
+  await f.restart();
+  await writeFile(f.bodyFile, f.pages.get('20').markdown_description + entry);
+  const resumed = await f.request('PLAN', { ...f.input, recoverDelivery: paused.receipts });
+  const result = await f.run(resumed);
+  assert.equal(result.state, 'SUBMITTED');
+  assert.equal(result.receipts.git.observedTargetSha, latest);
+  assert.equal(result.receipts.git.deliveredSha, delivered);
+  assert.equal(result.receipts.release.expectedSha, delivered);
+  assert.equal(result.receipts.release.queueId, 42);
+  assert.equal(f.calls.includes('get_merge_request'), false);
+  assert.equal(f.calls.filter(name => name === 'jenkins_trigger_build').length, 1);
+});
+
+test('a later test tip preserves a previously reviewed and built target increment during recovery', async t => {
+  const f = await fixture(t, { requireTargetReview: true, editBody: true });
+  const waiting = await f.run(await f.request('PLAN', f.input));
+  assert.equal(waiting.state, 'NEEDS_TARGET_REVIEW');
+  const increment = 'd'.repeat(40), latest = 'e'.repeat(40);
+  const targetEvidence = { deliveredSha: increment, scopeFingerprint: 'a'.repeat(64), contentFingerprint: 'b'.repeat(64),
+    evidenceRefs: ['independent review of delivered tree'] };
+  f.advanceFirstTarget(increment);
+  const reviewed = await f.request('PLAN', { resumePlanId: waiting.planId, targetEvidence });
+  const paused = await f.run(reviewed);
+  assert.equal(paused.state, 'NEEDS_WIKI_REVIEW');
+  assert.equal(paused.receipts.release.expectedSha, increment);
+  f.advanceFirstTarget(latest);
+  await f.restart();
+  await writeFile(f.bodyFile, f.pages.get('20').markdown_description + entry);
+  const merge = { ...f.input.merge, mockSafety: { ...f.input.merge.mockSafety, deliverySourceEvidence: targetEvidence } };
+  const resumed = await f.request('PLAN', { ...f.input, merge, recoverDelivery: paused.receipts });
+  const result = await f.run(resumed);
+  assert.equal(result.state, 'SUBMITTED');
+  assert.equal(result.receipts.git.deliveredSha, delivered);
+  assert.equal(result.receipts.target.observedTargetSha, latest);
+  assert.equal(result.receipts.target.deliveredSha, increment);
+  assert.equal(result.receipts.release.expectedSha, increment);
+  assert.deepEqual(f.calls.filter(name => ['merge_merge_request', 'jenkins_trigger_build'].includes(name)),
+    ['merge_merge_request', 'jenkins_trigger_build']);
+});
+
+test('a lost second build response preserves the first queue and blocks dependent writes in the same or a fresh session', async t => {
+  const f = await fixture(t, { batch: true, unknown: true });
+  const plan = await f.request('PLAN', f.input);
+  let uncertain;
+  await assert.rejects(f.run(plan), error => {
+    uncertain = error.result;
+    return uncertain.state === 'UNKNOWN' && uncertain.receipts.repositories[0].release.queueId === 42;
+  });
+  await assert.rejects(f.run(plan), /不允许/);
+  await f.restart();
+  await assert.rejects(f.request('PLAN', { ...f.input, recoverDelivery: uncertain.receipts }), /确切回执/);
+  assert.equal(f.calls.filter(name => name === 'jenkins_trigger_build').length, 2);
+  assert.equal(f.calls.includes('update_wiki'), false);
 });
 
 test('STANDARD with no Jenkins binding writes the Wiki and Task links without calling Jenkins', async t => {

@@ -26,6 +26,8 @@ Bugs or Stories, or drop a required project to close early.
 Consume the [same execution checklist](../../references/execution-checklist.md#围绕同一清单编排)
 and existing definitions/brief/Plan. Return actual results to their bound scope;
 do not repeat global collection, ordinary preparation validation or user confirmation.
+Apply its [scope and stopping rules](../../references/execution-checklist.md#本轮结束条件)
+when choosing components, changing code and reviewing the resulting diff.
 
 Use the verified handoff. Resolve missing input/branch constraints in
 [contracts.md](references/contracts.md) and [development rules](references/development-rules.md).

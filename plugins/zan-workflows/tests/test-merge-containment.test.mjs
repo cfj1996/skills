@@ -111,6 +111,9 @@ test('local Git containment refreshes the target ref and distinguishes ancestry 
     writeFileSync(join(repo, 'source.txt'), 'reviewed');
     git(repo, 'add', '.'); git(repo, 'commit', '-m', 'reviewed');
     const source = git(repo, 'rev-parse', 'HEAD');
+    writeFileSync(join(repo, 'delivery.txt'), 'original delivery');
+    git(repo, 'add', '.'); git(repo, 'commit', '-m', 'deliver');
+    const delivered = git(repo, 'rev-parse', 'HEAD');
     writeFileSync(join(repo, 'target.txt'), 'target advancement');
     git(repo, 'add', '.'); git(repo, 'commit', '-m', 'advance');
     const target = git(repo, 'rev-parse', 'HEAD');
@@ -119,6 +122,25 @@ test('local Git containment refreshes the target ref and distinguishes ancestry 
     const proof = await inspectTargetContainment({ repositoryPath: repo, sourceSha: source, targetBranch: 'develop' });
     assert.deepEqual(proof, { contained: true, targetSha: target });
     assert.equal(git(repo, 'rev-parse', 'refs/remotes/origin/develop'), target);
+
+    const history = { ...input(), repositoryPath: repo, sourceSha: source, targetSha: undefined,
+      mergeMode: 'CONTAINMENT_ONLY', expectedDeliveredSha: delivered };
+    let liveTarget = target;
+    const call = async name => {
+      if (name === 'get_project') return { http_url_to_repo: originUrl, default_branch: 'main' };
+      if (name === 'get_branch') return { commit: { id: liveTarget } };
+      assert.fail('Unexpected MR or GitLab write: ' + name);
+    };
+    const io = { checkRepository: async () => {} };
+    assert.deepEqual(mergeRequiredTools(history), ['get_branch', 'get_project']);
+    const historical = await originalMergeReviewedBranch(call, history, io);
+    assert.equal(historical.deliveredSha, delivered);
+    assert.equal(historical.observedTargetSha, target);
+    assert.equal(historical.writes, 0);
+    await assert.rejects(originalMergeReviewedBranch(call, { ...history, sourceSha: delivered, expectedDeliveredSha: source }, io), /尚未包含/);
+    await assert.rejects(originalMergeReviewedBranch(call,
+      { ...history, targetSha: delivered, expectedDeliveredSha: undefined }, io), /目标分支 SHA 已变化/);
+
     git(repo, 'checkout', '--orphan', 'unrelated');
     git(repo, 'rm', '-rf', '.');
     writeFileSync(join(repo, 'other.txt'), 'unrelated');
@@ -129,5 +151,10 @@ test('local Git containment refreshes the target ref and distinguishes ancestry 
     assert.deepEqual(await inspectTargetContainment({ repositoryPath: repo,
       sourceSha: source, expectedDeliveredSha: unrelated, targetBranch: 'develop' }), { contained: false, targetSha: target });
     await assert.rejects(inspectTargetContainment({ repositoryPath: repo, sourceSha: 'd'.repeat(40), targetBranch: 'develop' }), /包含关系未能验证/);
+
+    // The source is still present after the rewrite, but the old delivery is gone.
+    git(repo, 'push', 'origin', `+${source}:refs/heads/develop`);
+    liveTarget = source;
+    await assert.rejects(originalMergeReviewedBranch(call, history, io), /尚未包含/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

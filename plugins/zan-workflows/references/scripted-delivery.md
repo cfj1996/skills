@@ -18,11 +18,11 @@ not require another human turn when the main authorization already covers them.
 
 ## Compose stable checklist operations
 
-For a single Story, selected Task, or one completely reviewed single-repository Bug delivering to test, use the built-in
-[continuous submission request](../skills/submitting-for-test/references/continuous-submission.md)
-instead of writing per-run glue between merge, queue acceptance, Wiki and Task links.
-The session binds one reviewed plan in memory. New decisions supersede old drafts.
-Reconcile confirmed partial effects before opening any fresh execution session.
+Use the [continuous submission request](../skills/submitting-for-test/references/continuous-submission.md)
+to deliver one Story, its selected Tasks, or one complete Bug to test across one or
+more application repositories. One review binds all repository rows and one Wiki.
+Identical reads share one preview result. Write boundaries get fresh evidence.
+On continuation, reconcile actual effects and use the verified MR/queue receipts.
 
 ## 开发前的只读采集
 

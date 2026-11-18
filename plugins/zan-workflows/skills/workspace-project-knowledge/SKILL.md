@@ -66,6 +66,8 @@ supply the needed context. Read only applicable rules and missing knowledge;
 do not start a Hub/Graphify query, scan all workspace maps, or load all standard
 modules solely because this skill was invoked. A bounded UI change using an
 already-owned component does not imply cross-project analysis.
+For a read-only question, finish with the requested fact, its source and any
+material gap once the scoped evidence is sufficient.
 
 Source roles:
 

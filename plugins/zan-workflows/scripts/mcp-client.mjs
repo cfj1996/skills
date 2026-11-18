@@ -11,18 +11,20 @@ export class StdioMcpClient {
   constructor(command = process.execPath, args = [launcher, 'tapd-mcp'], name = 'tapd-mcp') {
     this.name = name;
     this.ownsGroup = ['darwin', 'linux'].includes(process.platform);
-    this.child = spawn(command, args, { detached: this.ownsGroup, stdio: ['pipe', 'pipe', 'inherit'] });
+    const captureStartup = name === 'tapd-mcp';
+    this.child = spawn(command, args, { detached: this.ownsGroup, stdio: ['pipe', 'pipe', captureStartup ? 'pipe' : 'inherit'] });
     this.started = new Promise(resolve => {
       this.child.once('spawn', () => resolve(true));
       this.child.once('error', () => resolve(false));
     });
     this.pending = new Map();
     this.nextId = 1;
-    const rejectAll = message => {
+    const rejectAll = (message, code) => {
       this.unavailable = true;
+      this.failure ??= Object.assign(new Error(message), code ? { code } : {});
       for (const pending of this.pending.values()) {
         clearTimeout(pending.timer);
-        pending.reject(new Error(message));
+        pending.reject(this.failure);
       }
       this.pending.clear();
     };
@@ -49,13 +51,28 @@ export class StdioMcpClient {
       }
       else pending.resolve(message.result);
     });
-    this.child.on('exit', () => rejectAll(`${name} 已退出`));
+    if (captureStartup) {
+      let stderrTail = '', startupFailure;
+      this.child.stderr.on('data', chunk => {
+        if (this.toolNames) return;
+        stderrTail = (stderrTail + chunk).slice(-4096);
+        if (/CERTIFICATE_VERIFY_FAILED|certificate verify failed|unknownissuer|unknown issuer/i.test(stderrTail)) {
+          startupFailure = ['TAPD MCP 启动时证书链未通过校验。请核实 uvx 和 Python 运行环境的 CA 信任配置', 'MCP_TLS_FAILED'];
+        } else if (!startupFailure && /failed to fetch|failed to download|no solution found when resolving/i.test(stderrTail)) {
+          startupFailure = ['TAPD MCP 启动时未能取得固定依赖。请核实 uvx 的包源和网络', 'MCP_DEPENDENCY_UNAVAILABLE'];
+        }
+      });
+      this.child.stderr.pipe(process.stderr, { end: false });
+      this.child.on('close', () => rejectAll(...(startupFailure || [`${name} 已退出`])));
+    } else {
+      this.child.on('exit', () => rejectAll(`${name} 已退出`));
+    }
     this.child.on('error', () => rejectAll(`无法启动 ${name}`));
     this.child.stdin.on('error', () => rejectAll(`${name} 输入已关闭`));
   }
 
   request(method, params = {}, timeoutMs = 30000) {
-    if (this.unavailable) return Promise.reject(new Error(`${this.name} 连接已不可用；不会重连或重试写操作`));
+    if (this.unavailable) return Promise.reject(this.failure);
     const id = this.nextId++;
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -128,7 +145,7 @@ export class StdioMcpClient {
         }
       } catch {
         try { if (this.ownsGroup && pid) signalGroup(pid, 'SIGKILL'); else this.child.kill('SIGKILL'); } catch {}
-      } finally { this.child.stdout.destroy(); this.child.stdin.destroy(); }
+      } finally { this.child.stdout.destroy(); this.child.stdin.destroy(); this.child.stderr?.destroy(); }
       return { server: this.name, pid: pid ?? null, state: cleanupComplete ? 'CLOSED' : 'CLEANUP_FAILED',
         cleanupComplete, cleanupScope: this.ownsGroup ? 'process-group' : 'direct-child-unverified', forced, remainingPids };
     })();

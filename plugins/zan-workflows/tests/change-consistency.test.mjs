@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { evaluateChangeConsistency } from '../scripts/change-consistency.mjs';
 import { evaluateMergeReadiness } from '../skills/merge-request-review/scripts/review-policy.mjs';
-import { assertWikiEntryUpdate, wikiReviewHash } from '../scripts/wiki-entry.mjs';
+import { assertWikiEntryUpdate, renderWikiEntries, wikiReviewHash } from '../scripts/wiki-entry.mjs';
 import { noMockFixture, fixtureMockIo } from './helpers/mock-safety-fixture.mjs';
 
 const branch = 'feature/alice.1024.权限调整';
@@ -99,6 +99,22 @@ test('entry correction preserves other repositories, history and identity', asyn
   const both = [selector, { sourceBranch: branch, originUrl: repoB }];
   assert.doesNotThrow(() => assertWikiEntryUpdate(page, page.replaceAll('列表只展示当前门店数据', '明确的新行为'), both));
   assert.throws(() => assertWikiEntryUpdate(page, corrected, [selector, selector]), /重复/);
+});
+
+test('generated entry updates preserve adjacent shared notes byte for byte', () => {
+  const project = entry(1, repoA) + '\n- 关联 Job：[front-jzan](https://ci.example.test/job/front-jzan/)\n';
+  const note = '\n<!-- 共用验收说明 -->\n联调时使用测试门店。  \n\n- 共用备注：保留原顺序\n\n';
+  const suffix = note + entry(2, repoB) + '\n# 备注\n保留人工备注';
+  const corrected = project.replace('列表只展示当前门店数据', '列表按新权限展示授权门店数据');
+  const entries = [{ entryRepoUrl: repoA, sourceBranch: branch, markdown: corrected }];
+  for (const newline of ['\n', '\r\n']) {
+    const before = `# 前端\n\n${project}${suffix}`.replaceAll('\n', newline);
+    const after = `# 前端\n\n${corrected}${suffix}`.replaceAll('\n', newline);
+    assert.equal(renderWikiEntries(before, entries), after);
+    assert.equal(renderWikiEntries(after, entries), after);
+    const lastEntry = `# 前端\n\n${project.trimEnd()}`.replaceAll('\n', newline);
+    assert.equal(renderWikiEntries(lastEntry, entries), `# 前端\n\n${corrected.trimEnd()}`.replaceAll('\n', newline));
+  }
 });
 
 test('fenced examples do not impersonate a real entry or hide meaningful content', async () => {

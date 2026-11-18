@@ -49,10 +49,7 @@ function validateDefinitions(job) {
   }
 }
 
-export async function loadFrozenJenkinsContract(input, io = {}) {
-  // The only test seam replaces file I/O. Definition objects in a deployment
-  // payload are deliberately ignored; production always rereads the authority.
-  const contractPath = await resolveJenkinsContractsPath(input);
+async function readRegistry(contractPath, input, io) {
   let body;
   try { body = await (io.readFrozenJenkinsContracts || readFile)(contractPath, 'utf8', input); }
   catch { throw new Error('无法读取 project-knowledge 的 Jenkins 固定参数配置；部署不会查询 Jenkins 参数或自动刷新'); }
@@ -60,6 +57,29 @@ export async function loadFrozenJenkinsContract(input, io = {}) {
   try { registry = JSON.parse(body); } catch { throw new Error('Jenkins 固定参数配置不是有效 JSON'); }
   if (registry.schemaVersion !== 1 || !object(registry.instance) || !text(registry.instance.name) ||
       !text(registry.instance.url) || !object(registry.jobs) || !object(registry.projectJobs)) throw new Error('Jenkins 固定参数配置版本或实例/项目映射无效');
+  return registry;
+}
+
+export async function bindFrozenJenkinsJob(input, io = {}) {
+  const contractPath = await resolveJenkinsContractsPath(input);
+  const registry = await readRegistry(contractPath, input, io);
+  const key = input.jenkinsProjectKey;
+  if (!text(key) || !own(registry.projectJobs, key)) throw new Error('本项目缺少固定 Jenkins Job 映射');
+  const jobName = registry.projectJobs[key];
+  const job = own(registry.jobs, jobName) && registry.jobs[jobName];
+  if (job?.status !== 'ready' || job.jobName !== jobName || !text(job.jobUrl)) {
+    throw new Error('项目映射的 Jenkins Job 尚未采集有效约定');
+  }
+  if (input.jobName !== undefined && input.jobName !== jobName || input.jobUrl !== undefined && input.jobUrl !== job.jobUrl) {
+    throw new Error('提供的 Jenkins Job 与本项目固定映射不一致');
+  }
+  return { ...input, jobName, jobUrl: job.jobUrl, jenkinsContractsPath: contractPath };
+}
+
+export async function loadFrozenJenkinsContract(input, io = {}) {
+  // Read from the configured authority even if the caller supplies definitions.
+  const contractPath = await resolveJenkinsContractsPath(input);
+  const registry = await readRegistry(contractPath, input, io);
   const job = registry.jobs[input.jobName];
   if (!object(job) || job.jobName !== input.jobName || job.status !== 'ready' || job.jobUrl !== input.jobUrl) {
     throw new Error('Job 尚未接入有效的 Jenkins 固定参数配置，或名称/URL 不匹配；请先独立刷新/维护');

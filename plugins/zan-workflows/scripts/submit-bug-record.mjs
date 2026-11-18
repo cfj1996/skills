@@ -9,14 +9,29 @@ const recordDrift = message => Object.assign(new Error(message), { code: 'REPAIR
 const numeric = value => typeof value === 'string' && /^\d+$/.test(value);
 const normalize = body => body.trim().replace(/\r\n/g, '\n').replace(/>\s+</g, '><');
 
-export function validateReviewedBugRecord(draft, registration, merge) {
+export function validateReviewedBugRecord(draft, registration, merges) {
+  const batch = Array.isArray(merges);
+  const required = batch ? merges : [merges];
   if (!draft || !Object.hasOwn(draft, 'previousRecord') || draft.previousRecord === undefined ||
       draft.workspaceId !== registration.workspaceId || draft.entryId !== registration.entryId ||
       !draft.author?.trim() || draft.author.trim() !== draft.author || typeof draft.body !== 'string' ||
-      draft.reviewedSourceSha !== merge.sourceSha || draft.contentFingerprint !== merge.mockSafety.contentFingerprint ||
-      !Array.isArray(draft.requiredRepositories) || draft.requiredRepositories.length !== 1 ||
-      repositoryKey(draft.requiredRepositories[0]) !== repositoryKey(merge.originUrl)) {
-    throw new Error('单 Bug 修复记录需绑定完整已审仓库、源码/内容、空间、Bug 和准确评论账号');
+      !Array.isArray(draft.requiredRepositories) || draft.requiredRepositories.length !== required.length) {
+    throw new Error('Bug 修复记录需绑定完整已审仓库、源码/内容、空间、Bug 和准确评论账号');
+  }
+  const expectedKeys = new Set(required.map(merge => repositoryKey(merge.originUrl)));
+  const declaredKeys = new Set(draft.requiredRepositories.map(repositoryKey));
+  const sources = batch ? draft.reviewedSources : [{ originUrl: draft.requiredRepositories[0],
+    sourceSha: draft.reviewedSourceSha, contentFingerprint: draft.contentFingerprint }];
+  if (declaredKeys.size !== expectedKeys.size || [...expectedKeys].some(key => !declaredKeys.has(key)) ||
+      !Array.isArray(sources) || sources.length !== required.length) {
+    throw new Error('Bug 修复记录没有覆盖本轮全部已审仓库');
+  }
+  for (const merge of required) {
+    const matches = sources.filter(row => row && repositoryKey(row.originUrl) === repositoryKey(merge.originUrl));
+    if (matches.length !== 1 || matches[0].sourceSha !== merge.sourceSha ||
+        matches[0].contentFingerprint !== merge.mockSafety.contentFingerprint) {
+      throw new Error('Bug 修复记录的仓库、源码或内容指纹与当前评审不一致');
+    }
   }
   const body = normalize(draft.body);
   const filled = (tag, label) => {
@@ -49,17 +64,23 @@ export function validateReviewedBugRecord(draft, registration, merge) {
 export async function publishSubmissionBugRecord(call, draft, binding, io) {
   const { registration, prerequisites } = binding;
   const [git] = binding.gitDeliveryReceipts || [];
+  const batch = binding.reviewedSources !== undefined;
   if (binding.confirmed !== true || registration?.entryType !== 'bug' || !git ||
-      !['SKIPPED_BY_INTENT', 'BUILD_SUBMITTED'].includes(prerequisites?.deployment) ||
-      prerequisites.deploymentReceipt?.state !== prerequisites.deployment ||
-      prerequisites?.deployment === 'BUILD_SUBMITTED' && (prerequisites.deploymentReceipt?.expectedSha !== git.deliveredSha ||
-        repositoryKey(prerequisites.deploymentReceipt.sourceRepository) !== repositoryKey(git.originUrl)) ||
       prerequisites?.profile === 'STANDARD' && (binding.wikiReceipt?.entryType !== 'bug' ||
         binding.wikiReceipt.entryId !== draft.entryId || binding.wikiReceipt.workspaceId !== draft.workspaceId ||
         !binding.wikiReceipt.links?.some(row => row.entryType === 'bug' && row.entryId === draft.entryId &&
           ['LINKED', 'ALREADY_LINKED'].includes(row.state)))) throw new Error('Bug 修复记录缺少匹配的交付授权、队列或 Wiki 回链');
   checkDeliveryPrerequisites(binding);
-  validateReviewedBugRecord(draft, registration, { originUrl: git.originUrl, sourceSha: binding.reviewedSourceSha, mockSafety: binding.mockSafety });
+  if (!batch && (!['SKIPPED_BY_INTENT', 'BUILD_SUBMITTED'].includes(prerequisites.deployment) ||
+      prerequisites.deploymentReceipt?.state !== prerequisites.deployment ||
+      prerequisites.deployment === 'BUILD_SUBMITTED' && (prerequisites.deploymentReceipt.expectedSha !== git.deliveredSha ||
+        repositoryKey(prerequisites.deploymentReceipt.sourceRepository) !== repositoryKey(git.originUrl)))) {
+    throw new Error('Bug 修复记录缺少匹配的构建回执');
+  }
+  if (batch && !Array.isArray(prerequisites.deploymentReceipts)) throw new Error('Bug 修复记录缺少完整的各仓构建回执');
+  validateReviewedBugRecord(draft, registration, batch ? binding.reviewedSources.map(row => ({
+    originUrl: row.originUrl, sourceSha: row.sourceSha, mockSafety: { contentFingerprint: row.contentFingerprint },
+  })) : { originUrl: git.originUrl, sourceSha: binding.reviewedSourceSha, mockSafety: binding.mockSafety });
   const { workspaceId, entryId, author, body } = draft;
   const expected = semanticBody(body), prior = new Map((draft.priorRounds || []).map(row => [row.commentId, row]));
   const exact = async id => {

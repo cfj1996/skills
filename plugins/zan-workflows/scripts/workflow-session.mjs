@@ -14,7 +14,7 @@ import { resolveJenkinsJob } from './resolve-jenkins-job.mjs';
 import { markPendingMergeWiki, validatePendingWikiPlan } from './pending-merge-wiki.mjs';
 import { performance } from 'node:perf_hooks';
 import { setTimeout as delay } from 'node:timers/promises';
-import { validateWait, waitForDeadline } from './workflow-runtime.mjs';
+import { stableJson, validateWait, waitForDeadline } from './workflow-runtime.mjs';
 import { sessionRecorder, stageForAction } from './execution-recorder.mjs';
 import { TestSubmissions } from './test-submission.mjs';
 import { createMockInspectionCache } from './mock-revision.mjs';
@@ -23,6 +23,8 @@ import { readTaskResults } from '../skills/breaking-down-requirement/scripts/rea
 
 const actions = ['collect', 'task-readback', 'submit', 'merge', 'release', 'wiki', 'registration', 'closeout', 'job'];
 const readOnlyActions = ['collect', 'task-readback', 'closeout', 'job'];
+const sharedPlanReads = new Set(['get_project', 'get_bug', 'get_comments', 'get_stories_or_tasks', 'get_wiki',
+  'jenkins_list_instances']);
 
 const ordinaryTimeoutMs = 180000;
 const maxTimeoutMs = 43200000;
@@ -231,9 +233,16 @@ export class WorkflowSession {
     if (request.action === 'merge') this.#validateMerge(input);
     if (execute && request.action === 'submit') this.submissions.assertReviewed(request.input);
     try {
-      const steps = { call, reader, io, run: (action, data, write) => {
+      const previewReads = new Map();
+      const stepCall = !execute && request.action === 'submit' ? server => (name, args) => {
+        if (!sharedPlanReads.has(name)) return call(server)(name, args);
+        const key = stableJson([server, name, args]);
+        if (!previewReads.has(key)) previewReads.set(key, call(server)(name, args));
+        return previewReads.get(key);
+      } : call;
+      const steps = { call: stepCall, reader, io, run: (action, data, write) => {
         if (action === 'merge') this.#validateMerge(data);
-        return this.#runAction(action, { ...data, execute: write, confirmed: write && input.confirmed === true }, { call, reader, io });
+        return this.#runAction(action, { ...data, execute: write, confirmed: write && input.confirmed === true }, { call: stepCall, reader, io });
       } };
       const result = request.action === 'submit'
         ? await (execute ? this.submissions.execute(request.input, steps) : this.submissions.prepare(request.input, steps))
@@ -402,7 +411,7 @@ export async function serveWorkflowSession({ session = new WorkflowSession(), in
         output.write(JSON.stringify({ id: request.id, result }) + '\n');
       } catch (error) {
         output.write(JSON.stringify({ id: request?.id || null,
-          result: error.result || { state: 'BLOCKED', writes: 0, error: error.message } }) + '\n');
+          result: error.result || { state: 'BLOCKED', writes: 0, error: error.message, code: error.code } }) + '\n');
       }
       if (session.closed) break;
       arm();

@@ -45,21 +45,52 @@ const ownerNames = value => typeof value === 'string'
   ? [...new Set(value.split(';').map(name => name.trim()).filter(Boolean))].sort().join(';') : '';
 const assigneeFields = item => Object.fromEntries(['current_owner', 'te', 'reporter'].map(name => [name, item[name] ?? null]));
 
+function checkAcceptedBuild(receipt) {
+  if (receipt?.state !== 'BUILD_SUBMITTED' || receipt.completionMode !== 'TRIGGER_ACCEPTED' ||
+      receipt.writes !== 1 || !Number.isSafeInteger(receipt.queueId) || receipt.queueId < 1 ||
+      !receipt.queueUrl || !receipt.jobUrl || !receipt.jobName || !receipt.sourceRepository ||
+      !/^[a-f\d]{40}(?:[a-f\d]{24})?$/i.test(receipt.expectedSha || '') ||
+      !receipt.submittedParams || !Object.keys(receipt.submittedParams).length) {
+    throw new Error('登记前缺少本次 Jenkins 构建提交的确切队列和参数回执');
+  }
+}
+
+function checkBatchBuilds(input, gates) {
+  const receipts = gates.deploymentReceipts;
+  const git = input.gitDeliveryReceipts;
+  if (!Array.isArray(receipts) || !Array.isArray(git) || !Array.isArray(input.requiredRepositories) ||
+      !input.requiredRepositories.length || receipts.length !== input.requiredRepositories.length ||
+      git.length !== receipts.length || gates.deploymentReceipt !== undefined) {
+    throw new Error('需为全部交付仓库提供各自的构建或跳过回执');
+  }
+  const remaining = new Set(input.requiredRepositories.map(repositoryKey));
+  if (remaining.size !== receipts.length) throw new Error('登记的仓库范围包含重复项');
+  for (const receipt of receipts) {
+    const key = repositoryKey(receipt?.sourceRepository);
+    const matches = git.filter(row => repositoryKey(row.originUrl || row.sourceRepository) === key);
+    const [delivery] = matches;
+    if (!remaining.delete(key) || matches.length !== 1 || !['VERIFIED', 'MERGED'].includes(delivery.state) ||
+        delivery.containment !== true || !['dev', 'develop'].includes(delivery.targetBranch) ||
+        !/^[a-f\d]{40}(?:[a-f\d]{24})?$/i.test(delivery.deliveredSha || '') ||
+        receipt.expectedSha !== delivery.deliveredSha) {
+      throw new Error('构建回执与本轮仓库、目标分支或实际交付版本不匹配');
+    }
+    if (receipt.state === 'SKIPPED_BY_INTENT' && receipt.writes === 0) continue;
+    checkAcceptedBuild(receipt);
+    if (receipt.releaseRef !== delivery.targetBranch || receipt.releaseChannel !== 'canary' ||
+        receipt.targetEnvironment !== 'test') throw new Error('构建回执不属于本次测试目标');
+  }
+  const expected = receipts.some(row => row.state === 'BUILD_SUBMITTED') ? 'BUILD_SUBMITTED' : 'SKIPPED_BY_INTENT';
+  if (gates.deployment !== expected) throw new Error('登记构建状态与各仓回执不一致');
+}
+
 export function checkDeliveryPrerequisites(input) {
   const gates = input.prerequisites;
   if (!gates || gates.git !== 'VERIFIED' || !['BUILD_SUBMITTED', 'DEPLOYED', 'RELEASED', 'SKIPPED_BY_INTENT'].includes(gates.deployment)) {
     throw new Error('登记前必须有 Git 交付和构建提交/部署/跳过部署的成功证据');
   }
-  if (gates.deployment === 'BUILD_SUBMITTED') {
-    const receipt = gates.deploymentReceipt;
-    if (receipt?.state !== 'BUILD_SUBMITTED' || receipt.completionMode !== 'TRIGGER_ACCEPTED' ||
-        receipt.writes !== 1 || !Number.isSafeInteger(receipt.queueId) || receipt.queueId < 1 ||
-        !receipt.queueUrl || !receipt.jobUrl || !receipt.jobName || !receipt.sourceRepository ||
-        !/^[a-f\d]{40}(?:[a-f\d]{24})?$/i.test(receipt.expectedSha || '') ||
-        !receipt.submittedParams || !Object.keys(receipt.submittedParams).length) {
-      throw new Error('登记前缺少本次 Jenkins 构建提交的确切队列和参数回执');
-    }
-  }
+  if (gates.deploymentReceipts !== undefined) checkBatchBuilds(input, gates);
+  else if (gates.deployment === 'BUILD_SUBMITTED') checkAcceptedBuild(gates.deploymentReceipt);
   if (gates.deployment === 'RELEASED') {
     const receipt = gates.deploymentReceipt;
     if (receipt?.state !== 'RELEASED' || receipt.releaseKind !== 'package' ||

@@ -145,8 +145,9 @@ A → C → B 处理，不因换技能或进入提交、构建、Wiki、登记�
 ## 4. 按请求交付
 
 仅 `SUBMIT|GO_LIVE` 进入 `zan-workflows:submitting-for-test`。
-单仓单 Bug 的完整 ReviewedChange、记录草稿和当前决定可用[连续提测](../submitting-for-test/references/continuous-submission.md)，
-一次执行至最终待测试读回。IMPLEMENT 仍在实施终点发表记录；多仓和上线仍按下文聚合与单独授权。
+普通单仓或跨仓应用交付用完整 ReviewedChange、记录草稿和当前决定进入
+[连续提测](../submitting-for-test/references/continuous-submission.md)，一次执行至最终待测试读回。
+IMPLEMENT 在实施终点发表记录；上线按完整交付回执和独立授权推进。
 将同一 Bug 的全部 `work_definitions` 与 `reviewed_changes` 按仓库准确配对，
 单仓库仍传原对象。先用 `submission_phase=PLAN` 准备完整 `SubmissionPlan`，在确认前不提交、
 推送、创建 MR、部署或更新 Wiki/TAPD。这里的确认可以来自完整执行清单：

@@ -1,8 +1,8 @@
-# 单仓需求与 Bug 连续提测
+# 应用连续提测
 
-在一个已核实的原分支向 dev/develop 交付一项 Story、所选 Task 或完整单仓 Bug 时，复用
-已有 workflow-session 的 `action=submit`。它调用原 Git、Jenkins、Wiki 和登记 helper，
-一次只准备或执行一份已审清单。输入通过 stdin，计划和回执留在会话内存。
+一个完整 Bug 或同一 Story 及所选 Tasks 使用 workflow-session 的 `action=submit`。
+一次规划全部应用仓库，由现有 Git、Jenkins、Wiki 和登记 helper 按回执推进。
+计划和回执留在会话内存。包发布、同仓多 Job、冲突中转分支按提测技能的相应步骤处理。
 
 ## 只读预览
 
@@ -13,13 +13,24 @@
 | --- | --- |
 | merge | 单个原分支的准确仓库、项目、目的、当前源码/目标 SHA、评审结果、CI 策略、MR 标题及 `mockSafety`。已交付或禁用写合并使用 `CONTAINMENT_ONLY`，不传 localGit。 |
 | localGit | 仅在本轮明确包含原分支本地提交/推送时提供。`commit`、`push:true`、准确 message、`reviewedFiles`（仓库相对路径 → `{sha256,mode}`，删除用 null）。mode 为 100644 或 100755。单独推已有提交时 commit=false、文件表为空。 |
-| release | 已选测试部署的实际 targetProject、releaseTarget、jobName、jobUrl、sourceRepository、测试渠道、冻结参数和实际测试分支 releaseRef，或明确 SKIP 时传 null。计划绑定 Job 和参数，执行从本次 Git 回执派生 expectedSha；无版本参数的项目使用同一 SHA 作版本身份。 |
-| wiki / linkTaskIds | STANDARD 使用已有 Wiki helper 的 workspaceId、entryType、entryId、sourceBranch、entryRepoUrl、作者及完整正文请求 bodyFile。linkTaskIds 只列本轮需补回链的真实 Task ID。NO_WIKI 时传 null 和空数组。预览固定父需求、目标页、既有正文及拟写正文指纹。 |
+| release | 所选测试构建。可传固定配置中的 `jenkinsProjectKey` 自动绑定 Job，或传准确的 `jobName`、`jobUrl` 和目标项目。默认用当前仓库与测试分支，参数由冻结契约填充，只传实际需要的覆盖值。明确 SKIP 时传 null。执行从 Git 回执派生 expectedSha。 |
+| wiki / linkTaskIds | STANDARD 传 workspaceId、entryType、entryId、原分支和仓库、作者及下方任一正文输入。linkTaskIds 只列本轮需补回链的真实 Task ID。NO_WIKI 时传 null 和空数组。预览固定父需求、目标页、既有正文及拟写正文指纹。 |
 | registration | 本条目的 workspaceId、entryType、entryId、workMode、目的和实际状态/版本动作。Story/Task 的 statusAction 为 NONE；versionAction 只有明确写版本才选 WRITE。 |
 | decisions | 最新已解决的实质决定，例如查询和保存的字段、实际配置 key、使用真实接口、交付终点。给整体评审者同一版本的决定、清单和完整 Wiki 正文。 |
-| repairRecord | 仅 Bug，传已审最终草稿 `{workspaceId,entryId,author,body,requiredRepositories,reviewedSourceSha,contentFingerprint,previousRecord}`。首次尚未发表明确填 null；先实施、后提测要传原 ReviewedChange 的确切评论回执。也会沿用 registration.prerequisites.repairRecord，两个来源必须一致。完整必要范围限本仓库，登记 statusAction=WAITING_TEST，不传 Task 回链。 |
+| repairRecord | 仅 Bug，传已审最终草稿 `{workspaceId,entryId,author,body,requiredRepositories,reviewedSourceSha,contentFingerprint,previousRecord}`。首次尚未发表的 `previousRecord` 填 null。先实施、后提测传原评论回执，其与 `registration.prerequisites.repairRecord` 一致。登记 statusAction=WAITING_TEST，Task 回链为空。 |
 
-返回 `planId` 及紧凑的 review 视图。独立评审这一版完整计划。人类授权可以来自匹配的
+跨仓时以 `repositories: [{merge, localGit?, release}, …]` 提供同一目的下的全部已审原仓库，
+替代顶层的 Git 和构建字段。每仓出现一次，Wiki、Task 回链和登记仍各用一份共同输入。
+跨仓 Bug 用草稿中的 `reviewedSources: [{originUrl, sourceSha, contentFingerprint}, …]`
+覆盖每个必要仓，替代单仓草稿的源码字段。
+
+Wiki 可用完整 `bodyFile`。需要生成补丁时，使用
+`entryMarkdown: [{entryRepoUrl, sourceBranch, markdown}, …]` 描述全部选定项目的完整编号条目。
+脚本在 `# 前端` 下保持旧条目标题和序号，计算新增序号，通过 `review.approvedWikiBody`
+返回完整正文用于展示和评审。预检返回失败的仓库、阶段和原因。TAPD MCP 证书和依赖启动
+失败分别返回 `MCP_TLS_FAILED`、`MCP_DEPENDENCY_UNAVAILABLE`。
+
+预检通过返回 `planId` 及 review 视图。独立评审这一版完整计划。人类授权可以来自匹配的
 完整执行清单。已批准的 Mock 范围和具体授权仍须与真实来源、操作和测试环境绑定。
 会话在等待期间已关闭时，用同样事实重新 PLAN，仅当 ID 仍匹配时复用评审/确认。
 重建临时 Wiki 文件时可以换路径。清单 ID 绑定正文指纹、页面归属、目标和动作，
@@ -34,7 +45,8 @@
 ~~~
 
 脚本核实/提交准确文件、推送原分支、执行或只读核验合并，用交付 SHA 触发所选测试构建，
-拿到队列回执就继续 Wiki/回链。无登记动作时直接保留 `NOT_APPLICABLE`。成功返回
+各仓依次取得回执后处理共用 Wiki、回链和登记。跨仓的 `receipts.repositories` 按原仓
+记录 Git 和构建回执。无登记动作时直接保留 `NOT_APPLICABLE`。成功返回
 `SUBMITTED` 和各步真实回执。同一会话再次引用已完成的同一计划只返回现有结果。
 主流程将这些真实回执填回原 TestSubmissionResult 的相应仓库/工作项。只有完整范围
 满足既有终点，且用户明确要求上线时，才把该结果交给 going-live 复核上线专属事实。
@@ -55,15 +67,26 @@ Bug 的记录在 Git、所选构建、适用 Wiki 及其独立链接评论核实
   `supersededWiki:{wikiId,noticeCommentId,noticeBodySha256}` 固定旧页及通知原文 SHA-256。
   预览和写入复核实际归属、所选各 Task 的全部回链、通知及正文。历史评论保持原样。
   缺证据或出现未解释的第三页时停止在 Wiki。
-- `NEEDS_TARGET_REVIEW`：核对合并后准确版本的新增依赖/Mock 配置，把 `deliveredSha`、
-  `scopeFingerprint`、`contentFingerprint` 和评审来源作为 `targetEvidence`，发
-  `PLAN {resumePlanId,targetEvidence,decisions}` 后使用新 ID。多仓或人工合并继续用已有专用流程。
+- 出现 `NEEDS_TARGET_REVIEW` 时，核对合并后准确版本的新增依赖/Mock 配置，把 `deliveredSha`、
+  `scopeFingerprint`、`contentFingerprint` 和评审来源作为 `targetEvidence`。跨仓追加暂停仓
+  的 `sourceRepository`。发 `PLAN {resumePlanId,targetEvidence,decisions}` 后使用新 ID。
+- 出现 `AWAITING_MERGE` 时，人工合并完成后发 `PLAN {resumePlanId}`。读回原 MR
+  和目标包含关系后沿用同一计划 ID，在真实授权仍适用时继续 EXECUTE。
 - `NEEDS_REPAIR_REVIEW`：尚未发送记录写入。先核实原评论、源码与人员/状态漂移；
   `PLAN {resumePlanId,repairRecord,decisions}` 只复核该记录及登记。已有评论 ID 不得丢弃或换 ID，
   保留所有已完成的 Git、构建和 Wiki。写入结果不明时不能用此续接重发。
 - 有写入结果不明、超时或部分成功时，报告失败步骤与已知回执，先只读核实实际效果。
-  会话已结束时，有准确原 MR 和队列回执的明确换页可走下述入口，其他情况用原单项 helper
-  续做缺失动作。不能从头重放提测。收尾仍发送 finish。
+  会话结束时沿用下述续接入口或用原单项 helper 补未完成动作。收尾发送 finish。
+
+## 会话关闭后的交付续接
+
+所有选定仓的 Git 和构建结果均已核实，仅余 Wiki、回链、修复记录或登记时，在新会话
+用原清单及受影响的更新发 PLAN，将上一轮结果的 `receipts` 作为 `recoverDelivery`。
+按原计划顺序提交各仓回执。原计划明确跳过构建时，沿用对应的跳过回执。
+PLAN 与 EXECUTE 均只读核实原 MR 或测试分支包含关系、固定 Job 和原队列参数。
+测试分支前进后，核实原交付版本包含已评审源码，且仍包含在当前测试分支中。
+保留原合并 SHA、已评审目标增量的交付 SHA 及对应的原构建回执。
+通过后从文档与登记继续。回执不足时先核实实际结果，禁止重放状态不明的写入。
 
 ## 会话关闭后的共享 Wiki 换页
 

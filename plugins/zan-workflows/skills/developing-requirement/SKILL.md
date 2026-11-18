@@ -214,7 +214,7 @@ Mock 完成、正式接口补齐时续接原分支、Task和Plan。先刷新契�
 `submission_profile=AUTO|STANDARD|NO_WIKI` 与 `deployment_mode=AUTO|DEPLOY|SKIP`。
 沿用当前清单的明确选择；未关闭时含 AUTO 默认 STANDARD 和 DEPLOY，不能覆盖明确的 NO_WIKI/SKIP。
 先 `submission_phase=PLAN` 准备各项目准确提测计划；与完整执行清单逐项核对
-时，普通单仓需求优先用[连续提测](../submitting-for-test/references/continuous-submission.md)带入当前决定和同一份评审；
+时，普通单仓和跨仓应用交付优先用[连续提测](../submitting-for-test/references/continuous-submission.md)带入当前决定和同一份评审；
 仍在原授权范围内，就直接 `submission_phase=EXECUTE`，不再次询问提交/推送/
 MR/部署确认。首轮未覆盖或实质变化才补充授权；单独执行技能仍先确认其具体计划。
 提测构建统一使用 `completionMode=TRIGGER_ACCEPTED`：确认 Jenkins 已接受确切队列，

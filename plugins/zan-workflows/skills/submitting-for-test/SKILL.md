@@ -53,6 +53,9 @@ verified test target, build/deploy its test environment and include Wiki.
 An explicit `NO_WIKI`/`SKIP` remains authoritative. Show the complete plan and
 Wiki preview before confirmation; defaults never authorize writes, and no
 separate Wiki preference question is needed.
+If the user says there is no Bug, resolve any verified Story/Task independently
+of the selected Wiki action. For a request without a TAPD item, deliver the
+requested Wiki text and identify any verified page target separately.
 
 Execute exactly one profile:
 
@@ -62,11 +65,13 @@ Execute exactly one profile:
 - `NO_WIKI`: Git delivery, optional Jenkins test deployment, the Bug's final
   repair record, and TAPD test registration; never load or invoke Wiki capability.
 
-Read [contracts.md](references/contracts.md),
-[change consistency](../../references/change-consistency.md),
-[submission-rules.md](references/submission-rules.md),
-[deployment-and-confirmation.md](references/deployment-and-confirmation.md), plus the shared
-[tool-routing policy](../../references/tool-routing.md) before writing.
+Use the [continuous submission contract](references/continuous-submission.md)
+for ordinary application delivery. Reuse applicable rules and verified facts
+from the handoff. Use [change consistency](../../references/change-consistency.md)
+for the reviewed delta and select the relevant sections of
+[contracts](references/contracts.md), [submission rules](references/submission-rules.md),
+[deployment and confirmation](references/deployment-and-confirmation.md), and
+[tool routing](../../references/tool-routing.md) for the remaining decisions.
 Read [acceptance-scenarios.md](references/acceptance-scenarios.md) only for an
 edge case or regression check.
 
@@ -76,9 +81,9 @@ MCP pool; individual CLI helpers remain available for standalone actions.
 Use the pinned helper runtime and wait for `SESSION_READY`; the session owns
 its TTY mode. Approval-format compatibility stays inside the merge helper;
 do not expand a missing `rules` field into manual endpoint probing.
-Send each authorized action separately, retain no workflow file, and refresh
-mutable facts inside its executor. Session reuse caches connections, not
-authorization, item state, refs or deployment evidence.
+Send the reviewed continuous submission as one request. For a specialized flow,
+send each selected helper action and use its receipt before calling the next.
+Keep the plan in memory and refresh mutable facts at the executor boundary.
 After the last selected helper result, send `action=finish, phase=PLAN` and
 require `SESSION_CLOSED` with verified cleanup before returning. Close before
 long human/reviewer waits; the default idle limit is five minutes. Request
@@ -207,14 +212,15 @@ requires a refreshed confirmation. Never rebuild on the test target or use
 
 ## Procedure
 
-普通单仓 Story/Task 或完整单仓 Bug 的已审测试交付优先使用 [连续提测入口](references/continuous-submission.md)。
+同一 Bug 或 Story/所选 Tasks 的普通单仓和跨仓应用测试交付优先使用
+[连续提测入口](references/continuous-submission.md)。该入口消费完整已审范围。
 同一份清单给用户和整体评审者，传入最新已确认的字段、配置项及交付终点。
-一条只读 PLAN 绑定实际参数、Wiki 补丁和所选任务，一条匹配确认的 EXECUTE 按真实回执推进。
-遇到目标增量或 Wiki 替换只补受影响的评审，沿用已取得的 Git、队列回执。
-原会话关闭后，已知原 MR 和队列且有明确作废通知的 Story/Task，走连续提测的跨会话换页入口。
+一条只读 PLAN 并行准备各仓及共享 Wiki，绑定实际参数、正文指纹和所选任务。
+一条匹配确认的 EXECUTE 按真实回执推进。目标增量、人工合并和 Wiki 变化按返回的暂停位置续跑。
+会话关闭后，原 Git 和构建回执齐全时用连续提测的跨会话续接，只读核实后完成 Wiki 或登记。
 Story/Task 无状态及版本动作时在计划中标为不适用。Bug 绑定已审的最终记录草稿，在 Git、
-所选构建及 Wiki/回链通过后发表或复用并精确读回，随后登记待测试。跨仓共享交付、包发布、
-人工合并和冲突处理继续使用下方专用步骤。
+所选构建及 Wiki/回链通过后发表或复用并精确读回，随后登记待测试。涉及包发布、
+同仓多 Job 或 A → C → B 冲突处理时，按下方对应步骤准备准确交付。
 
 Use the [whole-plan review](references/submission-rules.md#whole-plan-review):
 one independent `PRE_SUBMISSION_PLAN` covers the complete plan and its prepared

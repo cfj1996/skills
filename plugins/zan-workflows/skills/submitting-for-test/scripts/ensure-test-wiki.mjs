@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 
 import { StdioMcpClient } from '../../../scripts/mcp-client.mjs';
-import { assertWikiEntryUpdate, wikiEntry } from '../../../scripts/wiki-entry.mjs';
+import { assertWikiEntryUpdate, findWikiEntry, renderWikiEntries, wikiEntry } from '../../../scripts/wiki-entry.mjs';
 import { repositoryKey } from '../../../scripts/workflow-runtime.mjs';
 import { checkMockSafetySet, mockSafetyPreview } from '../../../scripts/mock-safety.mjs';
 export { StdioMcpClient } from '../../../scripts/mcp-client.mjs';
@@ -381,6 +381,20 @@ function validateSelectors(input) {
       throw new Error('entryUpdates 必须覆盖当前条目且不能重复');
     }
   }
+  if (input.entryMarkdown !== undefined) {
+    const key = row => `${repositoryKey(row.entryRepoUrl)}\n${row.sourceBranch}`;
+    const expected = (input.entryUpdates || [input]).map(key);
+    const entries = input.entryMarkdown;
+    if ((input.mode || 'ensure') !== 'ensure' || input.bodyFile || !Array.isArray(entries) ||
+        entries.length !== expected.length || entries.some(row => !row || !row.entryRepoUrl ||
+          typeof row.markdown !== 'string' || !row.markdown.trim())) {
+      throw new Error('生成 Wiki 正文需要每个选定项目的 Markdown 条目及其仓库和原分支');
+    }
+    const actual = entries.map(key);
+    if (new Set(actual).size !== expected.length || actual.some(value => !expected.includes(value))) {
+      throw new Error('待生成的 Wiki 条目没有准确覆盖本轮选定范围');
+    }
+  }
   if ((input.expectedOwnerType || input.expectedOwnerId) &&
       (!['stories', 'tasks', 'bug'].includes(input.expectedOwnerType) || !/^\d+$/.test(String(input.expectedOwnerId || '')))) {
     throw new Error('Wiki 归属必须成对提供准确的类型和 ID');
@@ -493,14 +507,16 @@ export async function ensureTestWiki(call, input, now = new Date(), io = {}) {
   }
   if (mode === 'update' && !input.expectedWikiId) throw new Error('update 模式必须指定 --expected-wiki-id');
   validateSelectors(input);
-  const [current, approvedBody, boundWiki] = await Promise.all([
+  const [current, bodyFromFile, boundWiki] = await Promise.all([
     mode === 'update' ? { entryType, entryId: String(entryId), item: { id: entryId }, comments: [] }
       : workWithComments(call, workspaceId, entryType, entryId),
     input.bodyFile ? readFile(input.bodyFile, 'utf8') : undefined,
     input.expectedWikiId ? wikiById(call, workspaceId, input.expectedWikiId) : undefined,
   ]);
-  if (input.expectedApprovedBodySha256 != null && (approvedBody === undefined ||
-      contentHash(approvedBody) !== input.expectedApprovedBodySha256)) throw wikiReviewError('拟写 Wiki 正文已变化，需刷新受影响的文档评审');
+  if (input.entryMarkdown === undefined && input.expectedApprovedBodySha256 != null &&
+      (bodyFromFile === undefined || contentHash(bodyFromFile) !== input.expectedApprovedBodySha256)) {
+    throw wikiReviewError('拟写 Wiki 正文已变化，需刷新受影响的文档评审');
+  }
   const { comments, item } = current;
   // Story owns all its Tasks; a Bug always owns its own cross-project submission.
   const owner = mode !== 'update' && entryType === 'tasks' && String(item.story_id) !== '0'
@@ -577,16 +593,33 @@ export async function ensureTestWiki(call, input, now = new Date(), io = {}) {
       assertBranch(child, sourceBranch, input);
     }
   }
+  const beforeBody = child?.markdown_description;
+  const generated = input.entryMarkdown !== undefined;
+  let approvedBody = bodyFromFile;
+  if (generated) {
+    try { approvedBody = renderWikiEntries(beforeBody ?? '', input.entryMarkdown); }
+    catch (error) { throw wikiReviewError(error.message); }
+    if (input.expectedApprovedBodySha256 != null && contentHash(approvedBody) !== input.expectedApprovedBodySha256) {
+      throw wikiReviewError('生成的 Wiki 正文已变化，需复核本次条目与最新正文');
+    }
+  }
+  const selectedEntries = input.entryUpdates || [input];
+  if (mode === 'ensure' && (generated || selectedEntries.length > 1) && approvedBody !== undefined) {
+    for (const item of selectedEntries) findWikiEntry(approvedBody, {
+      entryHeading: item.entryHeading, sourceBranch: item.sourceBranch, originUrl: item.entryRepoUrl,
+    });
+  }
   if (approvedBody !== undefined && (!approvedBody.trim() || !hasBranchEntry(approvedBody, sourceBranch, input))) {
     throw new Error('Wiki 正文必须非空并且只有一个准确的“代码分支名：<原分支>”行');
   }
   const target = child ? 'REUSE_EXISTING' : monthWiki ? 'CREATE_CHILD' : 'CREATE_MONTH_AND_CHILD';
-  const entryOperation = child && branchEntryCount(child.markdown_description, sourceBranch, input) === 0
+  const entryOperation = child && (mode === 'ensure' ? selectedEntries : [input])
+    .some(entry => branchEntryCount(beforeBody, entry.sourceBranch, entry) === 0)
     ? 'APPEND_ENTRY' : child ? 'REUSE_ENTRY' : 'NEW_PAGE';
   if (execute && mode === 'ensure' && entryOperation === 'APPEND_ENTRY' && approvedBody === undefined) {
     throw new Error('共用 Wiki 尚无当前项目分支条目；必须先预览并确认追加后的完整正文');
   }
-  if (mode === 'ensure' && entryOperation === 'APPEND_ENTRY' && approvedBody !== undefined) {
+  if (!generated && mode === 'ensure' && entryOperation === 'APPEND_ENTRY' && approvedBody !== undefined) {
     const before = child.markdown_description;
     let prefix = 0;
     while (prefix < before.length && before[prefix] === approvedBody[prefix]) prefix++;
@@ -597,15 +630,13 @@ export async function ensureTestWiki(call, input, now = new Date(), io = {}) {
   if (input.expectTarget && input.expectTarget !== target) {
     throw wikiReviewError(`Wiki 目标动作变为 ${target}，与确认计划不一致`);
   }
-  const beforeBody = child?.markdown_description;
-  if (child && typeof beforeBody !== 'string') throw new Error('已有 Wiki 缺少可验证的 Markdown 正文');
   const beforeBodySha256 = child ? contentHash(beforeBody) : null;
   const wikiOperation = child ? (approvedBody !== undefined && approvedBody !== beforeBody ? 'UPDATE' : 'NONE') : 'CREATE';
   if (wikiOperation === 'UPDATE' && entryOperation === 'REUSE_ENTRY' && !input.entryRepoUrl
       && /^[1-9]\d*[.、]\s*\S/m.test(beforeBody)) {
     throw new Error('更新规范 Wiki 条目必须提供 entryRepoUrl，不能仅凭分支修改整页');
   }
-  if (wikiOperation === 'UPDATE' && entryOperation === 'REUSE_ENTRY' && input.entryRepoUrl) {
+  if (!generated && wikiOperation === 'UPDATE' && entryOperation === 'REUSE_ENTRY' && input.entryRepoUrl) {
     assertWikiEntryUpdate(beforeBody, approvedBody, (input.entryUpdates || [input]).map(item => ({
       entryHeading: item.entryHeading, sourceBranch: item.sourceBranch, originUrl: item.entryRepoUrl,
     })));
@@ -635,13 +666,16 @@ export async function ensureTestWiki(call, input, now = new Date(), io = {}) {
     comment: mode === 'update' ? null : child ? commentBody(workspaceId, child.id) : '创建后用实际 Wiki ID 生成链接',
   };
   if (!execute) return {
-    ...plan, ...mockSafetyPreview(input), state: entryOperation === 'APPEND_ENTRY' ? 'PLANNED_APPEND_ENTRY'
+    ...plan, ...mockSafetyPreview(input),
+    ...(generated ? { approvedBody, approvedBodySha256: contentHash(approvedBody) } : {}),
+    state: entryOperation === 'APPEND_ENTRY' ? 'PLANNED_APPEND_ENTRY'
       : mode === 'update' && wikiOperation === 'NONE' ? 'UNCHANGED'
       : wikiOperation === 'UPDATE' ? 'PLANNED_UPDATE'
       : child ? (noWrite ? 'ALREADY_LINKED' : 'PLANNED_LINK')
         : monthWiki ? 'PLANNED_CREATE_CHILD' : 'PLANNED_CREATE_MONTH_AND_CHILD', writes: 0,
   };
   if (!noWrite) {
+    if (generated && !input.expectedApprovedBodySha256) throw new Error('写入前必须固定已审的生成 Wiki 正文指纹');
     if (mode === 'ensure' && owner !== current && (!input.expectedOwnerId || !input.expectedOwnerType)) {
       throw new Error('Task 写入前必须固定确认计划中的 --expected-owner-type 和 --expected-owner-id');
     }
