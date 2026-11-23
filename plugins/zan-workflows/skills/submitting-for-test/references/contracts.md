@@ -104,7 +104,12 @@ never rerun business implementation or invent a missing READY/REVIEWED handoff.
   real human authority, not a title/summary or true flag. Technical PLAN/results
   are its structured views. Grouped requirements retain the same completeness
   and dependency checks as grouped Bugs, but use the verified parent Story and
-  selected Task scope with no Bug repair record or state/owner transition. Final
+  selected Task scope with no Bug repair record or state/owner transition. The
+  [execution Wiki source](../../executing-tapd-plan/references/executing.md)
+  supplies its verified Story or Bug page, current confirmed revision and selected
+  P/F/TC with a complete reviewed set and no Task links. Wiki-based Bugs retain
+  the shared draft, actual prior comment evidence when available, and every
+  required repository's current verification and review. Final
   registration acts only on the exact applicable targets/policies in that plan.
   A planned predecessor may have already produced a real package/test service;
   its partial review/output is dependency evidence, not formal submission input

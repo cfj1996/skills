@@ -142,7 +142,7 @@ function validateValue(parameter, value) {
   if (parameter.requiresValue && (value === '' || value === null || value === undefined)) throw new Error(`Jenkins 参数需要显式提供值：${parameter.name}`);
 }
 
-export function verifyFrozenJenkinsReceiptParameters(contract, receipt) {
+export function verifyFrozenJenkinsReceiptParameters(contract, receipt, verifiedPipelineRef) {
   const { definitions, profile } = contract, params = receipt.submittedParams;
   if (!object(params) || Object.keys(params).length !== definitions.parameters.length ||
       definitions.parameters.some(parameter => !own(params, parameter.name))) {
@@ -157,7 +157,7 @@ export function verifyFrozenJenkinsReceiptParameters(contract, receipt) {
     if (!sensitiveParameter(parameter)) validateValue(parameter, value);
   }
   const refParameter = profile.refParameter || receipt.refParameter;
-  if (!refParameter || params[refParameter] !== receipt.releaseRef ||
+  if ((refParameter ? params[refParameter] !== receipt.releaseRef : !verifiedPipelineRef || verifiedPipelineRef !== receipt.releaseRef) ||
       profile.projectParameter && params[profile.projectParameter] !== receipt.targetProject ||
       Object.entries(profile.fixedParams).some(([key, value]) => params[key] !== value)) {
     throw new Error('原队列参数与已核实的分支、项目或固定测试环境不一致');

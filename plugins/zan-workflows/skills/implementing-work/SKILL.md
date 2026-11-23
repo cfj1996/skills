@@ -40,6 +40,13 @@ ambiguous case or regression check.
 
 ## 1. Verify the approved input and fixed branch
 
+For a Bug reopened from a [confirmed execution Wiki](../executing-tapd-plan/references/executing.md),
+use the verified Bug page revision as its implementation Plan and the current
+development request as the operation authority. Reconstruct the complete set
+of actual project/branch definitions from current facts before the first edit.
+Apply the same Bug status/owner, independent review and single repair-record
+rules below once for that Bug. A separate save confirmation covers Wiki storage.
+
 Require `READY_FOR_HANDOFF`, confirmed scope, verified project/repository,
 exact branch action `CREATE|USE_EXISTING`, matching current-conversation
 branch/scope authorization, and preparation `VALIDATION_PASSED`.
@@ -78,11 +85,7 @@ Plan. A brief covers behavior, exclusions, current evidence, ordered steps and
 verification. Small changes need no formal Plan, Task creation or estimate;
 existing formal Plan/Task requirements and blockers remain binding.
 
-Formal Task/Plan work follows the [task contract](../breaking-down-requirement/references/contracts.md).
-Require TASKS_READY, exact selected IDs/owners, final estimates, dependencies, acceptance and
-Plan tapdTaskKey links. Reuse current readbacks, estimate review and confirmation; a changed
-owner, total estimate, scope or unmapped step reopens only the affected task preparation.
-Internal remaining-work predictions do not write Task effort, dates or status.
+For TAPD Plan execution retain the confirmed Wiki revision and selected P/M/F/TC. Prior Task IDs, if provided, are read-only scope evidence.
 
 Bug work does not acquire requirement-only Task/Plan gates. Run the following
 once per Bug before any repository's source edits, using the complete approved

@@ -4,6 +4,22 @@
 一次规划全部应用仓库，由现有 Git、Jenkins、Wiki 和登记 helper 按回执推进。
 计划和回执留在会话内存。包发布、同仓多 Job、冲突中转分支按提测技能的相应步骤处理。
 
+## 来自执行中的 TAPD Plan
+
+START 返回 CONTINUOUS_SUBMIT 时，立即执行与手动开工均在首个 submit PLAN 的 input 中带 Wiki START 返回的 `tapdPlan`（正式页 URL、expectedRevision、expectedApprovalFingerprint、limit）。同一 execution context 下，PLAN 读回工作项、准确版本、逐仓 Git 操作与实际测试 Job/参数。独立评审通过后，直接以原人类指令发送现有的 confirmed 与 reviewedPlanHash，再次读回该版本后执行。无构建传 release=null。仅构建使用 workflow-session 的 release PLAN/EXECUTE，二者都带同一引用。旧格式或已确认的纯会话稿按完整当前清单核对，能够覆盖的动作直接沿用；无需为了复用已有授权重写文档。
+
+START 返回 DELIVERY_STEPS 时直接用本技能现有逐项路径。通常是同仓多个 Job、独立工具包/构建、同仓不同分支或多仓不同操作目的。按 gitProjects 去重提交推送和合并，再按 buildProjects 为每个 Job 执行一次 release，沿用各项目自己的目的。业务源在合入目标前后分别绑定已审源码与真实交付回执。逐项 merge、release、wiki、registration 的 PLAN/EXECUTE 都传同一 tapdPlan；先核对实际工作项归属、模板与授权，再处理公共提测 Wiki、Bug 修复记录及适用登记。全部所选仓库、构建回执和跨仓验收均就绪后才登记整项完成。只读刷新失败或写入结果不明时保留既有效果。每项调用的 confirmed 都映射同一次开工指令，不逐项询问用户。
+
+逐项 Wiki 和登记执行时带各仓 gitDeliveryReceipts。从本次会话已接受的测试队列核对全部选定 Job；尚缺回执会返回 `AWAITING_PLAN_BUILDS` 和缺少的 P 编号，自动去执行剩余构建，再续办原动作。同一次会话重复派发完全相同的 Plan 构建请求时复用已接受回执。跨会话可把从原进度恢复的确切队列回执作为 `planBuildReceipts` 传入；在当前冻结契约和 Jenkins 队列或历史构建读回通过后才复用，原提测登记的 Git/Wiki 门禁同时适用。
+
+整项 Wiki、Bug 修复记录和登记执行前均核验 gitProjects 的全部 Git 回执。缺项返回 `AWAITING_PLAN_GIT` 和待补 P 编号，当前步骤零写入。每份回执绑定 origin、源分支、目标分支、源 SHA 和交付 SHA。同仓不同分支分别提供回执和 Mock/评审依据，同 SHA 可能重合时在各份证据写清 sourceBranch、targetBranch。已选测试 Wiki 时，以本次写入的真实回执（或恢复时的 wikiReceipt）再次核对工作项上的回链与正文。逐项 Bug 用 `action=repair-record` 发表已审记录，再 `registration` 登记。局部授权只完成其 Git/Job 和进度回填。
+
+独立 Job 没有对应合并回执时，`reviewedBuildSources` 以 P 编号映射本轮已核实的构建 SHA，例如 `{"P2":"<本轮实际 SHA>"}`。同会话可复用该项目当轮真实构建的源码绑定；跨会话用当前 ReviewedChange 和真实 ref 核实。旧队列仅证明发生过构建，需与本轮实际源码、Job、冻结参数一并匹配。
+
+Plan 测试构建按工作项版本、Job、仓库、ref、SHA 和参数识别同一次派发。本机在 `${XDG_STATE_HOME:-~/.local/state}/zan-workflows/plan-builds/` 只保存摘要键、Jenkins 队列标识及按需核对的流水线指纹，支持同机新会话恢复。换机器时，沿用原执行记录的 `planBuildReceipts`。先核实冻结参数、当前源码、队列或历史构建，再复用。派发结果未知时，先取得实际队列证据；保留既有 MR 与成功回执。运行中在提交、推送、MR、Jenkins、Wiki 和 TAPD 的实际写入前复核当前确认版本，版本变化则停止剩余操作。
+
+`NEEDS_CONFLICT_RESOLUTION` 表示已经读回原 MR 的真实冲突，回执包含原 MR、A 的 SHA 和已选的 C/工作位置。按[冲突处理](../../../references/conflict-merge.md)转入受限的 A→C→B 流程，复核操作者身份和权限。替代 MR 合并后发送 `PLAN {resumePlanId, conflictResolution:{branch, mrIid, reviewedSha, reviewEvidence}}`。它只读核对替代 MR 及 A/C 在同一交付 SHA 的包含关系。用同一计划 ID 继续 EXECUTE，复用既有 commit、MR、构建回执；仍在等待、失败或结果不明均保持其实际状态。
+
 ## 只读预览
 
 发送 `{"id":"preview","action":"submit","phase":"PLAN","input":{…}}`。input 使用现有

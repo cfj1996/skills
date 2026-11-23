@@ -87,6 +87,7 @@ export async function executeSubmissionGit(merge, local, receipt, io) {
   if (local.commit) {
     await checkMockSafetySet(merge, { ...mockContext, sourceSha: sha }, io);
     const names = Object.keys(local.files).sort();
+    await io.beforePlanWrite?.();
     await git(merge, ['add', '-A', '--', ...names], io);
     const staged = paths(await git(merge, ['diff', '--cached', '--no-renames', '--name-only', '-z', '--'], io));
     if (!same(staged, names) || !same(await worktreeFiles(merge, io), local.files) ||
@@ -100,6 +101,7 @@ export async function executeSubmissionGit(merge, local, receipt, io) {
         throw new Error('暂存内容与已审文件不符');
       }
     }
+    await io.beforePlanWrite?.();
     receipt.phase = 'COMMIT';
     await git(merge, ['commit', '--file=-'], io, { stdin: local.message });
     sha = receipt.sourceSha = await branchState(merge, io);
@@ -122,6 +124,7 @@ export async function executeSubmissionGit(merge, local, receipt, io) {
       await remoteHead(merge, io) !== local.remoteSha) throw new Error('推送前源码、工作区或远端原分支发生变化');
   await checkMockSafetySet(merge, { ...mockContext, sourceSha: sha, requireCommitted: true }, io);
   if (local.remoteSha !== sha) {
+    await io.beforePlanWrite?.();
     receipt.phase = 'PUSH';
     await git(merge, ['-c', 'push.autoSetupRemote=false', 'push', '--no-follow-tags', '--recurse-submodules=no',
       'origin', sha + ':refs/heads/' + merge.sourceBranch], io);

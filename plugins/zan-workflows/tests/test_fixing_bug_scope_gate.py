@@ -4,13 +4,13 @@ import unittest
 
 
 PLUGIN_ROOT = Path(__file__).resolve().parents[1]
-SKILL_PATH = PLUGIN_ROOT / "skills/fixing-bug/SKILL.md"
+SKILL_PATH = PLUGIN_ROOT / "skills/fixing-bug/references/legacy-execution.md"
 SKILL = SKILL_PATH.read_text()
-CONTRACTS = (SKILL_PATH.parent / "references/contracts.md").read_text()
+CONTRACTS = (SKILL_PATH.parent / "contracts.md").read_text()
 CHECKLIST = (PLUGIN_ROOT / "references/execution-checklist.md").read_text()
 
 
-class FixingBugScopeGateTests(unittest.TestCase):
+class LegacyFixingBugScopeGateTests(unittest.TestCase):
     def test_shared_checklist_is_the_only_presentation_contract(self):
         self.assertIn("../../references/execution-checklist.md", SKILL)
         self.assertIn("| 项目 | 分支 | 交付范围 | 实施方案 | 验收标准 | 需求待确认 |", SKILL)
@@ -19,7 +19,7 @@ class FixingBugScopeGateTests(unittest.TestCase):
         self.assertIn("等待授权不是缺口", SKILL)
         self.assertIn("确认前只读", SKILL)
         self.assertIn("表格、编号详情、所引 Plan", SKILL)
-        self.assertFalse((SKILL_PATH.parent / "references/workflow.md").exists())
+        self.assertFalse((SKILL_PATH.parent / "workflow.md").exists())
 
     def test_prepare_is_read_only_until_all_items_and_confirmation_are_bound(self):
         self.assertIn("全部条目预检完成", SKILL)

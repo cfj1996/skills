@@ -66,7 +66,7 @@ binding for test submission.
 沿用[执行清单的确认复用](../../../references/execution-checklist.md#执行清单的确认复用)。
 `ReviewedChange` 通过后，首次提测写入前准备一份完整 `SubmissionPlan`。
 `submission_phase=PLAN` 始终只读，返回 `AWAITING_CONFIRMATION`；该技术状态
-本身不要求新增一轮人工确认。授权分为两条路径：
+本身不要求新增一轮人工确认。授权分为两条路径。立即和手动执行正式 TAPD Plan 都走主编排的复用路径，当前会话明确执行已核实版本即引用其中的具体操作、目的和目标。
 
 - 由 `fixing-bug` / `developing-requirement` 编排：接收完整执行清单、真实人工
   确认和当前交接结果，逐项比较所选操作及派生事实是否属于原授权范围。

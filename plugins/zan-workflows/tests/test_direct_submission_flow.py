@@ -12,10 +12,10 @@ def read(path):
 
 
 class DirectSubmissionFlowTests(unittest.TestCase):
-    def test_requirement_default_still_delivers_after_review(self):
+    def test_planning_stops_at_save_and_delivery_uses_selected_endpoint(self):
         requirement = read('skills/developing-requirement/SKILL.md')
-        self.assertIn('普通“开发”默认 SUBMIT', requirement)
-        self.assertIn('需求清单默认显示“直接提测：是”', requirement)
+        self.assertIn('到落盘结束', requirement)
+        self.assertIn('用户已选择并授权提测', requirement)
         checklist = read('references/execution-checklist.md')
         template = checklist.split('## 完整展示模板\n', 1)[1].split('## 展示顺序与语言', 1)[0]
         self.assertIn('**直接提测：**', template)
@@ -44,7 +44,7 @@ class DirectSubmissionFlowTests(unittest.TestCase):
         skip_row = next(line for line in deployment.splitlines() if line.startswith('| `SKIP` |'))
         self.assertNotIn('直接提测', skip_row)
         self.assertIn('不构建', skip_row)
-        self.assertIn('明确不构建/跳过发布选 `SKIP`', read('skills/fixing-bug/SKILL.md'))
+        self.assertIn('明确不构建/跳过发布选 `SKIP`', read('skills/fixing-bug/references/legacy-execution.md'))
         prompts = json.loads(read('.codex-plugin/plugin.json'))['interface']['defaultPrompt']
         self.assertTrue(any('$submitting-for-test' in prompt and '直接提测' in prompt for prompt in prompts))
 

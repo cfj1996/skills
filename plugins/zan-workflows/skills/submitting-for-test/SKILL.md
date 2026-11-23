@@ -47,6 +47,7 @@ Use the [same checklist](../../references/execution-checklist.md#围绕同一清
 as the shared scope/authority source; this phase derives exact technical inputs,
 not another business plan. A precursor output or partial provider review cannot
 replace the required complete reviewed set for formal submission.
+An immediate or manually started execution Wiki is an orchestrated handoff. Its current start instruction incorporates its verified branch, purpose and selected Git, Wiki and Jenkins operations. Follow the [execution context](../executing-tapd-plan/references/execution-context.md) for automatic delivery.
 Reuse the checklist's current explicit choices. Without overrides, resolve
 `STANDARD` and `DEPLOY` by default, including incoming `AUTO`: merge to the
 verified test target, build/deploy its test environment and include Wiki.
@@ -170,6 +171,14 @@ later execution result, not a PLAN or code-REVIEWED prerequisite. Missing code
 review, required repositories, record evidence or acceptance still blocks PLAN;
 unknown introducing cause/author/time stays explicit and does not alone block repair.
 
+A [confirmed execution Wiki](../executing-tapd-plan/references/executing.md)
+can supply the approved scope for a Story or Bug. Verify the correct item type
+and ID, its own execution-page link and confirmed revision, every required
+repository, and the P/F/TC actually covered by current review and verification.
+Reconstruct missing definitions from the original item/branch readbacks. Retain
+the complete Bug repair-record draft and a verified previous comment when present.
+Use the work item's separate test Wiki and an empty Task-link set.
+
 进入 `EXECUTE` 还须有一份 `PlannedTestSubmission`，其
 `terminal_state=AWAITING_CONFIRMATION`，且准确操作集已获授权：来源可以是
 主流程未变化的完整执行清单确认，也可以是独立提测计划的真实用户确认。
@@ -196,7 +205,9 @@ necessary repository, per-repository review evidence, cross-repository
 acceptance and the shared reviewed repair-record draft. Missing or mismatched
 required rows return `BLOCKED`; do not silently submit a partial Bug.
 Apply the same repository pairing/completeness rules to grouped requirement work,
-also verifying the exact parent Story and selected Task/Plan coverage. Do not add
+also verifying the exact parent Story and selected Task/Plan coverage where
+Tasks are selected. Story execution Wiki handoffs retain their P/F/TC attribution.
+Do not add
 sibling Tasks or a Bug repair-record/state gate. One successful row does not
 complete the whole selected requirement. Story/Task registration uses only its
 explicit applicable version policy, never Bug status/owner or automatic Task done.
@@ -220,7 +231,7 @@ requires a refreshed confirmation. Never rebuild on the test target or use
 会话关闭后，原 Git 和构建回执齐全时用连续提测的跨会话续接，只读核实后完成 Wiki 或登记。
 Story/Task 无状态及版本动作时在计划中标为不适用。Bug 绑定已审的最终记录草稿，在 Git、
 所选构建及 Wiki/回链通过后发表或复用并精确读回，随后登记待测试。涉及包发布、
-同仓多 Job 或 A → C → B 冲突处理时，按下方对应步骤准备准确交付。
+START 的 workflow=CONTINUOUS_SUBMIT 使用上述连续提测；DELIVERY_STEPS（例如同仓多 Job、金丝雀包或多仓各有交付目的）直接按下方操作束合并及构建，逐仓复用本轮执行上下文，再汇总回执。A → C → B 冲突处理沿用已选条件分支。
 
 Use the [whole-plan review](references/submission-rules.md#whole-plan-review):
 one independent `PRE_SUBMISSION_PLAN` covers the complete plan and its prepared

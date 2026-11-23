@@ -43,11 +43,11 @@ On continuation, reconcile actual effects and use the verified MR/queue receipts
 相同真实工作流类别共享一次状态映射查询。已待测试的 CONTINUE 保留处理人；
 修复人证据不足时只返回待补项。statusProposal 是只读提案，写前仍检查真实身份、授权、状态和处理人。
 
-正式任务按原 TAPD 方法创建/更新。完整或部分返回后，`action=task-readback,phase=PLAN`
+历史任务需要恢复既有效果时，`action=task-readback,phase=PLAN`
 接受 `{proposal,idsByKey}`，其中 proposal 为原已审 TaskBreakdownProposal，idsByKey
 只映射实际已知的 key 与 ID。已知 ID 精确读回；缺 ID 的拟建项才分页检查准确父需求的
 稳定标记，再按所选 ID 读回字段。输出沿用 records、proposalFingerprint 和原校验，
-只有 `TASKS_READY` 能交给正式 Plan。`PARTIAL/BLOCKED` 保留真实结果，不能作为补写或重试授权。
+该命令只读恢复已有 Task 的历史结果。TAPD Plan 直接引用工作项及功能编号。
 已读回项继续保留，issues 中无法核实的 ID 只补准确只读查询；发现阶段失败不报告“未创建”。
 会话关闭回执的 stageTimings 分别列本会话采集、任务准备、交付请求的次数与执行毫秒，
 模型调用间隔和用户等待不从这些数字推断。

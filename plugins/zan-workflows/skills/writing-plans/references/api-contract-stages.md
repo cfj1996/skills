@@ -38,7 +38,7 @@ API 的能力归属由业务能力确定，不由页面、组件或当前交付�
 
 ## reviewing 阶段
 
-`reviewing-page-delivery` 不得生成 Draft OpenAPI，也不得将交付单元设为可实施。它仅评审、呈现冲突并在用户确认更新 Plan 后回写评审范围内的事实。
+`reviewing-page-delivery` 不得生成 Draft OpenAPI，也不得将交付单元设为可实施。它在会话评审稿中记录已核实的事实及待确认项。
 
 ## 后续 planning 阶段
 

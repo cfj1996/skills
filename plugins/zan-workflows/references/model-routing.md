@@ -26,6 +26,8 @@ standard to compensate for model availability.
 | --- | --- | --- |
 | `developing-requirement` | `CRITICAL` | Orchestrates project routing, remote-master scope, branch binding, Plan writes, implementation, and review |
 | `fixing-bug` | `CRITICAL` | Coordinates multiple capability handoffs, confirmation state, and optional writes across one or more Bugs |
+| `collecting-requirements` | Conditional | Scope review in chat uses `BALANCED`. Confirmed Wiki and backlink writes use `CRITICAL` |
+| `executing-tapd-plan` | `CRITICAL` | Recovers a confirmed Wiki, implements its selected features, verifies and records actual results |
 | `preparing-work` | `CRITICAL` | Resolves ambiguous project ownership, scope, repository fingerprints, and branch identity |
 | `implementing-work` | `CRITICAL` | Changes code, verifies behavior, and performs independent change review |
 | `submitting-for-test` | `CRITICAL` | Executes Git, Wiki, TAPD, and test-version writes with ordered readbacks |
@@ -34,8 +36,7 @@ standard to compensate for model availability.
 | `linking-tapd-wiki` | `CRITICAL` | Plans or writes an exact TAPD work-item comment with conflict and readback gates |
 | `merge-request-review` | Conditional | Lead discovery and routine review are `BALANCED`; high-risk review and all merge decisions are `CRITICAL`. Reviewer agents use runtime defaults |
 | `drafting-wiki` | `BALANCED` | Read-only target resolution and deterministic Markdown/sequence calculation |
-| `writing-plans` | `BALANCED` | Resolves remote-master scope, chooses dialogue or panel review, and writes branch-bound Plans |
-| `breaking-down-requirement` | Conditional | Read-only task scope/estimates use `BALANCED`; confirmed TAPD creates/updates and recovery use `CRITICAL` |
+| `writing-plans` | `BALANCED` | Reads a prototype and reviews its behavior for the collector |
 | `workspace-project-knowledge` | `BALANCED` | Read-heavy routing and graph/knowledge lookup |
 | `project-memory-context` | `BALANCED` | Bounded retrieval and evidence-aware memory synthesis |
 | report-execution | Conditional | Local diagnostics/export are BALANCED; confirmed feedback submission is CRITICAL |

@@ -89,7 +89,10 @@ function mergeState(mr, input) {
   if (mr.state !== 'opened') return { state: mr.state || 'UNKNOWN', error: 'MR 不处于打开状态' };
   if (mr.draft || mr.work_in_progress) return { state: 'DRAFT', error: 'MR 仍是草稿，需要实际决策' };
   const detail = mr.detailed_merge_status;
-  if (mr.has_conflicts || detail === 'conflict') return { state: 'CONFLICT', error: 'MR 冲突，停止并转入单独确认的冲突流程' };
+  if (mr.has_conflicts || detail === 'conflict') {
+    return { state: 'CONFLICT', error: '原 MR 存在冲突。核对本次执行上下文的 A → C → B 范围，已覆盖时直接续办',
+      code: 'MR_CONFLICT' };
+  }
   if (mr.blocking_discussions_resolved === false || ['not_approved', 'discussions_not_resolved', 'need_rebase', 'blocked_status', 'status_checks_must_pass'].includes(detail)) {
     return { state: detail || 'DISCUSSION', error: 'MR 存在未满足的审批、讨论或合并条件' };
   }
@@ -173,6 +176,21 @@ function awaitingMerge(result, plan, mr, reason) {
       message: `${explanation}请联系有权限的同事审核并将 ${plan.sourceBranch} 合并到 ${plan.targetBranch}。`
         + `\nMR：[查看 MR](${mr.web_url})\n合并完成后，回复“${resumePrompt}”。` },
     resumePlan: { ...plan, mrIid: result.mrIid, mergeMode: 'VERIFY_ONLY', execute: false, confirmed: false } };
+}
+
+async function conflictOwner(call, plan, result) {
+  if (result.writes > 0) return 'CURRENT_OPERATOR';
+  try {
+    const [current, original] = await Promise.all([
+      readTool(call, 'whoami', {}),
+      readTool(call, 'get_merge_request', { project_id: plan.projectId, merge_request_iid: result.mrIid }),
+    ]);
+    bindMr(original, { ...plan, mrIid: result.mrIid });
+    if (!current?.id || !original.author?.id) return 'UNVERIFIED';
+    return String(current.id) === String(original.author.id) ? 'CURRENT_OPERATOR' : 'OTHER_OPERATOR';
+  } catch {
+    return 'UNVERIFIED';
+  }
 }
 
 export async function mergeReviewedBranch(call, input, io = {}) {
@@ -260,6 +278,7 @@ export async function mergeReviewedBranch(call, input, io = {}) {
     }
     const mrArgs = { ...projectArgs, merge_request_iid: String(mr.iid) };
     phase = 'WAIT_MR';
+    plan.mrIid = result.mrIid;
     mr = await pollState(() => readTool(call, 'get_merge_request', mrArgs),
       value => mergeState(value, plan), io);
     if (mr.state !== 'merged') {
@@ -281,7 +300,7 @@ export async function mergeReviewedBranch(call, input, io = {}) {
       // Keep the detailed server readiness check authoritative even when the
       // approval format is Community Edition's optional-approval summary.
       const readiness = mergeState(freshMr, plan);
-      if (readiness.state !== 'READY') throw new Error(readiness.error || '合并前 MR 条件已变化');
+      if (readiness.state !== 'READY') throw Object.assign(new Error(readiness.error || '合并前 MR 条件已变化'), { code: readiness.code });
       result.approvalEvidence = approvals;
       await (io.checkRepository || checkRepository)(input, io);
       await checkMockSafetySet(input, mockContext, io);
@@ -318,6 +337,9 @@ export async function mergeReviewedBranch(call, input, io = {}) {
       deliveredSha, mergeCommitSha: merged.merge_commit_sha || null };
   } catch (error) {
     error.result = { ...result, phase, error: error.message };
+    if (error.code === 'MR_CONFLICT') {
+      error.result.conflict = { targetSha: plan.targetSha, owner: await conflictOwner(call, plan, result), purpose: plan.purpose };
+    }
     throw error;
   }
 }

@@ -2,7 +2,7 @@
 import { readFile, lstat, realpath } from 'node:fs/promises';
 import { resolve, relative, isAbsolute, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readCliPlan, repositoryKey, sha256, stableJson, runScopedCommand } from './workflow-runtime.mjs';
+import { coversGitScopes, readCliPlan, repositoryKey, sha256, stableJson, runScopedCommand } from './workflow-runtime.mjs';
 import { createMockInspectionCache, inspectRevisionFiles, remember } from './mock-revision.mjs';
 
 const SHA = /^[a-f\d]{40}(?:[a-f\d]{24})?$/i;
@@ -342,6 +342,18 @@ export async function checkMockSafety(safety, context, io = {}) {
     productionArtifactVerified: false, writes: 0 };
 }
 
+// Match the independent review inventory to the actual delivered source. In
+// the local-commit flow revisionSha binds the reviewed worktree to its commit.
+export function safetyForGit(receipt, safeties) {
+  const repo = repositoryKey(receipt.originUrl || receipt.sourceRepository);
+  const matches = safeties.filter(safety => repositoryKey(safety.sourceRepository) === repo &&
+    (!safety.sourceBranch || safety.sourceBranch === receipt.sourceBranch) &&
+    (!safety.targetBranch || safety.targetBranch === receipt.targetBranch) &&
+    (safety.revisionSha || safety.sourceSha) === receipt.sourceSha);
+  if (matches.length !== 1) throw new Error('缺少与实际交付分支和源码 SHA 对应的已审变更');
+  return matches[0];
+}
+
 export async function checkMockSafetySet(input, context, io = {}) {
   const safeties = input.mockSafeties || (input.mockSafety ? [input.mockSafety] : null);
   if (!Array.isArray(safeties) || !safeties.length) throw new Error('交付前必须提供全部相关仓库的 Mock 清查集合');
@@ -368,11 +380,13 @@ export async function checkMockSafetySet(input, context, io = {}) {
         throw new Error('Mock 门禁的 Git 交付回执未验证准确源码包含关系');
       }
       if (context.targetBranch && context.targetBranch !== receipt.targetBranch) throw new Error('Mock 门禁测试目标分支与交付回执冲突');
-      return { sourceRepository, sourceSha: receipt.deliveredSha, targetBranch: receipt.targetBranch };
+      return { sourceRepository, sourceSha: receipt.deliveredSha, reviewedSha: receipt.sourceSha, sourceBranch: receipt.sourceBranch, targetBranch: receipt.targetBranch };
     });
     const requiredKeys = required.map(repositoryKey), receiptKeys = expected.map(row => repositoryKey(row.sourceRepository));
-    if (new Set(requiredKeys).size !== requiredKeys.length || new Set(receiptKeys).size !== receiptKeys.length ||
-        requiredKeys.length !== receiptKeys.length || requiredKeys.some(key => !receiptKeys.includes(key))) {
+    const identitiesMatch = requiredKeys.every(key => receiptKeys.includes(key)) && receiptKeys.every(key => requiredKeys.includes(key));
+    if (input.requiredGitScopes ? !identitiesMatch || !coversGitScopes(input.requiredGitScopes, expected)
+      : new Set(requiredKeys).size !== requiredKeys.length || new Set(receiptKeys).size !== receiptKeys.length ||
+        requiredKeys.length !== receiptKeys.length || !identitiesMatch) {
       throw new Error('Git 交付回执没有覆盖完整本轮仓库范围');
     }
     if (input.mockRepositories && stableJson(input.mockRepositories.map(row => ({ sourceRepository: repositoryKey(row.sourceRepository), sourceSha: row.sourceSha })).sort((x,y) => x.sourceRepository.localeCompare(y.sourceRepository))) !==
@@ -383,16 +397,20 @@ export async function checkMockSafetySet(input, context, io = {}) {
   if (!Array.isArray(expected) || !expected.length || expected.some(row => !text(row.sourceRepository) || !SHA.test(row.sourceSha || ''))) {
     throw new Error('Mock 清查集合缺少完整交付仓库/源码版本绑定');
   }
-  const keys = safeties.map(row => repositoryKey(row.sourceRepository));
-  const expectedKeys = expected.map(row => repositoryKey(row.sourceRepository));
-  if (new Set(keys).size !== keys.length || keys.length !== expectedKeys.length || expectedKeys.some(key => !keys.includes(key))) {
-    throw new Error('Mock 清查集合没有准确覆盖全部本轮交付仓库');
-  }
-  return Promise.all(safeties.map(safety => {
-    const row = expected.find(item => repositoryKey(item.sourceRepository) === repositoryKey(safety.sourceRepository));
-    return checkMockSafety(safety, { ...context, sourceRepository: row.sourceRepository, sourceSha: row.sourceSha,
-      targetBranch: row.targetBranch || context.targetBranch }, io);
-  }));
+  const remaining = new Set(expected);
+  const checks = safeties.map(safety => {
+    const candidates = expected.filter(row => repositoryKey(row.sourceRepository) === repositoryKey(safety.sourceRepository));
+    const matches = candidates.length <= 1 ? candidates : candidates.filter(row =>
+      (!safety.sourceBranch || row.sourceBranch === safety.sourceBranch) &&
+      (!safety.targetBranch || row.targetBranch === safety.targetBranch) &&
+      (row.reviewedSha === safety.sourceSha || row.reviewedSha === safety.revisionSha));
+    if (matches.length !== 1 || !remaining.delete(matches[0])) throw new Error('Mock 清查集合没有准确覆盖全部本轮交付仓库/分支');
+    return [safety, matches[0]];
+  });
+  if (remaining.size) throw new Error('Mock 清查集合没有准确覆盖全部本轮交付仓库');
+  return Promise.all(checks.map(([safety, row]) => checkMockSafety(safety, { ...context,
+    sourceRepository: row.sourceRepository, sourceSha: row.sourceSha, targetBranch: row.targetBranch || context.targetBranch }, io)));
+
 }
 
 export function mockSafetyPreview(input, production = false) {

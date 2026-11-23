@@ -46,10 +46,6 @@
 `--@zan:registry=https://npm.jubaozan.cn/` 下载 `@zan` 包；不能用全局
 `--registry` 将公共依赖一并指向公司源。TAPD 使用 Python 包源。
 
-TAPD 0.0.3 提供 `create_task` 和 `create_tasks`，用于在需求下创建单个或多个任务。
-任务拆分、确认及结果消费仍由 [需求任务模块](../skills/breaking-down-requirement/SKILL.md)
-处理；更新插件后重新连接 TAPD MCP，并通过实际 `tools/list` 核对新增能力。
-
 TAPD 0.0.4 新增统一的 `download_workitem_files`，在 MCP 内读取需求/Bug/任务/Wiki
 正文、评论和附件中的文件并下载，返回逐项结果及本地路径。调用和不完整结果的处理见
 [图片与附件读取](tool-routing.md#tapd-图片与附件读取)。升级启动版本前先确认对应包

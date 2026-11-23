@@ -1,0 +1,7 @@
+interface:
+  display_name: "zan:需求收集"
+  short_description: "按项目核对需求或缺陷的实现范围，在会话展示或确认后保存 TAPD Plan"
+  default_prompt: "使用 $collecting-requirements 收集这项工作的项目、功能点、外部数据和验收条件，先在会话里给我看。"
+
+policy:
+  allow_implicit_invocation: true

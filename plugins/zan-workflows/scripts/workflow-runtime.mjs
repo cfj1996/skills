@@ -28,6 +28,35 @@ export async function waitForDeadline(promise, deadline) {
   } finally { clearTimeout(timer); }
 }
 
+// Only conclusive client-side/server refusals release a dispatch claim.
+// A transport timeout mentioning permissions still has an unknown write outcome.
+export function rejectedWrite(value) {
+  const denied = /缺少[^。\n]{0,24}权限|无权|(?:没有|不具备|无)[^。\n]{0,16}权限|权限不足|拒绝访问|参数.{0,12}(无效|错误|不合法)|(?:permission|access) denied|insufficient permissions?|not authorized|forbidden|unauthorized|invalid (argument|parameter)/i;
+  const uncertain = /超时|未知|不明|timeout|timed out|connection (?:lost|reset)|unknown (outcome|write)|lost (?:ack|response)/i;
+  for (let i = 0; value && i < 10; i++) {
+    if (typeof value === 'string') {
+      try { value = JSON.parse(value); continue; } catch { /* Some MCP failures contain plain HTTP status text. */ }
+      return !uncertain.test(value) && /^(?:HTTP(?:\/\d(?:\.\d)?)?\s+(?:400|401|403|422))\b/i.test(value.trim());
+    }
+    const status = Number(value.httpStatus ?? value.statusCode ?? value.response?.status ?? value.status);
+    if ([400, 401, 403, 422].includes(status)) return true;
+    const reason = String(value.info ?? value.message ?? '');
+    if (uncertain.test(reason)) return false;
+    if ((value.status === 0 || value.status === '0') && denied.test(reason)) return true;
+    if (value.content?.length === 1 && value.content[0].type === 'text') value = value.content[0].text;
+    else value = value.result ?? value.structuredContent ?? value.data ?? value.message;
+  }
+  return false;
+}
+
+// The underlying read function stays uncached for an actual write boundary.
+export function guardRemoteWrites(call, verify) {
+  return async (name, args) => {
+    if (/^(?:create_|update_|merge_merge_request$|jenkins_trigger_build$)/.test(name)) await verify();
+    return call(name, args);
+  };
+}
+
 export function requireText(value, name) {
   if (typeof value !== 'string' || !value.trim()) throw new Error(`缺少 ${name}`);
 }
@@ -70,6 +99,20 @@ export function repositoryKey(value) {
   return (url.host.toLowerCase() + url.pathname.replace(/\/$/, '').replace(/\.git$/, '')).replace(/\/$/, '');
 }
 
+// A repository may supply several reviewed branches to the same work item.
+export function gitScopeKey(row) {
+  const source = row.sourceBranch, target = row.targetBranch;
+  requireText(source, 'Git 源分支');
+  requireText(target, 'Git 目标分支');
+  return stableJson([repositoryKey(row.originUrl || row.sourceRepository), source, target]);
+}
+
+export function coversGitScopes(required, receipts) {
+  if (!Array.isArray(required) || !Array.isArray(receipts) || required.length !== receipts.length) return false;
+  const expected = new Set(required.map(gitScopeKey));
+  return expected.size === required.length && receipts.every(row => expected.delete(gitScopeKey(row)));
+}
+
 export function validateWait(options = {}) {
   const maxWaitMs = options.maxWaitMs ?? 1800000;
   if (!Number.isFinite(maxWaitMs) || maxWaitMs < 1 || maxWaitMs > 43200000) throw new Error('等待期限无效');
@@ -92,7 +135,7 @@ export async function pollState(read, classify, options = {}) {
       delay = 5000;
       previous = status.state;
     } else delay = Math.min(delay * 2, 30000);
-    if (status.error) throw new Error(status.error);
+    if (status.error) throw Object.assign(new Error(status.error), { code: status.code });
     if (status.done) return value;
     const remaining = deadline - now();
     if (remaining <= 0) throw new Error(`等待 ${status.state} 超时；不重试写操作`);

@@ -34,6 +34,8 @@ ZAN_WORKFLOWS_RECORDING=off 关闭记录；DISABLED 时不再追加阶段事件�
 同一 runId；新任务新建，不使用“最近一次运行”作为跨任务隐式关联。
 可传 project 作为短项目名；后续工作传准确 parentRunId 关联已有运行，不恢复业务状态。
 
+新 Story／Bug 的执行 Wiki 预览在确认前保持只读。调查、`PLAN`、展示和等待确认期间，阶段信息只留在内存，不运行持久诊断 `start` 或 `event`。取得本次保存授权后，从当前实际动作开始采集；直接从已确认 Wiki 开工时按实际开工授权启动。沿用已有的本轮 runId 和禁用设置，只记录实际采集的阶段。预览后结束的请求无需创建运行目录。本地诊断既不保存业务计划，也不充当开工确认或跨会话前置回执。
+
 ~~~bash
 node "$plugin_root/scripts/execution-recorder.mjs" start --json <<'JSON'
 {"skill":"fixing-bug","goal":"用户明确表达的短目标","host":{"name":"codex"}}

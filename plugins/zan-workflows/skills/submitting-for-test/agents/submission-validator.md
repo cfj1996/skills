@@ -86,7 +86,11 @@ each repository's code review, explicit human authority or final readbacks.
   TAPD writes require every required Git/deployment gate; reject partial-Bug
   registration.
 - Grouped requirement rows additionally prove the same parent Story and exact
-  selected Task/Plan coverage. Apply the same per-repository and cross-repository
+  selected Task/Plan coverage when Tasks are selected. For a [Story or Bug execution Wiki](../../executing-tapd-plan/references/executing.md),
+  verify its own item's unique execution-page link, current confirmed revision and the immediate/manual start instruction incorporating the matching Git, Wiki and build operations,
+  all selected P/F/TC in the actual reviewed and tested changes, and an empty
+  Task-link set. A Bug still needs the full multi-repository record and review.
+  Apply the same per-repository and cross-repository
   completeness checks without inventing Bug status/records or Task completion.
   A valid dependency-output review does not make a partial collection eligible
   for formal submission.

@@ -1,253 +1,31 @@
 ---
 name: developing-requirement
-description: Use when one TAPD Story or selected Task must be developed from verified scope and a fixed branch through proportionate planning, reviewed implementation, and optional test delivery.
+description: Use for a new TAPD Story, an explicit start from its confirmed execution Wiki, or collection scoped to an existing Task.
 ---
 
 # Develop Requirement
 
-Preferred lead model profile: `CRITICAL`。可选模型时使用
-[模型路由](../../references/model-routing.md)，可用性不降低门禁。
+Preferred lead model profile: `CRITICAL`。见[模型路由](../../references/model-routing.md)。TAPD、GitLab、YApi 与原型取证遵守[工具路由](../../references/tool-routing.md)。
 
-编排一个准确 Story/Task 的需求开发；按阶段调用现有能力，不重复其写入规则。
-普通开发主线：读取需求与缺口 → 准备方案及必要任务 → 确定清单获确认成为执行清单 →
-精确任务/Plan 写回与分支 → 实施、验证、独立评审 → 返回实际结果。
-以 [同一清单编排](../../references/execution-checklist.md#围绕同一清单编排)
-推进需求与本轮所选 Task；各项目结果回填到原范围，已覆盖且未变的事实与授权
-跨阶段复用，不把每个技能或每个 Task 变成一条新的完整流程。
+## 新需求的默认入口
 
-首次开发和后续续修统一遵循 [变更与文档一致性](../../references/change-consistency.md)。
-将需求/反馈依据、实际行为变化、直接及间接影响和验证对应到同一范围说明；
-续修核对完整待交付差异及本轮增量，包含人工修改。交付包含 Wiki 时更新原页当前
-条目的过期内容，不因同页面、同分支或已有提测链接跳过。只刷新失效证据，不重复确认。
+普通“开发这个需求”、限定 B 端/前端和小改动都进入[需求收集](../collecting-requirements/SKILL.md)。先核实范围和功能点，再根据用户意图选择同一份评审稿的输出方式。明确“只在会话看”走 `SESSION`，展示后结束。普通请求默认 `TAPD_PLAN`，默认手动执行，到落盘结束。用户明确立即执行时，在同一次确认中纳入工作位置、分支、提测与构建，保存并读回后直接开工。已有正式页且要求执行时直接进入下一节。两种启动方式按[执行上下文](../executing-tapd-plan/references/execution-context.md)自动推进已选目标。
 
-## 1. 读取需求与交付边界
+1. **读需求，定项目。** 读取 TAPD Story 正文、关联 PRD/原型和已有执行文档回链。按 [workspace-project-knowledge](../workspace-project-knowledge/SKILL.md) 核实各项目及仓库。在提出方案前逐个列出 P 的现状、改动目标、包含/排除的范围、现有代码入口、项目规范、拟用分支和可核实的基线。已存在正式页时先准确读回，沿原页续办或修订。
+2. **逐功能确认怎么改。** 按项目 P → 模块 M → 功能 F 展开。每个 F 写明现有行为与目标、要改的路径/符号、复用点、有序实现动作、前置 F 及产出。UI 写触发/状态/反馈，TC 写测试输入、动作和可判定结果。外部数据在项目级 D 记录来源、请求与字段、传给组件或下游的值、权限及联调依据，用准确索引回指 F/UI/TC。跨项目列清提供方、消费方和先后关系。可查证的问题先查，仍缺的记录受影响步骤和解除条件；有分歧时请用户决定实际业务口径。
+3. **TAPD Plan 模式一次确认。** 由同一技能先执行只读 `PLAN`，展示完整执行稿、实际目标目录、版本/指纹和交付选项，请用户确认该版本。获确认后执行 `SAVE → READ`，在原 Story 读回唯一回链和确认版本。返回正式执行 Wiki 链接、已确认范围和待补项，手动执行停在待执行，并附新会话指令「执行 TAPD Plan <Wiki 链接>」。普通开发请求、保存确认、页面上“是否提测/是否构建”的选择各自保留其授权边界。新流程在 Wiki 维护这份计划，无需为它创建 TAPD Task 或项目本地 Plan。
 
-要求准确 TAPD Story 或 Task URL，经 TAPD MCP 读取相关正文、Wiki、附件和评论，核对关联 PRD。
-需要从原型核对交互时按[原型读取与标签页复用](../../references/tool-routing.md#原型读取与标签页复用)在同一页取证，后续阶段沿用结果。
-已有原文与当前项目证据就直接使用。缺少条目、父需求或多个仓库的固定分支事实时，
-用一次[只读采集](../../references/scripted-delivery.md#开发前的只读采集)补缺。仅分支终点到分支准备为止。
-Task 输入先核实真实父需求，只实施选定任务，不默认扩展到兄弟任务。
-只有 PRD/原型时可交 `writing-plans phase=SCOPE_REVIEW` 分析，进入分支绑定或
-实施前返回 `PENDING_TAPD_STORY_OR_TASK`，不编造 TAPD 身份。
-Bug 使用 `zan-workflows:fixing-bug`。
+## 按原执行 Wiki 开工
 
-`delivery_mode=PLAN_ONLY|BRANCH_ONLY|IMPLEMENT|SUBMIT|GO_LIVE` 根据明确请求确定：
-仅计划、仅建分支、仅开发验证、提测或上线。普通“开发”默认 SUBMIT，包含
-合并实际 dev/develop、构建测试环境和提测 Wiki；完整清单一次确认，后续准确计划仍须核对原授权。
-先区分业务范围与交付终点：“只开发 B 端相关功能”“仅改前端”“只做这个 Task”
-只缩小实施范围，仍默认 SUBMIT，不据此关闭合并、测试构建或 Wiki。
-明确“仅开发验证”“开发到评审为止”“不提测”等终点限制才到 IMPLEMENT 为止；
-需求清单默认显示“直接提测：是”，实现、验证和独立评审通过后按已确认范围交付。
-“先完成代码，我检查后再提测”“先不要提交/推送”“暂不直接提测”选 IMPLEMENT，
-显示“直接提测：否”，本轮合并、Wiki、构建均不执行，不预先准备这些交付目标。
-开发者检查后可单独调用 `$submitting-for-test`；按
-[直接提测流程](../submitting-for-test/references/direct-submission.md) 复用原实现，
-核实人工改动、补受影响验证/独立评审并确认本轮交付清单，不重复实施。
-“合并并构建”表示实际 dev/develop 与项目测试环境，不推导 master/生产。
-仅请求分支时不要求将来的实现说明、Task、Plan 或排期就绪。
+立即执行消费刚确认并保存的版本，新会话中用户明确“按这份计划开发”时，仍由 [执行 TAPD Plan](../executing-tapd-plan/SKILL.md) 按其[开工、验证和交接流程](../executing-tapd-plan/references/executing.md)接续。先核实 Story、正式页、确认版本、实际分支/源码和未完成的 F/TC。仅执行本轮选中的范围，按原步骤逐项验证、独立评审并以真实证据回填。用户仅要求查看或修订计划时留在相应阶段。
 
-调用 `zan-workflows:workspace-project-knowledge` 核实实际项目/子项目、
-仓库、origin 与依赖；在 source search 前取得项目约束和已验证远端基准。
-范围以已核实的远程 `origin/master` 为准，不以偶然检出的本地分支为准。
-复用有效 TAPD、原型、项目和基准证据，写前刷新可变事实，不按阶段重新发现。
+尊重本轮交付选择。“先完成代码，我检查后再提测”走 `IMPLEMENT`，直接提测：否，完成开发、验收和独立评审后停在人工检查。用户已选择并授权提测时带完整 ReviewedChange 交给 [submitting-for-test](../submitting-for-test/SKILL.md)，按已选范围和构建选项交付。已有已评审改动，后来单独要求“直接提测”时，走[直接提测流程](../submitting-for-test/references/direct-submission.md)刷新当前证据。仅在明确选择上线并具备对应授权时进入 [going-live](../going-live/SKILL.md)。
 
-## 2. 查清范围，准备必要产物
+## 已有资料与窄范围请求
 
-先核对已有清单、brief 或 Plan 是否完整覆盖同一需求/所选 Task、远程基准、
-范围/排除项、来源、验收、依赖及阻塞，复用仍有效的事实和本轮评审结果。
-用户明确要可视化面板，或有业务决定需要在原型上逐项比较时，把范围证据交给
-`writing-plans` 显式进入 `SCOPE_REVIEW` 的 `PANEL`。仅有文字摘要不能替代本轮面板提交。
-普通的既有页面/接口小改动，已核实行为、落点、排除项及验收时，主代理直接形成
-implementationBrief 并核对就绪条件。需要正式 Plan/协调、材料不足或实质范围变化时，调用
-`zan-workflows:writing-plans phase=SCOPE_REVIEW`，传项目、基准、`delivery_mode` 与
-`confirmation_mode=DEFER_TO_ORCHESTRATOR`，只读补齐实际缺口，
-不在子阶段重复请求范围确认。语义/就绪检查始终保留。
-按 [需求就绪检查](../writing-plans/references/requirement-readiness-checklist.md)
-区分需求不完整与实施条件缺失，限定本轮范围，不能用假设填平缺口。
-界面/Mock 范围不自动扩大到后端实现；真实集成交付不能自行改成 Mock。
-“接口还没定”时先核实现有页面、接口和表单能力。尚需业务决定的 Mock 只作为候选。
-确认是已有页面加字段后，沿用同一清单，把当前步骤收敛到真实读写、空值和相关表单行为，
-撤下已失效的 Mock 方案；保留用户明确要求的 Task、Plan 和交付选择。已确认的接口/配置项
-直接随当前事实交给评审，旧方案的评审结论只在仍匹配的部分复用。
-
-需求待确认只包含业务范围、规则、语义、流程和验收决定；接口/传输字段、Key
-配置、环境和外部服务按 [外部数据与依赖](../../references/external-data-dependencies.md)
-记录已知事实与缺口，内部代码落点仍在实施依据。需求确认、当前步骤依赖就绪和
-执行授权分开判断。按本轮已选功能/Task/阶段处理阻塞，保留后续未就绪事实。
-Mock 遵守 [跨项目规范](../../references/mock-development.md)，先发现项目真实能力，
-已接入 Query 的沿原数据链路补数据/配置，未接入的复用现有 Mock 或功能数据入口，
-不强制安装 Query Contract；契约未知时仅提供功能模型数据，不猜 HTTP 事实。
-默认只做正常业务数据；异常模拟须有明确用户/需求/验收依据。Mock 启停、重置和
-数据选择放在数据/配置层，默认不增加页面标识或调试控件，也不附加 Mock 分支后缀。
-
-按 [准备深度与验证](../../references/adaptive-workflow.md) 选择实际需要的内容：
-
-- 范围集中、依赖、实施与验收明确的小改动，用内存 `implementationBrief`
-  记录行为、排除项、证据、有序步骤与验证。没有 Task/Plan 不强制创建。
-- 明确要求正式 Plan、Task 写入，确需多人/跨模块协调，或继续已有正式 Plan
-  时，使用原任务与 Plan 能力。任务存在时读取其真实责任范围与负责人，
-  不因展示关联而修改旧任务、补估时或制造正式任务结果。
-- 在范围确认时按[评审模式选择](../writing-plans/SKILL.md#评审模式选择)确定面板或对话。
-  对话模式不加载未采用的面板运行时。风险直接落实到验证场景。
-
-准备正式 Task/Plan 的条件按本轮责任范围判断。多页面有独立业务/依赖/验收，或跨仓需分别交付时，
-即便有静态页、现成组件或先做 Mock，也应按内聚模块准备正式 Plan。Task 输入只检查或调整所选 Task，不扩到兄弟任务。
-每个模块可关联多个 Task，未来接口接入与当前已批准 Mock 分开计入范围和工时。
-
-只在需要任务准备时调用 `zan-workflows:breaking-down-requirement phase=PLAN`，
-传 `confirmation_mode=DEFER_TO_ORCHESTRATOR`。按[估算与独立评审](../breaking-down-requirement/references/effort-estimation.md)
-核实负责人、复用能力、实际增量、验证和可比吞吐参考；共享成本只算一次，未改工时用实际读回。
-首次实施清单列真实/拟建任务、最终工时、模块 Plan 的准确位置与拟写正文。缺项保持草稿，不伪造 ID。
-[任务关联](references/task-linked-delivery.md)约束选定边界、每步 tapdTaskKey 和跨模块隔离；
-单个 `create_task`、同需求批量 `create_tasks` 由[任务模块](../../references/tool-routing.md#tapd-任务创建)按已确认操作执行。
-
-## 3. 准备分支与一次执行确认
-
-按 [分支规则](references/branch-checklist.md) 为每个仓库解析分支作者、
-完整名称、创建/复用动作和准确基准。CONTINUE 复用原分支，不随日期换名。
-调用 `zan-workflows:preparing-work` 只读预检，传入已验证范围和分支约束；
-不重复广泛路由。Story/Task 必须为 `NOT_APPLICABLE_NON_BUG`，不准备 Bug 状态。
-
-先完成 [确认前准备](../../references/execution-checklist.md#确认前准备)，再按
-[完整展示模板](../../references/execution-checklist.md#完整展示模板) 展示 `确定清单`；
-以下六列仅是主表定义，不能当成整份模板：
-先列执行项目、关联需求及终点。有 Task 则在执行内容前列 `序号 | 标题 | 工时`，
-用【新建】【复用】【调整】及单个 `N 小时` 表明真实操作。再展示：
-
-| 项目 | 分支 | 交付范围 | 实施方案 | 验收标准 | 需求待确认 |
-| --- | --- | --- | --- | --- | --- |
-
-表后列外部依赖、本轮实际写入、合并和测试环境意图。Task `#F01` 与长备注 `#01` 分开，
-编号关联真实 Task、Plan 和步骤。适用时展示具体 Mock 标识、源码、启用、真实调用、
-测试范围/用途、退出条件及 Wiki 模板。普通直接提测不自动授权 Mock 或生产发布。
-明确只实施、仅计划、仅建分支时不准备测试交付；不查询未选择的 Jenkins/Wiki。
-
-`requirement_blocker_count=0` 才可确认需求；IMPLEMENT/SUBMIT/GO_LIVE 还需
-本轮选定步骤必需的 `implementation_blocker_count=0`，且外部依赖审查有证据。
-未来真实接入未就绪事实保留在同一 Plan，不把整条需求误报为全部可实施。
-有阻塞先解决或由用户明确调整本轮范围，
-不能把等待批准算成缺口。PLAN_ONLY 可保留实施缺口；BRANCH_ONLY 只要求
-本轮分支准备条件就绪，不受未来实现缺口阻塞。
-
-确认前逐项核对本轮所选交付的准确目标、Wiki 模板及 Task/Plan 拟写内容；
-能只读查清的继续准备，不在范围摘要或分支预检返回时提前结束。需要正式
-Plan 时先准备可审阅正文/差异，不要求提前保存；小改动的 brief 同样须完整。
-适用条件及完整模板核对通过后只问 `是否按以上确定清单执行？`，然后等待回答。范围、分支、
-Task/Plan 内容合并确认，不另问一轮范围或分支；任务写入须明确在本次授权中。
-初始开发请求不批准未展示的清单。确认前不创建分支、保存 Plan、写 Task 或源码。
-表格、备注、关联 Plan 和实际写入共同绑定授权；实质变化只重开受影响部分。
-取得对当前完整内容的确认后才称 `执行清单`，名称变化不增加确认或第二份文档。
-下游按共享 [确认复用规则](../../references/execution-checklist.md#执行清单的确认复用)
-消费同一执行清单；已覆盖的 Task/Plan、提交/MR、构建、Wiki/回链和登记不按
-技能重新询问，选定合并的冲突按已确认 A → C → B 自动处理。独立技能仍走
-自身具体计划确认；原清单未涵盖的范围或操作不能据此执行。
-用户调整范围/方案或合并、Wiki、部署选择时，返回确定阶段，复核变化后重新展示完整确定清单：概览、任务表、六列主表、
-写入和三项意图，需要 Wiki 则附模板，再等待确认。未变化内容也保留供对照；
-选项回答不能替代完整执行确认，已有分支/任务/记录等效果只展示、不重复执行。
-
-## 4. 精确写回与分支交接
-
-确认后沿用原定义，按 `preparing-work` 规则只刷新可变事实和授权绑定，
-不重做完整准备或常规独立 validator。全部检查有实际证据后才取得准确
-`TapdWorkDefinition` 与 `READY_FOR_HANDOFF`。固定仓库/分支/基准、范围、
-人员或实际写入改变时先展示差异，不能继续沿用过期授权。
-
-需要正式任务/Plan 的实施，先调用 `breaking-down-requirement phase=EXECUTE`
-通过上述 MCP 方法执行已确认任务操作；REUSE 只准确读回，不重写描述。要求所选任务全部
-`TaskBreakdownResult.terminal_state=TASKS_READY`。失败/不明或部分写入保留
-已成功 ID，核查原记录后补缺，禁止直接重试创建。任务创建不改变原分支身份。
-批量写入后用同一次 [task-readback](../../references/scripted-delivery.md#开发前的只读采集)
-把实际 ID 和字段读回给 Plan，已有任务不因人员分隔符或能力切换被重新创建。
-PLAN_ONLY 只有 Task 写入也已明确获准时才执行，未授权则保留任务提案。
-
-本轮需要正式 Plan 时，调用 `writing-plans phase=PLAN_WRITE` 保存并读回，绑定
-同一范围、仓库、基准和分支。每个模块可包含多个 Task，每个实施步骤用
-`tapdTaskKey` 关联真实 Task；不按每个任务新建 Plan 或分支。
-确认已涵盖稳定 taskKey → 准确读回 ID/链接的规则、正文与路径时，可机械
-回填系统字段；人员、工时、范围或方案变化必须另展示差异。PANEL 保留
-可信 confirmPlan 与保存回执，不能借回填绕过协议。
-
-PLAN_ONLY 在保存读回后返回，阶段 Plan 不宣称可实施。BRANCH_ONLY 只执行
-已确认准确分支操作并读回，返回 BRANCH_READY；新建分支使用无 upstream
-方式，尚未生成 Plan 不能阻塞单纯分支请求。这两种终点均不改业务源码。
-普通小改动跳过 Task/Plan 写入，将同一范围说明直接交给实施能力。
-
-## 5. 实施、验证与独立评审
-
-全部项目先通过预检，写前刷新准确分支、工作区和交接事实。主代理调用
-`zan-workflows:implementing-work`，单项目传原 TapdWorkDefinition；跨项目将
-同一 Story/所选 Task 的已确认定义作为 `work_definitions` 传入，保留各项目
-范围说明或已验证 Task/Plan。该能力按依赖和文件/资源边界分批执行，小改动
-直接完成，独立任务按 [多任务实施](../implementing-work/references/parallel-execution.md)
-使用子代理。主代理统一控制分支、共享操作与最终评审，不把整个流程重复
-派给每个子代理，不重复请求仍匹配的实施授权。
-不临时换分支，不包含未选择任务或无关改动。跨项目返回的 `reviewed_changes`
-按仓库/分支及所选范围对应回原项目；后续仍用各项目原有提测计划，不因并行
-改变 Task 状态、交付授权或共享 Wiki 规则。
-
-正式需求实施必须先通过 TASKS_READY 与 Plan 保存/步骤关联门禁；不能用
-简短说明绕过既有正式约定。只在用户要求排期/日期时读取
-[实施排期规则](../implementing-work/references/implementation-schedule.md)，
-默认不生成 scheduleRecommendation，不写 Task 日期/状态/工时。
-
-按实际行为验证，保留 Mock 与真实集成的局限；项目 lint 通过不能代表所有
-Task 验收通过。每个项目只有独立评审为 `REVIEW_PASSED` 才可返回 `REVIEWED`。
-首个 BLOCKED 停止依赖执行，真实报告已完成部分；所有项目通过才报告整轮完成。
-任务的实际完成范围、验证/评审和遗留项按任务关联规则汇总，不自动标 Task done。
-若清单明确授权的包/测试服务产出是后续实施或验收前置，沿用共享
-[依赖节点规则](../../references/execution-checklist.md#前置依赖产出与整体完成)：
-保留已验证提供方事实，由编排在其自身 Git/发布门禁满足后完成准确前置操作，
-核实真实可用产出再续接原 Task/Plan/分支。整轮仍未完成，不把局部结果当成
-完整 REVIEWED、不调用接受缺仓输入的正式提测、不标父需求/Task done；
-未知写入、验证失败或缺授权不享有例外，明确只实施/不提交等限制仍优先。
-IMPLEMENT 到这里结束，不进入提交、推送、提测或上线。
-
-Mock 完成、正式接口补齐时续接原分支、Task和Plan。先刷新契约、当前代码和
-人工修改，对比字段映射/枚举/权限/错误语义并解除受影响阻塞；仅技术事实补齐
-且原授权覆盖时继续，不重拆任务或重复业务确认。原只批准 Mock 而新增真实接入、
-关键方案/业务或交付范围改变时，展示完整当前确定清单为变化补充授权，保留
-已完成效果。补真实验证和受影响独立评审，不能用 Mock 验证替代。
-
-## 6. 按明确请求交付
-
-仅 SUBMIT/GO_LIVE 读取并调用 `zan-workflows:submitting-for-test`。解析实际
-`submission_profile=AUTO|STANDARD|NO_WIKI` 与 `deployment_mode=AUTO|DEPLOY|SKIP`。
-沿用当前清单的明确选择；未关闭时含 AUTO 默认 STANDARD 和 DEPLOY，不能覆盖明确的 NO_WIKI/SKIP。
-先 `submission_phase=PLAN` 准备各项目准确提测计划；与完整执行清单逐项核对
-时，普通单仓和跨仓应用交付优先用[连续提测](../submitting-for-test/references/continuous-submission.md)带入当前决定和同一份评审；
-仍在原授权范围内，就直接 `submission_phase=EXECUTE`，不再次询问提交/推送/
-MR/部署确认。首轮未覆盖或实质变化才补充授权；单独执行技能仍先确认其具体计划。
-提测构建统一使用 `completionMode=TRIGGER_ACCEPTED`：确认 Jenkins 已接受确切队列，
-记录 `BUILD_SUBMITTED` 和内部队列回执后继续 Wiki/TAPD，不等待排队、启动或构建完成。
-面向用户的测试构建链接使用回执中已核实的 `jobUrl`；`queueId`/`queueUrl` 仅作内部接受证据。
-修正展示链接时复用原回执，不重新触发构建。
-结果写“构建任务已提交”，不能写部署成功或发包成功；上线/正式发布仍需独立验证。
-使用 [共享提测 Wiki](../../references/shared-test-wiki.md)，同一 Story 的所选
-项目/Tasks 共用一页，全部相关交付门禁通过后再统一写回；不按 Task 新建 Wiki。
-准确读回后才关联实际 MR、测试构建和 Wiki，不制造未来链接或扩大登记对象。
-
-只有全部 SUBMITTED 且明确要求上线，才将完整结果及涉及的包/消费项目关系
-交 `zan-workflows:going-live`。由其负责独立上线确认、原分支合并、工具包
-latest/消费端验证、Wiki 和资源检查；业务应用生产部署不由本入口推导。
-AWAITING_MERGE 暂停依赖项目，展示准确 MR、userAction.message 和人工操作
-下一步；回复“已合并，继续上线”后只读核实同一 MR，不重复已完成效果。
-
-所有相关项目结束后汇总去重清理候选，委托 going-live 的精确清单与单独
-确认；不能提前删除其他项目仍使用的分支/工作树。未发生的交付、清理不报成功。
-后续才要求提测时复用仍有效 ReviewedChange，由接收能力刷新准确源码与验证，
-不为改变终点重复实施、重建 Task 或换分支。
-
-## 7. 结果与续接
-
-按 [进度与下一步](references/progress-guidance.md) 返回实际完成范围、任务/Plan
-链接、验证/评审、真实交付结果与剩余缺口。交接沿用当前能力结果，保留准确
-TAPD、仓库/分支、范围和已完成效果；只记录实际经过的阶段，不补假 ID/状态。
-不创建 workflow report、运行台账、原始需求 dump 或证据目录。
+- 仅要求建分支时按 [preparing-work](../preparing-work/SKILL.md) 办理，返回分支结果。仅请求命令时只返回命令。
+- 收到已有 Task 时先核实其父 Story 和所选范围。收集和执行都沿用真实工作项与页内功能映射。旧项目 Plan、分支和已完成结果可只读用作证据；需要独立开工时，从已确认的 TAPD Plan 恢复。
 
 ## Execution feedback
 
-按 [执行反馈记录](../../references/execution-feedback.md#attach-to-a-workflow) 在顶层
-任务开始时创建本地诊断 runId，能力切换复用同一编号；实际发生时记录阶段、确认
-事项、人工纠正及最终结局。传给公共交付会话以关联脚本事件，未接入步骤标明缺口。
-诊断不保存业务 Plan/result、不作为授权或恢复依据；失败不阻断原工作。只在用户
-明确要求提交/导出时调用 report-execution，不在任务结束时自动上传。
+新执行 Wiki 的确认前预览只在内存保留阶段信息，取得本次保存或保存并执行授权后才按[执行反馈记录](../../references/execution-feedback.md#attach-to-a-workflow)启动本地诊断并跨能力复用 runId。直接从已确认 Wiki 开工时按实际开工授权启动。诊断失败不阻断业务，正式进度与可续办证据以 Wiki 和实际回执为准；只在用户明确要求时导出或提交反馈。

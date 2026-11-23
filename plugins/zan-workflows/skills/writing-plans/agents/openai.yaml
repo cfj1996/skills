@@ -1,7 +1,7 @@
 interface:
-  display_name: "zan:可视化编写计划"
-  short_description: "根据远程 master 收敛范围并编写分支绑定的 Plan"
-  default_prompt: "使用 $writing-plans 根据需求或原型定位项目，以远程 master 收敛范围，按复杂度选择对话或面板评审，并编写绑定开发分支的 Plan。"
+  display_name: "zan:原型评审"
+  short_description: "核对页面、模块和交互的原型证据，把评审结果交回需求收集"
+  default_prompt: "使用 $writing-plans 评审这个页面原型，整理各功能的行为和待确认问题。"
 
 policy:
   allow_implicit_invocation: false

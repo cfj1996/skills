@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { clientFor } from './mcp-client.mjs';
 import { checkMockSafetySet, mockSafetyPreview } from './mock-safety.mjs';
 import { assertTransitionFields, resolveBugWorkflow, resolveVersionField } from './tapd-mappings.mjs';
-import { readCliPlan, sha256, stableJson, requireText, repositoryKey } from './workflow-runtime.mjs';
+import { readCliPlan, sha256, stableJson, requireText, repositoryKey, coversGitScopes } from './workflow-runtime.mjs';
 
 import { hasBugRepairTitle } from './bug-record-content.mjs';
 
@@ -58,21 +58,23 @@ function checkAcceptedBuild(receipt) {
 function checkBatchBuilds(input, gates) {
   const receipts = gates.deploymentReceipts;
   const git = input.gitDeliveryReceipts;
-  if (!Array.isArray(receipts) || !Array.isArray(git) || !Array.isArray(input.requiredRepositories) ||
-      !input.requiredRepositories.length || receipts.length !== input.requiredRepositories.length ||
-      git.length !== receipts.length || gates.deploymentReceipt !== undefined) {
-    throw new Error('需为全部交付仓库提供各自的构建或跳过回执');
-  }
-  const remaining = new Set(input.requiredRepositories.map(repositoryKey));
-  if (remaining.size !== receipts.length) throw new Error('登记的仓库范围包含重复项');
+  const required = input.requiredRepositories;
+  if (!Array.isArray(receipts) || !Array.isArray(git) || !Array.isArray(required) || !required.length ||
+      git.length !== receipts.length || gates.deploymentReceipt !== undefined) throw new Error('需为全部交付仓库提供各自的构建或跳过回执');
+  const repos = new Set(required.map(repositoryKey)), remaining = new Set(git);
+  const gitRepos = new Set(git.map(row => repositoryKey(row.originUrl || row.sourceRepository)));
+  if (repos.size !== gitRepos.size || [...repos].some(key => !gitRepos.has(key)) ||
+      (input.requiredGitScopes ? !coversGitScopes(input.requiredGitScopes, git)
+        : repos.size !== required.length || repos.size !== git.length)) throw new Error('登记的仓库/分支范围不完整或包含重复项');
   for (const receipt of receipts) {
     const key = repositoryKey(receipt?.sourceRepository);
-    const matches = git.filter(row => repositoryKey(row.originUrl || row.sourceRepository) === key);
+    const matches = git.filter(row => repositoryKey(row.originUrl || row.sourceRepository) === key &&
+      row.deliveredSha === receipt.expectedSha && (!receipt.sourceBranch || receipt.sourceBranch === row.sourceBranch) &&
+      (!(receipt.targetBranch || receipt.releaseRef) || (receipt.targetBranch || receipt.releaseRef) === row.targetBranch));
     const [delivery] = matches;
-    if (!remaining.delete(key) || matches.length !== 1 || !['VERIFIED', 'MERGED'].includes(delivery.state) ||
+    if (matches.length !== 1 || !remaining.delete(delivery) || !['VERIFIED', 'MERGED'].includes(delivery.state) ||
         delivery.containment !== true || !['dev', 'develop'].includes(delivery.targetBranch) ||
-        !/^[a-f\d]{40}(?:[a-f\d]{24})?$/i.test(delivery.deliveredSha || '') ||
-        receipt.expectedSha !== delivery.deliveredSha) {
+        !/^[a-f\d]{40}(?:[a-f\d]{24})?$/i.test(delivery.deliveredSha || '')) {
       throw new Error('构建回执与本轮仓库、目标分支或实际交付版本不匹配');
     }
     if (receipt.state === 'SKIPPED_BY_INTENT' && receipt.writes === 0) continue;

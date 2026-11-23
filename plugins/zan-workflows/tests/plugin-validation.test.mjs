@@ -70,6 +70,22 @@ test('repository plugin validates from outside the repository cwd', () => {
   assert.match(result.stdout, /Plugin validation passed:/);
 });
 
+test('new Story and Bug entry points both expose execution Wiki planning by default', () => {
+  const manifest = JSON.parse(readFileSync(path.join(pluginRoot, '.codex-plugin/plugin.json'), 'utf8'));
+  const planner = '$collecting-requirements';
+  const routing = manifest.interface.defaultPrompt.find(prompt => prompt.includes(planner));
+  assert.ok(routing, 'plugin must expose the shared planning route');
+  assert.match(routing, /TAPD_PLAN by default/);
+  assert.ok(routing.includes('SESSION'));
+  assert.ok(routing.includes('$executing-tapd-plan'));
+  for (const entry of ['developing-requirement', 'fixing-bug']) {
+    assert.ok(routing.includes(`$${entry}`), entry);
+    const metadata = readFileSync(path.join(pluginRoot, 'skills', entry, 'agents/openai.yaml'), 'utf8');
+    const defaultPrompt = metadata.split('\n').find(line => line.trimStart().startsWith('default_prompt:'));
+    assert.ok(defaultPrompt?.includes(planner), `${entry} picker must start with the shared planner`);
+  }
+});
+
 test('a well-formed disposable plugin validates', t => {
   const result = validate(fixture(t));
   assert.ifError(result.error);
