@@ -6,7 +6,7 @@
 
 ## 来自执行中的 TAPD Plan
 
-START 返回 CONTINUOUS_SUBMIT 时，立即执行与手动开工均在首个 submit PLAN 的 input 中带 Wiki START 返回的 `tapdPlan`（正式页 URL、expectedRevision、expectedApprovalFingerprint、limit）。同一 execution context 下，PLAN 读回工作项、准确版本、逐仓 Git 操作与实际测试 Job/参数。独立评审通过后，直接以原人类指令发送现有的 confirmed 与 reviewedPlanHash，再次读回该版本后执行。无构建传 release=null。仅构建使用 workflow-session 的 release PLAN/EXECUTE，二者都带同一引用。旧格式或已确认的纯会话稿按完整当前清单核对，能够覆盖的动作直接沿用；无需为了复用已有授权重写文档。
+START 返回 CONTINUOUS_SUBMIT 时，首个 submit PLAN 原样带 START 返回的 `tapdPlan`。新版引用同时绑定 Wiki 版本、功能范围、当次 `startup` 及其指纹。PLAN 读回正式页并核对本次逐仓 Git 操作、测试 Job 与参数。独立评审通过后，以同一人类指令和 reviewedPlanHash 执行。无构建传 release=null。仅构建时 release 的 PLAN 与 EXECUTE 使用同一引用。旧格式或已确认的会话稿按完整当前清单核对已有授权。
 
 START 返回 DELIVERY_STEPS 时直接用本技能现有逐项路径。通常是同仓多个 Job、独立工具包/构建、同仓不同分支或多仓不同操作目的。按 gitProjects 去重提交推送和合并，再按 buildProjects 为每个 Job 执行一次 release，沿用各项目自己的目的。业务源在合入目标前后分别绑定已审源码与真实交付回执。逐项 merge、release、wiki、registration 的 PLAN/EXECUTE 都传同一 tapdPlan；先核对实际工作项归属、模板与授权，再处理公共提测 Wiki、Bug 修复记录及适用登记。全部所选仓库、构建回执和跨仓验收均就绪后才登记整项完成。只读刷新失败或写入结果不明时保留既有效果。每项调用的 confirmed 都映射同一次开工指令，不逐项询问用户。
 

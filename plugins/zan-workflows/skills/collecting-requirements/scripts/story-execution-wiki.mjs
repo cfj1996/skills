@@ -8,7 +8,7 @@ import { StdioMcpClient } from '../../../scripts/mcp-client.mjs';
 import { apiData } from '../../../scripts/register-test-submission.mjs';
 import { stableJson, repositoryKey, rejectedWrite } from '../../../scripts/workflow-runtime.mjs';
 import { listAllComments, totalCount } from '../../submitting-for-test/scripts/ensure-test-wiki.mjs';
-import { validatePlan, planLines, itemLinkMatches, deliveryRoute } from './validate-plan.mjs';
+import { validatePlan, planLines, itemLinkMatches, deliveryRoute, startupDelivery } from './validate-plan.mjs';
 
 const hash = text => createHash('sha256').update(text, 'utf8').digest('hex');
 const digitId = value => typeof value === 'string' && /^[1-9]\d*$/.test(value);
@@ -58,10 +58,9 @@ function managedCell(text, label, allowed, value) {
   const [, prefix, actual, suffix] = row.text.match(pattern);
   return { actual, text: text.slice(0, row.offset) + prefix + value + suffix + text.slice(row.offset + row.text.length) };
 }
-function planHash(markdown) {
-  let { plan } = parts(markdown);
-  plan = managedCell(plan, '执行状态', statuses, '受管').text;
-  return hash(plan);
+function planHash(markdown, schema) {
+  const { plan } = parts(markdown);
+  return hash(schema < 4 ? managedCell(plan, '执行状态', statuses, '受管').text : plan);
 }
 
 function executionDefinition(markdown) {
@@ -70,7 +69,8 @@ function executionDefinition(markdown) {
   const { plan } = parts(markdown);
   const headerEnd = planLines(plan).find(line => /^##\s+P[1-9]\d*\s/.test(line.text)).offset;
   const header = plan.slice(0, headerEnd).replace(/^# [^\r\n]+/m, '#')
-    .replace(/^\|[ \t]*(?:TAPD (?:需求|缺陷|Bug ?)状态|创建时间|执行状态)[ \t]*\|[^\r\n]*$/gm, '');
+    .replace(/^\|[ \t]*(?:TAPD (?:需求|缺陷|Bug ?)状态|创建时间|执行状态)[ \t]*\|[^\r\n]*$/gm, '')
+    .replace(/^\|[ \t]*是否开启子智能体开发模式[ \t]*\|[ \t]*否[ \t]*\|[ \t]*(?:\r?\n|$)/gm, '');
   return (header + plan.slice(headerEnd)).replace(/\r\n/g, '\n').trimEnd();
 }
 
@@ -90,10 +90,10 @@ function unpack(page, scope) {
   const markdown = raw.slice(end + 1);
   must(same(approval.scope, scope) && approval.title === owner(scope).title && digest(approval) === approvalFingerprint
     && Number.isSafeInteger(approval.revision) && approval.revision > 0 && sha(approval.bodySha256)
-    && hash(markdown) === currentSha256 && planHash(markdown) === approval.planSha256, 'Wiki 归属、确认指纹或正文与记录不一致，须重新核查');
+    && hash(markdown) === currentSha256 && planHash(markdown, approval.schema) === approval.planSha256, 'Wiki 归属、确认指纹或正文与记录不一致，须重新核查');
   must(approval.previousWikiId === null || approval.previousWikiId === asId(page.id), '确认版本绑定了其他 Wiki');
-  const { delivery, featureIds, featureProjects } = validatePlan(markdown, scope, approval.schema);
-  return { approval, approvalFingerprint, markdown, delivery, featureIds, featureProjects, pageSha256: hash(raw) };
+  const { delivery, featureIds, featureProjects, executionStatus } = validatePlan(markdown, scope, approval.schema);
+  return { approval, approvalFingerprint, markdown, delivery, featureIds, featureProjects, executionStatus, pageSha256: hash(raw) };
 }
 
 async function localClaim(key) {
@@ -236,6 +236,7 @@ async function attempt(claim, key, write, verify) {
 }
 
 function manualStartCommand(url, revision, delivery, selectionText = '') {
+  if (!delivery) return `使用 $executing-tapd-plan 读取 ${url} r${revision}，开工前确定本轮是仅开发验证、提测、提测并构建还是仅构建。`;
   const lines = [`使用 $executing-tapd-plan 执行 ${url} r${revision}，${selectionText || '按此版已选范围开工'}。`];
   for (const project of delivery.projects) {
     const operations = [];
@@ -251,9 +252,9 @@ function manualStartCommand(url, revision, delivery, selectionText = '') {
 
 function publicRead(scope, state) {
   must(state.current && state.linkedId && state.approvalCommentId, '执行 Wiki 尚未同时完成正文、独立确认记录和唯一工作项回链核验');
-  const { approval, approvalFingerprint, markdown, pageSha256 } = state.current;
+  const { approval, approvalFingerprint, markdown, pageSha256, executionStatus } = state.current;
   const wikiUrl = link(scope.workspaceId, state.linkedId);
-  return { state: 'CONFIRMED', ...scope, wikiId: state.linkedId, wikiUrl,
+  return { state: 'CONFIRMED', ...(executionStatus === undefined ? {} : { executionStatus }), ...scope, wikiId: state.linkedId, wikiUrl,
     startCommand: manualStartCommand(wikiUrl, approval.revision, state.current.delivery),
     revision: approval.revision, bodySha256: approval.bodySha256, planSha256: approval.planSha256,
     approvalFingerprint, approvalCommentId: state.approvalCommentId, pageSha256, markdown, featureIds: state.current.featureIds, featureProjects: state.current.featureProjects, delivery: state.current.delivery };
@@ -300,7 +301,9 @@ export function executionFromPlan(plan, limit = 'AS_PLANNED', selection = {}) {
   }
   const partial = features.length !== all.length;
   const selectedProjects = [...new Set(features.map(id => id.split('-')[0]))];
-  const base = plan.delivery;
+  const usesStartup = plan.delivery === null || Object.hasOwn(selection, 'startup');
+  const startup = usesStartup ? selection.startup : undefined;
+  const base = usesStartup ? startupDelivery(plan.featureProjects, selectedProjects, startup, limit) : plan.delivery;
   const gaps = {};
   for (const key of ['submit', 'build']) gaps[key] = (base.gaps?.[key] || []).filter(gap =>
     gap.startsWith('工作项 ') || selectedProjects.includes(gap.split(' ')[0]));
@@ -324,6 +327,10 @@ export function executionFromPlan(plan, limit = 'AS_PLANNED', selection = {}) {
     (base.legacy || projects.some(p => p.release) || gaps.build.length > 0);
   const tapdPlan = { wikiUrl: plan.wikiUrl, expectedRevision: plan.revision,
     expectedApprovalFingerprint: plan.approvalFingerprint, limit, ...(partial ? { selectedFeatures: features } : {}) };
+  if (usesStartup) {
+    tapdPlan.startup = structuredClone(startup);
+    tapdPlan.startupFingerprint = digest([plan.approvalFingerprint, limit, features, startup]);
+  }
   const route = deliveryRoute(delivery, submit, build);
   if (partial && route.workflow === 'CONTINUOUS_SUBMIT') {
     route.workflow = 'DELIVERY_STEPS';
@@ -366,9 +373,10 @@ export async function runStoryWiki(mode, input, call, claim = localClaim) {
   let markdown = input.markdown;
   const { actor } = input;
   const store = storage(call, scope);
+  let draftSchema;
   if (['SAVE', 'PLAN', 'CHECK'].includes(mode)) {
     must(typeof markdown === 'string' && oneLine(actor), '需要完整 Markdown 和已核实 TAPD 操作者');
-    validatePlan(markdown, scope, 1);
+    draftSchema = validatePlan(markdown, scope, mode === 'PLAN' ? input.schema ?? 4 : input.approval?.schema).schema;
     parts(markdown);
   }
   const state = await store.load();
@@ -381,6 +389,8 @@ export async function runStoryWiki(mode, input, call, claim = localClaim) {
     must(input.progressAuthorized === true && expectedApprovalFingerprint === current.approvalFingerprint && sha(expectedPageSha256)
       && typeof receiptId === 'string' && /^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}$/.test(receiptId)
       && oneLine(entry) && oneLine(evidence), '进度回填需要授权、同一确认版、全页指纹、稳定回执编号和单行证据');
+    must(current.approval.schema < 4 || (executionStatus === undefined && !/｜执行状态 \S+$/.test(evidence)),
+      '新版执行记录请填写实际回执及依据');
     const prefix = `- [${receiptId}] `;
     const line = `${prefix}${entry}｜依据 ${evidence}${executionStatus ? `｜执行状态 ${executionStatus}` : ''}`;
     const { plan, history } = parts(current.markdown);
@@ -410,35 +420,37 @@ export async function runStoryWiki(mode, input, call, claim = localClaim) {
 
   // Completed rN keeps its original progress in its verified archive. A
   // substantive revision starts at 待执行; PLAN exposes the exact reset body.
-  const restart = current && managedCell(parts(current.markdown).plan, '执行状态', statuses, '受管').actual === '已上线' &&
+  const restart = draftSchema < 4 && current?.executionStatus === '已上线' &&
     executionDefinition(markdown) !== executionDefinition(current.markdown);
   if (mode === 'PLAN' && restart || input.approval?.restartsExecution && hash(markdown) !== input.approval.bodySha256) {
     const draft = parts(markdown);
-    const status = managedCell(draft.plan, '执行状态', statuses, '待执行');
+    const status = draftSchema < 4 ? managedCell(draft.plan, '执行状态', statuses, '待执行') : null;
     if (restart && (mode === 'PLAN' || input.approval?.previousPageSha256 === current.pageSha256)) must(draft.history === parts(current.markdown).history ||
-      (!draft.history.trim() && status.actual === '待执行'), '新版开始前须保留可归档的原记录或使用确认稿');
-    markdown = status.text + '\n';
+      (!draft.history.trim() && (!status || status.actual === '待执行')), '新版开始前须保留可归档的原记录或使用确认稿');
+    markdown = (status?.text ?? draft.plan) + '\n';
   }
-  const makeApproval = (schema = 3) => {
+  const makeApproval = (schema = draftSchema) => {
     if (current && current.markdown === markdown) return current.approval;
-    validatePlan(markdown, scope, schema);
+    const { executionStatus: status } = validatePlan(markdown, scope, schema);
     const next = parts(markdown);
-    const status = managedCell(next.plan, '执行状态', statuses, '受管').actual;
     if (current) {
       publicRead(scope, state);
       const previous = parts(current.markdown);
-      must(restart || (next.history === previous.history && managedCell(previous.plan, '执行状态', statuses, '受管').actual === status),
+      must(restart || (next.history === previous.history && (schema === 4 || current.executionStatus === status)),
         '修订执行范围时须保留完整现有执行记录与顶部状态，单独使用 PROGRESS 回填');
-      must(planHash(markdown) !== current.approval.planSha256, '只有进度/受管状态变化时请使用 PROGRESS');
-    } else must(status === '待执行' && !next.history.trim(), '初版须为待执行且执行记录为空，核实历史证据后再回填');
+      must(planHash(markdown, schema) !== current.approval.planSha256, '只有进度/受管状态变化时请使用 PROGRESS');
+    } else must((schema === 4 || status === '待执行') && !next.history.trim(), '初版须使用空执行记录，核实实际证据后再回填');
     return { schema, scope, parentName, title: item.title, actor, ...(restart ? { restartsExecution: true } : {}), revision: (current?.approval.revision ?? 0) + 1,
       previousWikiId: wikiId, previousPageSha256: page ? hash(page.markdown_description) : null,
       ...(page && !current ? { previousDraftTitle: page.name } : {}),
-      bodySha256: hash(markdown), planSha256: planHash(markdown) };
+      bodySha256: hash(markdown), planSha256: planHash(markdown, schema) };
   };
   if (mode === 'PLAN') {
     if (current?.markdown === markdown && state.linkedId && state.approvalCommentId) {
       return { ...publicRead(scope, state), action: 'REUSE' };
+    }
+    if (draftSchema === 4 && current && current.markdown !== markdown) {
+      must(input.expectedPageSha256 === current.pageSha256, '同页修订须绑定最新 READ 的全页指纹，请基于当前正文和执行记录调整');
     }
     const approval = makeApproval();
     const changed = current?.markdown !== markdown;
@@ -452,9 +464,9 @@ export async function runStoryWiki(mode, input, call, claim = localClaim) {
       operations, approval, markdown, fingerprint: digest(approval), wikiId, wikiUrl: wikiId ? link(workspaceId, wikiId) : null, linked: !!state.linkedId };
   }
   const { approval, confirmedFingerprint } = input;
-  must(approval && [1, 2, 3].includes(approval.schema) && same(approval.scope, scope) && approval.title === item.title
+  must(approval && [1, 2, 3, 4].includes(approval.schema) && same(approval.scope, scope) && approval.title === item.title
     && approval.parentName === parentName && oneLine(approval.actor) && approval.actor === actor && sha(confirmedFingerprint)
-    && digest(approval) === confirmedFingerprint && approval.bodySha256 === hash(markdown) && approval.planSha256 === planHash(markdown),
+    && digest(approval) === confirmedFingerprint && approval.bodySha256 === hash(markdown) && approval.planSha256 === planHash(markdown, approval.schema),
     '必须携带同一正文、目标和操作者的完整已确认 PLAN 指纹');
   const applied = current?.approvalFingerprint === confirmedFingerprint;
   if (mode === 'CHECK') return { state: !applied ? 'UNVERIFIED' :

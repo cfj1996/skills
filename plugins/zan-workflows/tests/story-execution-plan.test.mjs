@@ -7,6 +7,7 @@ import { validatePlan } from '../skills/collecting-requirements/scripts/validate
 
 const skill = new URL('../skills/collecting-requirements/', import.meta.url);
 const story = readFileSync(new URL('assets/example-plan.md', skill), 'utf8');
+const frontend = readFileSync(new URL('assets/example-frontend-plan.md', skill), 'utf8');
 const scope = { workspaceId: '123', storyId: '111230010000101' };
 const check = (text, target = scope) => validatePlan(text, target);
 const replace = (text, from, to) => {
@@ -19,7 +20,7 @@ const bugScope = { workspaceId: scope.workspaceId, bugId: '111230010000102' };
 test('accepts Story and Bug with exact type and string identity, including long IDs', () => {
   assert.ok(check(story).indexes.includes('P2-M1-F1-TC1'));
   assert.ok(check(bug, bugScope).valid);
-  assert.equal(check(bug, bugScope).alignment.status, '本轮无适用项');
+  assert.equal(check(bug, bugScope).alignment.status, '全部对齐');
   assert.ok(check(bug.replace('/tapd_fe/123/bug/detail/', '/123/bugtrace/bugs/view/'), bugScope).valid);
   assert.ok(check(story.replace('/tapd_fe/123/story/detail/', '/123/prong/stories/view/')).valid);
   const longId = '1150372234001084391';
@@ -34,10 +35,13 @@ test('accepts Story and Bug with exact type and string identity, including long 
   assert.throws(() => check(story.replace('需求 ID | ' + scope.storyId, '需求 ID | 9')), /工作项 ID/);
 });
 
-test('requires all eight fields, fixed choices and unique metadata', () => {
-  for (const label of ['需求链接', '需求 ID', 'TAPD 需求状态', '创建时间', '执行状态', '是否提测', '是否构建', '是否开启子智能体开发模式']) {
+test('requires execution status and delivery choices but allows the default delegation option to be omitted', () => {
+  for (const label of ['需求链接', '需求 ID', 'TAPD 需求状态', '创建时间', '执行状态', '是否提测', '是否构建']) {
     assert.throws(() => check(story.split('\n').filter(line => !line.startsWith('| ' + label + ' |')).join('\n')), /缺少工作项字段/);
   }
+  assert.deepEqual(check(replace(story, '| 是否开启子智能体开发模式 | 否 |\n', '')), check(story));
+  assert.ok(check(replace(story, '| 是否开启子智能体开发模式 | 否 |', '| 是否开启子智能体开发模式 | 是 |')).valid);
+  assert.throws(() => check(replace(story, '| 是否开启子智能体开发模式 | 否 |', '| 是否开启子智能体开发模式 | 待确定 |')), /须为是或否/);
   assert.throws(() => check(story.replace('| 是否提测 | 否 |', '| 是否提测 | 待确定 |')), /须为是或否/);
   assert.throws(() => check(story.replace('执行状态 | 待执行', '执行状态 | 评审中')), /执行状态无效/);
   assert.throws(() => check(story.replace('| 创建时间 |', '| 开发人员 | 无 |\n| 创建时间 |')), /工作项字段/);
@@ -87,6 +91,49 @@ test('alignment follows actual selected consumers, including shared providers an
   const unreviewed = outOfScope.slice(0, p2) + replace(outOfScope.slice(p2), '**依赖审查** 已核对', '**依赖审查** 待核实');
   assert.throws(() => check(unreviewed), /P2.*待核实/);
   assert.ok(check(replace(unreviewed, '**外部数据对齐** 本轮无适用项', '**外部数据对齐** 待核实')).valid);
+});
+
+test('frontend plan resolves reused, incomplete and Mock API rows without a provider project', () => {
+  const { featureProjects, featureIds, alignment } = check(frontend);
+  assert.deepEqual(featureProjects.map(project => project.id), ['P1']);
+  assert.deepEqual(featureIds, ['P1-M1-F1', 'P1-M1-F2', 'P1-M2-F1']);
+  assert.deepEqual(alignment.dependencies, [
+    { id: 'P1-D1', status: '已对齐', features: ['P1-M1-F1'] },
+    { id: 'P1-D2', status: '未对齐', features: ['P1-M1-F1', 'P1-M1-F2'] },
+    { id: 'P1-D3', status: '待核实', features: ['P1-M2-F1'] },
+  ]);
+  assert.equal(alignment.status, '未全部对齐');
+  const escaped = replace(frontend, '`storeId/visible`', '`storeId \\| visible`').replaceAll('\n', '\r\n');
+  assert.deepEqual(check(escaped), check(frontend));
+});
+
+test('the same interface can be referenced from two projects and is registered once', () => {
+  const legacyStart = story.indexOf('### P1-D2 ');
+  const legacyEnd = story.indexOf('### P1-M1 ');
+  const table = [
+    '### 接口清单', '',
+    '| 编号 | 接口 | 前端传 / 读 | 对齐 | 就绪与验证 | 本轮接入及缺口 | 依据 |',
+    '| --- | --- | --- | --- | --- | --- | --- |',
+    '| P1-D2 | 门店目录 · 查门店 · `GET /api/stores` | `regionId` 与门店候选 | 已对齐 | 待联调 | 联验候选 | 正式契约 |',
+    '', '',
+  ].join('\n');
+  const shared = story.slice(0, legacyStart) + table + story.slice(legacyEnd);
+  assert.deepEqual(check(shared), check(story));
+
+  const second = table.replace('P1-D2', 'P2-D1').replace('查门店', '门店下拉');
+  const duplicate = replace(shared, '### P2-M1 活动编辑', second + '### P2-M1 活动编辑');
+  assert.throws(() => check(duplicate), /P2-D1 重复登记接口，请引用 P1-D2/);
+});
+
+test('API tables reject malformed, dangling and mis-scoped rows', () => {
+  assert.throws(() => check(replace(frontend, '| P1-D3 |', '| P2-D3 |')), /须属于当前项目/);
+  assert.throws(() => check(replace(frontend, '| P1-D3 |', '| P1-D2 |')), /重复索引/);
+  assert.throws(() => check(replace(frontend, '### P1-M1 门店列表', '### P1-D2 同一编号\n\n### P1-M1 门店列表')), /重复索引/);
+  assert.throws(() => check(replace(frontend, '**数据依赖** P1-D3', '**数据依赖** P1-D4')), /数据依赖引用不存在/);
+  assert.throws(() => check(replace(frontend, '**数据依赖** P1-D3', '**数据依赖** 无')), /P1-D3 须由消费功能引用/);
+  assert.throws(() => check(replace(frontend, '| 待核实 | 本地可验。', '| 已对齐 | 本地可验。')), /未确认的方法与路径/);
+  assert.throws(() => check(replace(frontend, '| 依据 |', '| |')), /表头无效/);
+  assert.throws(() => check(replace(frontend, '### P1-M2 展示配置', '### 接口清单\n\n### P1-M2 展示配置')), /在业务模块之前且只出现一次/);
 });
 
 test('requires scoped implementation, repository rules and observable test/UI bodies', () => {

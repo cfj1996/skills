@@ -7,6 +7,7 @@ import { repositoryKey, stableJson } from '../../../scripts/workflow-runtime.mjs
 const indexPattern = /^P[1-9]\d*(?:-D[1-9]\d*|-M[1-9]\d*(?:-F[1-9]\d*(?:-(?:UI|TC)[1-9]\d*)?)?)?$/;
 const depth = { P: 2, D: 3, M: 3, F: 4, UI: 5, TC: 5 };
 const statuses = ['待执行', '开发中', '已上线'];
+const apiColumns = ['编号', '接口', '前端传 / 读', '对齐', '就绪与验证', '本轮接入及缺口', '依据'];
 
 function requireFact(test, message) {
   if (!test) throw new Error(message);
@@ -35,9 +36,51 @@ export function planLines(markdown) {
   return lines;
 }
 
+function apiTableCells(line) {
+  const row = line.trim();
+  // An escaped pipe belongs to the cell, including inside an inline code span.
+  const matches = [...row.matchAll(/\|((?:\\.|[^\\|])*)(?=\|)/gu)];
+  if (matches.map(match => match[0]).join('') + '|' !== row) return [];
+  return matches.map(([, cell]) => cell.trim());
+}
+
+function addApiDependencies(project, lines, nodes, apiOperations) {
+  const [headers, separator, ...rows] = lines.join('\n').trim().split('\n').map(apiTableCells);
+  requireFact(headers.length === apiColumns.length && apiColumns.every((column, index) => headers[index] === column),
+    project.id + ' 接口清单表头无效');
+  requireFact(separator?.length === apiColumns.length && separator.every(cell => /^:?-+:?$/.test(cell)) && rows.length,
+    project.id + ' 接口清单须包含表格分隔行及至少一条接口');
+  for (const row of rows) {
+    requireFact(row.length === apiColumns.length && row.every(Boolean), project.id + ' 接口清单行须填齐七列');
+    const [number, operation, usage, alignment, verification, action, source] = row;
+    const id = number.match(/^`([^`]+)`$/)?.[1] ?? number;
+    requireFact(/^P[1-9]\d*-D[1-9]\d*$/.test(id) && id.startsWith(project.id + '-'),
+      project.id + ' 接口编号须属于当前项目：' + id);
+    requireFact(!nodes.has(id), id + ' 重复索引');
+
+    const api = operation.match(/^([^·]+)·([^·]+)·\s*(?:`([A-Z]+) (\/[^\s`]+)`|待确认)$/u);
+    requireFact(api && api[1].trim() && api[2].trim(), id + ' 接口须填写提供方、用途及方法与路径，或标记待确认');
+    const [, provider, , method, path] = api;
+    if (method) {
+      const key = JSON.stringify([provider.trim(), method, path]);
+      requireFact(!apiOperations.has(key), id + ' 重复登记接口，请引用 ' + apiOperations.get(key));
+      apiOperations.set(key, id);
+    } else {
+      requireFact(['待核实', '未对齐'].includes(alignment), id + ' 未确认的方法与路径只能标为待核实或未对齐');
+    }
+    const fields = new Map([
+      ['来源', source], ['契约', operation + '\n' + usage], ['对齐', alignment],
+      ['就绪及验证', verification], ['影响及补齐条件', action],
+    ]);
+    const node = { id, type: 'D', parentId: project.id, project: project.id, lines: [], children: [], fields, fromApiTable: true };
+    nodes.set(id, node);
+    project.children.push(node);
+  }
+}
+
 function sectionTree(markdown, isBug) {
   const infoNames = isBug ? ['缺陷信息', 'Bug 信息'] : ['需求信息'];
-  const nodes = new Map(), parents = [];
+  const nodes = new Map(), parents = [], apiOperations = new Map();
   let title, info, history, current;
   for (const { text } of planLines(markdown)) {
     const heading = text.match(/^(#{1,6})[ \t]+(.+?)\s*$/);
@@ -47,6 +90,7 @@ function sectionTree(markdown, isBug) {
     }
     const level = heading[1].length, label = heading[2];
     requireFact(!history, '执行记录须为最后一节');
+    if (current?.apiProject) addApiDependencies(current.apiProject, current.lines, nodes, apiOperations);
     if (level === 1) {
       requireFact(!title && !info && !nodes.size, '正文需要唯一的一级标题');
       title = label;
@@ -55,6 +99,14 @@ function sectionTree(markdown, isBug) {
       current = info = { label, lines: [] };
     } else if (level === 2 && label === '执行记录') {
       current = history = { lines: [] };
+    } else if (level === 3 && label === '接口清单') {
+      const project = parents[2];
+      requireFact(project?.type === 'P', '接口清单须位于项目标题下');
+      requireFact(!project.hasApiTable && !project.children.some(child => child.type === 'M'),
+        project.id + ' 接口清单须在业务模块之前且只出现一次');
+      project.hasApiTable = true;
+      current = { apiProject: project, lines: [] };
+      parents.length = level;
     } else {
       requireFact(info, '缺少与工作项类型一致的基本信息');
       const [id, ...name] = label.split(/\s+/);
@@ -83,12 +135,13 @@ export function itemLinkMatches(href, scope) {
   return href === modern || href === classic;
 }
 
-function checkInfo(info, scope, isBug) {
+function checkInfo(info, scope, isBug, schema) {
   const noun = isBug ? (info.label === '缺陷信息' ? '缺陷' : 'Bug') : '需求';
   const labelPrefix = noun === 'Bug' ? 'Bug ' : noun;
   const linkLabel = labelPrefix + '链接', idLabel = noun + ' ID';
-  const labels = [linkLabel, idLabel, 'TAPD ' + labelPrefix + '状态', '创建时间', '执行状态',
-    '是否提测', '是否构建', '是否开启子智能体开发模式'];
+  const identity = [linkLabel, idLabel, '创建时间'];
+  const legacyLabels = ['TAPD ' + labelPrefix + '状态', '执行状态', '是否提测', '是否构建'];
+  const parallelLabel = '是否开启子智能体开发模式';
   const fields = new Map();
   for (const text of info.lines) {
     if (!text.startsWith('|')) continue;
@@ -96,18 +149,27 @@ function checkInfo(info, scope, isBug) {
     requireFact(row, '工作项信息须使用两列表格');
     const [, key, value] = row;
     if (key === '字段' && value === '内容' || /^:?-+:?$/.test(key) && /^:?-+:?$/.test(value)) continue;
-    requireFact(labels.includes(key) && value.trim() && !fields.has(key), '未知、空或重复的工作项字段：' + key);
+    requireFact((identity.includes(key) || legacyLabels.includes(key) || key === parallelLabel) && value.trim() && !fields.has(key),
+      '未知、空或重复的工作项字段：' + key);
     fields.set(key, value);
   }
-  for (const label of labels) requireFact(fields.has(label), '缺少工作项字段：' + label);
+  schema ??= [...legacyLabels, parallelLabel].some(label => fields.has(label)) ? 3 : 4;
+  for (const label of identity) requireFact(fields.has(label), '缺少工作项字段：' + label);
   const itemId = isBug ? scope.bugId : scope.storyId;
   requireFact(fields.get(idLabel) === itemId, '工作项 ID 与目标不一致');
   const raw = fields.get(linkLabel);
   const href = raw.match(/^\[[^\]]+\]\(([^\s)]+)\)$/)?.[1] ?? raw;
   requireFact(itemLinkMatches(href, scope), '工作项链接须指向准确的 TAPD 类型、空间及完整 ID');
-  requireFact(statuses.includes(fields.get('执行状态')), '执行状态无效');
-  for (const key of labels.slice(5)) requireFact(['是', '否'].includes(fields.get(key)), key + ' 须为是或否');
-  return fields;
+  if (schema < 4) {
+    for (const label of legacyLabels) requireFact(fields.has(label), '缺少工作项字段：' + label);
+    requireFact(statuses.includes(fields.get('执行状态')), '执行状态无效');
+    for (const key of [...legacyLabels.slice(2), parallelLabel]) {
+      requireFact(['是', '否'].includes(fields.get(key) ?? '否'), key + ' 须为是或否');
+    }
+  } else {
+    requireFact([...legacyLabels, parallelLabel].every(label => !fields.has(label)), '新版执行文档的状态及交付选择在启动时处理');
+  }
+  return { fields, schema };
 }
 
 function fieldsOf(node) {
@@ -150,7 +212,7 @@ function alignmentStatus(states, inventoryComplete) {
 function checkNodes(nodes, schema) {
   const features = [], projects = [];
   for (const n of nodes.values()) {
-    n.fields = fieldsOf(n);
+    n.fields ??= fieldsOf(n);
     if (n.type === 'P') {
       if (schema >= 2) {
         requireFact(n.children.some(child => child.type === 'M'), n.id + ' 缺少模块及功能');
@@ -180,6 +242,10 @@ function checkNodes(nodes, schema) {
     }
   }
   requireFact(features.some(n => n.inScope), '计划至少需要一个本轮纳入的功能');
+  const referencedData = new Set(features.flatMap(feature => feature.data));
+  for (const node of nodes.values()) {
+    requireFact(!node.fromApiTable || referencedData.has(node.id), node.id + ' 须由消费功能引用');
+  }
 
   const visiting = new Set(), visited = new Set();
   function visit(node) {
@@ -231,19 +297,15 @@ function checkHistory(lines, status) {
       lastStatus = state[1];
     }
   }
-  requireFact(status === lastStatus, '顶部执行状态与执行记录不一致');
+  requireFact(status === undefined || status === lastStatus, '顶部执行状态与执行记录不一致');
 }
 
-// Delivery facts come from the reviewed Markdown. Timing and the user's current
-// execution instruction are deliberately outside this persisted scope.
-function deliveryContext(nodes, info, fields, schema) {
-  const submit = fields.get('是否提测') === '是';
-  const build = fields.get('是否构建') === '是';
+function deliveryContext(projectNodes, infoFields, submit, build, schema) {
   const projects = [];
   if (schema < 3) return { submit, build, legacy: true, projects };
   if (!submit && !build) return { submit, build, projects };
 
-  const infoFields = fieldsOf(info), gaps = { submit: [], build: [] };
+  const gaps = { submit: [], build: [] };
   const pending = infoFields.get('交付待核实');
   function fact(node, key, missing) {
     const value = node.fields.get(key)?.split('\n', 1)[0].trim();
@@ -255,8 +317,7 @@ function deliveryContext(nodes, info, fields, schema) {
   }
   const testWiki = submit ? fact({ id: '工作项', fields: infoFields }, '提测 Wiki', gaps.submit) : '跳过';
   requireFact(!testWiki || ['需要', '跳过'].includes(testWiki), '选择提测时须明确提测 Wiki');
-  for (const node of nodes.values()) {
-    if (node.type !== 'P' || !node.children.some(mod => mod.children.some(feature => feature.inScope))) continue;
+  for (const node of projectNodes) {
     const git = submit ? fact(node, '提测合并', gaps.submit) : '跳过';
     const job = build ? fact(node, '测试构建 Job', gaps.build) : '跳过';
     if (git === '跳过' && job === '跳过') continue;
@@ -310,6 +371,39 @@ function deliveryContext(nodes, info, fields, schema) {
 
 }
 
+const startProjectFields = ['交付目的', '提测合并', '提测目标分支', '冲突中转分支', '冲突工作树',
+  '测试构建 Job', '构建类型', '构建来源', '构建项目', '构建对象', '构建参数指纹'];
+
+// Targets are confirmed for this run. Repository and source stay bound to the saved plan.
+export function startupDelivery(featureProjects, selectedProjects, startup, limit) {
+  requireFact(startup && typeof startup.submit === 'boolean' && typeof startup.build === 'boolean' &&
+    Object.keys(startup).every(key => ['submit', 'build', 'projects', 'testWiki', 'testVersion', 'parallelDevelopment'].includes(key)) &&
+    (startup.parallelDevelopment === undefined || typeof startup.parallelDevelopment === 'boolean'),
+  '启动前须明确本轮是否提测、是否构建及其范围');
+  const submit = startup.submit && !['IMPLEMENT_ONLY', 'BUILD_ONLY'].includes(limit);
+  const build = startup.build && !['IMPLEMENT_ONLY', 'NO_BUILD'].includes(limit);
+  const projectFields = startup.projects ?? {};
+  requireFact(projectFields && typeof projectFields === 'object' && !Array.isArray(projectFields) &&
+    Object.keys(projectFields).every(id => selectedProjects.includes(id)), '启动交付项目须属于本轮所选范围');
+  const infoFields = new Map();
+  for (const [key, label] of [['testWiki', '提测 Wiki'], ['testVersion', '登记测试版本']]) {
+    if (startup[key] === undefined) continue;
+    requireFact(typeof startup[key] === 'string' && startup[key].trim() && !/[\r\n]/.test(startup[key]), '启动字段无效：' + label);
+    infoFields.set(label, startup[key]);
+  }
+  const projects = featureProjects.filter(project => selectedProjects.includes(project.id)).map(project => {
+    const values = Object.hasOwn(projectFields, project.id) ? projectFields[project.id] : {};
+    requireFact(values && typeof values === 'object' && !Array.isArray(values) &&
+      Object.entries(values).every(([key, value]) => startProjectFields.includes(key) && typeof value === 'string' && value.trim() && !/[\r\n]/.test(value)),
+    project.id + ' 启动交付字段无效');
+    return { id: project.id, fields: new Map([
+      ['提测合并', '跳过'], ['测试构建 Job', '跳过'], ...Object.entries(values),
+      ['仓库', project.repository], ['开发分支', project.branch],
+    ]) };
+  });
+  return deliveryContext(projects, infoFields, submit, build, 4);
+}
+
 // The continuous submission helper has one Git row and at most one app Job
 // per repository, with a common purpose. Other shapes use the existing
 // individual delivery helpers; each reviewed Git operation and Job runs once.
@@ -344,8 +438,8 @@ export function deliveryRoute(delivery, submit, build) {
     separateBuilds: ['DELIVERY_STEPS', 'RELEASE_ONLY'].includes(workflow) ? jobs.map(job => job.id) : [] };
 }
 
-export function validatePlan(markdown, scope = {}, schema = 3) {
-  requireFact([1, 2, 3].includes(schema), '无法识别执行计划格式版本');
+export function validatePlan(markdown, scope = {}, schema) {
+  requireFact(schema === undefined || [1, 2, 3, 4].includes(schema), '无法识别执行计划格式版本');
   const ids = ['storyId', 'bugId'].filter(key => Object.hasOwn(scope, key));
   requireFact(ids.length === 1, 'storyId 和 bugId 必须且只能指定一项');
   for (const id of [scope.workspaceId, scope[ids[0]]]) {
@@ -354,7 +448,8 @@ export function validatePlan(markdown, scope = {}, schema = 3) {
   requireFact(typeof markdown === 'string', '缺少 Markdown 正文');
   const isBug = ids[0] === 'bugId';
   const { info, history, nodes } = sectionTree(markdown, isBug);
-  const fields = checkInfo(info, scope, isBug);
+  const { fields, schema: version } = checkInfo(info, scope, isBug, schema);
+  schema = version;
   const alignment = checkNodes(nodes, schema);
   if (isBug && schema >= 2) {
     const bug = { ...info, id: 'Bug', fields: fieldsOf(info) };
@@ -366,13 +461,15 @@ export function validatePlan(markdown, scope = {}, schema = 3) {
       requireFact(nodes.get(test.parentId).inScope, test.id + ' 的所属功能须纳入本轮回归验收');
     }
   }
-  checkHistory(history.lines, fields.get('执行状态'));
-  const delivery = deliveryContext(nodes, info, fields, schema);
+  const executionStatus = fields.get('执行状态');
+  checkHistory(history.lines, executionStatus);
+  const selectedProjects = [...nodes.values()].filter(node => node.type === 'P' && node.children.some(mod => mod.children.some(feature => feature.inScope)));
+  const delivery = schema === 4 ? null : deliveryContext(selectedProjects, fieldsOf(info), fields.get('是否提测') === '是', fields.get('是否构建') === '是', schema);
   const featureIds = [...nodes.values()].filter(node => node.type === 'F' && node.inScope).map(node => node.id);
   const featureProjects = [...nodes.values()].filter(node => node.type === 'P').map(node => ({
     id: node.id, repository: node.fields.get('仓库'), branch: node.fields.get('开发分支'),
   }));
-  return { valid: true, indexes: [...nodes.keys()], featureIds, featureProjects, alignment, delivery };
+  return { valid: true, schema, ...(executionStatus === undefined ? {} : { executionStatus }), indexes: [...nodes.keys()], featureIds, featureProjects, alignment, delivery };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

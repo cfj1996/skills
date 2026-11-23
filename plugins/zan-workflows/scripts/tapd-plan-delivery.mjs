@@ -11,13 +11,15 @@ import { repositoryKey, gitScopeKey, sha256, stableJson } from './workflow-runti
 export async function readExecutionPlan(reference, call) {
   if (!reference?.wikiUrl || !Number.isSafeInteger(reference.expectedRevision) || reference.expectedRevision < 1 ||
       !/^[a-f0-9]{64}$/.test(reference.expectedApprovalFingerprint || '') ||
-      Object.keys(reference).some(key => !['wikiUrl', 'expectedRevision', 'expectedApprovalFingerprint', 'limit', 'selectedFeatures'].includes(key))) {
+      Object.keys(reference).some(key => !['wikiUrl', 'expectedRevision', 'expectedApprovalFingerprint', 'limit', 'selectedFeatures',
+        'startup', 'startupFingerprint'].includes(key))) {
     throw new Error('从执行上下文交付须引用已启动的正式 Wiki、准确版本和确认指纹');
   }
   let confirmed;
   try { confirmed = await runStoryWiki('READ', reference, call); }
   catch (cause) { throw Object.assign(new Error(cause.message, { cause }), { code: 'PLAN_RECHECK_REQUIRED' }); }
   const plan = executionFromPlan(confirmed, reference.limit, reference);
+  if (plan.tapdPlan.startupFingerprint !== reference.startupFingerprint) throw new Error('本轮启动选择已变化，请复用已确认的 START 上下文');
   if (plan.missing.length) throw new Error('本轮所选交付待核实：' + plan.missing.join('、'));
   if (plan.delivery.legacy) throw new Error('旧版 Plan 未结构化绑定交付目标。请对照原文及当前开工指令核实实际约定');
   return plan;

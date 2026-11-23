@@ -728,7 +728,7 @@ test('a missing, rewritten or differently linked prior Bug record can never beco
 });
 
 async function startBoundPlan(f, startMode, change = m => m, limit) {
-  const example = await readFile(new URL('../skills/collecting-requirements/assets/example-bug-plan.md', import.meta.url), 'utf8');
+  const example = await readFile(new URL('fixtures/legacy-bug-plan.md', import.meta.url), 'utf8');
   const firstMerge = f.input.merge || f.input.repositories[0].merge;
   const bug = f.input.registration.entryType === 'bug';
   const template = bug ? example : example.replaceAll('缺陷', '需求').replace('/bug/detail/', '/story/detail/');
@@ -739,7 +739,7 @@ async function startBoundPlan(f, startMode, change = m => m, limit) {
     .replaceAll('merchant-admin', 'factory')
     .replace('将门店筛选修复提交测试环境验证', firstMerge.purpose));
   f.pages.set('70', { id: '70', name: '需求执行文档', parent_wiki_id: '0' });
-  const raw = { workspaceId: '123', [bug ? 'bugId' : 'storyId']: '1', parentWikiId: '70', actor: 'developer', markdown: body };
+  const raw = { workspaceId: '123', [bug ? 'bugId' : 'storyId']: '1', parentWikiId: '70', actor: 'developer', markdown: body, schema: 3 };
   const preview = await f.planWiki('PLAN', raw);
   const saved = await f.planWiki('SAVE', { ...raw, approval: preview.approval, confirmedFingerprint: preview.fingerprint });
   if (startMode === 'MANUAL') await f.restart();
@@ -748,6 +748,53 @@ async function startBoundPlan(f, startMode, change = m => m, limit) {
   f.input.tapdPlan = start.tapdPlan;
   return { start, saved, raw };
 }
+
+function secondProjectWithSharedApis(markdown) {
+  const start = markdown.indexOf('## P1 '), end = markdown.indexOf('## 执行记录');
+  return markdown.slice(start, end).replace(/^### 接口清单\n[\s\S]*?(?=^### )/m, '')
+    .replace('## P1 ', '## P2 ').replaceAll('P1-M', 'P2-M');
+}
+
+test('stateless Wiki selects delivery at startup and binds that choice through submission', async t => {
+  const f = await fixture(t, { bug: true });
+  const example = await readFile(new URL('../skills/collecting-requirements/assets/example-bug-plan.md', import.meta.url), 'utf8');
+  const markdown = example.replaceAll('111230010000102', '1')
+    .replace('https://git.example.test/team/merchant-admin.git', repo)
+    .replace('fixbug/demo.1120.1000102.修复门店筛选', branch);
+  f.pages.set('70', { id: '70', name: '需求执行文档', parent_wiki_id: '0' });
+  const raw = { workspaceId: '123', bugId: '1', parentWikiId: '70', actor: 'developer', markdown };
+  await assert.rejects(f.planWiki('PLAN', { ...raw,
+    markdown: markdown.replace('## P1 ', '| 是否提测 | 否 |\n\n## P1 ') }), /在启动时处理/);
+  const preview = await f.planWiki('PLAN', raw);
+  assert.equal(preview.approval.schema, 4);
+  const saved = await f.planWiki('SAVE', { ...raw, approval: preview.approval, confirmedFingerprint: preview.fingerprint });
+  assert.equal(saved.delivery, null);
+  const open = { wikiUrl: saved.wikiUrl, startMode: 'MANUAL' };
+  await assert.rejects(f.planWiki('START', open), /启动前须明确/);
+  const local = await f.planWiki('START', { ...open, startup: { submit: false, build: false } });
+  assert.equal(local.workflow, 'IMPLEMENT_ONLY');
+  const project = {
+    交付目的: f.input.merge.purpose, 提测合并: '提交推送并合并 MR', 提测目标分支: 'develop',
+    '测试构建 Job': jobUrl, 构建项目: 'factory', 构建对象: 'factory', 构建来源: 'develop',
+    构建参数指纹: sha256(JSON.stringify({ branch: 'develop' })),
+  };
+  const startup = { submit: true, build: true, testWiki: '需要', projects: { P1: project } };
+  const noBuild = await f.planWiki('START', { ...open, startup, limit: 'NO_BUILD' });
+  assert.equal(noBuild.submit, true);
+  assert.deepEqual(noBuild.buildProjects, []);
+  const buildOnly = await f.planWiki('START', { ...open, startup, limit: 'BUILD_ONLY' });
+  assert.equal(buildOnly.workflow, 'RELEASE_ONLY');
+  assert.deepEqual(buildOnly.gitProjects, []);
+  const both = await f.planWiki('START', { ...open, startup });
+  assert.equal(both.workflow, 'CONTINUOUS_SUBMIT');
+  f.input.tapdPlan = both.tapdPlan;
+  const swapped = { ...startup, projects: { P1: { ...project, 交付目的: '更换了交付目的' } } };
+  await assert.rejects(f.request('PLAN', { ...f.input, tapdPlan: { ...both.tapdPlan, startup: swapped } }), /启动选择已变化/);
+  const completed = await f.run(await f.request('PLAN', f.input));
+  assert.equal(completed.state, 'SUBMITTED');
+  assert.equal(completed.receipts.release.queueId, 42);
+  assert.deepEqual(await f.planWiki('READ', { wikiUrl: saved.wikiUrl }), saved);
+});
 
 for (const mode of ['IMMEDIATE', 'MANUAL']) {
   test(mode + ' uses the same confirmed Plan through Git, Jenkins, Wiki and Bug registration', async t => {
@@ -860,8 +907,8 @@ test('distinct project purposes route the same start to the selected Git and Jen
   const [one, two] = f.input.repositories;
   two.merge.purpose = '验证移动端展示';
   const { start } = await startBoundPlan(f, 'MANUAL', text => {
-    const begin = text.indexOf('## P1 '), end = text.indexOf('## 执行记录');
-    const second = text.slice(begin, end).replaceAll('P1', 'P2').replaceAll(repo, secondRepo)
+    const end = text.indexOf('## 执行记录');
+    const second = secondProjectWithSharedApis(text).replaceAll(repo, secondRepo)
       .replaceAll(jobUrl, two.release.jobUrl).replaceAll('factory', 'mobile').replaceAll('develop', 'dev')
       .replaceAll(one.merge.purpose, two.merge.purpose)
       .replace(sha256(JSON.stringify({ branch: 'develop' })), sha256(JSON.stringify({ branch: 'dev' })));
@@ -892,8 +939,8 @@ test('preauthorized conflict work does not replace another operator’s MR', asy
 test('two Jobs for one Git scope and a separately scoped canary use the individual delivery path', async t => {
   const f = await fixture(t, { bug: true });
   const { start } = await startBoundPlan(f, 'IMMEDIATE', text => {
-    const begin = text.indexOf('## P1 '), end = text.indexOf('## 执行记录');
-    const second = text.slice(begin, end).replaceAll('P1', 'P2')
+    const end = text.indexOf('## 执行记录');
+    const second = secondProjectWithSharedApis(text)
       .replace(jobUrl, ci + '/job/ui-tools/').replace('**构建对象** factory', '**构建对象** ui-tools')
       .replace('**构建来源** develop', '**构建类型** 金丝雀发包\n- **构建来源** master');
     return text.slice(0, end) + second + text.slice(end);
@@ -909,8 +956,8 @@ test('two Jobs for one Git scope and a separately scoped canary use the individu
 test('two app Jobs share one merge and both queue receipts before the Story Wiki and registration', async t => {
   const f = await fixture(t, { extraJob: true });
   const { start } = await startBoundPlan(f, 'MANUAL', text => {
-    const begin = text.indexOf('## P1 '), end = text.indexOf('## 执行记录');
-    const second = text.slice(begin, end).replaceAll('P1', 'P2').replace(jobUrl, ci + '/job/store-test/')
+    const end = text.indexOf('## 执行记录');
+    const second = secondProjectWithSharedApis(text).replace(jobUrl, ci + '/job/store-test/')
       .replace('**构建项目** factory', '**构建项目** store').replace('**构建对象** factory', '**构建对象** store');
     return text.slice(0, end) + second + text.slice(end);
   });
@@ -958,9 +1005,9 @@ test('a revision confirmed after the actual MR merge stops r1 before the Jenkins
 async function startTwoProjects(f, { noBuild = false, buildOnlySecond = false } = {}) {
   const [one, two] = f.input.repositories;
   return startBoundPlan(f, 'MANUAL', body => {
-    const from = body.indexOf('## P1 '), end = body.indexOf('## 执行记录');
+    const end = body.indexOf('## 执行记录');
     let first = body.slice(0, end);
-    let second = body.slice(from, end).replaceAll('P1', 'P2').replaceAll(repo, two.merge.originUrl)
+    let second = secondProjectWithSharedApis(body).replaceAll(repo, two.merge.originUrl)
       .replaceAll(one.merge.sourceBranch, two.merge.sourceBranch).replaceAll(jobUrl, two.release.jobUrl)
       .replace('**构建项目** factory', '**构建项目** mobile').replace('**构建对象** factory', '**构建对象** mobile').replaceAll('develop', 'dev')
       .replace(sha256(JSON.stringify({ branch: 'develop' })), sha256(JSON.stringify({ branch: 'dev' })))
@@ -1078,8 +1125,8 @@ test('partial branch delivery binds the reviewed F set even for a skipped siblin
   for (const skipSibling of [false,true]) {
     const f = await fixture(t, { bug:true });
     const { saved } = await startBoundPlan(f,'MANUAL', text => {
-      const begin = text.indexOf('## P1 '), end = text.indexOf('## 执行记录');
-      let second = text.slice(begin,end).replaceAll('P1','P2').replace(repo, 'git@git.example.test:team/factory.git');
+      const end = text.indexOf('## 执行记录');
+      let second = secondProjectWithSharedApis(text).replace(repo, 'git@git.example.test:team/factory.git');
       if (skipSibling) second = second.replace('**提测合并** 提交推送并合并 MR','**提测合并** 跳过')
         .replace('**测试构建 Job** ' + jobUrl, '**测试构建 Job** 跳过');
       return text.slice(0,end) + second + text.slice(end);
