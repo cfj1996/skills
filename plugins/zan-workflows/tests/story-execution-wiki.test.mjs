@@ -252,6 +252,36 @@ test('会话稿无需工作项或 Wiki 配置，转存后可在新会话仅凭�
   assert.deepEqual(fresh.writes, []);
 });
 
+test('跨页用例贯穿预览、保存和局部开工，维持正式页与交付授权的原有绑定', async () => {
+  const f = fixture();
+  const body = await readFile(new URL('../skills/collecting-requirements/assets/example-report-flow.md', import.meta.url), 'utf8');
+  const request = { ...input, schema: 4, markdown: body, checkAcceptancePaths: true };
+  await assert.rejects(f.exec('PLAN', { ...request, markdown: body.replace('| P1-M2-F1-UI1 |', '| P1-M2-F9-UI1 |') }), /引用不存在/);
+  assert.deepEqual(f.calls, []);
+
+  const preview = await f.exec('PLAN', request);
+  assert.equal(preview.acceptanceReview.paths[0].steps.length, 5);
+  assert.deepEqual(preview.acceptanceReview.standaloneTestIds, ['P1-M2-F1-TC1']);
+  const saved = await f.exec('SAVE', { ...request, approval: preview.approval, confirmedFingerprint: preview.fingerprint });
+  assert.equal(saved.markdown, body);
+  const reused = await f.exec('PLAN', request);
+  assert.equal(reused.action, 'REUSE');
+  assert.deepEqual(reused.acceptanceReview, preview.acceptanceReview);
+  const launch = { wikiUrl: saved.wikiUrl, startMode: 'MANUAL', selectedFeatures: ['P1-M1-F1'], startup: { submit: false, build: false } };
+  const ordinary = await f.exec('START', launch);
+  const checked = await f.exec('START', { ...launch, checkAcceptancePaths: true });
+  assert.deepEqual(checked.selectedFeatures, launch.selectedFeatures);
+  assert.deepEqual(checked.acceptanceReview.paths[0].outsideSelection, ['P1-M2-F1']);
+  assert.equal(ordinary.acceptanceReview, undefined);
+  assert.deepEqual(ordinary.tapdPlan, checked.tapdPlan);
+  const downstream = await f.exec('START', { ...launch, selectedFeatures: ['P1-M2-F1'], checkAcceptancePaths: true });
+  assert.deepEqual(downstream.selectedFeatures, ['P1-M2-F1']);
+  assert.deepEqual(downstream.acceptanceReview.paths[0].outsideSelection, ['P1-M1-F1']);
+  assert.deepEqual(downstream.acceptanceReview.standaloneTestIds, ['P1-M2-F1-TC1']);
+  assert.deepEqual(await f.exec('READ', { wikiUrl: saved.wikiUrl }), saved);
+  assert.deepEqual(f.writes, ['create_wiki', 'create_comments']);
+});
+
 test('新版执行页同页同步需求与实现变化，保留旧回执并重新绑定启动版本', async () => {
   const f = fixture();
   const frontend = await readFile(new URL('../skills/collecting-requirements/assets/example-frontend-plan.md', import.meta.url), 'utf8');

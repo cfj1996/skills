@@ -36,7 +36,7 @@ export function planLines(markdown) {
   return lines;
 }
 
-function apiTableCells(line) {
+function tableCells(line) {
   const row = line.trim();
   // An escaped pipe belongs to the cell, including inside an inline code span.
   const matches = [...row.matchAll(/\|((?:\\.|[^\\|])*)(?=\|)/gu)];
@@ -44,16 +44,24 @@ function apiTableCells(line) {
   return matches.map(([, cell]) => cell.trim());
 }
 
+function tableRows(cells, columns, label) {
+  const [headers, separator, ...rows] = cells;
+  requireFact(headers?.length === columns.length && columns.every((column, index) => headers[index] === column), label + '表头无效');
+  requireFact(separator?.length === columns.length && separator.every(cell => /^:?-+:?$/.test(cell)) && rows.length,
+    label + '须包含分隔行及数据行');
+  for (const row of rows) requireFact(row.length === columns.length && row.every(Boolean), label + '的数据行须填齐各列');
+  return rows;
+}
+
+function tableId(cell) {
+  return cell?.match(/^`([^`]+)`$/)?.[1] ?? cell;
+}
+
 function addApiDependencies(project, lines, nodes, apiOperations) {
-  const [headers, separator, ...rows] = lines.join('\n').trim().split('\n').map(apiTableCells);
-  requireFact(headers.length === apiColumns.length && apiColumns.every((column, index) => headers[index] === column),
-    project.id + ' 接口清单表头无效');
-  requireFact(separator?.length === apiColumns.length && separator.every(cell => /^:?-+:?$/.test(cell)) && rows.length,
-    project.id + ' 接口清单须包含表格分隔行及至少一条接口');
+  const rows = tableRows(lines.join('\n').trim().split('\n').map(tableCells), apiColumns, project.id + ' 接口清单');
   for (const row of rows) {
-    requireFact(row.length === apiColumns.length && row.every(Boolean), project.id + ' 接口清单行须填齐七列');
     const [number, operation, usage, alignment, verification, action, source] = row;
-    const id = number.match(/^`([^`]+)`$/)?.[1] ?? number;
+    const id = tableId(number);
     requireFact(/^P[1-9]\d*-D[1-9]\d*$/.test(id) && id.startsWith(project.id + '-'),
       project.id + ' 接口编号须属于当前项目：' + id);
     requireFact(!nodes.has(id), id + ' 重复索引');
@@ -192,6 +200,46 @@ function valueOf(node, key, options) {
   const value = node.fields.get(key);
   requireFact(value && (!options || options.includes(value)), node.id + ' 缺少或无效的' + key);
   return value;
+}
+
+// Optional view of a validated Plan. References to other features describe the
+// journey and never extend the caller's implementation or delivery selection.
+export function readAcceptanceReview(markdown, scope, selectedFeatures) {
+  const { nodes } = sectionTree(markdown, Object.hasOwn(scope, 'bugId'));
+  const selected = selectedFeatures && new Set(selectedFeatures);
+  const paths = [];
+  const standaloneTestIds = [];
+  let declared = false;
+  for (const test of nodes.values()) {
+    if (test.type !== 'TC') continue;
+    test.fields = fieldsOf(test);
+    const ownerSelected = !selected || selected.has(test.parentId);
+    if (!test.fields.has('跨页步骤')) {
+      if (ownerSelected) standaloneTestIds.push(test.id);
+      continue;
+    }
+    declared = true;
+    const cells = test.fields.get('跨页步骤').split('\n').map(tableCells);
+    if (!ownerSelected && !cells.some(([ref]) => selected.has(nodes.get(tableId(ref))?.parentId))) continue;
+
+    const precondition = valueOf(test, '验收前提');
+    const reference = valueOf(test, '对照依据');
+    const rows = tableRows(cells, ['交互编号', '操作', '可观察结果'], test.id + ' 跨页步骤');
+    requireFact(rows.length >= 2, test.id + ' 跨页验收需要至少两个连续动作');
+    const features = new Set([test.parentId]);
+    const steps = rows.map(([number, action, expected], index) => {
+      const uiId = tableId(number);
+      const ui = nodes.get(uiId);
+      requireFact(ui?.type === 'UI', `${test.id} 第 ${index + 1} 步的交互引用不存在或类型错误：${uiId}`);
+      features.add(ui.parentId);
+      return { uiId, action, expected };
+    });
+    const featureIds = [...features];
+    paths.push({ testId: test.id, precondition, reference, featureIds, steps,
+      ...(selected ? { outsideSelection: featureIds.filter(id => !selected.has(id)) } : {}) });
+  }
+  requireFact(declared, '本次选择按跨页路径验收，需要在 TC 中填写跨页步骤');
+  return { paths, standaloneTestIds };
 }
 
 function references(node, key, type, nodes) {
@@ -475,7 +523,9 @@ export function validatePlan(markdown, scope = {}, schema) {
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
     const input = JSON.parse(readFileSync(0, 'utf8'));
-    process.stdout.write(JSON.stringify(validatePlan(input.markdown, input)) + '\n');
+    const plan = validatePlan(input.markdown, input);
+    if (input.checkAcceptancePaths === true) plan.acceptanceReview = readAcceptanceReview(input.markdown, input);
+    process.stdout.write(JSON.stringify(plan) + '\n');
   } catch (error) {
     process.stderr.write(error.message + '\n');
     process.exitCode = 1;

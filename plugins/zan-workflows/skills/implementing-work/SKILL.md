@@ -199,12 +199,13 @@ goal; an extra behavior needs its own scope basis. Record documentation changes
 needed by later delivery, without requiring a Wiki or writing it in IMPLEMENT.
 For delegated work, the lead reconciles actual task/path changes and verification
 coverage before review. Worker self-checks are evidence, not independent review.
-Use one whole-project review where it covers multiple tasks; parallel read-only
-reviews of stable independent repositories still need integration acceptance.
-
-Give the exact diff, approved scope, Plan/brief, behavior expectations and their
-sources, repository/branch facts, concrete risks and verification results/gaps
-to [change-reviewer](agents/change-reviewer.md) with `POST_CHANGE_REVIEW`.
+Before assigning a reviewer, apply [实现评审复用](../../references/change-consistency.md#实现评审复用).
+Carry forward a current independent pass covering the selected change. Where review
+is due, group the open scope into one `POST_CHANGE_REVIEW` per repository. Supply the
+[change-reviewer](agents/change-reviewer.md) with the full diff, approved Plan/brief,
+repository/branch, behavior expectations and their sources, risks, verification results
+and gaps. Include earlier findings and the affected delta on rework. Independent
+repositories still need their applicable integration acceptance.
 For a specifically approved predecessor-output node, identify that exact purpose
 and provider scope in this review. Obtain independent review of the provider's
 current code and required pre-delivery checks while keeping later integration
@@ -222,8 +223,9 @@ final comment, not a future comment ID/readback; an explicitly scoped predecesso
 review uses the narrow rule above and leaves that complete-comment review pending.
 One independent review covers requirement behavior and
 engineering design/test coupling. Map its private line to
-`REVIEW_PASSED|REVIEW_FAILED|NOT_RUN`, retain a concise reason and discard the raw
-line. If review causes edits, verify and review the affected delta.
+`REVIEW_PASSED|REVIEW_FAILED|NOT_RUN`. Keep the distinct findings in the normalized
+reason and discard the private line. Address related findings together, then verify
+and review the affected delta.
 
 After all required repositories and cross-repository acceptance pass verification
 and review, refresh their source/diff facts; changed evidence reopens only the

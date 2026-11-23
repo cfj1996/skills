@@ -31,15 +31,16 @@
 
 ## 逐项实现和验证
 
+- 选用[按跨页路径验收](../../collecting-requirements/references/cross-page-acceptance.md)时，`START` 传 `checkAcceptancePaths: true`。主开发先做通代表路径，对照 `standaloneTestIds` 补验路径尚未覆盖的状态。局部开工参考 `outsideSelection`，只实施已选功能。
 - 在写入边界核对实际分支、基线和本轮开工授权。创建或切换分支遵守项目 Git 规则，并读回真实分支。保护既有未提交改动；遇到与选中 F 重叠且无法区分归属的修改时，暂停该范围。
 - 按计划顺序执行每个就绪 F。在指定文件/符号复用 P 所列的组件、API 封装和项目规范，对应 UI 输入、触发动作、展示结果以及 D 字段映射。接口鉴权使用约定的配置引用，Wiki、测试输出和执行记录只保留引用和验证结果。
 - 在开始依赖步骤前核实提供方的实际输出。契约已对齐、环境可用和真实联调通过是三个独立事实。按 [外部数据](../../../references/external-data-dependencies.md) 和 [Mock 规则](../../../references/mock-development.md) 处理阻塞；只有已确认的模拟范围可先开发，模拟结果只覆盖相应 TC。跨项目等待的功能保留在原索引下。
 - 主代理默认依序实现。本轮启动明确开启子智能体开发时按 [多任务实施](../../implementing-work/references/parallel-execution.md) 派发已就绪且文件不冲突的 F，由主代理持有分支和共享资源、核实前置产物。独立只读评审沿用原规则，用户明确禁止所有子智能体时如实记录独立评审缺失。
-- 逐一执行 F 的 TC，记录实际命令/复现动作、所用数据或环境、可观察结果及未验项；跨仓 TC 对照各方在同一场景下的实际表现。参照 [本地验证](../../../references/local-verification.md) 选择项目自带的命令和预算。失败、未执行、超时、仅模拟的场景各自保留实际结论。
+- 对照所选 F 的每个 TC，用已有实测覆盖相同前提和预期，补跑剩余步骤。在原执行记录中引用实际动作、数据或环境、观察结果及未验项。跨仓 TC 核对各方在同一场景下的实际表现。参照[本地验证](../../../references/local-verification.md)选择项目命令和预算，按实际情况注明失败、超时或仅模拟。
 
 ## 独立评审与开发回执
 
-停止相关写入后，每个实际仓库独立核对基线到当前的完整待交付差异，保留未提交文件的内容指纹。按 [变更一致性](../../../references/change-consistency.md) 将每个 F 的决策依据、代码差异及路径、影响范围、TC 结果和跨项目验收交给 [只读评审者](../../implementing-work/agents/change-reviewer.md) 执行 `POST_CHANGE_REVIEW`。提供正式 Wiki 标识及其确认正文作为 Plan。范围、实现设计和测试须同时通过。后续人工或自动修改触及这些事实时，仅刷新受影响的验证及评审。
+停止相关写入后，核对每个仓库从基线到当前的完整待交付差异及未提交内容指纹。按[实现评审复用](../../../references/change-consistency.md#实现评审复用)判断已有独立评审的覆盖。首次由一位[只读评审者](../../implementing-work/agents/change-reviewer.md)在同一轮 `POST_CHANGE_REVIEW` 核对 UI、功能和适用的 Zan 等项目规范。提供确认的 Wiki、各 F 的决策依据、diff、影响、TC 原始证据及跨项目验收。续修时聚焦变更影响和上轮遗留项。范围、实现设计和测试须同时通过。
 
 用现有 [ReviewedChange 字段](../../implementing-work/references/contracts.md) 表达结果。以真实仓库根目录、origin、固定分支配对，保留每个项目及 F/UI/TC 的归属、基线、当前源码/差异、测试与独立评审依据。同仓多个 P 共用一份仓库 diff，分别保留各自验收。所选仓库和跨项目验收通过且实际方案与当前执行文档一致后返回 `REVIEWED`。仅部分完成时列出结果和缺口，仅开发的请求到评审和回执为止。
 

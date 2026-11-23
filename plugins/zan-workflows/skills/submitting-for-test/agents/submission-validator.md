@@ -30,8 +30,12 @@ filesystem, or network write operations.
 
 For `PRE_SUBMISSION_PLAN`, inspect the complete plan once under
 [whole-plan review](../references/submission-rules.md#whole-plan-review).
-Require every changed repository's own implementation review and applicable
-cross-repository acceptance. Review the Git/deployment/Wiki/registration bundles,
+Match every changed repository's passing implementation review and applicable
+cross-repository acceptance to the full contents being delivered, including manual
+edits. Reuse current implementation evidence in this plan review. Reopen
+implementation review for missing or stale coverage of delivered behavior under
+[实现评审复用](../../../references/change-consistency.md#实现评审复用).
+Review the Git/deployment/Wiki/registration bundles,
 their exact authority, prerequisite order, expected old values and permitted
 future-ID derivations together. Apply [Wiki criteria](../../drafting-wiki/agents/wiki-validator.md)
 to the complete prepared body/patch, ownership, preservation and source facts in

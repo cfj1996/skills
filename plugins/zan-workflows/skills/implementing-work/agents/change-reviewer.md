@@ -85,6 +85,12 @@ contract and its blockers remain binding. Check in order:
    not require future Wiki writes or accept an implementation summary as proof.
 3. Pre-existing changes are not attributed to the current Bug.
 4. Relevant verification is present and truthful; failures are not hidden.
+   Compare the primary evidence with the expected behavior and current diff.
+   One observation may cover several assertions with matching inputs and state.
+   Reproduce cases required by the project and resolve material gaps, conflicting
+   observations or uncovered risks through targeted checks.
+   On rework, use the last reviewed diff and outstanding findings to identify
+   affected consumers, then reconcile that delta with the whole pending change.
    Apply [local verification budgets](../../../references/local-verification.md):
    assess actual behavior/risk coverage rather than demanding whole-project
    lint/type/build by default. A timeout/resource stop is incomplete evidence;
@@ -162,14 +168,18 @@ do not demand a separate comment or repeated state write per repository.
 Loss of a still-required behavior without an equivalent reachable replacement
 fails review. Equivalent refactoring and explicitly authorized changes/removals
 are evaluated against the current requirements, not the old source shape.
-Reference implementations do not supersede those requirements. If material
-evidence is missing, return `验证不通过：证据不足，<具体缺口>`; this blocks
-handoff without claiming a demonstrated code defect. A missing nonessential
+Reference implementations do not supersede those requirements. Mark material
+gaps as `证据不足` and name the missing observation. A missing nonessential
 check alone is not a failure when the available evidence supports the decision.
 
 Reject any other validation phase.
 
-Return exactly one line:
+Return exactly one private line. For `POST_CHANGE_REVIEW` on a verified target,
+report the distinct actionable findings from this pass together, most important
+first. Name the affected behavior or use case and its evidence once per issue.
+Join multiple findings with `｜`. If the repo, scope or revision cannot be
+established, report that blocker first and stop. For `PRE_STATUS_WRITE`, return
+the first concrete violation.
 
 ```text
 验证通过
@@ -178,5 +188,5 @@ Return exactly one line:
 or:
 
 ```text
-验证不通过：<首个具体问题>
+验证不通过：<具体问题及依据>
 ```

@@ -3,11 +3,12 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { validatePlan } from '../skills/collecting-requirements/scripts/validate-plan.mjs';
+import { readAcceptanceReview, validatePlan } from '../skills/collecting-requirements/scripts/validate-plan.mjs';
 
 const skill = new URL('../skills/collecting-requirements/', import.meta.url);
 const story = readFileSync(new URL('assets/example-plan.md', skill), 'utf8');
 const frontend = readFileSync(new URL('assets/example-frontend-plan.md', skill), 'utf8');
+const reportFlow = readFileSync(new URL('assets/example-report-flow.md', skill), 'utf8');
 const scope = { workspaceId: '123', storyId: '111230010000101' };
 const check = (text, target = scope) => validatePlan(text, target);
 const replace = (text, from, to) => {
@@ -105,6 +106,42 @@ test('frontend plan resolves reused, incomplete and Mock API rows without a prov
   assert.equal(alignment.status, '未全部对齐');
   const escaped = replace(frontend, '`storeId/visible`', '`storeId \\| visible`').replaceAll('\n', '\r\n');
   assert.deepEqual(check(escaped), check(frontend));
+});
+
+test('acceptance-first paths preserve navigation order, repeated UI visits and selection boundaries', () => {
+  const { featureIds } = check(reportFlow);
+  const full = readAcceptanceReview(reportFlow, scope, featureIds);
+  const [journey] = full.paths;
+  assert.deepEqual(full.standaloneTestIds, ['P1-M2-F1-TC1']);
+  assert.equal(journey.testId, 'P1-M1-F1-TC1');
+  assert.deepEqual(journey.featureIds, ['P1-M1-F1', 'P1-M2-F1']);
+  assert.deepEqual(journey.steps.map(step => step.uiId), [
+    'P1-M1-F1-UI1', 'P1-M1-F1-UI2', 'P1-M1-F1-UI2', 'P1-M2-F1-UI1', 'P1-M1-F1-UI2',
+  ]);
+  assert.match(journey.precondition, /1440×900/);
+  assert.match(journey.reference, /Zan/);
+  assert.match(journey.steps[2].expected, /viewAgencyId=101/);
+  assert.deepEqual(journey.outsideSelection, []);
+  const report = readAcceptanceReview(reportFlow, scope, ['P1-M1-F1']);
+  assert.deepEqual(report.paths[0].outsideSelection, ['P1-M2-F1']);
+  assert.deepEqual(report.standaloneTestIds, []);
+  const downloads = readAcceptanceReview(reportFlow, scope, ['P1-M2-F1']);
+  assert.deepEqual(downloads.paths[0].outsideSelection, ['P1-M1-F1']);
+  assert.deepEqual(downloads.standaloneTestIds, ['P1-M2-F1-TC1']);
+});
+
+test('optional path checking rejects broken interaction references, missing bases and empty outcomes', () => {
+  const badTarget = replace(reportFlow, '| P1-M2-F1-UI1 |', '| P1-M2-F1-TC1 |');
+  assert.ok(check(badTarget).valid); // Historical prose remains readable without this projection.
+  assert.throws(() => readAcceptanceReview(badTarget, scope), /第 4 步的交互引用/);
+  assert.throws(() => readAcceptanceReview(replace(badTarget, '| P1-M2-F1-TC1 |', '| P9-M1-F1-UI1 |'), scope), /引用不存在/);
+  assert.throws(() => readAcceptanceReview(replace(reportFlow, '**对照依据**', '**其他说明**'), scope), /对照依据/);
+  const blank = reportFlow.replace(/(\| P1-M1-F1-UI1 \|[^|\n]+\|)[^|\n]+\|/, '$1 |');
+  assert.notEqual(blank, reportFlow);
+  assert.throws(() => readAcceptanceReview(blank, scope), /填齐各列/);
+  assert.throws(() => readAcceptanceReview(frontend, scope), /需要在 TC 中填写跨页步骤/);
+  const escaped = replace(reportFlow, '以本周打开服务商报表', '以 `本周 \\| 自定义` 打开报表').replaceAll('\n', '\r\n');
+  assert.equal(readAcceptanceReview(escaped, scope).paths[0].steps.length, 5);
 });
 
 test('the same interface can be referenced from two projects and is registered once', () => {

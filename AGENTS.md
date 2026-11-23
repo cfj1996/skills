@@ -134,6 +134,16 @@ For prototype intake, tab reuse after an interrupted open, and transfer to a Pla
 panel, use `plugins/zan-workflows/skills/writing-plans/tests/scenarios/review-prototype-tabs.md`
 with a read-only evaluator. All browser inventories and page observations are simulated.
 
+For optional cross-page acceptance paths, ordered UI references and partial starts, run
+`node --test plugins/zan-workflows/tests/story-execution-plan.test.mjs plugins/zan-workflows/tests/story-execution-wiki.test.mjs`.
+The report example uses synthetic data and an in-memory Wiki service. The
+[review fixture](plugins/zan-workflows/skills/collecting-requirements/tests/scenarios/review-report-flow.md)
+and [comparison](plugins/zan-workflows/skills/collecting-requirements/tests/scenarios/report-flow-comparison.md)
+cover the role-based and cross-page approaches on the same observations. For the
+independent review and handoff cases, have one read-only evaluator use the fixture
+with the implementing, executing and submission skills. The cases cover grouped
+findings, unchanged handoff, export-only rework and a shared grid with two consumers.
+
 For the approved pending-merge Wiki patch, shared-page entry isolation,
 permission handoff, readback failure and workflow-session write barriers, run
 `node --test plugins/zan-workflows/tests/pending-merge-wiki.test.mjs`.

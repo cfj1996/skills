@@ -8,7 +8,7 @@ import { StdioMcpClient } from '../../../scripts/mcp-client.mjs';
 import { apiData } from '../../../scripts/register-test-submission.mjs';
 import { stableJson, repositoryKey, rejectedWrite } from '../../../scripts/workflow-runtime.mjs';
 import { listAllComments, totalCount } from '../../submitting-for-test/scripts/ensure-test-wiki.mjs';
-import { validatePlan, planLines, itemLinkMatches, deliveryRoute, startupDelivery } from './validate-plan.mjs';
+import { validatePlan, planLines, itemLinkMatches, deliveryRoute, startupDelivery, readAcceptanceReview } from './validate-plan.mjs';
 
 const hash = text => createHash('sha256').update(text, 'utf8').digest('hex');
 const digitId = value => typeof value === 'string' && /^[1-9]\d*$/.test(value);
@@ -361,7 +361,11 @@ export async function runStoryWiki(mode, input, call, claim = localClaim) {
       }
     }
     const plan = await readByUrl(input, call);
-    return { ...executionFromPlan(plan, input.limit, input), startMode: input.startMode };
+    const started = executionFromPlan(plan, input.limit, input);
+    if (input.checkAcceptancePaths === true) {
+      started.acceptanceReview = readAcceptanceReview(plan.markdown, plan, started.selectedFeatures);
+    }
+    return { ...started, startMode: input.startMode };
   }
   if (Object.hasOwn(input, 'wikiUrl')) {
     must(mode === 'READ', 'Wiki 链接用于读取确认上下文，写入请绑定原工作项和版本');
@@ -374,9 +378,11 @@ export async function runStoryWiki(mode, input, call, claim = localClaim) {
   const { actor } = input;
   const store = storage(call, scope);
   let draftSchema;
+  let acceptanceReview;
   if (['SAVE', 'PLAN', 'CHECK'].includes(mode)) {
     must(typeof markdown === 'string' && oneLine(actor), '需要完整 Markdown 和已核实 TAPD 操作者');
     draftSchema = validatePlan(markdown, scope, mode === 'PLAN' ? input.schema ?? 4 : input.approval?.schema).schema;
+    if (mode === 'PLAN' && input.checkAcceptancePaths === true) acceptanceReview = readAcceptanceReview(markdown, scope);
     parts(markdown);
   }
   const state = await store.load();
@@ -447,7 +453,7 @@ export async function runStoryWiki(mode, input, call, claim = localClaim) {
   };
   if (mode === 'PLAN') {
     if (current?.markdown === markdown && state.linkedId && state.approvalCommentId) {
-      return { ...publicRead(scope, state), action: 'REUSE' };
+      return { ...publicRead(scope, state), action: 'REUSE', ...(acceptanceReview && { acceptanceReview }) };
     }
     if (draftSchema === 4 && current && current.markdown !== markdown) {
       must(input.expectedPageSha256 === current.pageSha256, '同页修订须绑定最新 READ 的全页指纹，请基于当前正文和执行记录调整');
@@ -461,7 +467,8 @@ export async function runStoryWiki(mode, input, call, claim = localClaim) {
     if (needReceipt) operations.push(combine ? 'ADD_LINK_AND_APPROVAL_RECEIPT' : 'ADD_APPROVAL_RECEIPT');
     if (!combine && !state.linkedId) operations.push('ADD_LINK');
     return { state: 'PREVIEW', action: !page ? 'CREATE' : !current ? 'ADOPT' : changed ? 'UPDATE' : 'REUSE',
-      operations, approval, markdown, fingerprint: digest(approval), wikiId, wikiUrl: wikiId ? link(workspaceId, wikiId) : null, linked: !!state.linkedId };
+      operations, approval, markdown, fingerprint: digest(approval), wikiId, wikiUrl: wikiId ? link(workspaceId, wikiId) : null,
+      linked: !!state.linkedId, ...(acceptanceReview && { acceptanceReview }) };
   }
   const { approval, confirmedFingerprint } = input;
   must(approval && [1, 2, 3, 4].includes(approval.schema) && same(approval.scope, scope) && approval.title === item.title
