@@ -103,7 +103,7 @@ unreviewed paths.
 
 When delivery is already present, or merging is explicitly disabled, run the
 merge helper read-only with `mergeMode=CONTAINMENT_ONLY`, exact reviewed source
-SHA and actual dev/develop target. Require its `VERIFIED`/
+SHA and exact verified test target. Require its `VERIFIED`/
 `VERIFY_CONTAINMENT_ONLY` receipt, containment and zero writes; no MR is needed
 and no new merge may be claimed. Use its verified target `deliveredSha` for
 testing. All reviewed delivery changes must already be committed in the bound

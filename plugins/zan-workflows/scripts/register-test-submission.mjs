@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { clientFor } from './mcp-client.mjs';
 import { checkMockSafetySet, mockSafetyPreview } from './mock-safety.mjs';
+import { isTestDelivery } from './branch-roles.mjs';
 import { assertTransitionFields, resolveBugWorkflow, resolveVersionField } from './tapd-mappings.mjs';
 import { readCliPlan, sha256, stableJson, requireText, repositoryKey } from './workflow-runtime.mjs';
 
@@ -70,7 +71,7 @@ function checkBatchBuilds(input, gates) {
     const matches = git.filter(row => repositoryKey(row.originUrl || row.sourceRepository) === key);
     const [delivery] = matches;
     if (!remaining.delete(key) || matches.length !== 1 || !['VERIFIED', 'MERGED'].includes(delivery.state) ||
-        delivery.containment !== true || !['dev', 'develop'].includes(delivery.targetBranch) ||
+        delivery.containment !== true || !isTestDelivery(delivery) ||
         !/^[a-f\d]{40}(?:[a-f\d]{24})?$/i.test(delivery.deliveredSha || '') ||
         receipt.expectedSha !== delivery.deliveredSha) {
       throw new Error('构建回执与本轮仓库、目标分支或实际交付版本不匹配');
@@ -102,7 +103,7 @@ export function checkDeliveryPrerequisites(input) {
       throw new Error('复用包发布缺少原始 RELEASED 终态、准确构建和源码核验回执');
     }
     if (!input.gitDeliveryReceipts?.some(git => ['VERIFIED', 'MERGED'].includes(git.state) && git.containment === true &&
-        ['dev', 'develop'].includes(git.targetBranch) && git.deliveredSha === receipt.expectedSha &&
+        isTestDelivery(git) && git.deliveredSha === receipt.expectedSha &&
         repositoryKey(git.originUrl || git.sourceRepository) === repositoryKey(receipt.sourceRepository))) {
       throw new Error('复用包发布的仓库或源码与当前 Git 测试交付回执不匹配');
     }

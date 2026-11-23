@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import { evaluateChangeConsistency } from '../../../scripts/change-consistency.mjs';
 import { checkMockSafetySet } from '../../../scripts/mock-safety.mjs';
+import { COMMON_MAIN_BRANCHES, LEGACY_TEST_BRANCHES, deliveryTargetKind, isBranchName, isTestBranch } from '../../../scripts/branch-roles.mjs';
 
 const DOCUMENT_STATES = new Set(['missing', 'present', 'valid', 'invalid', 'unreadable', 'unknown']);
 const ADOPTION_SCOPES = new Set(['applicable', 'not-applicable', 'unknown']);
@@ -99,6 +100,16 @@ export function classifyAdoption({
   };
 }
 
+function reviewTargetKind(change) {
+  if (change.defaultBranch !== undefined || change.testBranch !== undefined) {
+    return deliveryTargetKind(change, change.defaultBranch);
+  }
+  // Earlier review payloads identified targets by the conventional names.
+  if (COMMON_MAIN_BRANCHES.includes(change.targetBranch)) return 'production';
+  if (LEGACY_TEST_BRANCHES.includes(change.targetBranch)) return 'test';
+  throw new Error('Mock 门禁缺少已核实的 MR 目标分支角色');
+}
+
 async function evaluateReadiness(input, io, operation) {
   const {
   codeReview = 'incomplete',
@@ -120,7 +131,7 @@ async function evaluateReadiness(input, io, operation) {
 
   if (codeReview === 'blocker') blockers.push('code');
   else if (codeReview !== 'pass') blockers.push('code-review-incomplete');
-  if (safety !== 'pass') blockers.push('safety');
+  if (safety !== 'pass' || isTestBranch(currentChange?.sourceBranch, currentChange?.testBranch)) blockers.push('safety');
   if (mergeability !== 'mergeable') blockers.push('mergeability');
   // Verified GitLab permission is independent of MR approvals and the human
   // authorization required for an actual write; this helper grants neither.
@@ -153,7 +164,7 @@ async function evaluateReadiness(input, io, operation) {
     if (!currentChange || !/^[a-f\d]{40}(?:[a-f\d]{24})?$/i.test(currentChange.targetSha || '') ||
         !/^[a-f\d]{40}(?:[a-f\d]{24})?$/i.test(currentChange.sourceSha || '') ||
         typeof currentChange.sourceRepository !== 'string' || !currentChange.sourceRepository.trim() ||
-        !['master', 'main', 'dev', 'develop'].includes(currentChange.targetBranch) ||
+        !isBranchName(currentChange.targetBranch) ||
         typeof currentChange.purpose !== 'string' || !currentChange.purpose.trim() ||
         !/^[a-f\d]{64}$/i.test(currentChange.scopeFingerprint || '')) {
       throw new Error('Mock 门禁缺少当前 MR 目标、完整差异指纹和准确操作目的');
@@ -163,12 +174,12 @@ async function evaluateReadiness(input, io, operation) {
         safeties[0]?.scopeFingerprint !== currentChange.scopeFingerprint) {
       throw new Error('Mock 清查必须覆盖当前 MR source/target 的完整差异，不能替换目标基准或范围');
     }
-    const production = ['master', 'main'].includes(currentChange.targetBranch);
+    const targetKind = reviewTargetKind(currentChange);
     await checkMockSafetySet(input, {
-      operation: 'git-delivery', environmentKind: production ? 'production' : 'test',
+      operation: 'git-delivery', environmentKind: targetKind,
       sourceRepository: currentChange.sourceRepository, sourceSha: currentChange.sourceSha,
       targetBranch: currentChange.targetBranch,
-      targetEnvironment: production ? 'production' : currentChange.targetEnvironment,
+      targetEnvironment: targetKind === 'production' ? 'production' : currentChange.targetEnvironment,
       purpose: currentChange.purpose, requireCommitted: true,
     }, io);
   } catch (error) {

@@ -1,6 +1,6 @@
 ---
 name: submitting-for-test
-description: Use for 直接提测 after implementation or developer inspection; verify the existing change, deliver it to the verified dev/develop branch, run selected test builds and Wiki updates, and register TAPD without repeating implementation.
+description: Use for 直接提测 after implementation or developer inspection; verify the existing change, deliver it to the verified test branch, run selected test builds and Wiki updates, and register TAPD without repeating implementation.
 ---
 
 # Submit for Test
@@ -202,7 +202,7 @@ complete the whole selected requirement. Story/Task registration uses only its
 explicit applicable version policy, never Bug status/owner or automatic Task done.
 
 Each source is the original `feature/*` or `fixbug/*` branch. Reuse its
-upstream verified and confirmed test target (`dev` or `develop`). For a
+upstream verified and confirmed test target. For a
 standalone invocation, resolve the actual test branch from project policy and
 remote refs before displaying the plan. If both names exist without an
 authoritative selection, report that gap; never choose by alias. Carry that
@@ -295,7 +295,7 @@ stage transitions do not start new private validators.
 6. For each repository, if already delivered or merge is explicitly disabled,
    first ensure every reviewed change is committed in the bound source SHA,
    with no uncommitted delivery delta. Run merge read-only in `CONTAINMENT_ONLY`
-   with that SHA and exact dev/develop target; require `VERIFIED`,
+   with that SHA and the exact confirmed test target; require `VERIFIED`,
    `operation=VERIFY_CONTAINMENT_ONLY`, containment and zero writes. Use its
    delivered target revision without requiring an MR or claiming a merge.
    Uncommitted, missing or unknown containment blocks before any commit/push;

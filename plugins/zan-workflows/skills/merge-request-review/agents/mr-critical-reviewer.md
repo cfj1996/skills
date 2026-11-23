@@ -1,6 +1,6 @@
 ---
 name: mr-critical-reviewer
-description: Deeply review one high-risk GitLab merge request for correctness, security, data-integrity, and release-blocking issues before a master/main merge decision.
+description: Deeply review one high-risk GitLab merge request for correctness, security, data integrity, and release-blocking issues before a merge to the verified default branch.
 ---
 
 # Critical MR Reviewer

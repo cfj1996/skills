@@ -4,6 +4,7 @@ import { resolve, relative, isAbsolute, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readCliPlan, repositoryKey, sha256, stableJson, runScopedCommand } from './workflow-runtime.mjs';
 import { createMockInspectionCache, inspectRevisionFiles, remember } from './mock-revision.mjs';
+import { isMainDelivery, isTestDelivery } from './branch-roles.mjs';
 
 const SHA = /^[a-f\d]{40}(?:[a-f\d]{24})?$/i;
 const HASH = /^[a-f\d]{64}$/i;
@@ -362,8 +363,8 @@ export async function checkMockSafetySet(input, context, io = {}) {
     expected = receipts.map(receipt => {
       const sourceRepository = receipt.originUrl || receipt.sourceRepository;
       if (!['MERGED', 'VERIFIED'].includes(receipt.state) || receipt.containment !== true ||
-          !(context.environmentKind === 'production' ? ['master', 'main'] : ['dev', 'develop']).includes(receipt.targetBranch) ||
-          context.environmentKind === 'production' && receipt.defaultTargetVerified !== true || !SHA.test(receipt.deliveredSha || '') ||
+          !(context.environmentKind === 'production' ? isMainDelivery(receipt) : isTestDelivery(receipt)) ||
+          !SHA.test(receipt.deliveredSha || '') ||
           !SHA.test(receipt.sourceSha || '') || !text(sourceRepository)) {
         throw new Error('Mock 门禁的 Git 交付回执未验证准确源码包含关系');
       }

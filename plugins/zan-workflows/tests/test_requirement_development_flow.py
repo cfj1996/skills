@@ -22,7 +22,8 @@ class RequirementDevelopmentFlowTests(unittest.TestCase):
         for capability in ["workspace-project-knowledge", "writing-plans", "breaking-down-requirement",
                            "preparing-work", "implementing-work", "submitting-for-test", "going-live"]:
             self.assertIn(capability, SKILL)
-        self.assertIn("origin/master", SKILL)
+        self.assertIn("已核实的远端默认分支及其最新 SHA", SKILL)
+        self.assertIn("记录准确的远端 ref/SHA", BRANCH)
         self.assertIn("delivery_mode=PLAN_ONLY|BRANCH_ONLY|IMPLEMENT|SUBMIT|GO_LIVE", SKILL)
         self.assertIn("PENDING_TAPD_STORY_OR_TASK", SKILL)
         self.assertIn("确认前不创建分支、保存 Plan、写 Task 或源码", SKILL)

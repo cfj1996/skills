@@ -33,7 +33,7 @@ Bug 使用 `zan-workflows:fixing-bug`。
 
 `delivery_mode=PLAN_ONLY|BRANCH_ONLY|IMPLEMENT|SUBMIT|GO_LIVE` 根据明确请求确定：
 仅计划、仅建分支、仅开发验证、提测或上线。普通“开发”默认 SUBMIT，包含
-合并实际 dev/develop、构建测试环境和提测 Wiki；完整清单一次确认，后续准确计划仍须核对原授权。
+合并到仓库实际提测分支、构建测试环境和处理提测 Wiki。完整清单一次确认，后续准确计划仍须核对原授权。
 先区分业务范围与交付终点：“只开发 B 端相关功能”“仅改前端”“只做这个 Task”
 只缩小实施范围，仍默认 SUBMIT，不据此关闭合并、测试构建或 Wiki。
 明确“仅开发验证”“开发到评审为止”“不提测”等终点限制才到 IMPLEMENT 为止；
@@ -43,12 +43,12 @@ Bug 使用 `zan-workflows:fixing-bug`。
 开发者检查后可单独调用 `$submitting-for-test`；按
 [直接提测流程](../submitting-for-test/references/direct-submission.md) 复用原实现，
 核实人工改动、补受影响验证/独立评审并确认本轮交付清单，不重复实施。
-“合并并构建”表示实际 dev/develop 与项目测试环境，不推导 master/生产。
+“合并并构建”按仓库的实际提测分支和测试环境执行。主分支合并和生产操作按各自的授权执行。
 仅请求分支时不要求将来的实现说明、Task、Plan 或排期就绪。
 
 调用 `zan-workflows:workspace-project-knowledge` 核实实际项目/子项目、
 仓库、origin 与依赖；在 source search 前取得项目约束和已验证远端基准。
-范围以已核实的远程 `origin/master` 为准，不以偶然检出的本地分支为准。
+范围以已核实的远端默认分支及其最新 SHA 为准。
 复用有效 TAPD、原型、项目和基准证据，写前刷新可变事实，不按阶段重新发现。
 
 ## 2. 查清范围，准备必要产物

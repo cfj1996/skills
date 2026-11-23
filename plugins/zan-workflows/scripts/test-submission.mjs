@@ -6,10 +6,10 @@ import { checkDeliveryPrerequisites } from './register-test-submission.mjs';
 import { verifyAcceptedTestBuild } from './jenkins-readonly.mjs';
 import { bindFrozenJenkinsJob, loadFrozenJenkinsContract, verifyFrozenJenkinsReceiptParameters } from './frozen-jenkins-contracts.mjs';
 import { readTool, repositoryKey, sha256, stableJson } from './workflow-runtime.mjs';
+import { deliveryTargetKind, isBranchName, isTestDelivery } from './branch-roles.mjs';
 
 const sha = value => typeof value === 'string' && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(value);
 const id = value => typeof value === 'string' && /^\d+$/.test(value);
-const testBranch = name => ['dev', 'develop'].includes(name);
 const snapshot = value => structuredClone(value);
 const repositoryRows = plan => plan.repositories || [plan];
 const repoKey = ({ merge }) => repositoryKey(merge.originUrl);
@@ -28,7 +28,8 @@ function planFingerprint(plan) {
 }
 
 function prepareRepositoryInput({ merge, release, localGit }) {
-  if (!merge || !sha(merge.sourceSha) || !sha(merge.targetSha) || !testBranch(merge.targetBranch) ||
+  if (!merge || !sha(merge.sourceSha) || !sha(merge.targetSha) || !isBranchName(merge.targetBranch) ||
+      (merge.testBranch !== undefined && merge.testBranch !== merge.targetBranch) ||
       !/^(feature|fixbug)\/[^\s]+$/.test(merge.sourceBranch) || merge.reviewPassed !== true ||
       typeof merge.pipelineRequired !== 'boolean' || !merge.projectId || !merge.originUrl ||
       !merge.repositoryPath || !merge.purpose?.trim() || !merge.mockSafety || merge.mockSafeties ||
@@ -133,17 +134,23 @@ async function prepareLocalMerge(merge, { call }) {
     repositoryKey(url) === repositoryKey(merge.originUrl)) || target.commit?.id !== merge.targetSha || !merge.title?.trim()) {
     throw new Error('本地提交前的 GitLab 项目、目标分支或 MR 标题不匹配');
   }
-  return { ...merge, pipelineRequired: merge.pipelineRequired || project.only_allow_merge_if_pipeline_succeeds === true };
+  deliveryTargetKind({ ...merge, testBranch: merge.targetBranch }, project.default_branch);
+  return { ...merge, defaultBranch: project.default_branch,
+    pipelineRequired: merge.pipelineRequired || project.only_allow_merge_if_pipeline_succeeds === true };
+}
+
+function mergeTestTarget(steps, merge, execute) {
+  return steps.run('merge', { ...merge, testBranch: merge.targetBranch }, execute);
 }
 
 async function prepareRepository({ merge, release, localGit }, steps) {
   const local = localGit && await prepareSubmissionGit(merge, localGit, steps.io);
   const [git, build] = await Promise.all([
-    localGit ? prepareLocalMerge(merge, steps) : steps.run('merge', merge, false),
+    localGit ? prepareLocalMerge(merge, steps) : mergeTestTarget(steps, merge, false),
     prepareRelease(merge, release, merge.targetSha, steps),
   ]);
   if (!localGit && !['VERIFIED', 'AWAITING_CONFIRMATION'].includes(git.state)) throw new Error('合并预览尚未就绪');
-  return { merge: { ...merge, sourceSha: git.sourceSha, targetSha: git.targetSha,
+  return { merge: { ...merge, sourceSha: git.sourceSha, targetSha: git.targetSha, defaultBranch: git.defaultBranch,
     pipelineRequired: git.pipelineRequired ?? merge.pipelineRequired, mrIid: git.mrIid || merge.mrIid },
     localGit: local || null, release: build };
 }
@@ -219,7 +226,7 @@ async function prepareRecoveredRepository(row, saved, steps) {
   const matchesTargetReview = !target || (target.state === 'VERIFIED' && target.sourceSha === git?.sourceSha &&
     repositoryKey(target.originUrl) === repoKey(row) && target.targetBranch === merge.targetBranch &&
     sha(target.deliveredSha));
-  if (!git || !['MERGED', 'VERIFIED'].includes(git.state) || git.containment !== true ||
+  if (!git || !['MERGED', 'VERIFIED'].includes(git.state) || git.containment !== true || !isTestDelivery(git) ||
       repositoryKey(git.originUrl) !== repoKey(row) || git.sourceBranch !== merge.sourceBranch ||
       git.targetBranch !== merge.targetBranch || String(git.projectId) !== String(merge.projectId) ||
       !sha(git.sourceSha) || !sha(git.deliveredSha) ||
@@ -260,7 +267,7 @@ async function recheckRecoveredRepository(row, steps) {
   const { merge, recovery } = row;
   const { mrIid, sourceSha, deliveredSha, targetSha, releaseReceipt } = recovery;
   const [git, release] = await Promise.all([
-    steps.run('merge', { ...merge, sourceSha, mrIid: mrIid || undefined,
+    mergeTestTarget(steps, { ...merge, sourceSha, mrIid: mrIid || undefined,
       mergeMode: mrIid ? 'VERIFY_ONLY' : 'CONTAINMENT_ONLY',
       targetSha: mrIid ? merge.targetSha : undefined, expectedDeliveredSha: deliveredSha }, false),
     releaseReceipt && recheckAcceptedBuild(merge, releaseReceipt, steps),
@@ -271,7 +278,7 @@ async function recheckRecoveredRepository(row, steps) {
   }
   const result = { git };
   if (targetSha && targetSha !== deliveredSha) {
-    result.target = await steps.run('merge', { ...merge, sourceSha, targetSha: undefined, mrIid: undefined,
+    result.target = await mergeTestTarget(steps, { ...merge, sourceSha, targetSha: undefined, mrIid: undefined,
       mergeMode: 'CONTAINMENT_ONLY', expectedDeliveredSha: targetSha }, false);
     if (result.target.state !== 'VERIFIED' || result.target.containment !== true ||
         result.target.deliveredSha !== targetSha) throw new Error('原构建所用的目标增量无法重新核实');
@@ -283,7 +290,7 @@ async function recheckRecoveredRepository(row, steps) {
 async function recheckWikiDelivery(plan, steps) {
   const { merge, wikiRecovery: { releaseReceipt } } = plan;
   const [git, release] = await Promise.all([
-    steps.run('merge', { ...merge, mergeMode: 'VERIFY_ONLY', expectedDeliveredSha: releaseReceipt.expectedSha }, false),
+    mergeTestTarget(steps, { ...merge, mergeMode: 'VERIFY_ONLY', expectedDeliveredSha: releaseReceipt.expectedSha }, false),
     recheckAcceptedBuild(merge, releaseReceipt, steps),
   ]);
   if (git.state !== 'MERGED' || git.writes !== 0 || git.containment !== true ||
@@ -405,7 +412,7 @@ export class TestSubmissions {
           throw new Error('增量评审不属于当前暂停的仓库');
         }
         const { git } = repositoryReceipts(plan, previous.receipts)[targetIndex];
-        targetReceipt = await steps.run('merge', { ...merge, mergeMode: 'CONTAINMENT_ONLY', mrIid: undefined,
+        targetReceipt = await mergeTestTarget(steps, { ...merge, mergeMode: 'CONTAINMENT_ONLY', mrIid: undefined,
           sourceSha: git.sourceSha, targetSha: evidence.deliveredSha }, false);
         if (targetReceipt.state !== 'VERIFIED' || targetReceipt.containment !== true ||
             targetReceipt.deliveredSha !== evidence.deliveredSha) throw new Error('增量评审目标与实时包含关系不一致');
@@ -455,7 +462,7 @@ export class TestSubmissions {
   async resumeManualMerge(input, record, steps) {
     if (Object.keys(input).length !== 1) throw new Error('人工合并续接只能核实原计划中的 MR');
     const pending = repositoryReceipts(record.plan, record.receipts).find(row => row.git?.state === 'AWAITING_MERGE');
-    const verified = await steps.run('merge', pending.git.resumePlan, false);
+    const verified = await mergeTestTarget(steps, pending.git.resumePlan, false);
     if (verified.state === 'AWAITING_MERGE') return summary(record);
     if (verified.state !== 'MERGED' || verified.writes !== 0 || verified.containment !== true) {
       throw new Error('未只读核实原 MR 的实际合并和源码包含关系');
@@ -525,7 +532,7 @@ export class TestSubmissions {
             const sourceSha = await executeSubmissionGit(merge, row.localGit, activeReceipts.localGit, steps.io);
             merge = { ...merge, sourceSha, ...immutableSource(merge, sourceSha) };
           }
-          activeReceipts.git = await steps.run('merge', merge, merge.mergeMode !== 'CONTAINMENT_ONLY');
+          activeReceipts.git = await mergeTestTarget(steps, merge, merge.mergeMode !== 'CONTAINMENT_ONLY');
           if (activeReceipts.git.state === 'AWAITING_MERGE') {
             return pause('AWAITING_MERGE', new Error('需按原 MR 只读核实人工合并'));
           }

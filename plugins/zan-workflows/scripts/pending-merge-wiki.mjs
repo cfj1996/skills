@@ -2,6 +2,7 @@ import { readTool, repositoryKey, requireText, sha256 } from './workflow-runtime
 import { records } from '../skills/submitting-for-test/scripts/ensure-test-wiki.mjs';
 import { wikiEntry } from './wiki-entry.mjs';
 import { checkMockSafetySet } from './mock-safety.mjs';
+import { isBranchName } from './branch-roles.mjs';
 
 const HASH = /^[a-f\d]{64}$/;
 
@@ -14,7 +15,8 @@ export function validatePendingWikiPlan(plan, merge) {
   if (!/^\d+$/.test(String(plan.workspaceId)) || !/^\d+$/.test(String(plan.wikiId)) ||
       !/^\d+$/.test(String(plan.parentWikiId)) || !HASH.test(plan.beforeBodySha256) || !HASH.test(plan.afterBodySha256) ||
       !/^[1-9]\d*[.、]\s*\S/.test(plan.entryHeading) ||
-      !['master', 'main'].includes(merge.targetBranch) || !/^(feature|fixbug)\/[^\s]+$/.test(merge.sourceBranch)) {
+      !isBranchName(merge.targetBranch) || (merge.defaultBranch !== undefined && merge.defaultBranch !== merge.targetBranch) ||
+      !/^(feature|fixbug)\/[^\s]+$/.test(merge.sourceBranch)) {
     throw new Error('待合并 Wiki 计划的目标、条目、正文指纹或原分支无效');
   }
 }

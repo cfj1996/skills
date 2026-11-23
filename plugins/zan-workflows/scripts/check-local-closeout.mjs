@@ -3,8 +3,9 @@ import { resolve, relative, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readCliPlan, requireText, runScopedCommand } from './workflow-runtime.mjs';
 import { collectLocalOccupancy } from './collect-local-occupancy.mjs';
+import { COMMON_MAIN_BRANCHES, COMMON_TEST_BRANCHES, isBranchName, isMainDelivery } from './branch-roles.mjs';
 
-const BASELINE = new Set(['main', 'master', 'develop', 'dev']);
+const COMMON_BASELINES = new Set([...COMMON_MAIN_BRANCHES, ...COMMON_TEST_BRANCHES]);
 const under = (path, parent) => {
   const rel = relative(resolve(parent), resolve(path));
   return !rel || (!rel.startsWith('..') && !isAbsolute(rel));
@@ -43,7 +44,7 @@ export async function checkLocalCloseout(input, io = {}) {
   if (input.execute) throw new Error('预检执行器只有只读模式，不接受删除执行');
   const delivery = input.delivery;
   if (!delivery || delivery.state !== 'MERGED' || delivery.mergeReadback !== true || delivery.containment !== true ||
-      delivery.defaultTargetVerified !== true || !['master', 'main'].includes(delivery.targetBranch)) {
+      !isMainDelivery(delivery)) {
     return { state: 'NOT_TRIGGERED', resources: [], candidates: [], readOnly: true, reason: '默认分支交付尚未核实' };
   }
   for (const key of ['repositoryPath', 'originUrl', 'currentTaskPath']) requireText(input[key], key);
@@ -63,7 +64,7 @@ export async function checkLocalCloseout(input, io = {}) {
   };
   const scoped = [{ branch: delivery.sourceBranch, targetBranch: delivery.targetBranch, verified: true }];
   for (const extra of input.relatedBranches || []) {
-    if (!validBranch(extra.branch) || !['master', 'main', 'develop', 'dev'].includes(extra.targetBranch)) throw new Error('关联分支或核验目标无效');
+    if (!validBranch(extra.branch) || !isBranchName(extra.targetBranch)) throw new Error('关联分支或核验目标无效');
     if (scoped.some(row => row.branch === extra.branch)) throw new Error('关联分支重复');
     scoped.push({ branch: extra.branch, targetBranch: extra.targetBranch,
       verified: extra.association?.state === 'MERGED' && extra.association?.sourceBranch === extra.branch &&
@@ -109,7 +110,7 @@ export async function checkLocalCloseout(input, io = {}) {
         const resource = { ...base, path: tree.path, tip, targetSha: target, contained: ancestry.code === 0,
           dirty: false, ignoredPaths: [], occupancy: evidenceFor(input, row.branch, tree.path, now), reasons: [] };
         let partial = false;
-        if (BASELINE.has(row.branch) || row.branch === result.currentBranch ||
+        if (COMMON_BASELINES.has(row.branch) || targets.includes(row.branch) || row.branch === result.currentBranch ||
             (tree.path && protectedPaths.some(path => under(path, tree.path)))) resource.reasons.push('当前分支或当前工作位置需保留');
         if (tree.locked) resource.reasons.push('worktree 已锁定');
         if (tree.prunable) { partial = true; resource.reasons.push('worktree 注册已失效，不能当成空目录'); }

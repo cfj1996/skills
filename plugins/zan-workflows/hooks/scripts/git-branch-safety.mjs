@@ -3,11 +3,11 @@
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { COMMON_MAIN_BRANCHES, COMMON_TEST_BRANCHES, isBranchName } from '../../scripts/branch-roles.mjs';
 
 const WORKING_BRANCH_PATTERN = /^(?:feature|fixbug)\//;
 const MERGE_BRANCH_PATTERN = /^merge\//;
-const DEVELOP_REFS = new Set(['develop', 'dev', 'origin/develop', 'origin/dev']);
-const MASTER_REF = 'origin/master';
+const ORIGIN_REFS = 'refs/remotes/origin/';
 const BRANCH_OPTIONS_WITH_VALUES = ['--format', '--sort', '--set-upstream-to', '-u'];
 
 function isPathInside(candidate, root) {
@@ -204,7 +204,7 @@ function branchCreation(invocation) {
     const branch = optionValue(worktreeArgs, ['-b', '-B']);
     if (!branch) return undefined;
     const positional = positionalArgs(worktreeArgs, ['-b', '-B']);
-    return { branch, startRef: positional.at(-1), hasNoTrack: worktreeArgs.includes('--no-track') };
+    return { branch, startRef: positional[1], hasNoTrack: worktreeArgs.includes('--no-track') };
   }
 
   return undefined;
@@ -222,16 +222,57 @@ function branchDeletion(invocation) {
   };
 }
 
-function inferCurrentBranch(cwd, globalArgs = []) {
+function readGit(cwd, globalArgs, args) {
   try {
-    return execFileSync('git', ['-C', cwd, ...globalArgs, 'branch', '--show-current'], {
+    return execFileSync('git', ['-C', cwd, ...globalArgs, ...args], {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
+      timeout: 3000,
+      env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
     }).trim();
   }
   catch {
     return '';
   }
+}
+
+function inferCurrentBranch(cwd, globalArgs) {
+  return readGit(cwd, globalArgs, ['branch', '--show-current']);
+}
+
+function inferMainBranch(cwd, globalArgs) {
+  const git = (...args) => readGit(cwd, globalArgs, args);
+  const remoteHead = git('symbolic-ref', '--quiet', `${ORIGIN_REFS}HEAD`);
+  if (remoteHead.startsWith(ORIGIN_REFS) && git('show-ref', '--verify', '--hash', remoteHead)) {
+    const branch = remoteHead.slice(ORIGIN_REFS.length);
+    if (isBranchName(branch)) return branch;
+  }
+  if (!git('remote', 'get-url', 'origin')) return undefined;
+  const head = /^ref: refs\/heads\/([^\t]+)\tHEAD$/m.exec(git('ls-remote', '--symref', 'origin', 'HEAD'));
+  return isBranchName(head?.[1]) ? head[1] : undefined;
+}
+
+function branchFromRef(ref, mainBranch) {
+  if (ref === 'origin/HEAD' || ref === `${ORIGIN_REFS}HEAD`) return mainBranch;
+  for (const prefix of [ORIGIN_REFS, 'refs/heads/', 'origin/']) {
+    if (ref.startsWith(prefix)) return ref.slice(prefix.length);
+  }
+  return ref;
+}
+
+function isRemoteMainRef(ref, mainBranch, cwd, globalArgs) {
+  const qualifiedRef = `${ORIGIN_REFS}${mainBranch}`;
+  if (ref === `origin/${mainBranch}` || ref === qualifiedRef) return true;
+  return (ref === 'origin/HEAD' || ref === `${ORIGIN_REFS}HEAD`) &&
+    readGit(cwd, globalArgs, ['symbolic-ref', '--quiet', `${ORIGIN_REFS}HEAD`]) === qualifiedRef;
+}
+
+function repositoryBranches(cwd, globalArgs, mainOverride) {
+  const mainBranch = mainOverride ?? inferMainBranch(cwd, globalArgs);
+  const configuredTests = readGit(cwd, globalArgs, ['config', '--local', '--get-all', 'zan-workflows.testBranch'])
+    .split('\n').filter(isBranchName);
+  const testBranches = configuredTests.length ? configuredTests : COMMON_TEST_BRANCHES;
+  return { mainBranch, testBranches: testBranches.filter(branch => branch !== mainBranch) };
 }
 
 function inferWorkspaceRoot(cwd) {
@@ -256,7 +297,7 @@ function deny(reason) {
   };
 }
 
-export function evaluateHookInput(input, { workspaceRoot, currentBranch } = {}) {
+export function evaluateHookInput(input, { workspaceRoot, currentBranch, mainBranch: mainOverride } = {}) {
   if (!workspaceRoot || input?.tool_name !== 'Bash') return undefined;
 
   const command = input?.tool_input?.command;
@@ -275,7 +316,8 @@ export function evaluateHookInput(input, { workspaceRoot, currentBranch } = {}) 
       if (deletion.forced) return deny('Blocked force branch deletion. Use ordinary git branch -d after verified delivery and explicit confirmation.');
       if (deletion.remote) return deny('Blocked non-local branch cleanup. Only exact confirmed local branches may be removed.');
       const branch = currentBranch ?? inferCurrentBranch(cwd, invocation.globalArgs);
-      const protectedBranches = new Set(['master', 'main', 'develop', 'dev', branch]);
+      const { mainBranch, testBranches } = repositoryBranches(cwd, invocation.globalArgs, mainOverride);
+      const protectedBranches = new Set([...(mainBranch ? [mainBranch] : COMMON_MAIN_BRANCHES), ...testBranches, branch]);
       if (deletion.branches.some(name => protectedBranches.has(name))) {
         return deny('Blocked deletion of a baseline or currently checked-out branch.');
       }
@@ -290,13 +332,20 @@ export function evaluateHookInput(input, { workspaceRoot, currentBranch } = {}) 
       const startRef = creation.startRef || '';
       const isWorkingBranch = WORKING_BRANCH_PATTERN.test(branch);
       const isMergeBranch = MERGE_BRANCH_PATTERN.test(branch);
+      const { mainBranch, testBranches } = repositoryBranches(cwd, invocation.globalArgs, mainOverride);
+      const startBranch = startRef ? branchFromRef(startRef, mainBranch)
+        : currentBranch ?? inferCurrentBranch(cwd, invocation.globalArgs);
+      const mainRef = mainBranch && `origin/${mainBranch}`;
 
-      if (DEVELOP_REFS.has(startRef) && !isMergeBranch) {
-        return deny(`Blocked working branch creation from ${startRef}. Create feature/* and fixbug/* branches from the latest ${MASTER_REF}.`);
+      if (testBranches.includes(startBranch) && !isMergeBranch) {
+        return deny(`Blocked working branch creation from test-submission branch ${startBranch}. Use the verified remote default branch.`);
       }
 
-      if (isWorkingBranch && startRef !== MASTER_REF) {
-        return deny(`Blocked ${branch}: feature/* and fixbug/* branches must be created from the latest ${MASTER_REF}.`);
+      if (isWorkingBranch && !mainRef) {
+        return deny(`Blocked ${branch}: verify the repository's remote default branch before creating a working branch.`);
+      }
+      if (isWorkingBranch && !isRemoteMainRef(startRef, mainBranch, cwd, invocation.globalArgs)) {
+        return deny(`Blocked ${branch}: feature/* and fixbug/* branches must be created from the latest ${mainRef}.`);
       }
 
       if (isWorkingBranch && !creation.hasNoTrack) {
@@ -305,14 +354,16 @@ export function evaluateHookInput(input, { workspaceRoot, currentBranch } = {}) 
     }
 
     if (invocation.subcommand === 'rebase') {
-      const refs = new Set(invocation.args);
+      const { mainBranch, testBranches } = repositoryBranches(cwd, invocation.globalArgs, mainOverride);
+      const refs = invocation.args.map(ref => branchFromRef(ref.replace(/^--onto=/, ''), mainBranch));
       const branch = currentBranch ?? inferCurrentBranch(cwd, invocation.globalArgs);
-      const targetsDevelop = invocation.args.some(argument => DEVELOP_REFS.has(argument));
-      const crossesProtectedBases = targetsDevelop
-        && (refs.has('master') || refs.has('origin/master') || WORKING_BRANCH_PATTERN.test(branch));
+      const targetsTest = refs.some(ref => testBranches.includes(ref));
+      const mainRefs = mainBranch ? [mainBranch] : COMMON_MAIN_BRANCHES;
+      const crossesProtectedBases = targetsTest
+        && (refs.some(ref => mainRefs.includes(ref)) || WORKING_BRANCH_PATTERN.test(branch));
 
       if (crossesProtectedBases) {
-        return deny('Blocked cross-base rebase between master and develop for a feature/* or fixbug/* workflow. Create the ordinary MR without changing the working branch base.');
+        return deny('Blocked cross-base rebase between the main and test-submission branches. Create the ordinary MR with the original working branch base.');
       }
     }
   }

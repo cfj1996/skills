@@ -443,6 +443,21 @@ test('ordinary review cannot infer no Mock from missing inspection or accept a p
   }
 });
 
+test('review binds production to the verified default and blocks the configured test source', async () => {
+  const change = { ...currentChange, targetBranch: 'release/trunk', defaultBranch: 'release/trunk',
+    sourceBranch: 'feature/delivery', testBranch: 'qa/integration' };
+  assert.deepEqual(await evaluateMergeReadiness({ ...passingReview, currentChange: change }),
+    { mergeAllowed: true, blockers: [] });
+  const wrongDefault = await evaluateMergeReadiness({ ...passingReview,
+    currentChange: { ...change, defaultBranch: 'main' } });
+  assert.equal(wrongDefault.mergeAllowed, false);
+  const testSource = await evaluateMergeReadiness({ ...passingReview,
+    currentChange: { ...change, sourceBranch: 'qa/integration' } });
+  assert.deepEqual(testSource.blockers, ['safety']);
+  const testMockOnMain = await evaluateMergeReadiness({ ...mockInput(), currentChange: change });
+  assert.match(testMockOnMain.mockSafetyError, /生产范围仍有 Mock/);
+});
+
 test('MR Mock inspection binds the current target and complete diff rather than a caller-selected base', async () => {
   for (const currentPatch of [{ targetSha: 'd'.repeat(40) }, { scopeFingerprint: 'e'.repeat(64) },
     { sourceRepository: undefined }, { sourceSha: undefined }, { targetBranch: 'release-next' }, { purpose: '' }]) {

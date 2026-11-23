@@ -1,6 +1,6 @@
 ---
 name: merge-request-review
-description: Help merge-authorized GitLab users discover pending merge requests, review their code and merge readiness, and execute explicitly authorized approvals or merges to master/main.
+description: Help merge-authorized GitLab users discover pending merge requests, review their code and readiness, and execute authorized approvals or merges to the verified remote default branch.
 ---
 
 # 合并请求 Review
@@ -26,9 +26,9 @@ GitLab MCP 优先，浏览器不是默认降级路径。
 分别保留本人处理关系、merge 能力和 approve 能力；角色级别不能单独证明当前权限。
 权限不足或未知仍可完成只读审核，合并资格保留 `merge-permission` 阻断。
 
-只处理目标为 `master` 或 `main` 的 open MR。指定对象不符合时明确列为跳过。
-`develop` 包含工作区约定的 `dev`：禁止其作为源分支或携带其合并历史进入任何目标；
-审核发现该问题时独立报告 `safety`，不把历史违规直接判成代码缺陷。
+从 GitLab 项目读回 `default_branch`，只处理目标为该分支的 open MR。指定对象不符合时明确列为跳过。
+按仓库交付配置或已核实的提测目标检查实际提测分支。提测分支来源及其合并历史均阻断合并，
+审核发现时独立报告 `safety`，代码结论按实际改动评估。
 本地仓库仅作只读 diff/上下文检查；使用 fetch MR refs、`git show <ref>:<path>` 等方式，
 不要为审核切换用户工作区分支或顺带修代码。
 
@@ -36,7 +36,7 @@ GitLab MCP 优先，浏览器不是默认降级路径。
 
 请求“有哪些需要我合并的 MR”“列一下这个项目的 MR”等时，收集本次范围内的候选：
 
-- 明确项目或 MR：列出该范围内的 open master/main 候选，不按 reviewer/assignee 丢弃对象。
+- 明确项目或 MR：列出目标为该仓库已核实主分支的 open 候选，保留 reviewer/assignee 信息。
 - “需要我处理/合并”：以当前账号的 reviewer、assignee、待本人审批或明确交办关系为依据。
   有 merge 权限只证明可处理，不自动把项目所有 MR 变成个人待办。
 - 身份或处理关系不可核实时，在已明确项目内保留候选和缺口；无项目范围时补问。
