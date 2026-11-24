@@ -47,6 +47,11 @@ manual-edit review refresh and standalone delivery confirmation, run
 `python3 -m unittest discover -s plugins/zan-workflows/tests -p 'test_direct_submission_flow.py'`.
 These checks inspect workflow contracts without external writes.
 
+For contextual direct submission, Wiki-only preflight updates and scoped Hook
+drift, run `node --test plugins/zan-workflows/tests/continuous-test-submission.test.mjs plugins/zan-workflows/tests/mock-revision.test.mjs`.
+Case C in `plugins/zan-workflows/skills/submitting-for-test/tests/scenarios/review-feedback-4-5.md`
+exercises the development closeout and standalone delivery decisions with a read-only evaluator.
+
 For already-delivered test-target containment, disabled-merge read-only delivery,
 stale/missing evidence and workflow-session continuation, run
 `node --test plugins/zan-workflows/tests/test-merge-containment.test.mjs`.

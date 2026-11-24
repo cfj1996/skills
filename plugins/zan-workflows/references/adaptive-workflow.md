@@ -18,8 +18,8 @@ Mock、静态检查与真实集成各自说明证明范围，未运行或条件�
 HEAD。同一内容转为 commit、推送或生成 MR/队列 ID 时，核实内容对应关系并
 更新内存绑定，不重做代码评审；目标分支新增未审差异、人工改动或冲突修改则
 只补受影响验证/独立评审。每个实际变更仓库仍须有自己的独立评审和必要跨仓验收。
-提测阶段按 [整体计划评审](../skills/submitting-for-test/references/submission-rules.md#whole-plan-review)
-合并流程审核；计划通过不代替写前实时检查或任何实际回执。
+提测阶段由主代理按[交付核对](../skills/submitting-for-test/references/submission-rules.md#whole-plan-review)
+核对已审源码、交付目标和实际回执。仅对失效增量补审。
 
 本地命令遵守 [范围与资源预算](local-verification.md)：默认验证变更行为及受影响
 文件/包，不机械执行全仓 lint + type + build；必要全量检查保留。

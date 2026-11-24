@@ -237,9 +237,9 @@ export class WorkflowSession {
     }
     if (execute && this.pendingMerges.size) throw new Error('存在待人工合并 MR；先用 PLAN 和 VERIFY_ONLY 核验原 MR，后续写入暂不执行');
     const input = { ...request.input, execute };
-    if (execute && input.confirmed !== true) throw new Error('执行缺少已展示清单的明确确认');
+    if (execute && input.confirmed !== true) throw new Error('执行缺少覆盖本次操作的明确确认');
     if (request.action === 'merge') this.#validateMerge(input);
-    const approved = execute && request.action === 'submit' ? this.submissions.assertReviewed(request.input) : null;
+    const approved = execute && request.action === 'submit' ? this.submissions.assertPrepared(request.input) : null;
     const reference = approved?.plan.tapdPlan || input.tapdPlan;
     if (execute && reference) {
       const rawCall = call;
@@ -267,6 +267,9 @@ export class WorkflowSession {
         ? await (execute ? this.submissions.execute(request.input, steps) : this.submissions.prepare(request.input, steps))
         : await this.#runAction(request.action, input, { call, reader, io });
       if (execute && ['BLOCKED', 'FAILED', 'UNKNOWN'].includes(result?.state)) this.executionBlocked = true;
+      if (!execute && reference && result.state === 'AWAITING_CONFIRMATION') {
+        return { ...result, state: 'PREPARED' };
+      }
       return result;
     } catch (error) {
       if (execute) this.executionBlocked = true;

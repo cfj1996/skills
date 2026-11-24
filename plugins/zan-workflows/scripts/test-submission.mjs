@@ -26,8 +26,10 @@ const wikiEntryKey = row => stableJson([repositoryKey(row.entryRepoUrl), row.sou
 function planFingerprint(plan) {
   if (!plan.wiki) return sha256(stableJson(plan));
   const { bodyFile, ...wiki } = plan.wiki;
-  // The approved bytes, target and scope are bound separately from their temporary carrier.
-  return sha256(stableJson({ ...plan, wiki }));
+  // File-backed bodies have always been bound by their byte hash, independent
+  // of their temporary path. Including the text in the review preserves that ID.
+  if (bodyFile && sha256(plan.approvedWikiBody) !== wiki.expectedApprovedBodySha256) throw new Error('Wiki 正文与已审指纹不符');
+  return sha256(stableJson({ ...plan, wiki, approvedWikiBody: bodyFile ? undefined : plan.approvedWikiBody }));
 }
 
 function prepareRepositoryInput({ merge, release, localGit }) {
@@ -107,7 +109,8 @@ function validatePlan(input) {
 
 async function wikiPlan(wiki, taskIds, steps) {
   if (!wiki) return { wiki: null };
-  const fileHash = wiki.bodyFile ? sha256(await readFile(wiki.bodyFile)) : null;
+  const bytes = wiki.bodyFile ? await readFile(wiki.bodyFile) : null;
+  const fileHash = bytes ? sha256(bytes) : null;
   const preview = await steps.run('wiki', { ...wiki, expectedApprovedBodySha256: fileHash }, false);
   const afterHash = fileHash || preview.approvedBodySha256 || null;
   if (preview.entryOperation === 'APPEND_ENTRY' && !afterHash || !preview.wikiId && !afterHash) {
@@ -118,7 +121,33 @@ async function wikiPlan(wiki, taskIds, steps) {
     expectTarget: preview.target, expectedWikiId: preview.wikiId, expectedMonthId: preview.monthWikiId,
     expectedBodySha256: preview.beforeBodySha256, month: preview.month || wiki.month, wikiTitle: preview.wikiTitle };
   await inspectSelectedWikiLinks(steps.call('tapd-mcp'), result, taskIds);
-  return { wiki: result, approvedWikiBody: preview.approvedBody };
+  return { wiki: result, approvedWikiBody: bytes ? bytes.toString('utf8') : preview.approvedBody };
+}
+
+// Before the first write a wording correction can reuse the prepared Git,
+// Jenkins and registration rows. Keep the old Wiki target and base pinned.
+async function reviseDraft(previous, input, steps) {
+  const { wiki, decisions } = input;
+  if (Object.keys(input).some(key => !['resumePlanId', 'wiki', 'decisions'].includes(key)) ||
+      wiki === undefined && decisions === undefined) throw new Error('预检修订仅接受 Wiki 正文和已核实的决定');
+  const plan = snapshot(previous.plan);
+  if (decisions !== undefined) {
+    if (!Array.isArray(decisions) || decisions.some(value => typeof value !== 'string' || !value.trim())) throw new Error('续接评审说明无效');
+    plan.decisions = [...new Set([...plan.decisions, ...decisions])];
+  }
+  if (wiki !== undefined) {
+    if (!plan.wiki || !wiki || Object.keys(wiki).length !== 1 ||
+        !(typeof wiki.bodyFile === 'string' && wiki.bodyFile.trim() || Array.isArray(wiki.entryMarkdown))) {
+      throw new Error('预检修订须沿用原 Wiki 归属，只替换 bodyFile 或 entryMarkdown');
+    }
+    const { bodyFile, entryMarkdown, ...binding } = plan.wiki;
+    const page = await wikiPlan({ ...binding, ...wiki }, plan.linkTaskIds, steps);
+    for (const key of ['expectTarget', 'expectedOwnerId', 'expectedOwnerType', 'expectedWikiId', 'expectedMonthId', 'expectedBodySha256', 'month', 'wikiTitle']) {
+      if (page.wiki[key] !== binding[key]) throw new Error('修订前的 Wiki 目标或原正文已变化，需重新核对');
+    }
+    Object.assign(plan, page);
+  }
+  return plan;
 }
 
 function immutableSource(merge, revision) {
@@ -370,7 +399,10 @@ export class TestSubmissions {
     const previous = input.resumePlanId && this.plans.get(input.resumePlanId);
     const resumeState = previous?.state;
     let plan, targetReceipt, targetIndex, recoveryReceipts;
-    if (input.resumePlanId) {
+    if (resumeState === 'PREPARED' && Object.keys(input).length === 1) return this.preview(previous);
+    if (resumeState === 'PREPARED' && !previous.started) {
+      plan = await reviseDraft(previous, input, steps);
+    } else if (input.resumePlanId) {
       if (resumeState === 'AWAITING_MERGE') return this.resumeManualMerge(input, previous, steps);
       if (resumeState === 'NEEDS_CONFLICT_RESOLUTION') return this.resumeConflict(input, previous, steps);
       const affected = { NEEDS_WIKI_REVIEW: 'wiki', NEEDS_TARGET_REVIEW: 'targetEvidence', NEEDS_REPAIR_REVIEW: 'repairRecord' }[resumeState];
@@ -444,11 +476,11 @@ export class TestSubmissions {
       throw new Error('此项交付已进入换页续接，只能沿用原回执');
     }
     if (prior.some(record => record !== previous && record.started && record.state !== 'SUPERSEDED' &&
-        !(record.hash === hash && record.state === 'AWAITING_CONFIRMATION'))) {
+        !(record.hash === hash && record.state === 'PREPARED'))) {
       throw new Error('此项交付已有实际执行；请沿用其回执，仅续接未完成动作');
     }
     for (const record of prior) {
-      if (record.hash === hash && record.state === 'AWAITING_CONFIRMATION') {
+      if (record.hash === hash && record.state === 'PREPARED') {
         if (plan.wiki) record.plan.wiki.bodyFile = plan.wiki.bodyFile;
         return this.preview(record);
       }
@@ -457,7 +489,7 @@ export class TestSubmissions {
     const receipts = previous?.receipts || recoveryReceipts || (plan.repositories
       ? { repositories: plan.repositories.map(row => ({ repository: row.merge.originUrl })) } : {});
     const record = { hash, keys, plan: snapshot(plan), receipts: snapshot(receipts),
-      started: Boolean(previous || recoveryReceipts || repositoryRows(plan).some(row => row.recovery)), state: 'AWAITING_CONFIRMATION' };
+      started: Boolean(previous?.started || recoveryReceipts || repositoryRows(plan).some(row => row.recovery)), state: 'PREPARED' };
     if (targetReceipt) repositoryReceipts(plan, record.receipts)[targetIndex].target = targetReceipt;
     if (resumeState === 'NEEDS_WIKI_REVIEW' && record.receipts.wiki) {
       (record.receipts.previousWikiReceipts ??= []).push({ wiki: record.receipts.wiki, links: record.receipts.links || [] });
@@ -476,7 +508,7 @@ export class TestSubmissions {
       throw new Error('未只读核实原 MR 的实际合并和源码包含关系');
     }
     pending.git = verified;
-    record.state = 'AWAITING_CONFIRMATION';
+    record.state = 'PREPARED';
     delete record.detail;
     delete record.repository;
     return this.preview(record);
@@ -522,7 +554,7 @@ export class TestSubmissions {
         !middle?.contained || middle.targetSha !== git.observedTargetSha) throw new Error('缺少原分支与中转分支在同一测试目标上的包含证据');
     receipt.git = git;
     receipt.conflict = { ...original, resolution: snapshot(resolution), deliveredSha };
-    record.state = 'AWAITING_CONFIRMATION';
+    record.state = 'PREPARED';
     delete record.detail;
     delete record.repository;
     return this.preview(record);
@@ -531,7 +563,7 @@ export class TestSubmissions {
   preview(record) {
     const p = record.plan;
     return { ...summary(record), writes: 0,
-      ...(p.tapdPlan ? { executionContext: { tapdPlan: snapshot(p.tapdPlan), next: 'USE_MATCHING_START_REQUEST_AFTER_REVIEW' } } : {}),
+      ...(p.tapdPlan ? { executionContext: { tapdPlan: snapshot(p.tapdPlan), next: 'USE_MATCHING_START_REQUEST' } } : {}),
       review: snapshot({ decisions: p.decisions, update: p.reviewUpdate,
       ...(p.repositories ? { repositories: p.repositories.map(reviewRepository) } : reviewRepository(p)),
       ...(p.wikiRecovery ? { recoverWiki: { previousWikiId: p.wikiRecovery.previousWikiId, mrIid: p.merge.mrIid,
@@ -542,18 +574,19 @@ export class TestSubmissions {
         statusAction: p.registration.statusAction, versionAction: p.registration.versionAction,
         expectedStatus: p.registration.expectedStatus, payload: p.registration.payload || {} } }) };
   }
-  assertReviewed(input) {
+  assertPrepared(input) {
     const record = this.plans.get(input.planId);
-    if (!record || input.confirmed !== true || input.reviewedPlanHash !== record.hash || planFingerprint(record.plan) !== record.hash ||
+    if (!record || input.confirmed !== true || planFingerprint(record.plan) !== record.hash ||
+        (Object.hasOwn(input, 'reviewedPlanHash') && input.reviewedPlanHash !== record.hash) ||
         Object.keys(input).some(key => !['planId', 'confirmed', 'reviewedPlanHash'].includes(key))) {
-      throw new Error('执行必须引用当前会话已审、已确认的同一完整计划');
+      throw new Error('执行须引用当前会话已核验的同一提测计划，匹配已审源码及实际授权');
     }
     if (record.state === 'SUPERSEDED') throw new Error('计划已被当前事实替换');
     return record;
   }
   async execute(input, steps) {
-    const record = this.assertReviewed(input);
-    if (record.state !== 'AWAITING_CONFIRMATION') return summary(record);
+    const record = this.assertPrepared(input);
+    if (record.state !== 'PREPARED') return summary(record);
     record.started = true; record.state = 'RUNNING';
     const { plan, receipts } = record;
     let repository, activeReceipts, executionContext;

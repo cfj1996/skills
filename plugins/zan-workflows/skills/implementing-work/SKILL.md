@@ -186,7 +186,7 @@ Share a common command across Tasks in this batch and carry its receipt to revie
 Reviewers use the actual diff and outcome for the same inputs. Human edits, a changed
 consumer, command, environment or acceptance condition reopen only affected evidence.
 
-## 4. Review, prepare the final record and return
+## 4. 开发收尾
 
 Compare the final diff with the starting baseline and approved scope. Exclude
 unrelated paths; check removed, moved or disconnected logic against authorized
@@ -241,7 +241,9 @@ Story/Task has no repair-record obligation.
 Return `REVIEWED` only when repository, branch, scope, verification and review pass.
 For Bugs also require the reviewed record draft; an IMPLEMENT endpoint additionally
 requires its final record readback. Submission-bound `REVIEWED` never requires future comment evidence.
-Otherwise return `BLOCKED` with the actual gap.
+Report 本轮开发完成 for this reviewed scope. An authorized submission continues
+with these receipts in the same turn. Otherwise an incomplete scope returns
+`BLOCKED` with the actual gap.
 Keep one in-memory `ReviewedChange`, or `reviewed_changes` for grouped work,
 paired to definitions by canonical repo/origin/fixed_branch, not array position.
 Each grouped result retains its selected scope and the confirmed required set;

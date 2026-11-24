@@ -51,9 +51,9 @@ An immediate or manually started execution Wiki is an orchestrated handoff. Its 
 Reuse the checklist's current explicit choices. Without overrides, resolve
 `STANDARD` and `DEPLOY` by default, including incoming `AUTO`: merge to the
 verified test target, build/deploy its test environment and include Wiki.
-An explicit `NO_WIKI`/`SKIP` remains authoritative. Show the complete plan and
-Wiki preview before confirmation; defaults never authorize writes, and no
-separate Wiki preference question is needed.
+An explicit `NO_WIKI`/`SKIP` remains authoritative. Bind the exact plan and Wiki
+draft for internal review. Defaults guide preparation. The current human request
+or its referenced authorization must cover the selected writes.
 If the user says there is no Bug, resolve any verified Story/Task independently
 of the selected Wiki action. For a request without a TAPD item, deliver the
 requested Wiki text and identify any verified page target separately.
@@ -91,14 +91,14 @@ long human/reviewer waits; the default idle limit is five minutes. Request
 timeouts/unknown writes require actual-effect inspection, never automatic
 replay. Follow the linked session reference for timing and budget flags.
 
-接受 `submission_phase=PLAN|EXECUTE`。首次调用始终进入 `PLAN`，只读准备并
-返回完整计划，遵守[执行清单的确认复用](../../references/execution-checklist.md#执行清单的确认复用)：
+## 提测指令与结果
 
-- 独立提测时，先展示完整计划，询问是否确认并等待回复；只有用户对该计划的
-  匹配确认，才允许进入 `EXECUTE` 执行。
-- 由 Bug 或需求主流程调用时，若完整执行清单及真实用户确认已覆盖本次准确
-  操作，核对匹配后直接进入 `EXECUTE`，无需再次询问。辅助脚本返回 `PLAN`
-  技术状态，本身不构成新的人工确认节点。
+接口接受 `submission_phase=PLAN|EXECUTE`。先只读准备计划，再按当前用户指令决定是否执行。需求、Bug 编排和单独运行共用以下规则。
+
+- 用户说「提测」「直接提测」时，把这条执行指令与当前上下文中的工作项、仓库、源和测试目标分支、交付目的、Git/MR 操作、所选构建、Wiki 及登记逐项对应。可只读核实的技术细节由执行方补齐。操作和目标明确，或已有覆盖本次交付的开工确认时，主代理核对只读预检，直接在同一轮进入 `EXECUTE`，最后汇总实际回执。
+- 常规交付新增独立评审次数为零。提交和推送核对已审内容与远端，合并核对 MR、CI、权限和实际包含关系，构建核对 Job、参数、源码和队列回执。合并冲突、人工改动或失效证据使业务行为发生变化时，只复核该增量及实际使用方。适用项目明定的审批和必检仍按其要求办理。
+- 用户说「先看看」「只预览」「等我确认」时，展示计划后停在只读阶段。交付目标有歧义、需要业务取舍或新增操作未获授权时，只问具体缺项。Mock 测试放行、生产发布等仍需各自的明确授权。
+- 已发起提测后，用户明确接受某项非必需修复为已知问题时，保留该决定及验收限制，接着办原提测。沿用与当前内容匹配的实现评审、lint、契约和浏览器记录；缺哪个场景就补哪个。独立评审仍未通过时，只把受影响的结论和新依据交回评审者。
 
 Carry the `ReviewedChange`, work definition, Git snapshot, TAPD item and Wiki
 target through both phases. `PLAN` does not repeat implementation review or
@@ -132,9 +132,7 @@ PLAN includes the exact account/body and late create/reuse action; EXECUTE publi
 only after Git, deployment and applicable Wiki/link gates. Submission-preflight
 rework refreshes affected code checks/review and the draft before any publication.
 
-独立直接提测时，展示包含实际变更与评审事实、合并与测试环境，以及所选完整
-Wiki 正文或补丁的确定清单，取得一次匹配确认后才进入 `EXECUTE`。仅实施授权
-不包含提测交付；主流程已有匹配的完整执行清单授权时，继续复用，不重复确认。
+独立直接提测沿用上面的[提测指令与结果](#提测指令与结果)。单纯完成实施或通过代码评审时，仍等待用户发起交付。
 
 ## Shared Wiki ownership
 
@@ -179,12 +177,9 @@ Reconstruct missing definitions from the original item/branch readbacks. Retain
 the complete Bug repair-record draft and a verified previous comment when present.
 Use the work item's separate test Wiki and an empty Task-link set.
 
-进入 `EXECUTE` 还须有一份 `PlannedTestSubmission`，其
-`terminal_state=AWAITING_CONFIRMATION`，且准确操作集已获授权：来源可以是
-主流程未变化的完整执行清单确认，也可以是独立提测计划的真实用户确认。
-仅修复授权、实现完成或设为真的确认字段，均不能代替提测授权。
+进入 `EXECUTE` 须有本次准确的 `PlannedTestSubmission`、仍有效的实现评审和覆盖实际操作的用户指令。`PREPARED` 表示只读准备完成。
 
-首次提测写入前，须有当前对话中覆盖每项已展示提测操作的统一授权。绑定事实
+首次提测写入前，须有当前对话中覆盖本次提测操作的统一授权。绑定事实
 变化时，先停止旧计划写入并核对原授权；仅缺失或实质变化的授权范围需要重新
 确认，按[统一提测授权](references/deployment-and-confirmation.md#consolidated-submission-authorization)处理。
 
@@ -225,7 +220,7 @@ requires a refreshed confirmation. Never rebuild on the test target or use
 
 同一 Bug 或 Story/所选 Tasks 的普通单仓和跨仓应用测试交付优先使用
 [连续提测入口](references/continuous-submission.md)。该入口消费完整已审范围。
-同一份清单给用户和整体评审者，传入最新已确认的字段、配置项及交付终点。
+主代理对照已确定的字段、配置和交付终点核实预检。用户要求预览时再展示清单。
 一条只读 PLAN 并行准备各仓及共享 Wiki，绑定实际参数、正文指纹和所选任务。
 一条匹配确认的 EXECUTE 按真实回执推进。目标增量、人工合并和 Wiki 变化按返回的暂停位置续跑。
 会话关闭后，原 Git 和构建回执齐全时用连续提测的跨会话续接，只读核实后完成 Wiki 或登记。
@@ -233,10 +228,9 @@ Story/Task 无状态及版本动作时在计划中标为不适用。Bug 绑定�
 所选构建及 Wiki/回链通过后发表或复用并精确读回，随后登记待测试。涉及包发布、
 START 的 workflow=CONTINUOUS_SUBMIT 使用上述连续提测；DELIVERY_STEPS（例如同仓多 Job、金丝雀包或多仓各有交付目的）直接按下方操作束合并及构建，逐仓复用本轮执行上下文，再汇总回执。A → C → B 冲突处理沿用已选条件分支。
 
-Use the [whole-plan review](references/submission-rules.md#whole-plan-review):
-one independent `PRE_SUBMISSION_PLAN` covers the complete plan and its prepared
-Wiki. The lead and executors own subsequent fresh checks/readbacks; routine
-stage transitions do not start new private validators.
+Apply the [delivery checks](references/submission-rules.md#whole-plan-review) once.
+The lead checks the prepared operations and Wiki against the current authorization
+and implementation evidence. The executors verify writes and read back their results.
 
 1. For each repository row, re-read repository, original source branch/SHA,
    confirmed test-target ref/SHA, current diff and commits. Verify they match
@@ -257,15 +251,15 @@ stage transitions do not start new private validators.
    evidence to `zan-workflows:drafting-wiki`. For a `SKIP` row without a
    verified primary Job link, use the [numbered Wiki heading without a link](../drafting-wiki/references/wiki-template.md#job-heading).
    Invoke the drafter read-only and require either one complete prepared
-   target/body plan for the joint review in step 4 or a
+   target/body plan for the check in step 4 or a
    `SKIPPED_BY_POLICY` result proven to be `NON_FUNCTIONAL_CONTINUE` with a
    verified owner page/current repository+branch entry and retained exact
    target/body readback. No historical page/entry uses the normal draft path. Under
    `NO_WIKI`, set Wiki to `SKIPPED_BY_POLICY` without loading Wiki capability.
    Reuse the item's current details/comments and the original source branch;
    do not start an independent Wiki search in this skill. Keep prepared Wiki facts
-   internal with validation `NOT_RUN`; do not claim `VALIDATED` until the joint
-   review passes. A still-current independently validated draft is reusable.
+   internal until the lead verifies the Wiki target, preservation and its content
+   against the actual reviewed change. Reuse a current validated draft.
 4. Build one consolidated `SubmissionPlan` containing each
    repository's Git/target/deployment selection, applicable shared Wiki/comment
    actions, the Bug's separate `BUG_REPAIR_RECORD` with exact account/reviewed body
@@ -288,18 +282,12 @@ stage transitions do not start new private validators.
    Job parameters through its adapter, showing a metadata-only Job binding
    or pipeline-computed version policy explicitly when used. Under
    `NO_WIKI`, explicitly list that no Wiki discovery/read/write/comment tool
-   will be called. Review this complete plan once with the private
-   [submission-validator.md](agents/submission-validator.md), phase
-   `PRE_SUBMISSION_PLAN`, including the Wiki validator's document criteria
-   only under STANDARD with a prepared body; NO_WIKI loads no Wiki capability.
-   Require a mapped pass for the plan and, under STANDARD, the complete draft
-   before the first delivery write. Unknown future IDs remain derivations,
-   not successful effects. Then return `PlannedTestSubmission` with
-   `terminal_state=AWAITING_CONFIRMATION`; PLAN itself performs no write.
-   独立调用时展示这份完整计划，询问是否确认并等待回复。主流程调用则核对
-   已确认执行清单，完整覆盖时连续执行；未变化的技术计划保留在内部，不把
-   预览变成新的审批或阶段结束时的询问。
-5. 在 `EXECUTE` 中核对独立提测的匹配确认，或主流程未变化的准确清单授权，
+   will be called. The lead cross-checks the complete operation set and the
+   applicable Wiki criteria once. Unknown future IDs remain derivations. Refer
+   only unresolved material findings or an explicitly required review to the
+   [submission validator](agents/submission-validator.md), with its precise
+   scope. Apply the current request under [提测指令与结果](#提测指令与结果).
+5. 在 `EXECUTE` 中核对覆盖准确操作的提测指令或开工确认，
    并在每次写入边界重新读取可变绑定事实。技术绑定变化时停止旧计划写入，
    生成准确的新计划并核对原授权；仅缺失或实质变化的范围需要用户确认，
    按已授权规则确定产生的回执不新增确认。
@@ -327,8 +315,8 @@ stage transitions do not start new private validators.
    A genuine metadata update or conflict needs its exact authorized action,
    not a new broad preparation/review run. Conflicts use the shared
    [A → C → B flow](../../references/conflict-merge.md): reuse the main checklist's
-   conditional resolution authority; standalone or missing scope still confirms
-   its exact ACB plan. Cleanup consumes only explicitly covered exact resources,
+   conditional resolution authority or the same terms in a standalone execution
+   request. Obtain only missing conflict-resolution authority. Cleanup consumes only explicitly covered exact resources,
    otherwise retain them and give next-step advice without another question. Keep A as the
    business source and retain the complete ConflictMergeHandoff, association
    and cleanup/retention/deferred outcomes in TestSubmissionResult for go-live.
@@ -428,6 +416,7 @@ stage transitions do not start new private validators.
    guessed receipt or continued dependent write.
    Report the actual readback status in the result, never the checklist's target
    as a completed transition while merge/deployment/Wiki prerequisites remain pending.
+   按项目汇总实际提交、MR/合并、已受理的测试构建和链接、Wiki、TAPD 结果及已知问题。部分完成时列出已完成步骤、当前阻塞及未执行项。
 
 ## Failure behavior
 
@@ -444,8 +433,8 @@ poisoned session's write barrier or treat a new session as recovery evidence.
 A PLAN-only parser/input/evidence failure with no mutation
 attempt is a read-only preflight problem: correct it and prepare a fresh
 read-only preview with a new request ID. It neither authorizes a write nor
-requires repeating implementation/review. Present a valid complete plan before
-any submission write; never call a read-only failure an unknown write effect.
+requires repeating implementation/review. Verify the corrected plan before
+the affected writes and proceed under the current matching authorization.
 
 No run/attempt/effect ledger, input/output JSON, report file, or interruption
 recovery is created. A temporary Markdown file used solely to carry the exact

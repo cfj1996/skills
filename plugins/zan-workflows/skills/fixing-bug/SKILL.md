@@ -20,6 +20,10 @@ Preferred lead model profile: `CRITICAL`。见[模型路由](../../references/mo
 
 立即执行消费刚确认并保存的版本，新会话中用户明确“按这份计划修复”后，由 [执行 TAPD Plan](../executing-tapd-plan/SKILL.md) 按[开工、验证和交接流程](../executing-tapd-plan/references/executing.md)读取原 Bug 的确认版本、范围、已完成效果及本轮授权。每个 Bug 的全部仓库共用一次 [implementing-work](../implementing-work/SKILL.md) 实施交接，按 F/TC 执行。逐 Bug 复用原分支，各自核实状态/处理人、全部相关仓库的修复和独立评审。共享分支的后项等前项的所选终点就绪后再实施，保留各 Bug 的独立 diff 和交付证据。
 
+## 开发收尾与交付
+
+按[开发收尾](../executing-tapd-plan/references/executing.md#开发收尾)完成实现评审，取得本轮范围的 `REVIEWED` 后报告「开发完成」。
+
 每个 Bug 只产生一份[完整修复记录](../implementing-work/references/bug-repair-record.md)。其发表时点与一条执行页回链分别核验。“先完成代码，我检查后再提测”走 `IMPLEMENT`，直接提测：否，完成评审与所需的单条修复记录后停在人工检查。已选择并授权提测时，把已审变更与草稿交给 [submitting-for-test](../submitting-for-test/SKILL.md)，在适用的交付、提测 Wiki 和回链通过后发表/复用单条记录，最后登记待测试。已评审后单独要求交付则走[直接提测流程](../submitting-for-test/references/direct-submission.md)，尊重当轮构建选择。明确需要上线时再进入 [going-live](../going-live/SKILL.md)。
 
 ## 已有资料与窄范围请求

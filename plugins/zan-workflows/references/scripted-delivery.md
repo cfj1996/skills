@@ -11,10 +11,11 @@ through stdin and return JSON on stdout; do not save workflow plan/result
 files. `--execute` is an execution switch, not evidence of human authorization.
 The caller must first bind the actual human confirmation to the current exact
 plan: reuse a main entry's complete execution checklist after scope comparison,
-or obtain the standalone skill's own plan confirmation. Follow
+or match a direct submission instruction and its established context. Other standalone
+operations use their own confirmation rules. Follow
 [confirmation reuse](execution-checklist.md#执行清单的确认复用); a PLAN result or
 `confirmed=true` alone is not evidence, and internal preview/execution calls do
-not require another human turn when the main authorization already covers them.
+not require another human turn when the current authorization already covers them.
 
 ## Compose stable checklist operations
 

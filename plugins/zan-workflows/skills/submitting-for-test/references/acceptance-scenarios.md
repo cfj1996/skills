@@ -4,7 +4,7 @@
 
 | Scenario | Expected result |
 | --- | --- |
-| Stable component fix plus consumer version upgrade, STANDARD | Each changed repository retains its own code review. Review the complete submission/Wiki plan once; scripts check Git, queue, Wiki and registration in dependency order and the lead checks final receipts. No per-stage Agent calls for unchanged facts. |
+| Stable component fix plus consumer version upgrade, STANDARD | Each changed repository retains its own code review. The lead checks the prepared submission/Wiki once. scripts check Git, queue, Wiki and registration in dependency order and the lead checks final receipts. No per-stage Agent calls for unchanged facts. |
 | Standalone NO_WIKI plan has not yet received human confirmation | Review the exact proposed plan with authority pending, without loading Wiki or demanding future queue/MR readbacks. PLAN writes nothing; EXECUTE waits for matching actual human approval. |
 | Current Bug code and final-record draft are independently reviewed but no comment exists | Accept the normal REVIEWED/PLAN input; plan one final record after Git/deployment and applicable Wiki/link gates, before registration. Never demand future comment readback before delivery. |
 | Commit creates a new SHA with exactly the reviewed content | Verify content/diff/dependency/environment correspondence and update the in-memory binding; do not rerun code review solely for the new SHA. A target's additional unreviewed diff still needs scoped review. |
@@ -14,13 +14,13 @@
 
 | Scenario | Expected result |
 | --- | --- |
-| Standalone first invocation after `ReviewedChange=REVIEWED` | Run read-only PLAN, display the complete plan/body, ask and stop; no writes before its own matching confirmation. |
+| Standalone first invocation after `ReviewedChange=REVIEWED` | A direct execution instruction with established targets goes from internal PLAN to EXECUTE with current implementation evidence in the same turn. A request to see the plan stops at the preview. |
 | A main entry supplies a complete confirmed execution checklist covering all delivery operations | Prepare/validate exact PLAN internally, compare scope and derived facts, then EXECUTE in the same user turn without another approval. |
 | Initial checklist covers only implementation or lacks the delivery operation | Do not infer authorization; prepare the missing scope and obtain only its required confirmation. |
 | User confirms the exact unchanged displayed SubmissionPlan in a later message | Run `submission_phase=EXECUTE` and reuse that one submission authorization. |
 | `NO_WIKI` with valid reviewed change | Merge to the confirmed actual test branch (`dev` or `develop`), resolve optional deployment, publish/reuse and read back the Bug repair record, then register TAPD; never load Wiki capability. Story/Task has no Bug record. |
 | User requests “发布测试环境后提测” | Select `DEPLOY` with `TRIGGER_ACCEPTED`; require the exact accepted queue and confirmed-target ref/SHA/params, then continue Wiki/TAPD without waiting. |
-| User requests “直接提测” after inspecting implementation | Reuse existing work and original branches, refresh mutable facts and only invalidated verification/review, display the standalone delivery checklist and confirm once; default STANDARD/DEPLOY, no repeated implementation. |
+| User requests “直接提测” after inspecting implementation | Reuse existing work and original branches, refresh mutable facts and only invalidated verification/review, bind the resolved delivery scope to the current request and execute after review. Defaults guide preparation; ask only about unresolved decisions. |
 | User requests “不构建” or “跳过发布”, including “直接提测，不构建” | Select `SKIP`, make no build/deploy/parameter/poll call, record `SKIPPED_BY_INTENT`, and continue direct提测; only missing canonical Wiki Job metadata may be read. |
 | User requests “先完成代码，我检查后再提测” | Select IMPLEMENT, show 直接提测：否 and all three delivery choices disabled; stop at REVIEWED without submission PLAN, commit/push/MR, Wiki, Jenkins or test registration. |
 | Developer edits content after REVIEWED and then requests delivery | Check only affected validation and independent POST_CHANGE_REVIEW; do not treat human inspection or stale review as current evidence. Block failed/unrelated changes before delivery writes. |

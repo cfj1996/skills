@@ -9,6 +9,13 @@ const git = async (merge, args, io, extra = {}) => (await runScopedCommand('git'
     maxBuffer: 8 * 1024 * 1024, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }, ...extra }, io)).stdout;
 const paths = output => output.split('\0').filter(Boolean).sort();
 const same = (left, right) => stableJson(left) === stableJson(right);
+async function treeModes(merge, tree, names, io) {
+  const rows = await git(merge, ['ls-tree', '-r', '-z', tree, '--', ...names], io);
+  return new Map(rows.split('\0').filter(Boolean).map(row => {
+    const tab = row.indexOf('\t');
+    return [row.slice(tab + 1), row.slice(0, tab).split(' ')[0]];
+  }));
+}
 function planFormatHash(data) {
   // Only table padding and separator length in a reviewed Plan may change in a hook.
   let fence = false;
@@ -89,15 +96,17 @@ export async function executeSubmissionGit(merge, local, receipt, io) {
     const names = Object.keys(local.files).sort();
     await io.beforePlanWrite?.();
     await git(merge, ['add', '-A', '--', ...names], io);
-    const staged = paths(await git(merge, ['diff', '--cached', '--no-renames', '--name-only', '-z', '--'], io));
+    const reviewedTree = (await git(merge, ['write-tree'], io)).trim();
+    const treeDiff = ['diff', '--no-renames', '--ignore-submodules=none', '--name-only', '-z'];
+    const staged = paths(await git(merge, [...treeDiff, sha, reviewedTree, '--'], io));
     if (!same(staged, names) || !same(await worktreeFiles(merge, io), local.files) ||
         await branchState(merge, io) !== sha) throw new Error('暂存后的实际差异已变化');
+    const stagedModes = await treeModes(merge, reviewedTree, names, io);
     for (const path of names) {
-      const index = (await git(merge, ['ls-files', '--stage', '-z', '--', path], io)).split('\t')[0];
       const expected = local.files[path];
-      if (!index && !expected) continue;
-      if (!expected || !index.startsWith(expected.mode + ' ') ||
-          sha256(await git(merge, ['show', ':' + path], io, { encoding: 'buffer' })) !== expected.sha256) {
+      if (!stagedModes.has(path) && !expected) continue;
+      if (!expected || stagedModes.get(path) !== expected.mode ||
+          sha256(await git(merge, ['show', reviewedTree + ':' + path], io, { encoding: 'buffer' })) !== expected.sha256) {
         throw new Error('暂存内容与已审文件不符');
       }
     }
@@ -105,18 +114,26 @@ export async function executeSubmissionGit(merge, local, receipt, io) {
     receipt.phase = 'COMMIT';
     await git(merge, ['commit', '--file=-'], io, { stdin: local.message });
     sha = receipt.sourceSha = await branchState(merge, io);
-    if ((await git(merge, ['show', '-s', '--format=%P', sha], io)).trim() !== local.head ||
-        !same(paths(await git(merge, ['diff', '--no-renames', '--name-only', '-z', local.head, sha, '--'], io)), names)) {
-      throw new Error('实际提交的父提交或文件范围发生变化，保留提交并暂停推送');
+    if ((await git(merge, ['show', '-s', '--format=%P', sha], io)).trim() !== local.head) {
+      throw new Error('实际提交的父提交发生变化，保留提交并暂停推送');
     }
-    for (const path of names) {
-      const entry = (await git(merge, ['ls-tree', '-z', sha, '--', path], io)).split('\t')[0];
-      const expected = local.files[path];
-      if (!expected && !entry) continue;
-      if (!expected || !entry.startsWith(expected.mode + ' blob ')) throw new Error('提交改变了已审文件类型');
-      const data = await git(merge, ['show', sha + ':' + path], io, { encoding: 'buffer' });
-      if (sha256(data) !== expected.sha256 && (!expected.formatHash || planFormatHash(data) !== expected.formatHash)) {
-        throw new Error('Hook 改变了已审内容，保留提交并暂停推送');
+    // A tree diff covers bytes, modes, deletions and hook-added paths in one read.
+    const delta = paths(await git(merge, [...treeDiff, reviewedTree, sha, '--'], io));
+    if (delta.length) {
+      const actualNames = new Set(paths(await git(merge, [...treeDiff, local.head, sha, '--'], io)));
+      const committedModes = await treeModes(merge, sha, delta, io);
+      const changedPaths = [];
+      for (const path of delta) {
+        const expected = local.files[path];
+        if (expected?.formatHash && committedModes.get(path) === expected.mode && actualNames.has(path)) {
+          const data = await git(merge, ['show', sha + ':' + path], io, { encoding: 'buffer' });
+          if (planFormatHash(data) === expected.formatHash) continue;
+        }
+        changedPaths.push(path);
+      }
+      if (changedPaths.length) {
+        Object.assign(receipt, { state: 'COMMITTED', phase: 'VERIFY_COMMIT', reviewedTree, changedPaths });
+        throw new Error('Hook 改变了已审内容，保留提交并暂停推送。待复核：' + changedPaths.join('、'));
       }
     }
   }

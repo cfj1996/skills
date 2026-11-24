@@ -19,6 +19,10 @@ Preferred lead model profile: `CRITICAL`。见[模型路由](../../references/mo
 
 立即执行消费刚确认并保存的版本，新会话中用户明确“按这份计划开发”时，仍由 [执行 TAPD Plan](../executing-tapd-plan/SKILL.md) 按其[开工、验证和交接流程](../executing-tapd-plan/references/executing.md)接续。先核实 Story、正式页、确认版本、实际分支/源码和未完成的 F/TC。仅执行本轮选中的范围，按原步骤逐项验证、独立评审并以真实证据回填。用户仅要求查看或修订计划时留在相应阶段。
 
+## 开发收尾与交付
+
+按[开发收尾](../executing-tapd-plan/references/executing.md#开发收尾)完成实现评审，取得本轮范围的 `REVIEWED` 后报告「开发完成」。
+
 尊重本轮交付选择。“先完成代码，我检查后再提测”走 `IMPLEMENT`，直接提测：否，完成开发、验收和独立评审后停在人工检查。用户已选择并授权提测时带完整 ReviewedChange 交给 [submitting-for-test](../submitting-for-test/SKILL.md)，按已选范围和构建选项交付。已有已评审改动，后来单独要求“直接提测”时，走[直接提测流程](../submitting-for-test/references/direct-submission.md)刷新当前证据。仅在明确选择上线并具备对应授权时进入 [going-live](../going-live/SKILL.md)。
 
 ## 已有资料与窄范围请求

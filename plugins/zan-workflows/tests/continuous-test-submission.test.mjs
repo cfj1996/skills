@@ -196,7 +196,7 @@ async function fixture(t, options = {}) {
       } } });
   let i = 0, session = newSession();
   const request = (phase, data) => session.dispatch({ id: 'request-' + ++i, action: 'submit', phase, input: data });
-  const run = plan => request('EXECUTE', { confirmed: true, planId: plan.planId, reviewedPlanHash: plan.planId });
+  const run = plan => request('EXECUTE', { confirmed: true, planId: plan.planId });
   t.after(async () => { await session.close(); await rm(dir, { recursive: true, force: true }); });
   return { input, request, run, calls, sourceChecks, pages, comments, bodyFile,
     planWiki: (mode, data) => runStoryWiki(mode, data, (name, args) => pool.call('tapd-mcp', name, args), async () => true),
@@ -216,7 +216,9 @@ async function fixture(t, options = {}) {
 test('one authorized request carries the merged SHA, accepted queue and verified Wiki into exactly the selected Task links', async t => {
   const f = await fixture(t);
   const plan = await f.request('PLAN', f.input);
-  assert.equal(plan.state, 'AWAITING_CONFIRMATION');
+  assert.equal(plan.state, 'PREPARED');
+  await assert.rejects(f.request('EXECUTE', { planId: plan.planId, reviewedPlanHash: plan.planId }), /明确确认/);
+  await assert.rejects(f.request('EXECUTE', { planId: plan.planId, confirmed: true, reviewedPlanHash: 'other' }), /已审/);
   assert.equal(f.calls.some(name => /^(create_|merge_merge_|jenkins_trigger|update_)/.test(name)), false);
   const result = await f.run(plan);
   assert.equal(result.state, 'SUBMITTED');
@@ -232,6 +234,39 @@ test('one authorized request carries the merged SHA, accepted queue and verified
   assert.equal(f.calls.length, count);
 });
 
+test('before delivery a Wiki correction and an accepted limitation reuse the prepared repository checks', async t => {
+  const f = await fixture(t, { batch: true });
+  const incomplete = structuredClone(f.input);
+  incomplete.repositories[1].merge.reviewPassed = false;
+  await assert.rejects(f.request('PLAN', incomplete), /已评审/);
+  assert.deepEqual(f.calls, []);
+  const first = await f.request('PLAN', f.input);
+  const reads = f.calls.length;
+  assert.deepEqual(await f.request('PLAN', { resumePlanId: first.planId }), first);
+  assert.equal(f.calls.length, reads);
+  const changedBody = first.review.approvedWikiBody + '- 验证结果：已核对移动端入口分流\n';
+  await writeFile(f.bodyFile, changedBody);
+  const before = f.calls.length;
+  await assert.rejects(f.request('PLAN', { resumePlanId: first.planId, release: null }), /预检修订/);
+  await assert.rejects(f.request('PLAN', { resumePlanId: first.planId, wiki: { bodyFile: f.bodyFile, creator: 'other' } }), /归属/);
+  const revised = await f.request('PLAN', { resumePlanId: first.planId, wiki: { bodyFile: f.bodyFile }, decisions: ['保留已知问题'] });
+  assert.equal(revised.state, 'PREPARED');
+  assert.notEqual(revised.planId, first.planId);
+  assert.deepEqual(revised.review.repositories, first.review.repositories);
+  assert.deepEqual(revised.review.decisions, [...first.review.decisions, '保留已知问题']);
+  assert.equal(revised.review.approvedWikiBody, changedBody);
+  assert.ok(f.calls.length > before);
+  assert.ok(f.calls.slice(before).every(name => ['get_wiki', 'get_comments', 'get_stories_or_tasks'].includes(name)));
+  const stable = await f.request('PLAN', { resumePlanId: revised.planId, decisions: ['保留已知问题'] });
+  assert.equal(stable.planId, revised.planId);
+  await assert.rejects(f.run(first), /已被.*替换/);
+  await assert.rejects(f.request('EXECUTE', { planId: revised.planId, reviewedPlanHash: first.planId, confirmed: true }), /已审/);
+  const result = await f.run(revised);
+  assert.equal(result.state, 'SUBMITTED');
+  assert.equal(f.pages.get('20').markdown_description, changedBody);
+  assert.equal(f.calls.filter(name => name === 'jenkins_trigger_build').length, 2);
+});
+
 test('Story-only delivery updates the test Wiki while preserving the separate execution page and its backlink', async t => {
   const f = await fixture(t, { batch: true, skipSecond: true });
   f.input.linkTaskIds = [];
@@ -243,7 +278,7 @@ test('Story-only delivery updates the test Wiki while preserving the separate ex
   f.comments.set('1', structuredClone(originalComments));
 
   const plan = await f.request('PLAN', f.input);
-  assert.equal(plan.state, 'AWAITING_CONFIRMATION');
+  assert.equal(plan.state, 'PREPARED');
   const result = await f.run(plan);
   assert.equal(result.state, 'SUBMITTED');
   assert.equal(result.receipts.wiki.wikiId, '20');
@@ -415,7 +450,7 @@ test('STANDARD with no Jenkins binding writes the Wiki and Task links without ca
   await writeFile(f.bodyFile, body);
 
   const plan = await f.request('PLAN', f.input);
-  assert.equal(plan.state, 'AWAITING_CONFIRMATION');
+  assert.equal(plan.state, 'PREPARED');
   const result = await f.run(plan);
 
   assert.equal(result.state, 'SUBMITTED');
@@ -484,7 +519,7 @@ test('a new session verifies the old MR and expired queue then updates only the 
   const { f, recovery, old } = await closedWikiFixture(t, { replace: true, expiredQueue: true, targetAdvanced: true });
   const count = f.calls.length;
   const plan = await f.request('PLAN', recovery);
-  assert.equal(plan.state, 'AWAITING_CONFIRMATION');
+  assert.equal(plan.state, 'PREPARED');
   assert.equal(plan.receipts.git.deliveredSha, delivered);
   assert.equal(plan.receipts.release.verification.matchedBy, 'BUILD_QUEUE_ID');
   assert.equal(plan.receipts.release.verification.writes, 0);
@@ -527,7 +562,7 @@ test('a replacement Wiki cannot recover a partial, artificially masked or produc
   }
   assert.equal(f.calls.slice(count).includes('read_queue'), false);
   assert.equal(f.calls.slice(count).some(name => /^(create_|merge_merge_|jenkins_trigger|update_)/.test(name)), false);
-  assert.equal((await f.request('PLAN', recovery)).state, 'AWAITING_CONFIRMATION');
+  assert.equal((await f.request('PLAN', recovery)).state, 'PREPARED');
 });
 
 test('a lost trigger response preserves Git evidence, stops dependent writes and cannot replay the trigger', async t => {
@@ -637,7 +672,7 @@ test('a two-repository Bug keeps its execution page and records one repair and r
   f.comments.get('1').push(executionLink);
 
   const plan = await f.request('PLAN', f.input);
-  assert.equal(plan.state, 'AWAITING_CONFIRMATION');
+  assert.equal(plan.state, 'PREPARED');
   const done = await f.run(plan);
   assert.equal(done.state, 'SUBMITTED');
   assert.deepEqual(done.receipts.repositories.map(row => row.git.deliveredSha), [delivered, secondDelivered]);
@@ -869,7 +904,7 @@ test('explicit build-only start triggers only its exact test Job and no Git or T
     purpose: f.input.merge.purpose, repositoryPath: f.input.merge.repositoryPath, mockSafety: f.input.merge.mockSafety,
     targetBranch: branch, completionMode: 'TRIGGER_ACCEPTED', tapdPlan: start.tapdPlan };
   const preview = await f.standaloneBuild('PLAN', request);
-  assert.equal(preview.state, 'AWAITING_CONFIRMATION');
+  assert.equal(preview.state, 'PREPARED');
   const result = await f.standaloneBuild('EXECUTE', { ...preview, confirmed: true });
   assert.equal(result.state, 'BUILD_SUBMITTED');
   assert.deepEqual(f.calls.slice(before).filter(name => /^(create_|merge_merge_|jenkins_trigger|update_)/.test(name)), ['jenkins_trigger_build']);
@@ -922,7 +957,7 @@ test('distinct project purposes route the same start to the selected Git and Jen
   const release = { ...two.release, purpose: two.merge.purpose, repositoryPath: two.merge.repositoryPath,
     targetBranch: 'dev', mockSafety: two.merge.mockSafety, expectedSha: secondDelivered, completionMode: 'TRIGGER_ACCEPTED',
     tapdPlan: start.tapdPlan };
-  assert.equal((await f.standaloneBuild('PLAN', release)).state, 'AWAITING_CONFIRMATION');
+  assert.equal((await f.standaloneBuild('PLAN', release)).state, 'PREPARED');
   await assert.rejects(f.step('merge', 'PLAN', { ...two.merge, targetBranch: 'main', tapdPlan: start.tapdPlan }), /Plan 不一致/);
 });
 
@@ -1135,7 +1170,7 @@ test('partial branch delivery binds the reviewed F set even for a skipped siblin
     await assert.rejects(f.step('merge','PLAN',{ ...f.input.merge,tapdPlan }), /已审差异/);
     await assert.rejects(f.step('merge','PLAN',{ ...f.input.merge,tapdPlan,reviewedFeatures:['P1-M1-F1','P2-M1-F1'] }), /已审差异/);
     const allowed = await f.step('merge','PLAN',{ ...f.input.merge,tapdPlan,reviewedFeatures:['P1-M1-F1'] });
-    assert.equal(allowed.state,'AWAITING_CONFIRMATION');
+    assert.equal(allowed.state,'PREPARED');
   }
 });
 

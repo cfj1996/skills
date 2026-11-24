@@ -36,7 +36,7 @@ class ToolRoutingTests(unittest.TestCase):
         self.assertIn("`jenkins-mcp`", text)
         self.assertIn("`tapd-mcp`", text)
         self.assertIn("submission_phase=PLAN|EXECUTE", text)
-        self.assertIn("AWAITING_CONFIRMATION", text)
+        self.assertIn("PREPARED", text)
 
         validator = (
             PLUGIN_ROOT

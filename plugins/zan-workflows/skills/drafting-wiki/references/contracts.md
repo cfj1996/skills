@@ -130,9 +130,9 @@
 - `VALIDATED` requires passing validation and a non-empty copyable Markdown
   body. `BLOCKED` requires a concise blocker and no rendered final body.
   During submission composition, prepared facts/body stay internal with
-  validation `NOT_RUN` until the complete `PRE_SUBMISSION_PLAN` review applies
-  the Wiki validator's criteria and passes. That one pass establishes both
-  mappings; no extra public state or duplicate document review is needed.
+  validation `NOT_RUN` until the lead verifies the Wiki criteria against the
+  prepared body and current implementation evidence during delivery preflight.
+  Map that result to the existing draft validation.
 
 - `待合并` is written only by `going-live` after an exact open default-target MR
   is created/reused under the approved conditional patch. Drafting never
