@@ -191,7 +191,8 @@ async function prepareRelease(merge, release, expectedSha, steps) {
   if (!release) return null;
   const input = release.jobName && release.jobUrl ? release : await bindFrozenJenkinsJob(release, steps.io);
   return steps.run('release', { ...input, expectedSha, completionMode: 'TRIGGER_ACCEPTED',
-    purpose: merge.purpose, mockSafety: merge.mockSafety }, false);
+    purpose: merge.purpose, mockSafety: merge.mockSafety,
+    ...(merge.visualAcceptance !== undefined && { visualAcceptance: merge.visualAcceptance }) }, false);
 }
 
 async function prepareSubmission(input, steps) {
@@ -407,7 +408,10 @@ export class TestSubmissions {
     const resumeState = previous?.state;
     let plan, targetReceipt, targetIndex, recoveryReceipts;
     if (resumeState === 'PREPARED' && Object.keys(input).length === 1) return this.preview(previous);
-    if (resumeState === 'PREPARED' && !previous.started) {
+    if (resumeState === 'NEEDS_VISUAL_ACCEPTANCE') {
+      if (Object.keys(input).length !== 1) throw new Error('视觉验收续接只读回原计划和补齐的回执');
+      plan = snapshot(previous.plan);
+    } else if (resumeState === 'PREPARED' && !previous.started) {
       plan = await reviseDraft(previous, input, steps);
     } else if (input.resumePlanId) {
       if (resumeState === 'AWAITING_MERGE') return this.resumeManualMerge(input, previous, steps);
@@ -658,6 +662,7 @@ export class TestSubmissions {
         }
         try {
           activeReceipts.release = await steps.run('release', { ...row.release, mockSafety,
+            ...(row.merge.visualAcceptance !== undefined && { visualAcceptance: row.merge.visualAcceptance }),
             requiredRepositories: [git.originUrl], gitDeliveryReceipts: [git], purpose: row.merge.purpose,
             targetEnvironment: 'test', targetBranch: git.targetBranch, expectedSha: git.deliveredSha,
             version: row.release.versionParameter ? row.release.version : git.deliveredSha }, true);
@@ -722,6 +727,7 @@ export class TestSubmissions {
     } catch (error) {
       const step = error.result;
       if (error.code === 'PLAN_WIKI_RECHECK_REQUIRED') return pause('NEEDS_WIKI_REVIEW', error);
+      if (error.code === 'VISUAL_ACCEPTANCE_REQUIRED') return pause('NEEDS_VISUAL_ACCEPTANCE', error);
       if (error.code === 'PLAN_RECHECK_REQUIRED') {
         record.state = 'PLAN_RECHECK_REQUIRED';
         record.detail = error.message;

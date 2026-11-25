@@ -1,3 +1,5 @@
+import { visualResults } from '../../../scripts/visual-acceptance.mjs';
+
 export const recordTitle = '执行与变更记录';
 export const receiptIdPattern = /^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}$/;
 export const oneLine = value => typeof value === 'string' && value.trim() && !/[\r\n\u2028\u2029]/u.test(value);
@@ -60,12 +62,16 @@ function anchor(id) {
 function executionLines(entry, changes) {
   const related = changes.find(change => change.id === entry.changeId);
   const relatedTitle = related?.title.replace(/[\\[\]]/g, '\\$&');
+  const visual = entry.visualAcceptance;
   return [
     '### ' + (entry.time ?? '时间待核实') + ' · 执行 · ' + entry.title,
     '',
     field('执行人', entry.executor ?? '待核实'),
     field('结果', entry.result),
     field('依据', entry.evidence),
+    ...(visual ? [field('视觉独立评审', visual.reviewEvidence),
+      ...visual.checks.map(check => field(check.testId, [visualResults[check.result], check.observation, check.evidence].filter(Boolean).join(' ｜ '))),
+    ] : []),
     ...(entry.nextStep ? [field('下一步', entry.nextStep)] : []),
     ...(related ? [field('关联变更', '[' + relatedTitle + '](#' + anchor(related.id) + ')')] : []),
   ];

@@ -86,6 +86,14 @@ contract and its blockers remain binding. Check in order:
 3. Pre-existing changes are not attributed to the current Bug.
 4. Relevant verification is present and truthful; failures are not hidden.
    Compare the primary evidence with the expected behavior and current diff.
+   For a formal TAPD Plan, trace each selected visible layout or style change
+   to its confirmed UI reference and visual TC. Compare the screenshot or
+   recording of each real rendered entry with the reference and its passing
+   criteria. Verify the observed result and the approved Plan and code versions.
+   Cover each affected entry of a shared component. A missing visual case,
+   stale evidence or unresolved mismatch blocks the current review.
+   [Visual acceptance evidence](../../collecting-requirements/references/wiki-storage.md#视觉验收回执)
+   supplies the check IDs and evidence links for the existing review handoff.
    One observation may cover several assertions with matching inputs and state.
    Reproduce cases required by the project and resolve material gaps, conflicting
    observations or uncovered risks through targeted checks.

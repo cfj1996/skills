@@ -9,6 +9,7 @@ import { noMockFixture, fixtureMockIo } from './helpers/mock-safety-fixture.mjs'
 import { frozenJenkinsFixture } from './helpers/frozen-jenkins-fixture.mjs';
 import { sha256 } from '../scripts/workflow-runtime.mjs';
 import { repairRecordBody } from './helpers/bug-repair-record-fixture.mjs';
+import { visualFeatures, withVisualTests } from './helpers/visual-plan-fixture.mjs';
 
 const source = 'a'.repeat(40), target = 'b'.repeat(40), delivered = 'c'.repeat(40);
 const branch = 'feature/test.disclaimer', repo = 'https://git.example.test/team/factory.git';
@@ -802,6 +803,108 @@ async function startBoundPlan(f, startMode, change = m => m, limit) {
   f.input.tapdPlan = start.tapdPlan;
   return { start, saved, raw };
 }
+
+async function startVisualPlan(f) {
+  f.pages.set('70', { id: '70', name: '需求执行文档', parent_wiki_id: '0' });
+  const example = await readFile(new URL('../skills/collecting-requirements/assets/example-frontend-plan.md', import.meta.url), 'utf8');
+  const markdown = withVisualTests(example.replaceAll('111230010000101', '1')
+    .replace('https://git.example.test/team/merchant-admin.git', repo)
+    .replace('feature/demo.1120.区域门店展示设置', branch));
+  const scope = { workspaceId: '123', storyId: '1', parentWikiId: '70' };
+  const raw = { ...scope, actor: 'developer', markdown };
+  const draft = await f.planWiki('PLAN', raw);
+  const saved = await f.planWiki('SAVE', { ...raw, markdown: draft.markdown, approval: draft.approval, confirmedFingerprint: draft.fingerprint });
+  const project = {
+    交付目的: f.input.merge.purpose, 提测合并: '提交推送并合并 MR', 提测目标分支: 'develop',
+    '测试构建 Job': jobUrl, 构建项目: 'factory', 构建对象: 'factory', 构建来源: 'develop',
+    构建参数指纹: sha256(JSON.stringify({ branch: 'develop' })),
+  };
+  const startInput = { wikiUrl: saved.wikiUrl, startMode: 'MANUAL',
+    startup: { submit: true, build: true, testWiki: '需要', projects: { P1: project } } };
+  const start = await f.planWiki('START', startInput);
+  f.input.tapdPlan = start.tapdPlan;
+  f.input.linkTaskIds = [];
+  const receipt = {
+    approvalFingerprint: start.approvalFingerprint, sourceSha: f.input.merge.mockSafety.sourceSha,
+    contentFingerprint: f.input.merge.mockSafety.contentFingerprint, reviewEvidence: 'codex://threads/independent-review',
+    checks: visualFeatures.map((feature, index) => ({ testId: feature + '-TC2', result: 'PASS',
+      evidence: 'https://evidence.example.test/dialog-' + index + '.png', observation: '三处布局均与已确认的图一对齐' })),
+  };
+  async function writeReceipt(visualAcceptance, receiptId) {
+    const live = await f.planWiki('READ', { wikiUrl: saved.wikiUrl });
+    return f.planWiki('PROGRESS', { ...scope, progressAuthorized: true, expectedApprovalFingerprint: live.approvalFingerprint,
+      expectedPageSha256: live.pageSha256, expectedRecordPageSha256: live.executionRecord.pageSha256,
+      receiptId, entry: '导入弹框视觉对照回执', evidence: '当前源码的独立评审', visualAcceptance });
+  }
+  return { start, startInput, receipt, writeReceipt };
+}
+
+test('continuous submission rejects missing, incomplete and stale visual receipts and restores valid Wiki evidence', async t => {
+  const f = await fixture(t);
+  const { start, receipt, writeReceipt } = await startVisualPlan(f);
+  assert.deepEqual(start.visualTests.map(row => row.testId), receipt.checks.map(row => row.testId));
+  const preview = visualAcceptance => f.request('PLAN', { ...f.input, merge: { ...f.input.merge, visualAcceptance } });
+  await assert.rejects(preview(undefined), { code: 'VISUAL_ACCEPTANCE_REQUIRED', message: /P1-M1-F1-TC2.*P1-M2-F1-TC2/ });
+  await assert.rejects(preview({ ...receipt, checks: receipt.checks.slice(0, 1) }), /待补验.*P1-M2-F1-TC2/);
+  for (const change of [{ approvalFingerprint: '1'.repeat(64) }, { contentFingerprint: '2'.repeat(64) }, { sourceSha: target }]) {
+    await assert.rejects(preview({ ...receipt, ...change }), { code: 'VISUAL_ACCEPTANCE_REQUIRED', message: /代码版本不一致/ });
+  }
+  await assert.rejects(f.request('PLAN', { ...f.input, merge: { ...f.input.merge, visualAcceptance: receipt,
+    mockSafety: { ...f.input.merge.mockSafety, revisionSha: target } } }), /待交付 SHA 不一致/);
+  await assert.rejects(preview({ ...receipt, checks: receipt.checks.map(check => ({ ...check, evidence: undefined })) }), /须附截图或录屏/);
+  await assert.rejects(writeReceipt({ ...receipt, approvalFingerprint: '1'.repeat(64) }, 'visual.stale'), /当前确认版/);
+  await assert.rejects(writeReceipt({ ...receipt, checks: [{ ...receipt.checks[0], testId: 'P1-M1-F1-TC1' }] }, 'visual.functional'),
+    /已声明视觉 TC/);
+  assert.ok(!f.calls.includes('create_merge_request') && !f.calls.includes('jenkins_trigger_build'));
+
+  const logged = await writeReceipt(receipt, 'visual.reviewed');
+  assert.deepEqual(logged.executionRecord.progress[0].visualAcceptance, receipt);
+  assert.match(f.pages.get(logged.executionRecord.wikiId).markdown_description, /P1-M1-F1-TC2\*\* 通过.*dialog-0\.png/);
+  await f.restart();
+  assert.equal((await f.run(await preview(undefined))).state, 'SUBMITTED');
+  assert.equal(f.calls.filter(name => name === 'jenkins_trigger_build').length, 1);
+});
+
+test('split Git and Jenkins previews gate only the selected visual tests and accept explicit reviewed evidence', async t => {
+  const f = await fixture(t);
+  const { startInput, receipt } = await startVisualPlan(f);
+  const selectedFeatures = visualFeatures.slice(0, 1);
+  const { tapdPlan, visualTests } = await f.planWiki('START', { ...startInput, selectedFeatures });
+  assert.deepEqual(visualTests.map(row => row.testId), [receipt.checks[0].testId]);
+  const merge = { ...f.input.merge, tapdPlan, reviewedFeatures: selectedFeatures };
+  const release = { ...f.input.release, tapdPlan, reviewedFeatures: selectedFeatures, repositoryPath: merge.repositoryPath,
+    expectedSha: source, purpose: merge.purpose, mockSafety: merge.mockSafety, targetBranch: 'develop' };
+  for (const [action, args] of [['merge', merge], ['release', release]]) {
+    await assert.rejects(f.step(action, 'PLAN', args), { code: 'VISUAL_ACCEPTANCE_REQUIRED', message: /P1-M1-F1-TC2$/ });
+    const accepted = { ...args, visualAcceptance: { ...receipt, checks: receipt.checks.slice(0, 1) } };
+    const prepared = await f.step(action, 'PLAN', accepted);
+    assert.equal(prepared.state, 'PREPARED');
+  }
+  assert.ok(!f.calls.includes('create_merge_request') && !f.calls.includes('jenkins_trigger_build'));
+});
+
+test('a failed visual observation after MR merge pauses the build and resumes it once the case passes', async t => {
+  const options = {};
+  const f = await fixture(t, options);
+  const { receipt, writeReceipt } = await startVisualPlan(f);
+  await writeReceipt(receipt, 'visual.passed');
+  const preview = await f.request('PLAN', f.input);
+  options.afterMerge = () => writeReceipt({ ...receipt,
+    checks: [{ ...receipt.checks[1], result: 'FAIL', observation: '验证码发送按钮在窄窗口换行' }],
+  }, 'visual.failed.after.merge');
+  const paused = await f.run(preview);
+  assert.equal(paused.state, 'NEEDS_VISUAL_ACCEPTANCE');
+  assert.match(paused.detail, /待补验.*P1-M2-F1-TC2/);
+  assert.equal(paused.receipts.git.state, 'MERGED');
+  assert.equal(f.calls.filter(name => name === 'merge_merge_request').length, 1);
+  assert.ok(!f.calls.includes('jenkins_trigger_build'));
+  await assert.rejects(f.request('PLAN', { resumePlanId: paused.planId }), /待补验/);
+  await writeReceipt(receipt, 'visual.passed.after.rework');
+  const resumed = await f.request('PLAN', { resumePlanId: paused.planId });
+  assert.equal((await f.run(resumed)).state, 'SUBMITTED');
+  assert.equal(f.calls.filter(name => name === 'merge_merge_request').length, 1);
+  assert.equal(f.calls.filter(name => name === 'jenkins_trigger_build').length, 1);
+});
 
 function secondProjectWithSharedApis(markdown) {
   const start = markdown.indexOf('## P1 '), end = markdown.indexOf('## 执行记录');

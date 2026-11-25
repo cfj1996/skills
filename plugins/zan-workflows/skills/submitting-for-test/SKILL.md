@@ -109,6 +109,8 @@ history do not need another read. Batch independent read-only checks, then
 stop on the first actual mismatch. Never rerun the full Wiki discovery after
 the exact target was identified in `PLAN`.
 
+从正式 Plan 提测时，传已启动的 `tapdPlan`，核对所选功能的[视觉验收回执](../collecting-requirements/references/wiki-storage.md#视觉验收回执)。回执可从记录子页读回，也可按仓库随已审交付清单交接。当前计划、已审代码和所有适用视觉 TC 的通过结果匹配后，才进行 Git 或测试构建交付。
+
 ## Direct submission after developer inspection
 
 Use [直接提测](references/direct-submission.md) when the user asks “直接提测”,

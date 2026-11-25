@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { readAcceptanceReview, validatePlan } from '../skills/collecting-requirements/scripts/validate-plan.mjs';
+import { visualFeatures, withVisualTests } from './helpers/visual-plan-fixture.mjs';
 
 const skill = new URL('../skills/collecting-requirements/', import.meta.url);
 const story = readFileSync(new URL('assets/example-plan.md', skill), 'utf8');
@@ -17,6 +18,20 @@ const replace = (text, from, to) => {
 };
 const bug = readFileSync(new URL('assets/example-bug-plan.md', skill), 'utf8');
 const bugScope = { workspaceId: scope.workspaceId, bugId: '111230010000102' };
+
+test('visual acceptance binds an approved reference and a concrete case to the same selected feature', () => {
+  const layout = withVisualTests(frontend);
+  const { visualTests: cases } = check(layout);
+  assert.deepEqual(cases.map(row => [row.testId, row.uiId, row.featureId, row.projectId]),
+    visualFeatures.map(feature => [feature + '-TC2', feature + '-UI1', feature, 'P1']));
+  assert.match(cases[0].reference, /https:\/\/design.example.test\/import.png/);
+  assert.match(cases[0].passing, /验证码同行/);
+  assert.equal(check(frontend).visualTests, undefined);
+  assert.throws(() => check(layout.replace(/^##### P1-M2-F1-TC2[\s\S]*$/m, '')), /P1-M2-F1-UI1 缺少.*视觉对齐 TC/);
+  assert.throws(() => check(replace(layout, '**对照界面** P1-M1-F1-UI1', '**对照界面** P1-M2-F1-UI1')), /同一功能/);
+  assert.throws(() => check(replace(layout, '[已确认的图一](https://design.example.test/import.png)', '图一')), /可回读的参考链接/);
+  assert.throws(() => check(layout.replace(/^- \*\*通过条件\*\*.*$/gm, '')), /通过条件/);
+});
 
 test('accepts Story and Bug with exact type and string identity, including long IDs', () => {
   assert.ok(check(story).indexes.includes('P2-M1-F1-TC1'));

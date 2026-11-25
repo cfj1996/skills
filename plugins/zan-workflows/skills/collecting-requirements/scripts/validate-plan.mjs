@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isBranchName, isTestBranch } from '../../../scripts/branch-roles.mjs';
 import { repositoryKey, stableJson } from '../../../scripts/workflow-runtime.mjs';
+import { isEvidenceReference } from '../../../scripts/visual-acceptance.mjs';
 
 const indexPattern = /^P[1-9]\d*(?:-D[1-9]\d*|-M[1-9]\d*(?:-F[1-9]\d*(?:-(?:UI|TC)[1-9]\d*)?)?)?$/;
 const depth = { P: 2, D: 3, M: 3, F: 4, UI: 5, TC: 5 };
@@ -250,6 +251,36 @@ function references(node, key, type, nodes) {
   requireFact(ids.length > 0, node.id + ' 请填写' + key + '或无');
   for (const id of ids) requireFact(nodes.get(id)?.type === type, node.id + ' 的' + key + '引用不存在或类型错误：' + id);
   return [...new Set(ids)];
+}
+
+function readVisualTests(nodes) {
+  const declared = new Map();
+  for (const ui of nodes.values()) {
+    if (ui.type !== 'UI' || !nodes.get(ui.parentId).inScope ||
+        !['视觉对照依据', '视觉对齐要点'].some(key => ui.fields.has(key))) continue;
+    const reference = valueOf(ui, '视觉对照依据');
+    const links = [...reference.matchAll(/\[[^\]\n]+\]\(([^)\n]+)\)/g)].map(link => link[1].trim());
+    requireFact(isEvidenceReference(reference) || links.some(isEvidenceReference), ui.id + ' 视觉对照依据须包含可回读的参考链接');
+    declared.set(ui.id, { reference, expectations: valueOf(ui, '视觉对齐要点') });
+  }
+
+  const tests = [];
+  const covered = new Set();
+  for (const tc of nodes.values()) {
+    if (tc.type !== 'TC' || !nodes.get(tc.parentId).inScope ||
+        !(tc.fields.get('验收类型') === '视觉对齐' || tc.fields.has('对照界面'))) continue;
+    valueOf(tc, '验收类型', ['视觉对齐']);
+    const uiId = valueOf(tc, '对照界面');
+    requireFact(declared.has(uiId) && nodes.get(uiId).parentId === tc.parentId,
+      tc.id + ' 须引用同一功能下已声明视觉对照依据和要点的 UI');
+    covered.add(uiId);
+    tests.push({ testId: tc.id, featureId: tc.parentId, projectId: tc.project, uiId, ...declared.get(uiId),
+      precondition: valueOf(tc, '验收前提'), steps: valueOf(tc, '验收步骤'), passing: valueOf(tc, '通过条件') });
+  }
+  for (const uiId of declared.keys()) {
+    requireFact(covered.has(uiId), uiId + ' 缺少同一功能下的视觉对齐 TC');
+  }
+  return tests;
 }
 
 function alignmentStatus(states, inventoryComplete) {
@@ -500,6 +531,7 @@ export function validatePlan(markdown, scope = {}, schema) {
   const { fields, schema: version } = checkInfo(info, scope, isBug, schema);
   schema = version;
   const alignment = checkNodes(nodes, schema);
+  const visualTests = readVisualTests(nodes);
   if (isBug && schema >= 2) {
     const bug = { ...info, id: 'Bug', fields: fieldsOf(info) };
     for (const field of ['复现与实际结果', '预期结果', '定位依据或调查步骤', '修复方向']) valueOf(bug, field);
@@ -519,7 +551,8 @@ export function validatePlan(markdown, scope = {}, schema) {
   const featureProjects = [...nodes.values()].filter(node => node.type === 'P').map(node => ({
     id: node.id, repository: node.fields.get('仓库'), branch: node.fields.get('开发分支'),
   }));
-  return { valid: true, schema, ...(executionStatus === undefined ? {} : { executionStatus }), indexes: [...nodes.keys()], featureIds, featureProjects, alignment, delivery };
+  return { valid: true, schema, ...(executionStatus === undefined ? {} : { executionStatus }), indexes: [...nodes.keys()],
+    featureIds, featureProjects, alignment, delivery, ...(visualTests.length && { visualTests }) };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

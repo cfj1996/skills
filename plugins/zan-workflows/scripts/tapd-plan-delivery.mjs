@@ -6,6 +6,7 @@ import { ensureTestWiki } from '../skills/submitting-for-test/scripts/ensure-tes
 import { runStoryWiki, executionFromPlan } from '../skills/collecting-requirements/scripts/story-execution-wiki.mjs';
 import { isTestDelivery } from './branch-roles.mjs';
 import { repositoryKey, gitScopeKey, sha256, stableJson } from './workflow-runtime.mjs';
+import { checkVisualDelivery } from './visual-acceptance.mjs';
 
 // The caller maps the human's start instruction. This readback proves the
 // selected version and its limits, not that a user has asked to start.
@@ -131,9 +132,10 @@ function checkSelectedFeatures(plan, project, reviewed) {
 }
 
 export function checkPlanBuild(plan, release) {
-  const project = plan.delivery.projects.find(p => matchesRelease(p, release, release.purpose));
-  if (!plan.build || !project) throw new Error('构建与执行 Plan 的仓库、项目/对象、Job、ref、测试通道、参数或目的不一致');
-  checkSelectedFeatures(plan, project, release.reviewedFeatures);
+  const projects = plan.delivery.projects.filter(p => matchesRelease(p, release, release.purpose));
+  if (!plan.build || !projects.length) throw new Error('构建与执行 Plan 的仓库、项目/对象、Job、ref、测试通道、参数或目的不一致');
+  checkSelectedFeatures(plan, projects[0], release.reviewedFeatures);
+  checkVisualDelivery(plan, projects, release, release.sourceRepository);
 }
 
 export function checkPlanMerge(plan, merge, localGit) {
@@ -149,6 +151,7 @@ export function checkPlanMerge(plan, merge, localGit) {
     throw new Error('Git 仓库、源/目标分支、提交推送或合并操作与执行 Plan 不一致');
   }
   for (const p of allowed) checkSelectedFeatures(plan, p, merge.reviewedFeatures);
+  if (merge.mergeMode !== 'VERIFY_ONLY') checkVisualDelivery(plan, allowed, merge, merge.originUrl, merge.sourceSha);
 }
 
 export function checkPlanItem(plan, item, action) {
@@ -207,6 +210,7 @@ export function checkPlanSubmission(plan, submission) {
     if (job ? !matchesRelease(job, release, merge.purpose) : Boolean(release)) {
       throw new Error('该仓所选的测试 Job、构建来源、参数或环境已变化');
     }
+    if (job) checkVisualDelivery(plan, [job], merge, merge.originUrl, merge.sourceSha);
   }
 }
 

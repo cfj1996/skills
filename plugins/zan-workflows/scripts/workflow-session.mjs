@@ -16,7 +16,7 @@ import { performance } from 'node:perf_hooks';
 import { setTimeout as delay } from 'node:timers/promises';
 import { guardRemoteWrites, rejectedWrite, repositoryKey, sha256, stableJson, validateWait, waitForDeadline } from './workflow-runtime.mjs';
 import { sessionRecorder, stageForAction } from './execution-recorder.mjs';
-import { checkPlanBuild, checkPlanMerge, checkPlanItem, checkPriorPlanBuild, missingPlanBuilds, planGitCoverage, planBuildKey, recoverOrRunPlanBuild, recoveredQueueReceipt, verifyPlanTestWiki, readExecutionPlan } from './tapd-plan-delivery.mjs';
+import { checkPlanBuild, checkPlanMerge, checkPlanItem, checkPlanSubmission, checkPriorPlanBuild, missingPlanBuilds, planGitCoverage, planBuildKey, recoverOrRunPlanBuild, recoveredQueueReceipt, verifyPlanTestWiki, readExecutionPlan } from './tapd-plan-delivery.mjs';
 import { publishSubmissionBugRecord, validateReviewedBugRecord } from './submit-bug-record.mjs';
 import { TestSubmissions, recheckAcceptedBuild } from './test-submission.mjs';
 import { createMockInspectionCache } from './mock-revision.mjs';
@@ -244,8 +244,16 @@ export class WorkflowSession {
     if (execute && reference) {
       const rawCall = call;
       const verify = async () => {
-        try { await readExecutionPlan(reference, rawCall('tapd-mcp')); }
-        catch (error) { throw Object.assign(new Error(error.message, { cause: error }), { code: 'PLAN_RECHECK_REQUIRED' }); }
+        try {
+          const plan = await readExecutionPlan(reference, rawCall('tapd-mcp'));
+          if (!plan.visualTests?.length) return;
+          if (approved) checkPlanSubmission(plan, approved.plan);
+          else if (request.action === 'merge') checkPlanMerge(plan, input);
+          else if (request.action === 'release') checkPlanBuild(plan, input);
+        } catch (error) {
+          if (error.code === 'VISUAL_ACCEPTANCE_REQUIRED') throw error;
+          throw Object.assign(new Error(error.message, { cause: error }), { code: 'PLAN_RECHECK_REQUIRED' });
+        }
       };
       io = { ...io, beforePlanWrite: verify };
       call = server => guardRemoteWrites(rawCall(server), verify);

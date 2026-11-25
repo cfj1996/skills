@@ -108,6 +108,10 @@ and covers Shanghai-date titles, same-title work items, legacy titles and
 recovery before a backlink exists.
 That suite also checks execution-record child Wiki creation, inline receipt
 migration, revision and progress recovery, and concurrent record drift.
+For visual acceptance declarations, current-review receipts and Plan delivery
+checks, run `node --test plugins/zan-workflows/tests/story-execution-plan.test.mjs plugins/zan-workflows/tests/continuous-test-submission.test.mjs`.
+The fixtures exercise partial scope, stale receipts and readback before test builds
+using simulated TAPD, GitLab and Jenkins responses.
 Project-local Plan files and TAPD Task creation are retired. Historical Task fixtures
 cover the read-only helper that existing-work continuation still consumes.
 

@@ -83,6 +83,29 @@
 
 同一个实际事件使用同一个回执 ID，内容相同可重放。按[续接位置](../../executing-tapd-plan/references/executing.md#新会话从哪里继续)复核当前证据。启动时的交付选择仍随开工指令传递。只有旧版格式支持原 `executionStatus` 字段。
 
+## 视觉验收回执
+
+按 [视觉对齐用例](plan-format.md#视觉对齐用例)核对实际浏览器画面。独立评审已经核实后，将下列 `visualAcceptance` 随现行 `PROGRESS` 回填，空间、工作项及授权字段沿用普通回填。在交付清单需要携带同一证明时，连续提测传给相应仓库的 `merge.visualAcceptance`，逐项交付传给对应 merge / release 输入。代码指纹使用本轮已审 `mockSafety` 中的 `sourceSha` 和 `contentFingerprint`，可覆盖提交前已经冻结的工作区。
+
+```json
+{
+  "visualAcceptance": {
+    "approvalFingerprint": "<当前 READ 的确认指纹>",
+    "sourceSha": "<本轮 mockSafety.sourceSha>",
+    "contentFingerprint": "<本轮 mockSafety.contentFingerprint>",
+    "reviewEvidence": "codex://threads/independent-review",
+    "checks": [{
+      "testId": "P1-M2-F1-TC2",
+      "result": "PASS",
+      "evidence": "https://evidence.example.test/import-dialog.png",
+      "observation": "说明区、虚线上传框和同行验证码均对齐"
+    }]
+  }
+}
+```
+
+每条用例记录 `PASS`、`FAIL` 或 `UNVERIFIED` 和实际观察。通过项附可读的截图或录屏引用。对同一计划和源码，提测读取子页中该用例最后一条回执。尚未回填的用例可使用本轮独立评审交接的回执。界面变化使现有证据失效时，补验后追加一条新的回执。
+
 ## 未知写入和并发
 
 - SAVE 中断后，将原 SAVE 输入用于只读 `CHECK`。它返回 `CONFIRMED`、`WIKI_VERIFIED_LINK_PENDING`、`WIKI_VERIFIED_RECORD_PENDING` 或 `UNVERIFIED`。正文已核实但缺回链、确认评论、子页或变更生效记录时，使用原 SAVE 恢复。未核实先检查页面身份和原页内容。PROGRESS/CHANGE 中断则 READ 并核验同一编号的完整记录。

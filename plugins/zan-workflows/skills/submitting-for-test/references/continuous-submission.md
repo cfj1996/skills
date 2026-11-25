@@ -89,6 +89,9 @@ Bug 的记录在 Git、所选构建、适用 Wiki 及其独立链接评论核实
 - 出现 `NEEDS_TARGET_REVIEW` 时，核对合并后准确版本的新增依赖/Mock 配置，把 `deliveredSha`、
   `scopeFingerprint`、`contentFingerprint` 和评审来源作为 `targetEvidence`。跨仓追加暂停仓
   的 `sourceRepository`。发 `PLAN {resumePlanId,targetEvidence,decisions}` 后使用新 ID。
+- 出现 `NEEDS_VISUAL_ACCEPTANCE` 时，按返回的用例编号补齐当前计划和代码的
+  [视觉验收回执](../../collecting-requirements/references/wiki-storage.md#视觉验收回执)。
+  将通过回执回填后发 `PLAN {resumePlanId}`，通过后从现有 Git 和构建回执续接。
 - 出现 `AWAITING_MERGE` 时，人工合并完成后发 `PLAN {resumePlanId}`。读回原 MR
   和目标包含关系后沿用同一计划 ID，在真实授权仍适用时继续 EXECUTE。
 - `NEEDS_REPAIR_REVIEW`：尚未发送记录写入。先核实原评论、源码与人员/状态漂移；
