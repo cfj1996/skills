@@ -28,10 +28,15 @@ filesystem, or network write operations.
 
 ## Complete plan review
 
-For `PRE_SUBMISSION_PLAN`, inspect the complete plan once under
+Use `PRE_SUBMISSION_PLAN` for a referred discrepancy or a required independent
+check. Limit the review to that scope under
 [whole-plan review](../references/submission-rules.md#whole-plan-review).
-Require every changed repository's own implementation review and applicable
-cross-repository acceptance. Review the Git/deployment/Wiki/registration bundles,
+Match every changed repository's passing implementation review and applicable
+cross-repository acceptance to the full contents being delivered, including manual
+edits. Reuse current implementation evidence in this plan review. Reopen
+implementation review for missing or stale coverage of delivered behavior under
+[实现评审复用](../../../references/change-consistency.md#实现评审复用).
+For the referred scope inspect the applicable Git/deployment/Wiki/registration bundles,
 their exact authority, prerequisite order, expected old values and permitted
 future-ID derivations together. Apply [Wiki criteria](../../drafting-wiki/agents/wiki-validator.md)
 to the complete prepared body/patch, ownership, preservation and source facts in
@@ -39,11 +44,9 @@ this same invocation; do not demand a pre-existing `VALIDATED` verdict from a
 second agent to start this review. A current independently validated unchanged
 draft may reuse that review instead.
 
-Standalone read-only PLAN may precede human confirmation: inspect the exact
-proposed authority and keep it pending, without rejecting the preview for that
-future approval or treating review as permission. EXECUTE must still receive
-matching real human authority. An orchestrated plan checks its existing complete
-checklist confirmation. Apply Wiki criteria only for STANDARD with a prepared
+Match actual authority to the user's direct execution request and its established
+context, or to the confirmed startup checklist. An explicit preview can be reviewed
+while authority is pending. Apply Wiki criteria only for STANDARD with a prepared
 body; NO_WIKI never loads Wiki capability and a policy skip keeps its own criteria.
 
 For Bugs, require the current independently reviewed complete record draft and
@@ -86,7 +89,11 @@ each repository's code review, explicit human authority or final readbacks.
   TAPD writes require every required Git/deployment gate; reject partial-Bug
   registration.
 - Grouped requirement rows additionally prove the same parent Story and exact
-  selected Task/Plan coverage. Apply the same per-repository and cross-repository
+  selected Task/Plan coverage when Tasks are selected. For a [Story or Bug execution Wiki](../../executing-tapd-plan/references/executing.md),
+  verify its own item's unique execution-page link, current confirmed revision and the immediate/manual start instruction incorporating the matching Git, Wiki and build operations,
+  all selected P/F/TC in the actual reviewed and tested changes, and an empty
+  Task-link set. A Bug still needs the full multi-repository record and review.
+  Apply the same per-repository and cross-repository
   completeness checks without inventing Bug status/records or Task completion.
   A valid dependency-output review does not make a partial collection eligible
   for formal submission.
@@ -94,8 +101,8 @@ each repository's code review, explicit human authority or final readbacks.
   bindings/payload, current re-read facts, purpose, `tool_route`, and authority
   all match. Apply the shared [confirmation reuse](../../../references/execution-checklist.md#执行清单的确认复用):
   from a main entry, accept its complete execution checklist and actual human
-  confirmation after scope comparison; standalone calls require their own
-  exact-plan confirmation. Reject repair-only permission, summaries or true
+  confirmation after scope comparison. A direct submission request covering these
+  operations in context also qualifies. Reject repair-only permission, summaries or true
   flags alone. A technical PLAN state is not grounds to demand a second user
   turn. Derived facts/body completion need validation, not routine reapproval.
 - Browser automation is invalid for GitLab MR, Jenkins, TAPD, Wiki, comment,
@@ -305,7 +312,12 @@ or continuation. For `INITIAL`, require applicable waiting-test/owner/version re
 `CONTINUE` already in `待测试`, require no status/owner/version write and public
 `SKIPPED_ALREADY_WAITING_TEST`. Verify ordering and truthful completed effects.
 
-Return exactly one line:
+Return one private line. During `PRE_SUBMISSION_PLAN`, group distinct actionable
+gaps found in the verified plan so the lead can correct them together. Reuse a
+passing review for the identical plan ID and still-valid evidence. When a draft
+changes, bind the correction review to the new ID and carry forward verified
+coverage of the unchanged items. An uncertain identity or authority blocks
+its dependent writes.
 
 ```text
 验证通过
@@ -314,5 +326,5 @@ Return exactly one line:
 or:
 
 ```text
-验证不通过：<首个具体违例>
+验证不通过：<具体违例及依据>
 ```

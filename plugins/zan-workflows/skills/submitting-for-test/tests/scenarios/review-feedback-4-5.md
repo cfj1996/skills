@@ -35,6 +35,33 @@ queue returns 404. Its exact Job still has a unique matching historical
 advanced while retaining the original delivered commit. Registration is
 `NOT_APPLICABLE`. A re-created temporary file contains identical reviewed bytes.
 
+## C. Standalone submission in an established conversation
+
+The approved Story covers a desktop report and a mobile entry. Both original
+branches, their respective develop targets, commit/push/MR/merge, two specific
+test Jobs, shared test Wiki and Story registration policy are established in
+this conversation. There is no Mock or outstanding mandatory project check.
+Both repositories have current independent implementation passes, matching
+lint/contract and cross-client browser evidence. The user says “提测”.
+Describe the next actions, when to report results and how many additional
+full reviews, lint runs and user confirmations the submission needs.
+
+Consider these separate variations on that same request.
+
+- The user has accepted a nonblocking tab fallback issue with “不用管，记已知问题继续”.
+  The source is unchanged and there is a scoped passing review against that disposition.
+  The initial Wiki draft omits a mobile path already verified in the browser log.
+- A local commit Hook reformats two declaration files in a set of 54. The commit
+  is read back, and the remote source still points at the original SHA.
+- A source MR has a genuine conflict with its test target. Compare an A → C → B
+  resolution already covered by the current authorization with an uncovered
+  resolution requiring a business choice.
+- Replace the user message with “先给我看一下提测计划”. In a separate run, keep
+  “提测” but remove the target selection: both dev and develop are supported.
+- During development the desktop repository is ready while a required mobile
+  integration case has no result. Identify when the lead can report development
+  complete and begin delivery.
+
 ## Evaluator checks
 
 - A resolves the new import in the real app before expanding layout tests.

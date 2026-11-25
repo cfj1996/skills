@@ -300,7 +300,7 @@ function validateReciprocalLinks(itemsByCollection, indexes, errors) {
   }
 }
 
-const { validatePlanTaskBindings } = require('../../breaking-down-requirement/scripts/validate-task-breakdown.js');
+const { validatePlanTaskBindings } = require('../../../scripts/task-readback/validate-task-breakdown.js');
 
 function validatePagePlanModel(model) {
   const errors = [];

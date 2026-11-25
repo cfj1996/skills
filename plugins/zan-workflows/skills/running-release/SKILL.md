@@ -9,6 +9,8 @@ Follow workspace release-safety rules and [tool routing](../../references/tool-r
 Preferred model profile: `CRITICAL`; consult [model routing](../../references/model-routing.md)
 only when model selection is available. No TAPD item is required for a standalone build.
 
+来自[立即或手动执行的 Plan](../executing-tapd-plan/references/execution-context.md)时，用本轮开工指令与已确认项目、对象、测试环境、Job、ref、版本依据、参数、通道和目的核实本次构建。匹配后完成只读预检即触发选定 Job，无需另问一次。
+
 ## Choose the flow first
 
 - **Daily build (default):** a standalone application/project build for a verified

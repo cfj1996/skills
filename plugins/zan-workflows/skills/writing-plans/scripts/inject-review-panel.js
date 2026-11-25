@@ -1674,7 +1674,8 @@
     if (collapsed) return `${handles}${header}`;
     const errorMarkup = state.lastError ? `<p data-review-error>${escape(state.lastError.message)}</p>` : "";
     const evidenceMarkup = evidenceStatus ? `<p data-review-evidence-status>${escape(evidenceStatus.message)}</p>` : "";
-    const savedLabel = state.saveState === "saved" ? "文档已保存" : state.saveState === "pending" ? "内容已确认，等待保存" : "文档未保存";
+    const sessionReview = state.artifactRuleResolution?.status === "session";
+    const savedLabel = sessionReview ? "" : state.saveState === "saved" ? "文档已保存" : state.saveState === "pending" ? "内容已确认，等待保存" : "文档未保存";
     let workflowLabel = state.mode === "reviewing"
       ? "意见已提交，等待 Agent 处理。请回到对话发送“已提交”；页面暂不支持自动唤醒。"
       : state.mode === "result" ? "Agent 已整理本轮意见，请核对拟更新内容后确认保存。"
@@ -1688,6 +1689,7 @@
       ? "保存确认已通知 Agent，等待读取当前确认并写入。"
       : state.mode === "reviewing" ? "意见已提交，已自动通知 Agent，等待处理。" : workflowLabel;
     if (notice?.status === "failed") workflowLabel = "自动通知未确认成功，评审意见仍已保留。请回到对话发送“已提交”或“已确认保存”。";
+    if (sessionReview && state.mode === "result") workflowLabel = "本轮评审结果已就绪，可在会话中核对。";
     const alerts = `<div data-review-alerts>${errorMarkup}${evidenceMarkup}<p data-review-workflow-status>${workflowLabel}</p><span data-review-save-status>${savedLabel}</span></div>`;
     if (!isResultMode && state.cards.length === 0) {
       return `${handles}${header}<div data-review-body>${alerts}<p data-review-empty>本轮没有需要评审的卡片</p></div>`;
@@ -1705,7 +1707,7 @@
       const resultMarkup = result
         ? `<article data-review-result data-result-id="${escape(result.id)}"><div data-review-card-header><h2 data-review-card-title>${escape(result.moduleName || result.id)}</h2>${statusBadgeMarkup(result.conclusion)}</div>${result.summary ? `<p data-result-summary>${escape(result.summary)}</p>` : ""}${result.planChangeSummary ? `<p data-result-plan-change-summary>${escape(result.planChangeSummary)}</p>` : ""}</article>`
         : "<p>没有返回项</p>";
-      const confirmationMarkup = lastResult
+      const confirmationMarkup = lastResult && !sessionReview
         ? `<div data-review-actions><button type="button" data-action="confirm-plan"${state.mode === "confirmed" || confirmationError ? " disabled" : ""}>确认更新 Plan</button>${confirmationError ? `<p data-review-confirm-blocked>${escape(confirmationError.message)}</p>` : ""}</div>`
         : "";
       const resultList = reviewListMarkup(state.results, state.currentResultIndex, "result");
@@ -2209,6 +2211,9 @@
 
   function canonicalizeArtifactRuleResolution(value) {
     if (!isNormalizedObject(value)) return null;
+    if (value.status === "session" && value.source === "conversation") {
+      return { status: "session", source: "conversation" };
+    }
     if (value.status === "resolved" && value.source === "agents") {
       return { status: "resolved", source: "agents" };
     }
@@ -2219,7 +2224,8 @@
   }
 
   function isReviewableArtifactRuleResolution(value) {
-    return (value?.status === "resolved" && value.source === "agents") ||
+    return (value?.status === "session" && value.source === "conversation") ||
+      (value?.status === "resolved" && value.source === "agents") ||
       (value?.status === "unresolved-candidate" && value.source === "candidate");
   }
 

@@ -8,13 +8,13 @@ Reviewing another author's MR alone does not authorize conflict repair.
 
 ## Main-workflow automatic handling
 
-From `fixing-bug`/`developing-requirement`, a complete confirmed execution
+From `fixing-bug`, `developing-requirement` or an immediate/manual `executing-tapd-plan` run, a complete confirmed execution
 checklist may already cover conditional A → C → B resolution: exact A/B,
 repository and purpose, derived C naming/work-location rules, scoped resolution,
 MR creation/merge and verification. After an actual conflict, refresh its
 evidence and calculate exact C/SHAs and the repository-local `.worktrees/`
 path in an internal ACB plan; compare to that authority and proceed without
-another user question. Normal merge authorization without this conditional
+another user question. For remote conflict replacement, first verify the original MR was created by the current operator, using its creation receipt or an exact author/current-user readback. Normal merge authorization without this conditional
 scope is insufficient. Standalone execution uses the confirmation below.
 
 Resolve only the current delivery's conflicts, preserve approved behavior and

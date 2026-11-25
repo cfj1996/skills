@@ -12,10 +12,10 @@ def read(path):
 
 
 class DirectSubmissionFlowTests(unittest.TestCase):
-    def test_requirement_default_still_delivers_after_review(self):
+    def test_planning_stops_at_save_and_delivery_uses_selected_endpoint(self):
         requirement = read('skills/developing-requirement/SKILL.md')
-        self.assertIn('普通“开发”默认 SUBMIT', requirement)
-        self.assertIn('需求清单默认显示“直接提测：是”', requirement)
+        self.assertIn('到落盘结束', requirement)
+        self.assertIn('用户已选择并授权提测', requirement)
         checklist = read('references/execution-checklist.md')
         template = checklist.split('## 完整展示模板\n', 1)[1].split('## 展示顺序与语言', 1)[0]
         self.assertIn('**直接提测：**', template)
@@ -39,12 +39,12 @@ class DirectSubmissionFlowTests(unittest.TestCase):
         metadata = read('skills/submitting-for-test/agents/openai.yaml')
         self.assertIn('display_name: "zan:直接提测"', metadata)
         self.assertIn('$submitting-for-test', metadata)
-        self.assertIn('直接提测不表示跳过构建', metadata)
+        self.assertIn('$submitting-for-test', metadata)
         deployment = read('skills/submitting-for-test/references/deployment-and-confirmation.md')
         skip_row = next(line for line in deployment.splitlines() if line.startswith('| `SKIP` |'))
         self.assertNotIn('直接提测', skip_row)
         self.assertIn('不构建', skip_row)
-        self.assertIn('明确不构建/跳过发布选 `SKIP`', read('skills/fixing-bug/SKILL.md'))
+        self.assertIn('明确不构建/跳过发布选 `SKIP`', read('skills/fixing-bug/references/legacy-execution.md'))
         prompts = json.loads(read('.codex-plugin/plugin.json'))['interface']['defaultPrompt']
         self.assertTrue(any('$submitting-for-test' in prompt and '直接提测' in prompt for prompt in prompts))
 
@@ -58,18 +58,17 @@ class DirectSubmissionFlowTests(unittest.TestCase):
                      '不在直接提测中自动修复业务代码', '不要求重写提交']:
             self.assertIn(rule, flow)
 
-    def test_standalone_checklist_has_exact_delivery_scope_and_one_confirmation(self):
+    def test_standalone_and_orchestrated_entry_use_the_same_execution_and_preview_rules(self):
         flow = read('skills/submitting-for-test/references/direct-submission.md')
-        self.assertIn('实施授权或人工看过代码不能代替准确交付计划的确认', flow)
+        policy_link = '../SKILL.md#提测指令与结果'
+        skill = read('skills/submitting-for-test/SKILL.md')
+        self.assertIn(policy_link, flow)
+        self.assertIn(policy_link, read('skills/submitting-for-test/references/deployment-and-confirmation.md'))
+        self.assertIn('## 提测指令与结果', skill)
+        self.assertIn('PREPARED', skill)
+        self.assertNotIn('是否按以上确定清单执行？', flow)
         self.assertIn('本次明确要求直接提测后重新解析本轮选择', flow)
         self.assertIn('本轮明确的 NO_WIKI/SKIP 仍保留', flow)
-        template = re.search(r'```markdown\n(.*?)\n```', flow, re.S).group(1)
-        markers = ['### 待交付变更', '### 合并与测试环境', '**直接提测：**',
-                   '**合并到测试分支：**', '**是否需要提测 Wiki：**', '**部署测试环境：**',
-                   '**TAPD 状态：**', '### 提测 Wiki 模板预览', '是否按以上确定清单执行？']
-        positions = [template.index(marker) for marker in markers]
-        self.assertEqual(positions, sorted(positions))
-        self.assertEqual(template.count('是否按以上确定清单执行？'), 1)
         self.assertIn('TRIGGER_ACCEPTED', flow)
         self.assertIn('不等待构建完成', flow)
 
@@ -84,7 +83,7 @@ class DirectSubmissionFlowTests(unittest.TestCase):
 
     def test_bug_record_publication_is_a_normal_late_step_not_an_input_exception(self):
         flow = read('skills/submitting-for-test/references/direct-submission.md')
-        record = flow.split('## Bug 修复记录\n', 1)[1].split('## 独立直接提测的确定清单', 1)[0]
+        record = flow.split('## Bug 修复记录\n', 1)[1].split('## 提测结果', 1)[0]
         self.assertIn('已评审的完整草稿即可正常进入 PLAN', record)
         self.assertIn('没有已发表评论不是缺口', record)
         self.assertIn('适用 Wiki/独立回链之后、TAPD 登记之前', record)

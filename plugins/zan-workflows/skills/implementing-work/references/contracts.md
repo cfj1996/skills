@@ -60,18 +60,10 @@ not a new persisted schema or a queue of unrelated work items.
 - A brief contains behavior, exclusions, evidence, ordered steps and verification
   with no material unresolved implementation facts. It reuses the approved
   definition without requiring a formal Plan, Task breakdown or estimate.
-  Formal requirement Task/Plan work retains `TASKS_READY` and complete task
-  checks. Bug work has no requirement-only Task/Plan gates.
+  A confirmed TAPD Plan supplies project, feature and test bindings for this handoff.
 - Verification follows concrete affected risks, including relevant failure paths,
   compatibility and preserved behavior. Scheduling is optional and request-driven.
-- Formal Task handoffs retain current independent estimate-review bindings or
-  verified unchanged historical hours under [effort estimation](../../breaking-down-requirement/references/effort-estimation.md).
-  Scope/total-effort changes reopen only affected assessment and confirmation;
-  internal remaining-work predictions never replace the Task value. Completed
-  code or budget deviation alone neither authorizes effort writes nor proves
-  an estimate was reasonable. User-requested retrospectives reuse actual
-  change/impact/verification evidence, without creating a ledger or judging
-  work-hour truthfulness from patch size.
+- Use existing Task IDs only as scope evidence when the user selected a Task.
 - `REVIEWED` requires the actual repository fingerprint to match the prepared
   definition and the actual current branch to equal the fixed branch.
 - `CREATE` uses only the definition's verified base ref/SHA; missing or changed

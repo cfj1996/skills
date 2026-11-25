@@ -40,6 +40,13 @@ ambiguous case or regression check.
 
 ## 1. Verify the approved input and fixed branch
 
+For a Bug reopened from a [confirmed execution Wiki](../executing-tapd-plan/references/executing.md),
+use the verified Bug page revision as its implementation Plan and the current
+development request as the operation authority. Reconstruct the complete set
+of actual project/branch definitions from current facts before the first edit.
+Apply the same Bug status/owner, independent review and single repair-record
+rules below once for that Bug. A separate save confirmation covers Wiki storage.
+
 Require `READY_FOR_HANDOFF`, confirmed scope, verified project/repository,
 exact branch action `CREATE|USE_EXISTING`, matching current-conversation
 branch/scope authorization, and preparation `VALIDATION_PASSED`.
@@ -78,11 +85,7 @@ Plan. A brief covers behavior, exclusions, current evidence, ordered steps and
 verification. Small changes need no formal Plan, Task creation or estimate;
 existing formal Plan/Task requirements and blockers remain binding.
 
-Formal Task/Plan work follows the [task contract](../breaking-down-requirement/references/contracts.md).
-Require TASKS_READY, exact selected IDs/owners, final estimates, dependencies, acceptance and
-Plan tapdTaskKey links. Reuse current readbacks, estimate review and confirmation; a changed
-owner, total estimate, scope or unmapped step reopens only the affected task preparation.
-Internal remaining-work predictions do not write Task effort, dates or status.
+For TAPD Plan execution retain the confirmed Wiki revision and selected P/M/F/TC. Prior Task IDs, if provided, are read-only scope evidence.
 
 Bug work does not acquire requirement-only Task/Plan gates. Run the following
 once per Bug before any repository's source edits, using the complete approved
@@ -183,7 +186,7 @@ Share a common command across Tasks in this batch and carry its receipt to revie
 Reviewers use the actual diff and outcome for the same inputs. Human edits, a changed
 consumer, command, environment or acceptance condition reopen only affected evidence.
 
-## 4. Review, prepare the final record and return
+## 4. 开发收尾
 
 Compare the final diff with the starting baseline and approved scope. Exclude
 unrelated paths; check removed, moved or disconnected logic against authorized
@@ -196,12 +199,13 @@ goal; an extra behavior needs its own scope basis. Record documentation changes
 needed by later delivery, without requiring a Wiki or writing it in IMPLEMENT.
 For delegated work, the lead reconciles actual task/path changes and verification
 coverage before review. Worker self-checks are evidence, not independent review.
-Use one whole-project review where it covers multiple tasks; parallel read-only
-reviews of stable independent repositories still need integration acceptance.
-
-Give the exact diff, approved scope, Plan/brief, behavior expectations and their
-sources, repository/branch facts, concrete risks and verification results/gaps
-to [change-reviewer](agents/change-reviewer.md) with `POST_CHANGE_REVIEW`.
+Before assigning a reviewer, apply [实现评审复用](../../references/change-consistency.md#实现评审复用).
+Carry forward a current independent pass covering the selected change. Where review
+is due, group the open scope into one `POST_CHANGE_REVIEW` per repository. Supply the
+[change-reviewer](agents/change-reviewer.md) with the full diff, approved Plan/brief,
+repository/branch, behavior expectations and their sources, risks, verification results
+and gaps. Include earlier findings and the affected delta on rework. Independent
+repositories still need their applicable integration acceptance.
 For a specifically approved predecessor-output node, identify that exact purpose
 and provider scope in this review. Obtain independent review of the provider's
 current code and required pre-delivery checks while keeping later integration
@@ -219,8 +223,9 @@ final comment, not a future comment ID/readback; an explicitly scoped predecesso
 review uses the narrow rule above and leaves that complete-comment review pending.
 One independent review covers requirement behavior and
 engineering design/test coupling. Map its private line to
-`REVIEW_PASSED|REVIEW_FAILED|NOT_RUN`, retain a concise reason and discard the raw
-line. If review causes edits, verify and review the affected delta.
+`REVIEW_PASSED|REVIEW_FAILED|NOT_RUN`. Keep the distinct findings in the normalized
+reason and discard the private line. Address related findings together, then verify
+and review the affected delta.
 
 After all required repositories and cross-repository acceptance pass verification
 and review, refresh their source/diff facts; changed evidence reopens only the
@@ -236,7 +241,9 @@ Story/Task has no repair-record obligation.
 Return `REVIEWED` only when repository, branch, scope, verification and review pass.
 For Bugs also require the reviewed record draft; an IMPLEMENT endpoint additionally
 requires its final record readback. Submission-bound `REVIEWED` never requires future comment evidence.
-Otherwise return `BLOCKED` with the actual gap.
+Report 本轮开发完成 for this reviewed scope. An authorized submission continues
+with these receipts in the same turn. Otherwise an incomplete scope returns
+`BLOCKED` with the actual gap.
 Keep one in-memory `ReviewedChange`, or `reviewed_changes` for grouped work,
 paired to definitions by canonical repo/origin/fixed_branch, not array position.
 Each grouped result retains its selected scope and the confirmed required set;

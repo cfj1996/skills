@@ -3,7 +3,7 @@ import unittest
 
 
 PLUGIN_ROOT = Path(__file__).resolve().parents[1]
-FIXING = (PLUGIN_ROOT / "skills/fixing-bug/SKILL.md").read_text()
+FIXING = (PLUGIN_ROOT / "skills/fixing-bug/references/legacy-execution.md").read_text()
 PREPARING = (PLUGIN_ROOT / "skills/preparing-work/SKILL.md").read_text()
 BRANCH_RULES = (PLUGIN_ROOT / "skills/preparing-work/references/collection-and-branch.md").read_text()
 IMPLEMENTING = (PLUGIN_ROOT / "skills/implementing-work/SKILL.md").read_text()
@@ -11,7 +11,7 @@ SUBMITTING = (PLUGIN_ROOT / "skills/submitting-for-test/SKILL.md").read_text()
 DEPLOYMENT = (PLUGIN_ROOT / "skills/submitting-for-test/references/deployment-and-confirmation.md").read_text()
 
 
-class BugFlowStateAndConfirmationTests(unittest.TestCase):
+class LegacyBugFlowStateAndConfirmationTests(unittest.TestCase):
     def test_continue_reuses_branch_and_preserves_waiting_test_owner(self):
         self.assertIn("work_mode=AUTO|INITIAL|CONTINUE", FIXING)
         self.assertIn("不新建“后续修复”分支", FIXING)

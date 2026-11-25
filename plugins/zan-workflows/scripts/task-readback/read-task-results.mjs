@@ -1,6 +1,6 @@
 import rules from './validate-task-breakdown.js';
-import { apiData } from '../../../scripts/register-test-submission.mjs';
-import { totalCount } from '../../submitting-for-test/scripts/ensure-test-wiki.mjs';
+import { apiData } from '../register-test-submission.mjs';
+import { totalCount } from '../../skills/submitting-for-test/scripts/ensure-test-wiki.mjs';
 
 const id = value => typeof value === 'string' && /^\d+$/.test(value);
 // A partial or interrupted batch must be reconciled before the caller chooses

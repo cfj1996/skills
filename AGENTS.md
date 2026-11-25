@@ -47,6 +47,11 @@ manual-edit review refresh and standalone delivery confirmation, run
 `python3 -m unittest discover -s plugins/zan-workflows/tests -p 'test_direct_submission_flow.py'`.
 These checks inspect workflow contracts without external writes.
 
+For contextual direct submission, Wiki-only preflight updates and scoped Hook
+drift, run `node --test plugins/zan-workflows/tests/continuous-test-submission.test.mjs plugins/zan-workflows/tests/mock-revision.test.mjs`.
+Case C in `plugins/zan-workflows/skills/submitting-for-test/tests/scenarios/review-feedback-4-5.md`
+exercises the development closeout and standalone delivery decisions with a read-only evaluator.
+
 For already-delivered test-target containment, disabled-merge read-only delivery,
 stale/missing evidence and workflow-session continuation, run
 `node --test plugins/zan-workflows/tests/test-merge-containment.test.mjs`.
@@ -84,6 +89,26 @@ run `node --test plugins/zan-workflows/tests/git-branch-safety.test.mjs`. These
 tests evaluate the Hook without executing deletion commands and use one
 disposable local Git fixture for `git -C` branch lookup.
 
+For selected project/module/feature scope, pinned revisions between writes, branch-specific Git coverage, independent Job SHA and queue recovery, and Wiki revision/permission recovery, run
+`node --test plugins/zan-workflows/tests/continuous-test-submission.test.mjs plugins/zan-workflows/tests/story-execution-wiki.test.mjs plugins/zan-workflows/tests/mock-safety.test.mjs plugins/zan-workflows/tests/bug-repair-registration.test.mjs`.
+The fixtures use disposable state directories, simulated TAPD/GitLab/Jenkins and no company writes.
+
+For immediate and manual TAPD Plan execution, pinned Wiki revisions, test-only
+and build-only startup, and confirmed A → C → B conflict continuation, run
+`node --test plugins/zan-workflows/tests/continuous-test-submission.test.mjs plugins/zan-workflows/tests/story-execution-plan.test.mjs plugins/zan-workflows/tests/story-execution-wiki.test.mjs`.
+These tests simulate TAPD/GitLab/Jenkins, including multi-project Job selection,
+changed scope and preservation of accepted delivery receipts.
+
+For Story/Bug collection in chat, confirmed TAPD Plan storage, new-session execution
+by Wiki URL and readback-bound progress, run
+`node --test plugins/zan-workflows/tests/story-execution-plan.test.mjs plugins/zan-workflows/tests/story-execution-wiki.test.mjs` and
+`python3 -m unittest discover -s plugins/zan-workflows/tests -p 'test_execution_plan_routing.py'`.
+Both examples use synthetic data. The Wiki suite uses an in-memory TAPD service
+and covers Shanghai-date titles, same-title work items, legacy titles and
+recovery before a backlink exists.
+Project-local Plan files and TAPD Task creation are retired. Historical Task fixtures
+cover the read-only helper that existing-work continuation still consumes.
+
 For requirement task estimates, confirmation fingerprints, exact Task readbacks,
 and Plan-to-Task ownership/coverage checks, run
 `node --test plugins/zan-workflows/tests/task-breakdown.test.mjs`. These tests
@@ -115,6 +140,16 @@ and authorized delivery checks; no page debug controls or company writes are nee
 For prototype intake, tab reuse after an interrupted open, and transfer to a Plan
 panel, use `plugins/zan-workflows/skills/writing-plans/tests/scenarios/review-prototype-tabs.md`
 with a read-only evaluator. All browser inventories and page observations are simulated.
+
+For optional cross-page acceptance paths, ordered UI references and partial starts, run
+`node --test plugins/zan-workflows/tests/story-execution-plan.test.mjs plugins/zan-workflows/tests/story-execution-wiki.test.mjs`.
+The report example uses synthetic data and an in-memory Wiki service. The
+[review fixture](plugins/zan-workflows/skills/collecting-requirements/tests/scenarios/review-report-flow.md)
+and [comparison](plugins/zan-workflows/skills/collecting-requirements/tests/scenarios/report-flow-comparison.md)
+cover the role-based and cross-page approaches on the same observations. For the
+independent review and handoff cases, have one read-only evaluator use the fixture
+with the implementing, executing and submission skills. The cases cover grouped
+findings, unchanged handoff, export-only rework and a shared grid with two consumers.
 
 For the approved pending-merge Wiki patch, shared-page entry isolation,
 permission handoff, readback failure and workflow-session write barriers, run

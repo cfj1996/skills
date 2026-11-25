@@ -38,14 +38,6 @@ const sectionContaining = (markdown, marker) => {
   return nextHeading === -1 ? rest : rest.slice(0, nextHeading + 1);
 };
 
-const visibleLineContaining = (markdown, marker) => {
-  const line = visibleMarkdown(markdown)
-    .split(/\r?\n/)
-    .find((candidate) => candidate.includes(marker));
-  assert.ok(line, `missing visible line: ${marker}`);
-  return line;
-};
-
 const dimensions = [
   "页面定义",
   "URL、路由与参数",
@@ -75,7 +67,6 @@ const genericResourcePaths = [
   "skills/reviewing-page-delivery/references/page-review-standard.md",
   "skills/reviewing-page-delivery/references/status-model.md",
   "skills/reviewing-page-delivery/references/api-contract-stages.md",
-  "skills/reviewing-page-delivery/assets/page-delivery-plan-template.md",
   "skills/reviewing-page-delivery/scripts/inject-review-panel.js",
   "skills/reviewing-page-delivery/scripts/calculate-progress.js",
   "skills/reviewing-page-delivery/scripts/validate-page-plan.js",
@@ -100,7 +91,7 @@ const listDistributableResourcePaths = async () => [
   "skills/reviewing-page-delivery/SKILL.md",
   ...await listFiles("skills/reviewing-page-delivery/scripts"),
   ...await listFiles("skills/reviewing-page-delivery/references"),
-  ...await listFiles("skills/reviewing-page-delivery/assets"),
+
 ];
 
 const semanticGenericResourcePolicy = {
@@ -121,28 +112,16 @@ const semanticGenericResourcePolicy = {
           path: "skills/reviewing-page-delivery/references/status-model.md",
           line: "允许报告本轮评审总数及各结论数量、待复评数量、功能/接口/页面依赖/验收状态数量、任务总数/完成数/验证数和 Draft operation 数量。禁止使用单一页面完成百分比，也不得将不同性质状态折算为页面完成率。",
         },
-        {
-          path: "skills/reviewing-page-delivery/assets/page-delivery-plan-template.md",
-          line: "不得使用页面完成率；不得把不同性质状态折算为单一百分比。",
-        },
       ],
     },
     {
       literal: "默认 Plan 目录",
       occurrences: [
-        {
-          path: "skills/reviewing-page-delivery/assets/page-delivery-plan-template.md",
-          line: "不得使用隐藏 JSON、自动生成 Draft、从 Markdown 解析、插件默认 Plan 目录或插件默认 Draft 目录。",
-        },
       ],
     },
     {
       literal: "默认 Draft 目录",
       occurrences: [
-        {
-          path: "skills/reviewing-page-delivery/assets/page-delivery-plan-template.md",
-          line: "不得使用隐藏 JSON、自动生成 Draft、从 Markdown 解析、插件默认 Plan 目录或插件默认 Draft 目录。",
-        },
       ],
     },
   ],
@@ -190,64 +169,14 @@ test("repository exposes the plugin through the canonical marketplace layout", a
   ]);
 });
 
-test("skill declares the review workflow and required gates", async () => {
-  const skill = visibleMarkdown(await read("skills/reviewing-page-delivery/SKILL.md"));
-  assert.match(skill, /^---\n[\s\S]*name: writing-plans[\s\S]*\n---/);
-  for (const required of [
-    "superpowers:brainstorming",
-    "superpowers:writing-plans",
-    "superpowers:subagent-driven-development",
-    "superpowers:verification-before-completion",
-    "启动确认",
-    "统一提交评审",
-    "确认更新 Plan",
-    "Plan 内容指纹",
-    "in-app 浏览器",
-    "Shadow DOM",
-    "页面或模块",
-    "产物位置规则",
-    "不得提供默认目录",
-    "两道独立门禁",
-  ]) {
-    assert.match(skill, new RegExp(required.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-  }
+test("prototype review hands collection and persistence to their owning skill", async () => {
+  const skill = await read("skills/writing-plans/SKILL.md");
+  assert.match(skill, /collecting-requirements\/SKILL\.md/);
+  assert.match(skill, /会话稿或一份 TAPD Plan/);
+  assert.doesNotMatch(skill, /PLAN_WRITE|create_tasks?\b/);
 });
 
-test("workflow gates have an enforced order and explicit visible prohibitions", async () => {
-  const skill = visibleMarkdown(await read("skills/reviewing-page-delivery/SKILL.md"));
-  const startupConfirmation = skill.indexOf("## 启动确认");
-  const unifiedReview = skill.indexOf("## 统一提交评审");
-  const planConfirmation = skill.indexOf("## 确认更新 Plan");
-  assert.ok(
-    startupConfirmation < unifiedReview && unifiedReview < planConfirmation,
-    "启动确认、统一提交评审、确认更新 Plan 必须按此顺序出现",
-  );
-
-  const locationRules = sectionContaining(skill, "产物位置规则");
-  assert.match(locationRules, /不得提供默认目录/);
-  assert.match(locationRules, /两道独立门禁/);
-  assert.match(visibleLineContaining(skill, "不得生成 Draft"), /不得生成 Draft/);
-  assert.match(
-    visibleLineContaining(skill, "不得在确认前写 Plan"),
-    /不得在确认前写 Plan/,
-  );
-});
-
-test("review behavior discovers project rules before resolving ambiguity and rejects unsafe scope or evidence shortcuts", async () => {
-  const skill = visibleMarkdown(await read("skills/reviewing-page-delivery/SKILL.md"));
-  const standard = await read("skills/reviewing-page-delivery/references/page-review-standard.md");
-  const startup = sectionContaining(skill, "启动确认");
-
-  assert.ok(
-    startup.indexOf("Read applicable `AGENTS.md`") < startup.indexOf("superpowers:brainstorming"),
-    "必须先发现项目规则，再处理未决事项",
-  );
-  assert.match(skill, /拒绝项目级“大 Plan”/);
-  assert.match(standard, /项目级范围.*拒绝/);
-  assert.match(standard, /PRD 与原型.*冲突.*单独识别、报告并等待确认.*不得任选其一/);
-});
-
-test("review references define module contracts, background checks, status groups, and artifact gates", async () => {
+test("review references define module contracts, evidence and status groups", async () => {
   const standard = await read("skills/reviewing-page-delivery/references/page-review-standard.md");
   const statusModel = await read("skills/reviewing-page-delivery/references/status-model.md");
   const apiStages = await read("skills/reviewing-page-delivery/references/api-contract-stages.md");
@@ -258,10 +187,7 @@ test("review references define module contracts, background checks, status group
     "questions", "change", "revision", "父模块", "内部实现",
   ]) assert.match(standard, new RegExp(field));
   for (const rule of [
-    "证据优先级", "项目规范发现", "首次全量", "后续复评", "两阶段确认", "展示冲突",
-    "一次确认", "AGENTS.md", "不得提供默认目录", "ReviewSession", "dimension",
     "sourceEvidence", "reviewGoal", "regionAndComponents", "interactionStates",
-    "浏览器可信点击", "dispatchEvent", "重复消费",
   ]) assert.match(standard, new RegExp(rule));
   for (const status of statuses) assert.match(statusModel, new RegExp(status));
   assert.match(statusModel, /页面完成百分比/);
@@ -276,7 +202,6 @@ test("API review is gated by consumer needs and never assigns an API to a page o
   const skill = visibleMarkdown(await read("skills/reviewing-page-delivery/SKILL.md"));
   const standard = await read("skills/reviewing-page-delivery/references/page-review-standard.md");
   const apiStages = await read("skills/reviewing-page-delivery/references/api-contract-stages.md");
-  const template = await read("skills/reviewing-page-delivery/assets/page-delivery-plan-template.md");
   const scenario = await readFile(
     path.join(testDir, "scenarios", "review-app-shell-current-user.md"),
     "utf8",
@@ -297,12 +222,6 @@ test("API review is gated by consumer needs and never assigns an API to a page o
   assert.match(apiStages, /“不涉及接口”[\s\S]*具体消费需求/);
   assert.match(apiStages, /不得[\s\S]*页面[\s\S]*模块[\s\S]*接口归属/);
   assert.match(standard, /应用壳层[\s\S]*跨页面[\s\S]*会话级/);
-  assert.match(template, /^## 消费需求与运行时依赖$/m);
-  assert.match(template, /API 需求：`<required\/none>`/);
-  assert.match(template, /能力归属：/);
-  assert.match(template, /运行时范围：/);
-  assert.match(template, /本次交付关系：`<直接消费\/继承依赖\/契约变更>`/);
-  assert.match(template, /继承依赖[\s\S]*不得制造实施任务/);
 
   assert.match(scenario, /Layout 用户区/);
   assert.match(scenario, /首页内容区/);
@@ -324,11 +243,10 @@ test("API consumer evidence stays inside module cards without forcing one card p
 });
 
 test("module behavior and implementation readiness are independent while ready contracts remain evidence-backed", async () => {
-  const [skill, standard, runtime, template] = await Promise.all([
+  const [skill, standard, runtime] = await Promise.all([
     read("skills/reviewing-page-delivery/SKILL.md"),
     read("skills/reviewing-page-delivery/references/page-review-standard.md"),
     read("skills/reviewing-page-delivery/references/feature-review-runtime.md"),
-    read("skills/reviewing-page-delivery/assets/page-delivery-plan-template.md"),
   ]);
 
   for (const required of [
@@ -356,14 +274,11 @@ test("module behavior and implementation readiness are independent while ready c
   assert.doesNotMatch(runtime, /非阻塞结论不可选择/);
   assert.match(runtime, /四块|4\s*块/);
   assert.match(runtime, /折叠|展开/);
-  assert.match(template, /一句话实施方案.*怎么实现.*怎么联动.*数据怎么走.*怎么验收.*实现依据/s);
-  assert.match(template, /implementationPlan\.status.*ready/s);
 });
 
 test("module review schema and normalized Plan preserve hierarchy, revisions, and separate conclusions", async () => {
-  const [standard, template, status] = await Promise.all([
+  const [standard, status] = await Promise.all([
     read("skills/reviewing-page-delivery/references/page-review-standard.md"),
-    read("skills/reviewing-page-delivery/assets/page-delivery-plan-template.md"),
     read("skills/reviewing-page-delivery/references/status-model.md"),
   ]);
   assert.match(standard, /ReviewSession.*schemaVersion=3/s);
@@ -377,7 +292,6 @@ test("module review schema and normalized Plan preserve hierarchy, revisions, an
     assert.match(standard, new RegExp(field));
   }
   assert.match(standard, /不得悬空、自引用或形成环/);
-  assert.match(template, /需求结论、外部依赖就绪及本轮执行授权分别判断/);
   assert.match(status, /需求已确认 · 实现方案待补充 · 评审记录已保存/);
 });
 
@@ -398,17 +312,10 @@ test("dialogue additions use the session update API without losing input or revi
   assert.match(additions, /进入或退出 removed.*递增并重开/s);
 });
 
-test("saving requires file readback and a submission-bound receipt after trusted confirmation", async () => {
-  const runtime = await read("skills/reviewing-page-delivery/references/feature-review-runtime.md");
-  const saving = sectionContaining(runtime, "## 确认与回写");
-  for (const required of ["confirmPlan", "已确认，待保存", "markPlanSaved", "savedPlanFingerprint", "submissionId", "artifactRuleFingerprint", "读回"])
-    assert.match(saving, new RegExp(required));
-  assert.ok(saving.indexOf("confirmPlan") < saving.indexOf("markPlanSaved"));
-  assert.match(saving, /不执行磁盘 I\/O/);
-  assert.match(saving, /未经 confirmPlan、身份或指纹不匹配时必须拒绝/);
-  assert.match(runtime, /提交成功必须有可见反馈/);
-  assert.match(saving, /plan-confirm-requested.*收到通知仍执行本节全部\s*校验/s);
-  assert.match(runtime, /不能把已入队显示成 Agent 已开始处理/);
+test("panel results hand off to collection for the actual Wiki save", async () => {
+  const runtime = await read("skills/writing-plans/references/feature-review-runtime.md");
+  assert.match(sectionContaining(runtime, "## 交回收集"), /collecting-requirements\/SKILL\.md/);
+  assert.doesNotMatch(runtime, /进入 PLAN_WRITE|Agent 才能写入适用 Agent 文件/);
 });
 
 test("automatic notifications bind a temporary local bridge and never replace submission or confirmation evidence", async () => {
@@ -421,7 +328,7 @@ test("automatic notifications bind a temporary local bridge and never replace su
     "connection.connected === true", "review-submitted", "plan-confirm-requested",
     "exportSubmission()", "getPlanConfirmationRequest()",
   ]) assert.ok(bridge.includes(required), `missing bridge protocol: ${required}`);
-  assert.match(skill, /默认连接/);
+  assert.match(skill, /功能评审运行协议/);
   assert.match(bridge, /禁止进入 ReviewSession、state、draft、\s*submission/);
   assert.match(bridge, /网页不能指定消息正文、目标任务或命令/);
   assert.match(bridge, /旧通知丢弃/);
@@ -440,86 +347,10 @@ test("automatic notifications bind a temporary local bridge and never replace su
   assert.match(wait, /普通交回用户等待操作时保留进程/);
 });
 
-test("artifact-location candidates allow scope review while formal writes require confirmed rules", async () => {
-  const skill = visibleMarkdown(await read("skills/reviewing-page-delivery/SKILL.md"));
-  const standard = await read("skills/reviewing-page-delivery/references/page-review-standard.md");
-  const runtime = await read("skills/reviewing-page-delivery/references/feature-review-runtime.md");
-  for (const document of [skill, standard]) {
-    assert.match(document, /SCOPE_REVIEW[\s\S]*unresolved-candidate[\s\S]*source=candidate/);
-    assert.match(document, /PLAN_WRITE[\s\S]*(?:已授权目录规则写入|用户确认完整候选)[\s\S]*固化至最近适用公共作用域[\s\S]*重新读取[\s\S]*唯一解析/);
-    assert.match(document, /(?:不提前写规则|不得提前固化)/);
-  }
-  assert.match(runtime, /已有提交[\s\S]*reviewing[\s\S]*result[\s\S]*reviewRound \+ 1/);
-  assert.match(runtime, /旧提交、结果、确认请求及保存状态全部失效/);
-  assert.match(runtime, /不得用旧 `resumeSubmission`/);
-});
-
-test("a complete artifact candidate is evidence-filled before confirmation but remains unofficial", async () => {
-  const skill = visibleMarkdown(await read("skills/reviewing-page-delivery/SKILL.md"));
-  const locationSection = sectionContaining(skill, "产物位置规则");
-  assert.match(locationSection, /只读证据/);
-  assert.match(locationSection, /填充.*候选值/);
-  assert.match(locationSection, /展示.*完整候选/);
-  assert.match(locationSection, /范围评审中指定目录不得提前固化/);
-  assert.match(locationSection, /候选状态只能评审范围，不能确认更新 Plan 或保存/);
-  assert.doesNotMatch(locationSection, /Do not fill in any field value until the project confirms it/);
-});
-
-test("plan template keeps stable human-readable sections and prohibits unsafe defaults", async () => {
-  const template = await read("skills/reviewing-page-delivery/assets/page-delivery-plan-template.md");
-  for (const section of [
-    "模块范围与本次变更", "页面定义", "路由与参数", "功能模块与行为契约", "组件与功能实现方案", "UI 与交互状态",
-    "外部数据与依赖", "API 契约关联", "Mock 标识与交付限制", "权限与安全", "页面依赖", "实施任务", "验收步骤与证据", "评审批次",
-    "客观统计", "遗留问题",
-  ]) assert.match(template, new RegExp(`^## .*${section}`, "m"));
-  for (const required of [
-    "交付单元类型：页面/模块", "deliveryUnit.kind", "产物位置规则来源", "稳定编号", "关联",
-    "双向关联", "Plan 内容指纹", "产物位置规则指纹", "冲突检查", "一个页面或一个内聚功能模块对应一个 Plan",
-  ]) assert.match(template, new RegExp(required.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-  for (const forbidden of [
-    "页面完成率", "隐藏 JSON", "自动生成 Draft", "从 Markdown 解析", "插件默认 Plan 目录", "插件默认 Draft 目录",
-  ]) assert.match(template, new RegExp(`不得.*${forbidden}`));
-});
-
-test("plan template validates declared bidirectional links without inventing tasks for inherited APIs", async () => {
-  const template = await read("skills/reviewing-page-delivery/assets/page-delivery-plan-template.md");
-  const lineWith = (id) => template.split(/\r?\n/).find((line) => line.startsWith(`- \`${id}\``));
-
-  for (const [id, expected] of [
-    ["F-001", "双向关联：`<API-001, T-001>`"],
-    ["API-001", "双向关联功能：`<F-001>`；可选双向关联任务：`<T-001>`"],
-    ["T-001", "双向关联：`<F-001, API-001>`"],
-  ]) assert.match(lineWith(id), new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-
-  for (const id of [
-    "PAGE-001", "ROUTE-001", "DESIGN-001", "UI-001", "MOCK-001", "SEC-001",
-    "DEP-001", "AC-001", "E-001", "RR-001", "ISSUE-001",
-  ]) {
-    const line = lineWith(id);
-    assert.match(line, /关联：/);
-    assert.doesNotMatch(line, /双向关联：/);
-  }
-  assert.match(template, /所有已声明的功能点↔API、功能点↔任务、API↔任务双向关联/);
-  assert.match(template, /继承依赖.*不要求 API↔任务关联/);
-});
-
-test("template keeps no-API decisions on consumers instead of inventing API records", async () => {
-  const template = await read("skills/reviewing-page-delivery/assets/page-delivery-plan-template.md");
-  assert.match(template, /API-001.*状态：`<证据确认后从接口固定状态集合选择>`/);
-  assert.match(template, /DEP-001.*状态：`<证据确认后从页面依赖固定状态集合选择>`/);
-  assert.match(template, /API 需求：`<required\/none>`/);
-  assert.match(template, /不存在接口实体时不得创建状态为“不涉及接口”的 API 记录/);
-  assert.match(template, /`none` 必须有 API 判断证据/);
-  assert.match(template, /“不涉及”状态必须有不适用证据/);
-  assert.doesNotMatch(template, /API-001.*状态：`不涉及接口`/);
-  assert.doesNotMatch(template, /DEP-001.*状态：`不涉及`/);
-});
-
 test("documentation status terms match the validator and generic assets contain no project defaults", async () => {
   const content = (await Promise.all(genericResourcePaths.map(read))).join("\n");
   const statusTerms = Object.values(STATUS_MODEL).flat();
   for (const status of statusTerms) assert.match(content, new RegExp(status));
-  assert.match(content, /不得提供默认目录|不得使用插件默认目录/);
   assert.doesNotMatch(
     content,
     /Vantix|@zan\/ui-vue3|Element Plus|UnoCSS|仓配|\/Users\/cfj\/projects\/vantix|product\/plans\/|engineering\/implementation-plans\/|api\/drafts\/|contracts\/openapi\//i,
@@ -572,7 +403,6 @@ test("generic resource scanner covers distributable resources and excludes test 
     "skills/reviewing-page-delivery/references/page-review-standard.md",
     "skills/reviewing-page-delivery/references/status-model.md",
     "skills/reviewing-page-delivery/references/api-contract-stages.md",
-    "skills/reviewing-page-delivery/assets/page-delivery-plan-template.md",
     "skills/reviewing-page-delivery/scripts/inject-review-panel.js",
     "skills/reviewing-page-delivery/scripts/calculate-progress.js",
     "skills/reviewing-page-delivery/scripts/validate-page-plan.js",
@@ -589,14 +419,8 @@ test("skill links its detailed references without duplicating them", async () =>
   const skill = visibleMarkdown(await read("skills/reviewing-page-delivery/SKILL.md"));
   for (const resource of [
     "references/page-review-standard.md", "references/status-model.md", "references/api-contract-stages.md",
-    "assets/page-delivery-plan-template.md",
   ]) assert.match(skill, new RegExp(resource.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-  assert.match(skill, /Plan 路径模式/);
-  assert.match(skill, /Draft OpenAPI 路径模式/);
-  assert.match(skill, /交付单元命名/);
-  assert.match(skill, /编号规则/);
-  assert.match(skill, /路径变量/);
-  assert.match(skill, /既有文件/);
+  assert.match(skill, /需求收集/);
 });
 
 test("Zan plugin exposes the migrated skill alongside its existing skills", async () => {
@@ -617,7 +441,7 @@ test("generic core does not hardcode the acceptance project", async () => {
 
 test("skill root follows the standard skill layout", async () => {
   const yaml = await readFile(path.join(skillRoot, "agents", "openai.yaml"), "utf8");
-  assert.match(yaml, /display_name:\s*"zan:可视化编写计划"/);
+  assert.match(yaml, /display_name:\s*"zan:原型评审"/);
   assert.match(yaml, /\$writing-plans/);
 });
 

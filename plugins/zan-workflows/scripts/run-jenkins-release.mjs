@@ -300,6 +300,11 @@ export async function runJenkinsRelease(call, reader, input, io = {}) {
   }
   result.jobBindingMode = jobBindingMode;
   result.jobAdapter = input.jobAdapter;
+  if (input.jobAdapter === 'npm-tools-v1') {
+    result.pipelineBodyHash = input.pipelineBodyHash;
+    result.pipelineSource = input.pipelineSource;
+    result.releaseScope = input.releaseScope;
+  }
   result.versionStrategy = input.versionStrategy || 'EXPLICIT';
   result.completionMode = completionMode;
   let phase = 'TRIGGER';

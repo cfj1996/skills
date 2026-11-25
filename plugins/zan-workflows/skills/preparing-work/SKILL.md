@@ -37,6 +37,8 @@ when the intake actually lacks several shared item/branch facts. A COLLECTED res
 has no authority to edit code or create a branch. An outdated tracking ref still needs
 refresh; scope, remote base, working location and authorization must be verified.
 
+来自[执行中的 TAPD Plan](../executing-tapd-plan/references/execution-context.md)时，复用本轮指令引用的项目、工作位置、分支动作、基准与目的。核实当前远端和工作区后，按已选位置创建或复用分支。
+
 ## Inputs
 
 Accept exactly one TAPD URL plus optional hard constraints:

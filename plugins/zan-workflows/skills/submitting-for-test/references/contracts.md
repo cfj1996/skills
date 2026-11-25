@@ -3,9 +3,9 @@
 `TestSubmissionResult` is an in-memory handoff to optional `going-live`.
 
 `submission_phase=PLAN` returns an in-memory `PlannedTestSubmission` with the
-complete `SubmissionPlan` (visible for standalone confirmation or material changes), bound-fact fingerprint, exact
+complete `SubmissionPlan` for internal review or a requested preview, bound-fact fingerprint, exact
 `STANDARD|NO_WIKI`, resolved `DEPLOY|SKIP`, and
-`terminal_state=AWAITING_CONFIRMATION`. It has effects `NONE` and is not a
+`terminal_state=PREPARED`. It has effects `NONE` and is not a
 `TestSubmissionResult`.
 
 ## Required content
@@ -14,7 +14,7 @@ complete `SubmissionPlan` (visible for standalone confirmation or material chang
 | --- | --- |
 | Inputs | one source definition/reviewed change pair, one Bug's or one verified Story/selected Tasks' `work_definitions`/`reviewed_changes` collections matched by canonical repository/root, origin and fixed branch; shared Bug identity and reviewed repair-record draft only for Bugs, or exact parent/selected Task/Plan coverage for requirements; all required repository evidence; `INITIAL|CONTINUE`, exact Wiki profile, and `AUTO|DEPLOY|SKIP` deployment mode |
 | Repository | expected/actual path, Git root, origin, verification result |
-| Authorization | complete execution checklist and actual human confirmation from a main entry, or the standalone plan's own confirmation; current scope-coverage comparison, exact technical plan/bound facts, deterministic derivations, and any reauthorization reason |
+| Authorization | current human submission instruction with its established context or matching startup confirmation, comparison to the exact operations and targets, allowed derivations and any uncovered decisions |
 | Mock safety | per-repository current source/diff-bound inspection and same Plan/brief inventory; explicit evidenced no-Mock or exact MOCK-* scope and matching human test authorization for target environment/branch/Job, purpose and selected writes; stale/missing evidence blocks; preserve real acceptance gaps in result/Wiki |
 | Git delivery | per repository: original source branch/SHA, exact verified test target and remote default branch, current-round commits, commit/push/MR/merge results, actual-target containment |
 | Conflict handoff | when A → C → B was used, exact ConflictMergeHandoff including original A/B, C MR/revisions/containment, temporary resources, upfront cleanup authority, latest retention policy and per-resource cleanup/deferred outcome; retain it even if C is absent |
@@ -25,7 +25,7 @@ complete `SubmissionPlan` (visible for standalone confirmation or material chang
 | TAPD | exact status action, waiting-test owner and source (`te` or `reporter`) for Bug transitions, owner write/readback result, exact `Bug|Story|Task` Wiki-link result when applicable, duplicate/conflict evidence, and write/readback results |
 | Bug repair record | Bug only: shared reviewed draft/authority, late publication or safe reuse after all Git/deployment and applicable Wiki/link gates; execution `prerequisites.repairRecord={commentId, author, bodySha256}` from the actual raw HTML readback; the registration executor freshly verifies that exact comment and returns its verified identity before registration; independent of the Wiki-link comment |
 | Test version | `WRITTEN|SKIPPED_ALREADY_WAITING_TEST|BLOCKED|NOT_ATTEMPTED`, structured payload and readback when written |
-| Validation | one mapped complete-plan review including Wiki, each executor's immediate prerequisite/readback checks, scoped review for material changes, and the lead's final receipt check |
+| Validation | one lead check of the prepared operations and Wiki, current per-write prerequisites and receipts, targeted review for material deltas or project requirements |
 | Terminal | `SUBMITTED|BLOCKED` and blocker when applicable |
 
 ## Direct-submission continuation
@@ -34,8 +34,8 @@ Apply [direct-submission.md](direct-submission.md) for independently requested
 existing-change delivery. Reuse original scope/branches and still-current
 verification/review; refresh invalidated checks and independent review after
 human edits. A previous IMPLEMENT endpoint is not this new request's deployment
-choice or delivery authority. “直接提测” does not imply SKIP. Show the actual
-standalone delivery checklist and obtain its matching confirmation before writes;
+choice or delivery authority. “直接提测” does not imply SKIP. Match this request
+and its context to the actual delivery plan and execute after the lead verifies the prepared operations;
 never rerun business implementation or invent a missing READY/REVIEWED handoff.
 
 ## Invariants
@@ -68,19 +68,18 @@ never rerun business implementation or invent a missing READY/REVIEWED handoff.
   repeated writes. Unchanged approvals and deterministic receipts retain their
   original reuse rules.
 - `PLAN` performs no commit, push, MR, deployment, Wiki, TAPD, status or test
-  version write. Its `AWAITING_CONFIRMATION` result is a read-only technical
-  preview. A standalone call displays it and waits for its own human approval.
-  In a main workflow, the orchestrator may immediately consume existing matching
-  complete execution-checklist authority and proceed without another user turn.
+  version write. Its `PREPARED` result is internal to a delivery request.
+  Both entry points proceed in the same turn once the current human instruction
+  covers the prepared plan and the source review is current. Preview-only requests stop at PLAN.
 - `EXECUTE` requires the exact current `PlannedTestSubmission` and either that
-  confirmed complete execution checklist or a matching standalone confirmation.
+  confirmed complete execution checklist or a matching direct execution request.
   Apply [confirmation reuse](../../../references/execution-checklist.md#执行清单的确认复用);
   repair-only authorization, completion, an old summary or a true flag alone
   cannot establish submission authority. No new runtime state/model is needed.
 
 - `SUBMITTED` requires every necessary repository's matching upstream inputs,
-  exact repository/original source and confirmed test target, passing
-  authorization, an independent complete-plan review,
+  exact repository/original source and confirmed test target, matching authority
+  and verified delivery operations,
   immediate prerequisite checks/readbacks for every executed write, and containment of all current-round
   commits in that repository's exact remote target. Bind the repository's
   confirmed target as `testBranch` when calling the standalone merge executor.
@@ -107,7 +106,12 @@ never rerun business implementation or invent a missing READY/REVIEWED handoff.
   real human authority, not a title/summary or true flag. Technical PLAN/results
   are its structured views. Grouped requirements retain the same completeness
   and dependency checks as grouped Bugs, but use the verified parent Story and
-  selected Task scope with no Bug repair record or state/owner transition. Final
+  selected Task scope with no Bug repair record or state/owner transition. The
+  [execution Wiki source](../../executing-tapd-plan/references/executing.md)
+  supplies its verified Story or Bug page, current confirmed revision and selected
+  P/F/TC with a complete reviewed set and no Task links. Wiki-based Bugs retain
+  the shared draft, actual prior comment evidence when available, and every
+  required repository's current verification and review. Final
   registration acts only on the exact applicable targets/policies in that plan.
   A planned predecessor may have already produced a real package/test service;
   its partial review/output is dependency evidence, not formal submission input
@@ -132,7 +136,7 @@ never rerun business implementation or invent a missing READY/REVIEWED handoff.
   merge and safety checks trigger that unchanged scope without another prompt.
   User retention revokes the affected deletion authority and survives go-live.
   Preserve exact related-branch association and cleanup outcomes in the handoff.
-- One displayed `GIT_DELIVERY_BUNDLE` included in the complete-plan review covers that
+- One verified `GIT_DELIVERY_BUNDLE` in the prepared plan covers that
   unchanged sequence; internal fresh checks/readbacks remain mandatory without
   per-step Agent validators. The merge executor supplies the actual delivered
   merge revision and observed target tip; deployment must not confuse the

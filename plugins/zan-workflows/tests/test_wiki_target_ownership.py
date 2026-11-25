@@ -4,7 +4,7 @@ import unittest
 
 
 PLUGIN_ROOT = Path(__file__).resolve().parents[1]
-FIXING = (PLUGIN_ROOT / "skills/fixing-bug/SKILL.md").read_text()
+FIXING = (PLUGIN_ROOT / "skills/fixing-bug/references/legacy-execution.md").read_text()
 FIXING_CONTRACT = (
     PLUGIN_ROOT / "skills/fixing-bug/references/contracts.md"
 ).read_text()
@@ -39,7 +39,7 @@ PROJECT_RELATIONS = (
 
 
 class WikiTargetOwnershipTests(unittest.TestCase):
-    def test_fixing_bug_never_requires_user_wiki_target(self):
+    def test_legacy_bug_submission_never_requires_user_test_wiki_target(self):
         self.assertNotIn("target_wiki_url", FIXING + FIXING_CONTRACT)
         self.assertIn("不向用户索要 Wiki URL", FIXING)
         self.assertIn("缺少用户提供的 Wiki URL 不阻塞预检", FIXING_CONTRACT)

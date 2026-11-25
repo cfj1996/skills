@@ -7,42 +7,37 @@ Prepare one consolidated authorization using
 external write inside that unchanged authorized plan:
 
 1. The main execution checklist has confirmed the operation/target/purpose
-   and allowed derivations, or the standalone plan has confirmed the exact
-   payload. Calculate and validate the current exact bindings before writing;
+   and allowed derivations, or the user's direct execution request and its
+   established context cover them. Calculate and validate the current exact bindings before writing;
    do not repeat user display/approval or broad discovery for each operation.
 2. Re-read only the mutable facts for this specific write immediately before
    execution. Reuse the consolidated authorization when they still match;
    stop stale bindings and refresh the accurate plan when needed. Reuse
    authority for permitted technical derivations; material scope/operation
    changes need fresh approval.
-3. Require the complete plan's independent review below, then let the owning
-   executor check this operation's actual prerequisites and read its result
-   back before proceeding. Do not start another Agent for unchanged inputs.
+3. The lead matches the prepared plan to the authorized scope and upstream reviews.
+   The owning executor verifies current prerequisites and reads back the result of each write.
 
 ## Whole-plan review
 
-Pass the latest business decisions with the plan, including any resolved configuration conflict.
-For continuous submission, bind the independent result to the returned planId. A result for a
-superseded plan cannot release the current one. When only the Wiki changes, review its owner,
-target and patch against the preserved Git/build receipts.
+For ordinary test delivery the lead checks the exact operation set once. Current
+independent implementation review covers the code. Git, MR/CI, Jenkins, Wiki
+and registration each have a concrete target and receipt to verify. A routine
+submission adds zero independent review calls and zero repeat business tests.
+Under STANDARD validate the Wiki owner, preservation of other entries and its
+claims against the existing verification. Under NO_WIKI skip its operations.
 
-Before the first delivery write, give the complete `SubmissionPlan` to the
-private submission validator once with `PRE_SUBMISSION_PLAN`: all repository
-reviews, authority, Git actions, exact deployment selections, complete Wiki
-body/patch and ownership evidence, the Bug's reviewed final record draft and
-late create/reuse action, and registration preview. Under STANDARD,
-include the Wiki validator's criteria in this same review; NO_WIKI loads no
-Wiki capability. A prepared draft is not yet
-`VALIDATED`. Map a passing review to the plan and its Wiki validation together.
-An independently validated unchanged draft may instead reuse its existing
-review; do not review that document again merely to change phases.
-Standalone PLAN can be reviewed with its proposed human authority pending;
-only the later matching real confirmation permits EXECUTE. An orchestrator
-instead verifies its already-confirmed complete checklist. Review is not approval.
-Bug publication is a future execution effect, not a REVIEWED/PLAN prerequisite.
-Review its complete proposed body and single-write timing after Git/deployment
-and applicable Wiki/link gates, before registration. All current code reviews,
-required repositories and agreed acceptance still must pass before delivery.
+Keep the user's direct submission instruction or startup authorization attached
+to the exact prepared plan ID. An explicit preview stops here. A matching
+execution request continues in the same turn.
+
+Refer a specific unresolved material delta or an explicitly required independent
+check to the relevant reviewer. For a conflict resolution or a post-review edit,
+verify the affected code, consumers and tests. For a Wiki omission, check the
+corrected entry and its evidence. If an observation is missing, run just that
+scenario. Record a user-accepted nonblocking limitation as a known issue. A
+previous failed implementation review must have its outstanding finding resolved
+against the current accepted scope. Keep project-mandated checks and approvals.
 
 Future commit/MR/queue/Wiki identifiers are unknown at planning time. Review
 their exact derivation and dependency rules, never invent successful receipts.
@@ -53,8 +48,7 @@ effect stops dependent steps immediately, not at the final summary.
 At the end the lead checks all actual receipts once using `POST_WRITE`'s
 criteria. This is a deterministic result check, not another routine private
 Agent call. A material plan/body semantic change, unreviewed diff, conflict
-resolution or ambiguous receipt needs scoped independent review; one initial
-review is not a limit on necessary later reviews. Standalone individual actions
+resolution or ambiguous receipt needs scoped independent review; resolve only the affected scope. Standalone individual actions
 may still use `PRE_GIT_WRITE|PRE_SUBMISSION_WRITE|POST_WRITE` for their exact scope.
 Do not use them in addition to an unchanged complete plan review.
 

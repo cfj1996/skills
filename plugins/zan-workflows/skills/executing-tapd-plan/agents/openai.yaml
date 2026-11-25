@@ -1,0 +1,7 @@
+interface:
+  display_name: "zan:执行 TAPD Plan"
+  short_description: "按 TAPD Plan 立即或手动开工，沿用已确认的分支、提测和构建选项"
+  default_prompt: "使用 $executing-tapd-plan 执行这份 TAPD Plan，从首个可执行的未完成项开始。"
+
+policy:
+  allow_implicit_invocation: true

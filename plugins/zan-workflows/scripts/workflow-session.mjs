@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { McpClientPool } from './mcp-client.mjs';
 import { configuredJenkinsReader } from './jenkins-readonly.mjs';
 import { mergeReviewedBranch } from './merge-reviewed-branch.mjs';
-import { runJenkinsRelease } from './run-jenkins-release.mjs';
+import { runJenkinsRelease, checkReleaseSource } from './run-jenkins-release.mjs';
 import { registerTestSubmission } from './register-test-submission.mjs';
 import { checkLocalCloseout } from './check-local-closeout.mjs';
 import { ensureTestWiki } from '../skills/submitting-for-test/scripts/ensure-test-wiki.mjs';
@@ -14,14 +14,16 @@ import { resolveJenkinsJob } from './resolve-jenkins-job.mjs';
 import { markPendingMergeWiki, validatePendingWikiPlan } from './pending-merge-wiki.mjs';
 import { performance } from 'node:perf_hooks';
 import { setTimeout as delay } from 'node:timers/promises';
-import { stableJson, validateWait, waitForDeadline } from './workflow-runtime.mjs';
+import { guardRemoteWrites, rejectedWrite, repositoryKey, sha256, stableJson, validateWait, waitForDeadline } from './workflow-runtime.mjs';
 import { sessionRecorder, stageForAction } from './execution-recorder.mjs';
-import { TestSubmissions } from './test-submission.mjs';
+import { checkPlanBuild, checkPlanMerge, checkPlanItem, checkPriorPlanBuild, missingPlanBuilds, planGitCoverage, planBuildKey, recoverOrRunPlanBuild, recoveredQueueReceipt, verifyPlanTestWiki, readExecutionPlan } from './tapd-plan-delivery.mjs';
+import { publishSubmissionBugRecord, validateReviewedBugRecord } from './submit-bug-record.mjs';
+import { TestSubmissions, recheckAcceptedBuild } from './test-submission.mjs';
 import { createMockInspectionCache } from './mock-revision.mjs';
 import { collectWorkInputs } from './collect-work-inputs.mjs';
-import { readTaskResults } from '../skills/breaking-down-requirement/scripts/read-task-results.mjs';
+import { readTaskResults } from './task-readback/read-task-results.mjs';
 
-const actions = ['collect', 'task-readback', 'submit', 'merge', 'release', 'wiki', 'registration', 'closeout', 'job'];
+const actions = ['collect', 'task-readback', 'submit', 'merge', 'release', 'wiki', 'registration', 'repair-record', 'closeout', 'job'];
 const readOnlyActions = ['collect', 'task-readback', 'closeout', 'job'];
 const sharedPlanReads = new Set(['get_project', 'get_bug', 'get_comments', 'get_stories_or_tasks', 'get_wiki',
   'jenkins_list_instances']);
@@ -67,6 +69,9 @@ export class WorkflowSession {
     this.reader = reader;
     this.io = { ...io, mockInspectionCache: io.mockInspectionCache || createMockInspectionCache() };
     this.submissions = new TestSubmissions();
+    this.planBuilds = new Map();
+    this.planWikis = new Map();
+    this.planGit = new Set();
     this.executionBlocked = false;
     this.pendingMerges = new Map();
     this.ids = new Set();
@@ -227,11 +232,24 @@ export class WorkflowSession {
     if (execute && (!this.allowExecute || this.executionBlocked || readOnlyActions.includes(request.action))) {
       throw new Error('当前会话不允许此写操作；关闭会话并重新核实实际状态');
     }
+    if (execute && [...this.submissions.plans.values()].some(record => record.state === 'NEEDS_CONFLICT_RESOLUTION')) {
+      throw new Error('冲突交付尚未核实，请先读回替代 MR 和包含关系');
+    }
     if (execute && this.pendingMerges.size) throw new Error('存在待人工合并 MR；先用 PLAN 和 VERIFY_ONLY 核验原 MR，后续写入暂不执行');
     const input = { ...request.input, execute };
-    if (execute && input.confirmed !== true) throw new Error('执行缺少已展示清单的明确确认');
+    if (execute && input.confirmed !== true) throw new Error('执行缺少覆盖本次操作的明确确认');
     if (request.action === 'merge') this.#validateMerge(input);
-    if (execute && request.action === 'submit') this.submissions.assertReviewed(request.input);
+    const approved = execute && request.action === 'submit' ? this.submissions.assertPrepared(request.input) : null;
+    const reference = approved?.plan.tapdPlan || input.tapdPlan;
+    if (execute && reference) {
+      const rawCall = call;
+      const verify = async () => {
+        try { await readExecutionPlan(reference, rawCall('tapd-mcp')); }
+        catch (error) { throw Object.assign(new Error(error.message, { cause: error }), { code: 'PLAN_RECHECK_REQUIRED' }); }
+      };
+      io = { ...io, beforePlanWrite: verify };
+      call = server => guardRemoteWrites(rawCall(server), verify);
+    }
     try {
       const previewReads = new Map();
       const stepCall = !execute && request.action === 'submit' ? server => (name, args) => {
@@ -240,14 +258,18 @@ export class WorkflowSession {
         if (!previewReads.has(key)) previewReads.set(key, call(server)(name, args));
         return previewReads.get(key);
       } : call;
-      const steps = { call: stepCall, reader, io, run: (action, data, write) => {
+      const steps = { call: stepCall, reader, io, run: (action, data, write, beforeWrite) => {
         if (action === 'merge') this.#validateMerge(data);
-        return this.#runAction(action, { ...data, execute: write, confirmed: write && input.confirmed === true }, { call: stepCall, reader, io });
+        const scoped = beforeWrite ? server => guardRemoteWrites(stepCall(server), beforeWrite) : stepCall;
+        return this.#runAction(action, { ...data, ...(reference && ['merge', 'release'].includes(action) && write ? { tapdPlan: reference } : {}), execute: write, confirmed: write && input.confirmed === true }, { call: scoped, reader, io });
       } };
       const result = request.action === 'submit'
         ? await (execute ? this.submissions.execute(request.input, steps) : this.submissions.prepare(request.input, steps))
         : await this.#runAction(request.action, input, { call, reader, io });
       if (execute && ['BLOCKED', 'FAILED', 'UNKNOWN'].includes(result?.state)) this.executionBlocked = true;
+      if (!execute && reference && result.state === 'AWAITING_CONFIRMATION') {
+        return { ...result, state: 'PREPARED' };
+      }
       return result;
     } catch (error) {
       if (execute) this.executionBlocked = true;
@@ -266,19 +288,157 @@ export class WorkflowSession {
     }
   }
 
+  async #verifyPlanGit(context, receipts, call, io) {
+    for (const receipt of receipts) {
+      const key = sha256(stableJson([context.approvalFingerprint, receipt]));
+      if (this.planGit.has(key)) continue;
+      const p = context.delivery.projects.find(p => p.source === receipt.sourceBranch && p.target === receipt.targetBranch &&
+        repositoryKey(p.repository) === repositoryKey(receipt.originUrl || receipt.sourceRepository));
+      const verified = await mergeReviewedBranch(call('gitlab-mcp'), { projectId: receipt.projectId, repositoryPath: receipt.repositoryPath,
+        originUrl: receipt.originUrl || receipt.sourceRepository,
+        sourceBranch: p.source, targetBranch: p.target, testBranch: p.target, purpose: p.purpose, sourceSha: receipt.sourceSha,
+        expectedDeliveredSha: receipt.deliveredSha, pipelineRequired: receipt.pipelineRequired === true,
+        reviewPassed: true, execute: false, mergeMode: receipt.mrIid ? 'VERIFY_ONLY' : 'CONTAINMENT_ONLY', mrIid: receipt.mrIid || undefined }, io);
+      if (!['MERGED', 'VERIFIED'].includes(verified.state) || verified.containment !== true ||
+          verified.deliveredSha !== receipt.deliveredSha || verified.writes !== 0) throw new Error('原 Git 分支交付效果尚未读回');
+      this.planGit.add(key);
+    }
+  }
+
+  async #planCloseout(context, action, input, { call, reader, io }) {
+    const coverage = planGitCoverage(context, input.gitDeliveryReceipts || []);
+    if (coverage.missing.length) return { state: 'AWAITING_PLAN_GIT', missing: coverage.missing, writes: 0 };
+    await this.#verifyPlanGit(context, input.gitDeliveryReceipts, call, io);
+    input = { ...input, requiredGitScopes: coverage.scopes, requiredRepositories: [...new Set(coverage.scopes.map(p => p.originUrl))] };
+    const receipts = [...this.planBuilds.values()].filter(row => row.plan === context.approvalFingerprint).map(row => row.receipt);
+    const git = input.gitDeliveryReceipts || [];
+    const sources = { ...(input.reviewedBuildSources || {}) };
+    for (const p of context.delivery.projects.filter(p => context.buildProjects.includes(p.id))) {
+      const fresh = [...this.planBuilds.values()].filter(row => row.plan === context.approvalFingerprint && row.projectIds.includes(p.id));
+      if (!sources[p.id] && fresh.length === 1) sources[p.id] = fresh[0].expectedSha;
+      if (sources[p.id] && !git.some(row => row.sourceBranch === p.source && row.targetBranch === p.release.ref &&
+          repositoryKey(row.originUrl || row.sourceRepository) === repositoryKey(p.repository))) {
+        if (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(sources[p.id])) throw new Error('独立构建的本轮已审 SHA 无效');
+        await (io.checkSource || checkReleaseSource)({ sourceRepository: p.repository, releaseRef: p.release.ref,
+          expectedSha: sources[p.id], repositoryPath: input.repositoryPath }, undefined, io);
+      }
+    }
+    for (const prior of input.planBuildReceipts || []) {
+      checkPriorPlanBuild(context, prior);
+      const verified = await recheckAcceptedBuild({ repositoryPath: input.repositoryPath }, prior, { reader, io });
+      receipts.push(verified);
+    }
+    const missing = missingPlanBuilds(context, receipts, git, sources);
+    if (missing.length) return { state: 'AWAITING_PLAN_BUILDS', missing, writes: 0 };
+    if (action !== 'wiki') {
+      const needWiki = context.delivery.testWiki === '需要';
+      if (input.prerequisites && (input.prerequisites.profile !== (needWiki ? 'STANDARD' : 'NO_WIKI') ||
+          input.prerequisites.wiki !== (needWiki ? 'VERIFIED' : 'SKIPPED_NO_WIKI'))) throw new Error('当前 Plan 的提测 Wiki 选择与登记前置条件不符');
+      if (needWiki) {
+        const wiki = input.wikiReceipt || this.planWikis.get(context.approvalFingerprint);
+        if (!wiki?.wikiId || !wiki.bodySha256) return { state: 'AWAITING_PLAN_WIKI', writes: 0 };
+        const work = action === 'repair-record' ? input.registration : input;
+        const before = call;
+        const verify = () => verifyPlanTestWiki(context, work, wiki, before('tapd-mcp'), input.supersededWiki, io);
+        try { await verify(); }
+        catch (error) { return { state: 'AWAITING_PLAN_WIKI', detail: error.message, writes: 0 }; }
+        call = server => guardRemoteWrites(before(server), verify);
+        input = { ...input, wikiReceipt: wiki };
+      }
+    }
+    return { call, input };
+  }
+
+  async #planRelease(context, input, { call, reader, io }) {
+    const execute = input.execute;
+    let result;
+    if (context && !input.completionMode) input = { ...input, completionMode: 'TRIGGER_ACCEPTED' };
+    const key = context && execute ? planBuildKey(context, input) : null;
+    if (key) {
+      checkPlanBuild(context, input);
+      const cached = this.planBuilds.get(key)?.receipt;
+      if (cached && !input.planBuildReceipts?.length && cached.jobName === input.jobName && stableJson(cached.submittedParams) === stableJson(input.params)) return structuredClone(cached);
+    }
+    if (key && input.completionMode === 'TRIGGER_ACCEPTED') {
+      const jenkins = call('jenkins-mcp');
+      result = await recoverOrRunPlanBuild(context, input, { stateDir: io.planBuildStateDir,
+        run: claim => runJenkinsRelease(async (name, args) => {
+          if (name !== 'jenkins_trigger_build') return jenkins(name, args);
+          await claim();
+          try {
+            const response = await jenkins(name, args);
+            if (rejectedWrite(response)) throw Object.assign(new Error('Jenkins 明确拒绝本次构建'), { code: 'WRITE_REJECTED' });
+            return response;
+          } catch (error) {
+            if (rejectedWrite(error)) error.code = 'WRITE_REJECTED';
+            throw error;
+          }
+        }, reader(input), input, io),
+        verify: async prior => {
+          await (io.checkSource || checkReleaseSource)(input, undefined, io);
+          const preview = await runJenkinsRelease(jenkins, reader(input), { ...input, execute: false }, io);
+          checkPlanBuild(context, preview);
+          const receipt = prior.state ? prior : recoveredQueueReceipt(preview, prior);
+          return recheckAcceptedBuild(input, receipt, { reader, io });
+        },
+      });
+    } else result = await runJenkinsRelease(call('jenkins-mcp'), reader(input), input, io);
+    if (context && !execute) checkPlanBuild(context, result);
+    if (key && result.state === 'BUILD_SUBMITTED') {
+      result.planBuildKey = key;
+      const projectIds = context.delivery.projects.filter(p => p.release?.jobUrl === input.jobUrl.replace(/\/$/, '') &&
+        p.release?.ref === input.releaseRef && repositoryKey(p.repository) === repositoryKey(input.sourceRepository)).map(p => p.id);
+      this.planBuilds.set(key, { plan: context.approvalFingerprint, expectedSha: input.expectedSha, projectIds, receipt: structuredClone(result) });
+    }
+
+    return result;
+  }
+
   async #runAction(action, input, { call, reader, io }) {
     const execute = input.execute;
     if (execute && (!this.allowExecute || this.executionBlocked || this.pendingMerges.size || !input.confirmed)) {
       throw new Error('交付操作未获准或存在必须先核实的写入结果');
     }
+    if (action === 'repair-record' && (!input.tapdPlan || !input.repairRecord || input.registration?.entryType !== 'bug')) throw new Error('逐项修复记录须绑定正式 Bug Plan、登记及已审草稿');
+    const context = Object.hasOwn(input, 'tapdPlan') ? await readExecutionPlan(input.tapdPlan, call('tapd-mcp')) : null;
+    if (context && ['merge', 'wiki', 'registration', 'repair-record'].includes(action)) {
+      if (action === 'merge') {
+        checkPlanMerge(context, input);
+        input = { ...input, testBranch: input.targetBranch };
+      } else if (action === 'repair-record') checkPlanItem(context, input.registration, 'registration');
+      else checkPlanItem(context, input, action);
+      if (execute && action !== 'merge') {
+        const prepared = await this.#planCloseout(context, action, input, { call, reader, io });
+        if (prepared.state) return prepared;
+        ({ call, input } = prepared);
+      }
+    }
     let result;
     switch (action) {
       case 'task-readback': result = await readTaskResults(call('tapd-mcp'), input); break;
       case 'collect': result = await collectWorkInputs(call('tapd-mcp'), input, io); break;
-      case 'merge': result = await mergeReviewedBranch(call('gitlab-mcp'), input, io); break;
-      case 'release': result = await runJenkinsRelease(call('jenkins-mcp'), reader(input), input, io); break;
+      case 'merge':
+        result = await mergeReviewedBranch(call('gitlab-mcp'), input, io);
+        if (context && ['MERGED', 'VERIFIED'].includes(result.state) && result.containment === true) {
+          this.planGit.add(sha256(stableJson([context.approvalFingerprint, result])));
+        }
+        break;
+      case 'release': result = await this.#planRelease(context, input, { call, reader, io }); break;
+      case 'repair-record': {
+        const merges = input.reviewedSources?.map(row => ({ ...row, mockSafety: { contentFingerprint: row.contentFingerprint } })) ||
+          { originUrl: input.gitDeliveryReceipts?.[0]?.originUrl, sourceSha: input.reviewedSourceSha, mockSafety: input.mockSafety };
+        if (execute) result = await publishSubmissionBugRecord(call('tapd-mcp'), input.repairRecord, input, io);
+        else {
+          validateReviewedBugRecord(input.repairRecord, input.registration, merges);
+          result = { state: 'AWAITING_CONFIRMATION', writes: 0 };
+        }
+        break;
+      }
       case 'registration': result = await registerTestSubmission(call('tapd-mcp'), input, io); break;
-      case 'wiki': result = await ensureTestWiki(call('tapd-mcp'), input, new Date(), io); break;
+      case 'wiki':
+        result = await ensureTestWiki(call('tapd-mcp'), input, new Date(), io);
+        if (context && execute && result.links?.length) this.planWikis.set(context.approvalFingerprint, structuredClone(result));
+        break;
       case 'closeout': result = await checkLocalCloseout(input, io); break;
       case 'job': result = await resolveJenkinsJob(call('jenkins-mcp'), input); break;
     }

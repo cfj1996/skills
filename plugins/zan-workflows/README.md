@@ -1,22 +1,15 @@
 # Zan Workflows
 
-日常研发从两个实施入口开始，也可对已有实现直接提测，其他技能由当前阶段按需调用。
-
-| 入口 | 适用工作 | 默认终点 |
+| 工作入口 | 第一次会话 | 新会话 |
 | --- | --- | --- |
-| `$fixing-bug` | 一条或一组 TAPD Bug | 修复、验证、独立评审、记录及测试交付 |
-| `$developing-requirement` | 一条 TAPD Story 或选定 Task | 开发、验证、独立评审及测试交付 |
-| `$submitting-for-test`（直接提测） | 已有实现，或开发者检查代码后交付 | 核实变更和评审、确认交付清单，再提交/推送/合并、所选 Wiki/构建及登记 |
+| [需求开发](skills/developing-requirement/SKILL.md) | 收集 Story，确认各项目的功能、交互、接口和验收 | 执行该 Story 的 TAPD Plan |
+| [Bug 修复](skills/fixing-bug/SKILL.md) | 收集复现、原因、受影响项目和回归用例。批量时每个 Bug 一页 | 执行该 Bug 的 TAPD Plan，沿用一条修复记录 |
+
+[需求收集](skills/collecting-requirements/SKILL.md)有两个输出模式。「只在会话看」直接展示评审稿。普通需求开发和 Bug 修复默认生成 TAPD Plan，在用户确认当前版本后保存到执行 Wiki，读回并把链接关联至原条目，默认手动执行，到此结束。「确认并立即执行」则在同一会话直接开工。同一个工作项的所有项目、外部数据、模块、功能、交互和测试使用页内编号。
+
+在新会话发送「执行 TAPD Plan <Wiki 链接>」进入[执行技能](skills/executing-tapd-plan/SKILL.md)。它读取确认版本和实际进度，从符合条件的步骤继续。单独打开链接时只读查看。立即与手动开工共享[执行上下文](skills/executing-tapd-plan/references/execution-context.md)，自动完成其中已确认的分支操作、测试交付及构建。历史 Task 和本地 Plan 可以只读提供范围证据。
 
 ## 实施与直接提测流程
-
-**Bug：** 读取与定位 → 六列清单确认 → 固定分支与修复状态 → 修复验证与独立评审 →
-已评审记录草稿 → 核对提测计划并交付 → Wiki 及独立链接评论 → 唯一修复记录 → 登记待测试。
-仅修复不提测时，在本轮实施最终结束前写一次修复记录；同轮返工只更新草稿。
-
-**需求：** 读取需求/所选任务与缺口 → 准备必要的任务和方案 → 六列清单确认 →
-执行已批准的 Task/分支/Plan 写入 → 实施验证 → 独立评审 → 按任务返回结果 →
-核对执行清单后交付。
 
 **先实现后人工检查：** 确定清单明确“直接提测：否” → 实现、验证、独立评审
 及适用记录 → 返回结果并结束 → 开发者自行检查代码。
@@ -27,43 +20,9 @@
 已完成的提交、推送或 MR 准确核实后复用，不重复开发、建分支或建 Task/Plan。
 “直接提测”不等于跳过构建；明确“不构建/跳过发布”才关闭构建。
 
-需求清单默认“直接提测：是”；明确“先完成代码，我检查后再提测”“先不要
-提交/推送”才设为否，本轮合并、Wiki、构建逐项显示不执行，不做提测登记。
-之后独立直接提测须确认本轮具体交付计划，原实施授权不自动扩展为交付授权。
+## 六列确定清单与执行清单的续接
 
-- 小改动使用简短执行说明；需求涉及多页面独立业务/验收或跨仓责任衔接时，即使
-  单人、已有静态页或先做 Mock，也准备 Task 和模块 Plan。首次完整清单包含
-  真实/拟建任务、负责人及校准后的工时。见[准备与验证规则](references/adaptive-workflow.md)。
-- 页面开发与正式接口对接有独立交付时分别设计 Task，共用同一模块 Plan；
-  仅批准 Mock 时保留未来接入候选/依赖，不把真实接入计入当前工时或完成范围。
-  用户吞吐参考结合已核实 Zan 复用及具体增量校准，不当作实测或全局标准，
-  不默认每日小时数。见[估时规则](skills/breaking-down-requirement/references/effort-estimation.md)。
-- 大需求按页面/内聚模块分子目录维护 Plan，总览只作索引和依赖说明。
-  旧单文件规则不足时在原确认中预览调整，不提前迁移文件或改业务项目规则。
-- 任务创建统一交 `breaking-down-requirement`，确认后调用 TAPD MCP 的
-  `create_task`（单个）或 `create_tasks`（同需求批量）；开发清单与 Plan 复用
-  同一任务结果。参数与能力检查见[任务创建路由](references/tool-routing.md#tapd-任务创建)。
-- 先查证、后提问，复用同一份事实；进入写阶段只刷新会变化的事实。
-- 确认后由 `implementing-work` 统一开发：小任务直接执行，独立步骤按
-  [多任务实施](skills/implementing-work/references/parallel-execution.md) 分批并行，
-  通常同时 2 个开发子代理、最多 3 个。主代理统一控制共享操作、集成与评审。
-- 初始清单统一确认已展示的范围、分支及本轮写入。继续同一工作时使用原始
-  分支，已有有效确认不重复问；实质变化只重开受影响内容。
-- 普通修复/开发默认合并实际 dev/develop、构建测试环境和提测 Wiki，先展示
-  完整确定清单和模板，一次确认后下游按准确计划核对并消费执行清单，不按阶段
-  重复询问；独立调用技能仍先确认自身具体计划。明确只开发/计划/分支或关闭某项
-  时覆盖默认；上线仍须明确要求。“合并并构建”指实际测试分支和项目测试环境。
-  “只开发 B 端相关功能”“仅改前端”“只做所选 Task”只限定业务范围，
-  不表示不提测，不关闭默认交付。
-
-提测阶段只确认 Jenkins 已接受构建任务：保留准确队列回执后继续 Wiki 和 TAPD，
-不等待排队、构建启动或完成。结果显示“构建任务已提交”，链接使用已核实的 `jobUrl`；
-`queueId`/`queueUrl` 仅作内部接受证据，修正展示链接不重新触发构建。包构建尚无发布证据时，
-Wiki 保留已验证的当前版本，无历史证据则显示“待发布”。正式发布仍等待并验证结果。
-
-## 确定清单与执行清单
-
-使用[统一清单](references/execution-checklist.md)，始终保留六列：
+继续已确认的六列清单，或独立交付流程要求该格式时，使用[统一清单](references/execution-checklist.md)。
 先完成其中的[确认前准备](references/execution-checklist.md#确认前准备)，
 再按[完整展示模板](references/execution-checklist.md#完整展示模板)生成整份清单。
 范围摘要和分支预检不是执行确认点；所选测试交付的准确目标及 Wiki 预览
@@ -77,13 +36,7 @@ Wiki 保留已验证的当前版本，无历史证据则显示“待发布”。
 | 项目 | 分支 | 交付范围 | 实施方案 | 验收标准 | 需求待确认 |
 | --- | --- | --- | --- | --- | --- |
 
-有 TAPD Task 时，在“执行内容”前先列“序号、标题、工时”三列表，标题保留
-真实 Task 链接。后面的六列清单按 `#F01`、`#F02` 引用，详情备注另用 `#01`；
-不把任务明细藏在表后，不为阅读索引改写 Task 身份或强制补估时。
-标题前用【新建】【复用】【调整】说明本轮任务操作。工时格只显示一个 `N 小时`，
-不加预估/剩余标签、多组时间或变更箭头；只展示任务列表，不追加汇总。
-未知不按零算，同一任务跨项目只计一次。内部预测不替代任务工时，不默认展示、
-写回 TAPD 或触发日期排期。
+已存在且选定的 Task 只读用于限定原需求范围。
 
 长内容通过 `#01`、`#02` 关联数字备注；有 Plan 时链接准确详情，无 Plan
 直接展开，不为链接生成额外文档。对外只说明本轮目标、实际风险和具体动作，
@@ -112,10 +65,7 @@ Mock模块、数据、handler、runtime及启用入口，源码退出、制品�
 [项目检查模板](assets/project-mock-check/check-mock.mjs)接入已有发布入口；
 本插件更新不会自动给业务项目安装检查或修改Jenkins配置，缺接入须准确说明。
 
-正式新建模型使用 PagePlan v4 / ReviewSession v3，同一Plan承载外部依赖和Mock，
-面板/清单/实施/交付引用同一事实。旧Plan/会话可读取，缺失审查信息保持未核实，
-不默认实施就绪。接口补齐续接原Task/Plan/分支，只刷新失效证据；原仅批准Mock
-而新增真实接入时，为新增范围补充确认，不重跑全部需求流程。
+正式需求/缺陷 Plan 使用一份 Wiki Markdown。面板的旧模型仅用于还原历史评审事实。
 
 Bug 的 TAPD 更新与单条最终修复记录规则合并展示；“合并与测试环境”明确合并、是否需要
 提测 Wiki、构建三项，普通修复/开发默认都需要。需要 Wiki 时，确认前先
@@ -133,34 +83,14 @@ Bug 在“合并与测试环境”末尾补“TAPD 状态：待测试（提测�
 常规完整修复先到修复中，全部提测交付条件通过后再到待测试；只修复验证则
 保留修复中。预览是交付目标，执行结果以实际读回为准，续接沿用原幂等策略。
 
-## Bug 与 Task 的区别
-
-Bug 使用[修复人员规则](skills/implementing-work/references/bug-repair-owner.md)和
-[溯源记录](skills/implementing-work/references/bug-repair-record.md)：状态与准确
-处理人联合写入并读回；原因、引入证据、实际修复和验证结果汇总为单条最终记录。
-历史责任未知如实标明；已经待测试的续修不重置状态或处理人。
-同一 Bug 涉及多个仓库时，先确认全部项目范围，各仓库分别实现与评审；
-全部通过后统一交接已评审草稿。直接提测在全部必要交付及适用 Wiki/独立回链通过后，
-才发表/复用该记录并读回，再登记待测试。Wiki 链接与修复记录保持两条独立评论。
-
-需求使用[任务关联](skills/developing-requirement/references/task-linked-delivery.md)：
-父需求 → 本轮所选 Task → 项目/分支 → Plan 步骤/接口与缺口 → 验收和评审 →
-实际交付链接。代码进度与 TAPD 状态分别说明；只开发所选任务，不扩为全部
-兄弟任务，不因代码已完成就自动改 Task 状态。人员和最终工时按实际任务核实，
-只有用户要求排期时才提供日期建议。
-
-新建或重估需求任务使用 [增量工时评估](skills/breaking-down-requirement/references/effort-estimation.md)：
-核实实际责任、现有能力复用和新增/适配/验证工作，公共成本只计一次；独立评审通过后
-并入原清单确认，任务表仍只显示 `N 小时`。范围未变的历史任务保留准确读回工时，
-续修新增预算不能覆盖原任务完整预算；内部剩余预测不自动回写。
-
 ## 阶段职责
 
 | 能力 | 负责什么 | 按需加载 |
 | --- | --- | --- |
 | [preparing-work](skills/preparing-work/SKILL.md) | 只读条目、项目、范围与固定分支核验 | 开始及写前事实刷新 |
-| [writing-plans](skills/writing-plans/SKILL.md) | 需求范围/验收、必要的正式 Plan | 需求分析；确需计划时 |
-| [breaking-down-requirement](skills/breaking-down-requirement/SKILL.md) | Task 提案、获准创建/更新和精确读回 | 实际需要任务管理时 |
+| [collecting-requirements](skills/collecting-requirements/SKILL.md) | 项目范围、功能点与依赖确认 | 会话稿或已确认的执行 Wiki |
+| [executing-tapd-plan](skills/executing-tapd-plan/SKILL.md) | 从链接恢复已确认的 Story / Bug | 在获准分支实施、验证、回填 |
+| [writing-plans](skills/writing-plans/SKILL.md) | 只读原型评审与范围证据 | 需要在原型上收集意见时 |
 | [implementing-work](skills/implementing-work/SKILL.md) | 固定分支实现、验证、独立评审及 Bug 记录 | 已确认实施时 |
 | [submitting-for-test](skills/submitting-for-test/SKILL.md) | dev/develop 交付、所选测试部署、Wiki 和适用 TAPD 登记 | 默认测试交付，或明确要求提测/合并构建时 |
 | [going-live](skills/going-live/SKILL.md) | 原分支主线交付、适用包发布/升级、Wiki 与清理计划 | 明确要求上线时 |
@@ -185,14 +115,6 @@ MR 和已完成效果；清理按准确资源清单单独确认，不在主入�
 发现、审核、合并可独立执行；批准和合并按准确授权分别执行，写前刷新当前账号对目标的
 有效权限及统一门禁。数据交接、合并细则和报告模板分别维护在该技能的 references 下。
 技能已更名，旧调用名称需更新；仓库历史文档中的旧名称仅记录当时状态。
-
-## 当前数据格式
-
-评审面板只使用 ReviewSession v2，正式 Plan 只使用 PagePlan v3。旧版面板/Plan
-输入和临时目录确认状态不再受支持；不静默转换旧内容。TaskBreakdown v1 是
-独立且仍在使用的任务契约。TAPD、GitLab、Jenkins 的真实服务响应适配继续保留。
-旧 Task 交接缺少新估算证据时，从当前准确读回构造 RETAINED；新建或实际重估补齐
-CALCULATED 与独立评审。不能补造历史正常投入或通过回执，也不因此自动改旧 Task/Plan。
 
 ## 插件执行反馈
 
@@ -268,7 +190,9 @@ codex plugin add zan-workflows@cfj-skills --json
 ## 调用示例
 
 ```text
-使用 $fixing-bug 修复这个 Bug：<TAPD URL>。先展示确定清单。
+使用 $fixing-bug 修复 <TAPD Bug URL>。先让我确认各项目的修复点、回归用例和执行文档。
+使用 $collecting-requirements 只在会话中评审 <需求或 Bug URL> 的项目、功能点与数据缺口。
+使用 $executing-tapd-plan 执行 <执行 Wiki URL>。
 使用 $developing-requirement 开发这个需求：<TAPD URL>。本次只完成开发和验证。
 使用 $developing-requirement 开发这个 Task：<TAPD URL>。仅处理所选任务。
 修复完成后合并到 dev，并构建项目测试环境。

@@ -93,6 +93,26 @@ test('the local Git step commits only the reviewed files, accepts Plan table for
   assert.equal(git('for-each-ref', '--format=%(upstream)', 'refs/heads/feature/test.field'), '');
 });
 
+test('Hook changes identify the committed delta against the reviewed tree and stop before push', async t => {
+  const { input, work, git, write } = await repo(t);
+  const files = { 'src/page.ts': 'export const value = 2;\n', 'src/ui.d.ts': 'export type Kind = "A";\n',
+    'src/other.d.ts': 'export type Mode = "B";\n' };
+  for (const [path, bytes] of Object.entries(files)) await write(path, bytes);
+  const mockSafety = { ...input, ...await inspectMockSource(input), schemaVersion: 1, mockModules: [], evidenceRefs: ['reviewed code'] };
+  const merge = { repositoryPath: work, originUrl: origin, sourceSha: input.baseSha, sourceBranch: 'feature/test.field',
+    targetBranch: 'develop', purpose: 'field submission', mockSafety };
+  const local = await prepareSubmissionGit(merge, { commit: true, push: true, message: 'feat: field',
+    reviewedFiles: Object.fromEntries(Object.entries(files).map(([path, data]) => [path, { mode: '100644', sha256: sha256(data) }])) }, {});
+  await writeFile(join(work, '.git/hooks/pre-commit'), '#!/bin/sh\necho "// formatted" >> src/ui.d.ts\nrm src/other.d.ts\ngit add -A -- src\n', { mode: 0o755 });
+  const receipt = {};
+  await assert.rejects(executeSubmissionGit(merge, local, receipt, {}), /Hook 改变了已审内容/);
+  assert.equal(receipt.state, 'COMMITTED');
+  assert.equal(receipt.sourceSha, git('rev-parse', 'HEAD'));
+  assert.deepEqual(receipt.changedPaths, ['src/other.d.ts', 'src/ui.d.ts']);
+  assert.deepEqual(git('diff', '--name-only', receipt.reviewedTree, receipt.sourceSha).split('\n'), receipt.changedPaths);
+  assert.equal(git('ls-remote', 'origin', 'refs/heads/feature/test.field'), '');
+});
+
 test('non-applicable Story/Task registration opens no TAPD or Mock executor, including for old direct EXECUTE callers', async () => {
   for (const entryType of ['stories', 'tasks']) for (const execute of [true, false]) {
     const result = await registerTestSubmission(() => assert.fail('unexpected TAPD call'), { workspaceId: 1, entryId: '12', entryType,

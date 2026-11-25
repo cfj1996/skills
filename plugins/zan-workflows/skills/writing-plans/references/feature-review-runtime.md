@@ -4,9 +4,7 @@
 
 ## 选择评审页面
 
-启动确认通过后，只读发现 PRD、既有 Plan、项目 `AGENTS.md` 中现有的产物位置
-规则，以及浏览器可访问的原型来源。没有正式位置规则时保留候选或明确无候选，
-不阻塞只读范围评审。选择与当前页面或内聚模块对应的原型页面；原型源码不得修改。
+读取本轮 PRD、已有资料和浏览器可访问的原型，选择对应的页面或模块。评审内容在会话中维护。
 
 原型来源按 `scripts/resolve-prototype-source.js` 的固定规则分类：
 
@@ -100,10 +98,8 @@ Badge 区分状态，右侧展示当前详情。列表点击与上一个/下一�
 旧快照与当前外部事实不相同，不能恢复旧提交或确认。字段详见页面评审规范。
 面板保存仅批准 Plan 更新，不批准含 Mock 的测试部署，更不能允许 Mock 上线。
 
-`SCOPE_REVIEW` 无正式目录规则时，以
-`artifactRuleResolution.status=unresolved-candidate, source=candidate` 挂载。
-`artifactRuleFingerprint` 来自当前候选信息快照；尚无候选时明确记录无候选快照，
-不得伪造 `source=agents`。可提交范围意见并回填结果，但确认更新 Plan 与保存保持阻塞。
+新评审以 `artifactRuleResolution={status:"session",source:"conversation"}` 挂载。
+`artifactRuleFingerprint` 使用本轮会话输出约定的稳定指纹。面板只收集和回填意见，点击提交后回到当前对话。项目文件路径与保存许可均无需提供。
 
 `implementationPlan` 及项目规范、依赖、具体组件、代码落点、API 消费事实与来源证据
 收纳在默认折叠的“内部实现 / 实现依据”中；展开后一并显示一句话方案及四块
@@ -175,7 +171,7 @@ submission、评审结果、Plan、Draft 或日志；原型 URL 与 origin 同�
 收到通知后先读现有页面 API、`getState()` 和 `exportSubmission()`，核对本节后续的
 提交身份及指纹；旧通知丢弃，不能为匹配旧通知而恢复旧快照或无条件重新挂载。
 `review-submitted` 进入结果回填；`plan-confirm-requested` 必须再读取
-`getPlanConfirmationRequest()`，通过原有确认与指纹校验后才允许保存。
+`getPlanConfirmationRequest()`，作为历史面板事件核对。新会话评审使用 review-submitted；正式保存只认 TAPD Plan 的确认。
 若 `state.mode` 为 `result` 或 `confirmed`，且 `lastSubmission` 身份相同、结果已回填，
 将该提交视为已处理，不重复 `applyResult()`，也不清除待确认请求；已保存时不重复保存。
 
@@ -261,72 +257,12 @@ const next = window.__PAGE_DELIVERY_REVIEW__.applyResult({
 `submissionId` 是脚本为每次提交生成的独立身份，必须原样回传，不能重算或省略。
 遇到 `stale-result` 重新读取当前提交并重新评审；遇到 `invalid-results` 补齐本轮
 卡片覆盖及具体摘要后重试，不自动确认。
-保留本轮评审卡和拟更新内容，正式保存仍需独立确认。用户尚未提交时继续等待。
+保留本轮评审卡和拟更新内容，正式 TAPD Wiki 保存由需求收集办理。用户尚未提交时继续等待。
 用户已提交但无法读回匹配的快照时，保留现场并报告提交核验缺口。不得在 reviewing 阶段生成 Draft OpenAPI。
 
-## 从范围评审进入正式保存
+## 交回收集
 
-目录规则写入限定 `PLAN_WRITE`：范围、分支已确认且目录写入已获授权后，
-Agent 才能写入适用 Agent 文件，读回验证并计算正式规则指纹。目录指定不等于
-评审内容写入许可，也不允许在 `SCOPE_REVIEW` 提前写规则。读回失败保留候选
-状态并报告错误，不能伪造 `status=resolved, source=agents`。
-
-首次将同一交付单元从 `unresolved-candidate/candidate` 转为 `resolved/agents`：
-
-1. 读取最新 `getState()` 和 `exportSubmission()`，保留完整模块清单及最新意见。
-2. 构造 `nextSession`：新 `sessionId`、正式 `artifactRuleFingerprint` 和
-   `artifactRuleResolution`、输入态、归零的提交版本及 `viewScope=all`。转换要求当前
-   已有提交，状态为 `reviewing` 或 `result`，使用 `reviewRound + 1`；输入态先完成
-   只读范围提交。候选规则不能进入 `confirmed` 或已保存状态。
-   Plan 指纹来自当前实际内容，首次尚无文件时明确保持未创建事实。
-3. 调用 `updateReviewSession(nextSession)` 并核对新身份、正式规则及完整模块。
-   保留未受影响模块的意见；旧提交、结果、确认请求及保存状态全部失效。
-   不得用旧 `resumeSubmission` 或旧确认请求恢复本轮授权。
-4. 用户重新提交全部拟保存内容，Agent 重新回填，再按下节取得本轮确认并保存。
-
-该转换只允许候选首次解析为正式规则。已有正式规则变化或回退候选时，必须
-另行读取证据、展示影响并重新挂载，不能用 `updateReviewSession` 改写规则身份。
-失败时保留旧面板现场，规则文件的实际写入结果与面板状态分别报告。
-
-## 确认与回写
-
-进入本节前必须完成范围/分支确认、正式目录规则写入和读回；当前会话使用
-`status=resolved, source=agents` 及其精确指纹。候选规则只能用于只读范围评审。
-
-1. 回填结果后，让用户核对面板内容并在最后一张结果卡点击“确认更新 Plan”。
-   Agent 不得代点。通过 `getPlanConfirmationRequest()` 轮询只读请求元数据；
-   返回 `null` 就继续等待或保留当前 tab 交回用户，不能把日志当作写入许可。
-   该 API 不创建请求，不暴露可伪造的授权令牌；只有可信点击能在面板内部创建请求。
-   自动通知已连接时该点击会发送 `plan-confirm-requested`；收到通知仍执行本节全部
-   校验。未连接或投递失败时提示用户回到对话继续保存，保留原确认请求。
-2. 将请求的 `sessionId`、`submissionId`、`submissionVersion` 与当前提交比较，
-   重新读取磁盘上的 Plan 和产物规则并计算指纹，禁止直接把旧指纹当成新检查结果。
-   本轮拟更新必须与用户实际看到的 `planChangeSummary` 一致；有冲突时停止回写。
-3. 在同一页面调用 `confirmPlan({ planFingerprint, artifactRuleFingerprint })`，
-   传入刚重新读取后计算的指纹。只有返回 `mode === "confirmed"` 且无 `lastError`
-   才能按用户确认的范围写入 Plan。该调用只消费一次内部许可，不会自行写文件。
-4. “已确认，待保存”与“已保存”分开显示。运行 `validate-page-plan.js` 对拟写内容
-   的规范化模型（新建使用 `schemaVersion=4`，旧 v3 仅可读取评审）进行校验；阶段 Plan
-   允许包含未决问题和 blocked 实现，不能将其标成可实施。通过后用 Agent 文件工具
-   写入同一 Plan，再读回核对实际内容并计算保存后的指纹。
-5. 读回一致后在同一页面调用下列 API 并核对保存状态。调用只记录本轮保存凭据，
-   不执行磁盘 I/O；未经 confirmPlan、身份或指纹不匹配时必须拒绝。保存失败不得
-   报告成功；修复原因后重新展示拟更新并要求新的确认，不复用已消费请求。
-
-```js
-window.__PAGE_DELIVERY_REVIEW__.markPlanSaved({
-  sessionId: submission.sessionId,
-  submissionId: submission.submissionId,
-  planFingerprint: submission.planFingerprint, // 本轮修改前的 Plan 指纹
-  artifactRuleFingerprint: submission.artifactRuleFingerprint,
-  savedPlanFingerprint, // Agent 实际写入并读回后计算，不能用预期内容冒充
-});
-// 核对返回状态无 lastError，面板显示“已保存”，才向用户报告保存完成。
-```
-
-若要修改已回填的结果、处理写入失败或开启复评，保留旧输入，由 Agent 构造新的
-`sessionId` 和所需轮次后重新挂载，并要求用户重新提交及确认。不要在原结果已确认后
-静默更换拟写内容。
+逐卡读回结果和未决问题后，在会话中展示。用户选择保存 TAPD Plan 时，将同一范围和依据交给[需求收集](../../collecting-requirements/SKILL.md)，由其确认实际 Wiki 目标、正文和版本。面板可信点击只证明此次页面评审事件。
 
 ## 对话补充功能
 
@@ -366,8 +302,7 @@ window.__PAGE_DELIVERY_REVIEW__.markPlanSaved({
    状态选择轮次。同步后核对 host、Shadow Root、API、新 sessionId、模块数量、
    新增和重开项及原备注，说明哪些内容已同步、哪些需复评。失败时保留旧现场并
    报告错误，不能先销毁旧面板再尝试恢复。
-7. 等待本轮统一提交，再按结果回填与确认保存流程更新同一模块 Plan。清单或意见
-   未能完整保留时停止覆盖；未决事项可作为阶段记录保存，不写成已具备实施条件。
+7. 等待本轮统一提交，按结果在会话回填已确认事项、修改与缺口。
 
 ## 刷新、重挂载与等待
 

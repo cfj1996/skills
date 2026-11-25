@@ -242,3 +242,14 @@ test('artifact rule transitions require submitted scope, fresh identity and a fu
   assert.throws(() => mergeReviewSession(resolved, { ...nextInput, artifactRuleResolution: initial.artifactRuleResolution }), error => error.code === 'invalid-session-update');
   assert.throws(() => mergeReviewSession(resolved, { ...nextInput, artifactRuleFingerprint: 'sha256:changed-agents-rule' }), error => error.code === 'invalid-session-update');
 });
+
+test('a conversation review can finish without a project Plan location or a save button', () => {
+  const input = session();
+  input.artifactRuleResolution = { status: 'session', source: 'conversation' };
+  for (const card of input.cards) card.conclusion = '已确认';
+  const reviewed = result(submit(createReviewState(input)));
+  const last = reduceReviewState(reviewed, { type: 'SELECT_RESULT', index: reviewed.results.length - 1 });
+  assert.equal(last.mode, 'result');
+  assert.doesNotMatch(panelMarkup(last, false, null), /data-action="confirm-plan"|文档未保存/);
+  assert.match(panelMarkup(last, false, null), /会话中核对/);
+});

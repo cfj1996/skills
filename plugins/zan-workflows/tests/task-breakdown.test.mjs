@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { readTaskResults } from '../skills/breaking-down-requirement/scripts/read-task-results.mjs';
+import { readTaskResults } from '../scripts/task-readback/read-task-results.mjs';
 
 const require = createRequire(import.meta.url);
-const { estimateHours, fingerprintProposal, fingerprintEstimate, fingerprintTaskWork, validateTaskBreakdown, validateConfirmation, validateTaskReadbacks, validatePlanTaskBindings } = require('../skills/breaking-down-requirement/scripts/validate-task-breakdown.js');
+const { estimateHours, fingerprintProposal, fingerprintEstimate, fingerprintTaskWork, validateTaskBreakdown, validateConfirmation, validateTaskReadbacks, validatePlanTaskBindings } = require('../scripts/task-readback/validate-task-breakdown.js');
 const { validatePagePlanModel } = require('../skills/writing-plans/scripts/validate-page-plan.js');
 
 // Simulated independent receipts are test fixtures, never production evidence.
@@ -411,7 +411,7 @@ test('malformed proposal or dependency shapes return validation errors rather th
 });
 
 test('stdin validator validates without remote writes and fails closed on bad JSON', () => {
-  const script = new URL('../skills/breaking-down-requirement/scripts/validate-task-breakdown.js', import.meta.url);
+  const script = new URL('../scripts/task-readback/validate-task-breakdown.js', import.meta.url);
   const ok = spawnSync(process.execPath, [script.pathname], { input: JSON.stringify(proposal()), encoding: 'utf8' });
   assert.equal(ok.status, 0); assert.equal(JSON.parse(ok.stdout).proposalFingerprint, fingerprintProposal(proposal()));
   const invalid = spawnSync(process.execPath, [script.pathname], { input: '{', encoding: 'utf8' });
@@ -629,7 +629,7 @@ test('a readback-backed Plan cannot bypass missing or stale effort review', () =
 });
 
 test('pre-review CLI returns only a review binding and cannot act as a final proposal receipt', () => {
-  const script = new URL('../skills/breaking-down-requirement/scripts/validate-task-breakdown.js', import.meta.url);
+  const script = new URL('../scripts/task-readback/validate-task-breakdown.js', import.meta.url);
   const input = proposal(); delete input.estimateReview;
   const preview = spawnSync(process.execPath, [script.pathname, '--prepare-estimate-review'], { input: JSON.stringify(input), encoding: 'utf8' });
   assert.equal(preview.status, 0);

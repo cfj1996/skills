@@ -5,6 +5,8 @@ description: Use when submitted TAPD changes must merge original fixed branches 
 
 # Go Live
 
+来自[正在执行的 TAPD Plan](../executing-tapd-plan/references/execution-context.md)时，当前开工指令明确覆盖的正式源/目标、MR 操作、目的和发布目标可复用；仅测试交付的请求终止在测试环境。权限及保护分支约束继续按实核验。
+
 ## 用户说明
 
 独立调用本技能时同样遵守[限制与确认说明](../../references/execution-checklist.md#限制与确认说明)。

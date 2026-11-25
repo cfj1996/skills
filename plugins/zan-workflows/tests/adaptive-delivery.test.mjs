@@ -9,6 +9,8 @@ import { join } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { McpClientPool } from '../scripts/mcp-client.mjs';
+import { recheckAcceptedBuild } from '../scripts/test-submission.mjs';
+import { frozenJenkinsFixture } from './helpers/frozen-jenkins-fixture.mjs';
 import { WorkflowSession as originalWorkflowSession } from '../scripts/workflow-session.mjs';
 import { registerTestSubmission as originalRegisterTestSubmission } from '../scripts/register-test-submission.mjs';
 import { resolveBugWorkflow, resolveVersionField } from '../scripts/tapd-mappings.mjs';
@@ -451,4 +453,20 @@ test('GET-only Job and publication reads remain bound to the exact configured Jo
   assert.equal(await reader.console(10), 'summary');
   await assert.rejects(reader.console(0), /构建号/);
   assert.ok(urls.every(({ url, options }) => url.startsWith('https://ci.example.test/job/front-demo-test/') && options.method === 'GET' && options.redirect === 'error'));
+});
+
+test('cold recovery of a canary queue checks the pipeline-bound ref as well as frozen parameters', async () => {
+  const fake = jenkins({ packageJob: true });
+  const input = { ...fake.base, releaseScope: undefined, targetEnvironment: 'test', releaseChannel: 'canary',
+    releaseRef: 'develop', completionMode: 'TRIGGER_ACCEPTED' };
+  const preview = await runJenkinsRelease(fake.call, fake.reader, input, fake.io);
+  const queued = await runJenkinsRelease(fake.call, fake.reader, { ...preview, execute: true, confirmed: true }, fake.io);
+  const reader = { ...fake.reader, queue: async () => ({ id: queued.queueId, actions: [{
+    parameters: Object.entries(queued.submittedParams).map(([name, value]) => ({ name, value })),
+  }] }) };
+  const io = { ...fake.io, readFrozenJenkinsContracts: async () => frozenJenkinsFixture(input, fake.io.frozenFixtureDefinitions, reader.instanceUrl) };
+  const steps = { reader: () => reader, io };
+  assert.equal((await recheckAcceptedBuild(input, queued, steps)).verification.writes, 0);
+  await assert.rejects(recheckAcceptedBuild(input, { ...queued, pipelineBodyHash: '0'.repeat(64) }, steps), /流水线源码绑定/);
+  assert.equal(fake.calls.filter(row => row.name === 'jenkins_trigger_build').length, 1);
 });
