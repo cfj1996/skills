@@ -130,11 +130,8 @@ export function startRun(input = {}, options = {}) {
   }
   if (input.parentRunId !== undefined) runDirectory(input.parentRunId, options);
   const root = privateDirectory(dataDirectory(options)), runs = privateDirectory(join(root, 'runs'));
-  const full = fs.readdirSync(runs).filter(name => runPattern.test(name)).length >= limits.runs;
-  if (full && !feedbackOnly) {
-    throw new Error('本地已保留 100 次运行；请先导出并清理不再需要的诊断记录');
-  }
-  const runId = 'run-' + randomUUID(), parent = full ? join(root, feedbackSlot) : runs, dir = join(parent, runId);
+  const useFeedbackSlot = feedbackOnly && fs.readdirSync(runs).filter(name => runPattern.test(name)).length >= limits.runs;
+  const runId = 'run-' + randomUUID(), parent = useFeedbackSlot ? join(root, feedbackSlot) : runs, dir = join(parent, runId);
   const metadata = { schemaVersion: 1, runId, startedAt: new Date().toISOString(),
     plugin: pluginIdentity(options.pluginRoot || pluginRoot), skill: input.skill,
     goal: redactText(input.goal), project: redactText(input.project, 100),
@@ -144,7 +141,7 @@ export function startRun(input = {}, options = {}) {
     host: { name: redactText(input.host?.name || 'unknown', 60),
       version: redactText(input.host?.version || 'unknown', 80), model: redactText(input.host?.model || 'unknown', 100) },
     runtime: { node: process.version, platform: process.platform, arch: process.arch } };
-  if (full) {
+  if (useFeedbackSlot) {
     // Claim one reserved slot atomically; it never replaces an older report.
     try { fs.mkdirSync(parent, { mode: 0o700 }); }
     catch (error) {
@@ -158,13 +155,12 @@ export function startRun(input = {}, options = {}) {
     created = true;
     writePrivateFile(join(dir, 'run.json'), JSON.stringify(metadata) + '\n', { exclusive: true });
     const gap = feedbackOnly ? JSON.stringify({ schemaVersion: 1, at: metadata.startedAt, type: 'coverage_gap',
-      source: 'agent_summary', stage: 'collection', code: full ? 'RUN_CAPACITY_REACHED' : 'ORIGINAL_RUN_MISSING',
-      summary: full ? '常规诊断记录已满。本记录只保留脱敏反馈摘要，原流程的执行器耗时未采集。'
-        : '本记录只保留脱敏反馈摘要，原流程的执行器耗时未采集。' }) + '\n' : '';
+      source: 'agent_summary', stage: 'collection', code: 'ORIGINAL_RUN_MISSING',
+      summary: '本记录只保留脱敏反馈摘要，原流程的执行器耗时未采集。' }) + '\n' : '';
     writePrivateFile(join(dir, 'events.jsonl'), gap, { exclusive: true });
   } catch (error) {
     if (created) fs.rmSync(dir, { recursive: true });
-    if (full) fs.rmdirSync(parent);
+    if (useFeedbackSlot) fs.rmdirSync(parent);
     throw error;
   }
   return { state: 'RECORDING', runId, ...(feedbackOnly ? { feedbackOnly } : {}) };
@@ -207,10 +203,13 @@ export function recordEvent(runId, input, options = {}) {
   return { state: 'RECORDED', runId };
 }
 
-export function readRun(runId, options = {}) {
-  const dir = runDirectory(runId, options);
+function readRunMetadata(dir, runId) {
   const metadata = readPrivateJson(join(dir, 'run.json'), 32768);
   if (metadata.runId !== runId || metadata.schemaVersion !== 1) throw new Error('运行元数据无效');
+  return metadata;
+}
+
+function readRunEvents(dir) {
   const rows = readPrivateFile(join(dir, 'events.jsonl')).toString().split('\n').filter(Boolean);
   const events = [];
   let incomplete = fs.existsSync(join(dir, 'truncated'));
@@ -222,7 +221,12 @@ export function readRun(runId, options = {}) {
       events.push(event);
     } catch { incomplete = true; }
   }
-  return { metadata, events, incomplete };
+  return { events, incomplete };
+}
+
+export function readRun(runId, options = {}) {
+  const dir = runDirectory(runId, options);
+  return { metadata: readRunMetadata(dir, runId), ...readRunEvents(dir) };
 }
 
 export function listRuns(options = {}) {
@@ -231,13 +235,25 @@ export function listRuns(options = {}) {
     const path = join(root, name);
     return fs.existsSync(path) ? fs.readdirSync(checkedDirectory(path)).filter(value => runPattern.test(value)) : [];
   });
-  return [...new Set(ids)].map(runId => {
+  const candidates = [...new Set(ids)].map(runId => {
     try {
-      const { metadata, events, incomplete } = readRun(runId, options);
-      return { runId, skill: metadata.skill, startedAt: metadata.startedAt, goal: metadata.goal,
-        outcome: events.findLast(e => e.type === 'run_finished')?.outcome || 'UNKNOWN', incomplete };
-    } catch { return { runId, outcome: 'UNKNOWN', incomplete: true }; }
-  }).sort((a, b) => (b.startedAt || '').localeCompare(a.startedAt || ''));
+      const dir = runDirectory(runId, options);
+      const { skill, startedAt, goal } = readRunMetadata(dir, runId);
+      return { dir, runId, skill, startedAt: typeof startedAt === 'string' ? startedAt : undefined, goal };
+    } catch { return { runId }; }
+  }).sort((a, b) => (b.startedAt || '').localeCompare(a.startedAt || '') || a.runId.localeCompare(b.runId));
+
+  // Archived runs keep their paths so active recorders, exports and receipts remain accessible.
+  const selected = options.includeArchived ? candidates : candidates.slice(0, limits.runs);
+  return selected.map(({ dir, ...candidate }) => {
+    if (dir) {
+      try {
+        const { events, incomplete } = readRunEvents(dir);
+        return { ...candidate, outcome: events.findLast(e => e.type === 'run_finished')?.outcome || 'UNKNOWN', incomplete };
+      } catch { /* A missing or unreadable log is still a candidate with incomplete evidence. */ }
+    }
+    return { ...candidate, outcome: 'UNKNOWN', incomplete: true };
+  });
 }
 
 // Deliberately separate from WorkflowSession.onEvent: diagnostics must never poison delivery.
@@ -296,7 +312,7 @@ async function main() {
   else if (action === 'event') result = recordEvent(input.runId, input.event);
   else if (action === 'finish') result = recordEvent(input.runId, { type: 'run_finished',
     source: 'agent_summary', outcome: input.outcome, summary: input.summary });
-  else if (action === 'list') result = { state: 'LISTED', runs: listRuns() };
+  else if (action === 'list') result = { state: 'LISTED', runs: listRuns({ includeArchived: input.includeArchived === true }) };
   else throw new Error('使用 start|event|finish|list');
   process.stdout.write(JSON.stringify(result) + '\n');
 }

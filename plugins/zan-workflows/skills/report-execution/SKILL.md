@@ -14,12 +14,13 @@ Default model profile: BALANCED for export; CRITICAL for submission. Follow the 
 
 ## Select and prepare
 
-1. 从当前任务中选准确 runId；没有时使用 recorder 的 list，只展示运行时间、
-   技能和目标。多条候选无法判断时只问一次，不静默合并不同任务的记录。
+1. 从当前任务中选准确 runId。没有时使用 recorder 的 `list --json`，只展示运行时间、
+   技能和目标。查找更早的运行时，在 stdin 传入 `{"includeArchived":true}`。
+   多条候选无法判断时只问一次，不静默合并不同任务的记录。
 2. 旧版本或未接入步骤没有事件时，允许创建本次反馈记录并追加 coverage_gap；
    主动选取的已知过程标为 agent_summary，保持原流程结局 UNKNOWN，不补造时间、
    事件、模型名或成功状态。正在执行的工作也可提交，不要求先结束。
-   无准确原 runId 且常规记录满额时，按执行反馈参考使用备用摘要记录。
+   已有 100 次常规运行时，按执行反馈参考使用备用摘要记录。
 3. 保存用户已给出的反馈。目标达成可选 REACHED/PARTIAL/NOT_REACHED/UNKNOWN，
    未评价保留 UNKNOWN，不为了填表阻塞提交。证据仅接收用户明确选择的最多
    5 段文本，不扫描源码、环境变量、凭据或会话目录。

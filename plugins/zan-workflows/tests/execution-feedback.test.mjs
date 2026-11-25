@@ -159,13 +159,44 @@ test('missing linked run and capacity failures are isolated from delivery observ
   assert.equal(readRun(runId, options).incomplete, true);
 });
 
-test('an explicit summary report still exports and submits with the regular recorder full', async t => {
+test('new runs keep recording and older runs remain exportable beyond the recent list', t => {
+  const { options, runId, input } = fixture(t);
+  const metadata = readRun(runId, options).metadata;
+  metadata.startedAt = '1970-01-01T00:00:00.000Z';
+  writePrivateFile(join(runDirectory(runId, options), 'run.json'), JSON.stringify(metadata) + '\n');
+  const original = exportExecutionReport(input, options);
+  const originalZip = fs.readFileSync(original.archivePath);
+  const active = sessionRecorder({ ...options, runId });
+
+  for (let i = 1; i < limits.runs; i++) startRun({ skill: 'fixing-bug' }, options);
+  const next = sessionRecorder(options);
+  assert.equal(next.status.state, 'RECORDING');
+  const recent = listRuns(options);
+  assert.equal(recent.length, limits.runs);
+  assert.ok(recent.some(row => row.runId === next.status.runId));
+  assert.ok(recent.every(row => row.runId !== runId));
+
+  active({ state: 'REQUEST_FINISHED', requestId: 'late-action', action: 'release', elapsedMs: 12 });
+  assert.equal(active.status.state, 'RECORDING');
+  assert.equal(exportExecutionReport(input, options).report.metrics.actionElapsedMs, 12);
+  assert.deepEqual(fs.readFileSync(original.archivePath), originalZip);
+
+  const recorder = fileURLToPath(new URL('../scripts/execution-recorder.mjs', import.meta.url));
+  const listing = spawnSync(process.execPath, [recorder, 'list', '--json'], {
+    env: { ...process.env, ZAN_WORKFLOWS_DATA_DIR: options.dataDir },
+    input: JSON.stringify({ includeArchived: true }), encoding: 'utf8', timeout: 5000,
+  });
+  assert.equal(listing.status, 0, listing.stderr);
+  const history = JSON.parse(listing.stdout).runs;
+  assert.equal(history.length, limits.runs + 1);
+  assert.equal(history.at(-1).runId, runId);
+});
+
+test('an explicit summary report still exports and submits with at least 100 regular runs', async t => {
   const { options, runId, fake } = submissionFixture(t);
   const original = readRun(runId, options);
   const runs = join(options.dataDir, 'runs');
   for (let i = 1; i < limits.runs; i++) fs.mkdirSync(join(runs, 'run-' + randomUUID()));
-  assert.throws(() => startRun({ skill: 'fixing-bug' }, options), /保留 100 次运行/);
-  assert.equal(sessionRecorder(options).status.state, 'UNAVAILABLE');
   assert.throws(() => startRun({ skill: 'fixing-bug', feedbackOnly: true }, options), /仅供显式/);
   const feedback = startRun({ skill: 'report-execution', feedbackOnly: true, goal: '原运行未录制' }, options);
   assert.equal(fs.readdirSync(runs).length, limits.runs);
@@ -179,7 +210,7 @@ test('an explicit summary report still exports and submits with the regular reco
   const input = { runId: feedback.runId, feedback: { problem: '原运行耗时未记录' } };
   const { report } = exportExecutionReport(input, options);
   assert.equal(report.outcome, 'UNKNOWN');
-  assert.equal(report.events[0].code, 'RUN_CAPACITY_REACHED');
+  assert.equal(report.events[0].code, 'ORIGINAL_RUN_MISSING');
   assert.equal(report.events[1].elapsedMs, undefined);
   assert.equal(report.metrics.explicitWaitMs, null);
   const submitted = await submitExecutionFeedback(fake.call, { ...input, execute: true, confirmed: true }, options);

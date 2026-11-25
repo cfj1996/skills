@@ -14,11 +14,11 @@ agent_summary（观察到的阶段摘要）、user_feedback（同事评价）。
 识别任意未标注秘密；发送前可阅读导出文件，要求先预览时必须等用户指示再上传。
 
 数据根依次使用 ZAN_WORKFLOWS_DATA_DIR、PLUGIN_DATA、CLAUDE_PLUGIN_DATA，
-最后使用 ~/.local/share/zan-workflows。不写安装缓存或业务仓库。最多保留
-100 个运行，每个事件文件 1 MiB，每次运行最多 10 个报告修订；达到上限停止
-采集并说明缺口，导出/检查后由用户清理不再需要的运行目录，不自动删除未提交数据。
-常规记录已满且用户明确要求反馈时，`report-execution` 可使用同一数据根下单个
-`feedback-overflow` 备用槽，先导出需保留的内容，再按用户意愿清理备用目录。
+最后使用 ~/.local/share/zan-workflows。诊断数据应放在安装缓存和业务仓库之外。
+每个事件文件最多 1 MiB，每次运行最多 10 个报告修订。旧记录原地保留，可继续按运行编号
+追加事件或导出。已生成的报告和提交回执保留原路径。检查后可清理不再需要的已提交记录。
+已有 100 次常规运行且用户明确要求创建补充反馈时，`report-execution` 使用同一数据根下单个
+`feedback-overflow` 备用槽。先导出需保留的内容，再按用户意愿清理备用目录。
 ZAN_WORKFLOWS_RECORDING=off 关闭记录；DISABLED 时不再追加阶段事件。目录/文件
 分别按 0700/0600 创建。公共会话的 SESSION_READY 同时给出采集状态及关联 runId，
 采集不可用时如实说明，不将无日志当作未执行。
@@ -74,12 +74,13 @@ JSON
 结局为 COMPLETED/FAILED/WAITING/CANCELLED/UNKNOWN。等待后还要继续追加事件时，
 用 stage_finished/state=WAITING 而非 finish；finish 结束此记录，后续工作新建
 关联记录。中断、进程被杀或采集失败可能没有终止事件，UNKNOWN 不等于失败。
-recorder 的 list --json 返回本地候选；坏行/日志截断保留完整性缺口。记录失败
-只说明采集不可用，不能中止原开发、交付或重试业务写入。
+新运行持续写入，recorder 的 `list --json` 按开始时间倒序显示最近 100 次。查找更早的运行时，
+在 stdin 传入 `{"includeArchived":true}`。坏行或日志截断保留完整性缺口。记录失败只说明
+采集不可用，不能中止原开发、交付或重试业务写入。
 
 ## Export
 
-没有准确原 runId 且常规记录已满时，用户明确请求反馈后可执行：
+没有准确原 runId 且用户明确请求反馈时，可创建补充反馈记录。
 
 ~~~bash
 node "$plugin_root/scripts/execution-recorder.mjs" start --json <<'JSON'
