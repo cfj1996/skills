@@ -132,7 +132,7 @@ function sectionTree(markdown, isBug) {
       parents[level] = current;
     }
   }
-  requireFact(title && info && history && nodes.size, '需要完整的工作项信息、项目及文末执行记录');
+  requireFact(title && info && nodes.size, '需要完整的工作项信息和项目');
   return { info, history, nodes };
 }
 
@@ -511,7 +511,8 @@ export function validatePlan(markdown, scope = {}, schema) {
     }
   }
   const executionStatus = fields.get('执行状态');
-  checkHistory(history.lines, executionStatus);
+  requireFact(schema === 4 || history, '旧版正文需要文末执行记录');
+  checkHistory(history?.lines ?? [], executionStatus);
   const selectedProjects = [...nodes.values()].filter(node => node.type === 'P' && node.children.some(mod => mod.children.some(feature => feature.inScope)));
   const delivery = schema === 4 ? null : deliveryContext(selectedProjects, fieldsOf(info), fields.get('是否提测') === '是', fields.get('是否构建') === '是', schema);
   const featureIds = [...nodes.values()].filter(node => node.type === 'F' && node.inScope).map(node => node.id);

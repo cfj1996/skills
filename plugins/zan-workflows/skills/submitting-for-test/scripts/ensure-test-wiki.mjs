@@ -458,9 +458,12 @@ function wikiUrl(workspaceId, wikiId) {
   return `https://www.tapd.cn/${workspaceId}/markdown_wikis/show/#${wikiId}`;
 }
 
+export function wikiCommentLink(url, label = url) {
+  return `[${label}](${url})`;
+}
+
 function commentBody(workspaceId, wikiId) {
-  const url = wikiUrl(workspaceId, wikiId);
-  return `提测wiki：[${url}](${url})`;
+  return '提测wiki：' + wikiCommentLink(wikiUrl(workspaceId, wikiId));
 }
 
 async function createAndReadWiki(call, workspaceId, options, parentId, onCreated) {

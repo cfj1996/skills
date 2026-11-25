@@ -5,8 +5,10 @@ import { runStoryWiki } from '../skills/collecting-requirements/scripts/story-ex
 import { sha256, stableJson } from '../scripts/workflow-runtime.mjs';
 
 const markdown = await readFile(new URL('../skills/collecting-requirements/assets/example-plan.md', import.meta.url), 'utf8');
+const frontend = await readFile(new URL('../skills/collecting-requirements/assets/example-frontend-plan.md', import.meta.url), 'utf8');
 const scope = { workspaceId: '123', storyId: '111230010000101', parentWikiId: '111230010000201' };
 const input = { ...scope, actor: '示例用户', markdown, schema: 3 };
+const frontendInput = { ...input, markdown: frontend, schema: 4 };
 const proposal = markdown.replace('门店候选查询和活动表单下拉选择', '支持授权区域内的门店候选查询与活动表单选择');
 const wrap = (data) => ({ content: [{ type: 'text', text: JSON.stringify({ status: 1, data }) }] });
 
@@ -62,8 +64,8 @@ function fixture({ bugId, storyIds = [scope.storyId] } = {}) {
   };
   const exec = (mode, params) => runStoryWiki(mode, params, run, claim, hooks.now);
   const confirmed = async (params = input) => {
-    const { approval, fingerprint } = await exec('PLAN', params);
-    return { ...params, approval, confirmedFingerprint: fingerprint };
+    const { approval, fingerprint, markdown } = await exec('PLAN', params);
+    return { ...params, markdown, approval, confirmedFingerprint: fingerprint };
   };
   return { pages, comments, writes, calls, hooks, exec, confirmed };
 }
@@ -86,6 +88,9 @@ test('只读 PLAN，确认固定目标和精确原文；SAVE 读回且只回链�
   f.hooks.lostAck = 'create_wiki';
   const completed = await f.exec('SAVE', request);
   assert.deepEqual(f.writes, ['create_wiki', 'create_comments']);
+  assert.equal(f.comments.find(row => row.id === completed.approvalCommentId).description,
+    '需求开发执行文档：[' + completed.wikiUrl + '](' + completed.wikiUrl + ') ｜ 执行计划版本确认：' +
+    completed.wikiId + ':r1:' + request.confirmedFingerprint);
   assert.equal(completed.markdown, markdown);
   assert.equal(completed.wikiTitle, request.approval.title);
   assert.equal(f.pages.get(completed.wikiId).name, completed.wikiTitle);
@@ -94,6 +99,55 @@ test('只读 PLAN，确认固定目标和精确原文；SAVE 读回且只回链�
   assert.equal((await f.exec('SAVE', request)).wikiId, completed.wikiId);
   assert.equal((await f.exec('CHECK', request)).state, 'CONFIRMED');
   assert.equal(f.writes.length, 2);
+});
+
+test('执行文档独立补链使用可点击格式，富文本读回可恢复且无重复发送', async () => {
+  const f = fixture();
+  const request = await f.confirmed();
+  const original = await f.exec('SAVE', request);
+  const receipt = f.comments.find(comment => comment.id === original.approvalCommentId);
+  receipt.description = receipt.description.slice(receipt.description.indexOf('执行计划版本确认：'));
+  let submitted;
+  f.hooks.after = (tool, opts) => {
+    if (tool !== 'create_comments') return;
+    submitted = opts.description;
+    f.comments.at(-1).description = '<p>需求开发执行文档：&nbsp;<a target="_blank" href="' +
+      original.wikiUrl.replace('#', '&#35;') + '"><strong>' + original.wikiUrl + '</strong></a></p>';
+  };
+  f.hooks.lostAck = 'create_comments';
+  assert.deepEqual(await f.exec('SAVE', request), original);
+  assert.equal(submitted, '需求开发执行文档：[' + original.wikiUrl + '](' + original.wikiUrl + ')');
+  assert.deepEqual(await f.exec('READ', { wikiUrl: original.wikiUrl }), original);
+  assert.deepEqual(await f.exec('SAVE', request), original);
+  assert.deepEqual(f.writes, ['create_wiki', 'create_comments', 'create_comments']);
+});
+
+test('合并版本回执支持富文本和旧纯文本，拒绝链接文字与目标不一致', async () => {
+  const f = fixture();
+  const saved = await f.exec('SAVE', await f.confirmed());
+  const { wikiId, wikiUrl, approvalFingerprint } = saved;
+  const comment = f.comments.find(row => row.id === saved.approvalCommentId);
+  const marker = '需求开发执行文档：';
+  const receipt = '执行计划版本确认：' + wikiId + ':r1:' + approvalFingerprint;
+  const conflict = wikiUrl.replace(/#\d+$/, '#799');
+  const encoded = wikiUrl.replace('#', '%23');
+  for (const body of [
+    '<p>' + marker + wikiUrl + ' ｜ ' + receipt + '</p>',
+    '<p>' + marker + '<a title="执行文档" href="' + encoded + '">查看执行文档</a>&nbsp;｜<br>' + receipt + '</p>',
+    marker + '[' + wikiUrl + '](' + encoded + ') ｜ ' + receipt,
+  ]) {
+    comment.description = body;
+    assert.deepEqual(await f.exec('READ', { wikiUrl }), saved);
+  }
+  for (const body of [
+    marker + '[' + conflict + '](' + wikiUrl + ') ｜ ' + receipt,
+    marker + '<a href="' + conflict + '">' + wikiUrl + '</a> ｜ ' + receipt,
+    marker + '[查看执行文档](' + wikiUrl.replace('/123/', '/999/') + ') ｜ ' + receipt,
+  ]) {
+    comment.description = body;
+    await assert.rejects(f.exec('READ', { wikiUrl }), /无效或冲突链接/);
+  }
+  assert.deepEqual(f.writes, ['create_wiki', 'create_comments']);
 });
 
 test('同一天的同名需求按工作项 ID、独立回链和 Wiki ID 各自保存和读回', async () => {
@@ -251,7 +305,8 @@ test('Bug 与相同编号的 Story 使用独立目标、审批及回链，不能
   assert.notEqual(bugResult.wikiId, storyResult.wikiId);
   assert.equal(f.pages.get(bugResult.wikiId).name, '11-25: 修复门店选择');
   assert.deepEqual(f.comments.map(c => [c.entry_type, c.description.split(' ｜ ')[0]]), [
-    ['stories', '需求开发执行文档：' + storyResult.wikiUrl], ['bug', 'Bug 修复执行文档：' + bugResult.wikiUrl],
+    ['stories', '需求开发执行文档：[' + storyResult.wikiUrl + '](' + storyResult.wikiUrl + ')'],
+    ['bug', 'Bug 修复执行文档：[' + bugResult.wikiUrl + '](' + bugResult.wikiUrl + ')'],
   ]);
   assert.ok(bugResult.approvalCommentId);
   assert.equal((await f.exec('READ', bug)).markdown, body);
@@ -285,11 +340,11 @@ test('会话稿无需工作项或 Wiki 配置，转存后可在新会话仅凭�
   const draft = '# 评审稿\n范围待确认';
   assert.deepEqual(await first.exec('SESSION', { markdown: draft }), { state: 'SESSION', markdown: draft });
   assert.deepEqual(first.calls, []);
-  const frontend = await readFile(new URL('../skills/collecting-requirements/assets/example-frontend-plan.md', import.meta.url), 'utf8');
   const reviewed = await first.exec('SESSION', { markdown: frontend });
   const saved = await first.exec('SAVE', await first.confirmed({ ...input, schema: 4, markdown: reviewed.markdown }));
   const fresh = fixture();
   fresh.pages.set(saved.wikiId, structuredClone(first.pages.get(saved.wikiId)));
+  fresh.pages.set(saved.executionRecord.wikiId, structuredClone(first.pages.get(saved.executionRecord.wikiId)));
   fresh.comments.push(...structuredClone(first.comments));
   assert.deepEqual(await fresh.exec('READ', { wikiUrl: saved.wikiUrl }), saved);
   assert.equal(saved.markdown, frontend);
@@ -331,13 +386,12 @@ test('跨页用例贯穿预览、保存和局部开工，维持正式页与交�
   assert.deepEqual(downstream.acceptanceReview.paths[0].outsideSelection, ['P1-M1-F1']);
   assert.deepEqual(downstream.acceptanceReview.standaloneTestIds, ['P1-M2-F1-TC1']);
   assert.deepEqual(await f.exec('READ', { wikiUrl: saved.wikiUrl }), saved);
-  assert.deepEqual(f.writes, ['create_wiki', 'create_comments']);
+  assert.deepEqual(f.writes, ['create_wiki', 'create_wiki', 'update_wiki', 'create_comments']);
 });
 
 test('新版执行页同页同步需求与实现变化，保留旧回执并重新绑定启动版本', async () => {
   const f = fixture();
-  const frontend = await readFile(new URL('../skills/collecting-requirements/assets/example-frontend-plan.md', import.meta.url), 'utf8');
-  const draft = { ...input, schema: 4, markdown: frontend };
+  const draft = frontendInput;
   const initial = await f.exec('SAVE', await f.confirmed(draft));
   const current = await f.exec('PROGRESS', { ...scope, progressAuthorized: true, receiptId: 'P1.settings.verified',
     expectedPageSha256: initial.pageSha256, expectedApprovalFingerprint: initial.approvalFingerprint,
@@ -353,7 +407,7 @@ test('新版执行页同页同步需求与实现变化，保留旧回执并重�
   const revision = { ...draft, markdown };
   const before = f.writes.length;
   await assert.rejects(f.exec('PLAN', revision), /最新 READ/);
-  await assert.rejects(f.exec('PLAN', { ...revision, expectedPageSha256: initial.pageSha256 }), /最新 READ/);
+  assert.equal(current.pageSha256, initial.pageSha256);
   assert.equal(f.writes.length, before);
 
   const request = await f.confirmed({ ...revision, expectedPageSha256: current.pageSha256 });
@@ -363,8 +417,13 @@ test('新版执行页同页同步需求与实现变化，保留旧回执并重�
   assert.equal(saved.markdown, markdown);
   assert.match(saved.markdown, /支持多选区域/);
   assert.match(saved.markdown, /POST \/api\/stores\/query/);
-  assert.match(saved.markdown, /P1.settings.verified/);
-  assert.equal([...f.pages.values()].find(page => page.parent_wiki_id === saved.wikiId)?.markdown_description, previousPage);
+  assert.doesNotMatch(saved.markdown, /P1.settings.verified/);
+  assert.deepEqual(saved.executionRecord.progress, current.executionRecord.progress);
+  assert.equal(saved.executionRecord.wikiId, initial.executionRecord.wikiId);
+  const archive = [...f.pages.values()].find(page => page.name === '第 1 版归档 · 2026-11-25 00:15');
+  assert.equal(archive.markdown_description, previousPage);
+  assert.equal(saved.executionRecord.changes[0].confirmation.revision, 2);
+  assert.ok(saved.executionRecord.changes[0].confirmation.archiveUrl.endsWith('#' + archive.id));
   assert.equal(f.comments.filter(comment => comment.description.startsWith('需求开发执行文档：')).length, 1);
   const competing = { ...draft, markdown: current.markdown.replace('显示营业状态', '显示门店营业状态') };
   await assert.rejects(f.exec('PLAN', { ...competing, expectedPageSha256: current.pageSha256 }), /最新 READ/);
@@ -385,17 +444,159 @@ test('执行 Bug Plan 的新会话仅凭链接读回 Bug 的范围与既有进�
   const bug = { workspaceId: scope.workspaceId, parentWikiId: scope.parentWikiId, bugId };
   const body = await readFile(new URL('../skills/collecting-requirements/assets/example-bug-plan.md', import.meta.url), 'utf8');
   const saved = await f.exec('SAVE', await f.confirmed({ ...bug, markdown: body, actor: input.actor }));
-  const event = { ...bug, receiptId: 'p1.start', entry: '按确认分支开工',
+  const event = { ...bug, receiptId: 'p1.start', entry: '按确认分支开工', executor: '示例执行人', nextStep: '核对第一项回归',
     evidence: '已核对分支及开工授权', expectedPageSha256: saved.pageSha256,
-    expectedApprovalFingerprint: saved.approvalFingerprint, progressAuthorized: true };
+    expectedApprovalFingerprint: saved.approvalFingerprint, progressAuthorized: true,
+    expectedRecordPageSha256: saved.executionRecord.pageSha256 };
   await assert.rejects(f.exec('PROGRESS', { ...event, executionStatus: '开发中' }), /实际回执/);
   const started = await f.exec('PROGRESS', event);
-  assert.equal(started.markdown, body + '- [p1.start] 按确认分支开工｜依据 已核对分支及开工授权\n');
+  assert.equal(started.markdown, body);
+  assert.equal(started.pageSha256, saved.pageSha256);
+  const recordBody = f.pages.get(saved.executionRecord.wikiId).markdown_description.split('\n').slice(1).join('\n');
+  assert.match(recordBody, /2026-11-25 00:15 · 执行 · 按确认分支开工/);
+  assert.match(recordBody, /\*\*执行人\*\* 示例执行人/);
+  assert.match(recordBody, /\*\*下一步\*\* 核对第一项回归/);
+  assert.deepEqual(await f.exec('PROGRESS', event), started);
+  await assert.rejects(f.exec('PROGRESS', { ...event, receiptId: 'p1.old' }), /基版已变化/);
+  assert.deepEqual(f.writes.slice(-1), ['update_wiki']);
   assert.equal(started.planSha256, saved.planSha256);
   assert.equal(started.delivery, null);
   assert.deepEqual(await f.exec('READ', { wikiUrl: saved.wikiUrl }), started);
   assert.equal(started.bugId, bugId);
   assert.equal(started.storyId, undefined);
+});
+
+test('正式保存中断可核实主计划并续建唯一记录页', async () => {
+  const f = fixture();
+  const request = await f.confirmed(frontendInput);
+  f.hooks.after = (tool, opts) => {
+    if (tool === 'create_wiki' && opts.name === request.approval.title) f.hooks.deny = 'create_wiki';
+  };
+  await assert.rejects(f.exec('SAVE', request), { code: 'WRITE_REJECTED' });
+  assert.equal((await f.exec('CHECK', request)).state, 'WIKI_VERIFIED_RECORD_PENDING');
+  delete f.hooks.after;
+  delete f.hooks.deny;
+  const saved = await f.exec('SAVE', request);
+  const journal = f.pages.get(saved.executionRecord.wikiId);
+  assert.equal(journal.parent_wiki_id, saved.wikiId);
+  assert.match(journal.markdown_description, /计划已保存，待开工/);
+  const mainBody = f.pages.get(saved.wikiId).markdown_description;
+  assert.ok(mainBody.includes('[执行与变更记录](' + saved.executionRecord.wikiUrl + ')'));
+  assert.doesNotMatch(mainBody, /^## 执行记录$/m);
+  const writes = f.writes.length;
+  assert.deepEqual(await f.exec('SAVE', request), saved);
+  assert.equal(f.writes.length, writes);
+  assert.equal((await f.exec('CHECK', request)).state, 'CONFIRMED');
+});
+
+test('已有第 1 版先核实迁移完整记录，再改主计划入口，原确认继续可读', async () => {
+  const f = fixture();
+  const { approval: preview } = await f.exec('PLAN', frontendInput);
+  const prefix = frontend.replaceAll('\n', '\r\n') + '\r\n## 执行记录';
+  const inline = '\r\n- [old.review] 两项本地评审通过｜依据 原分支和验证回执\r\n';
+  const approval = { ...preview, bodySha256: sha256(prefix + '\r\n'), planSha256: sha256(prefix) };
+  const approvalFingerprint = sha256(stableJson(approval));
+  const id = '501';
+  const wikiUrl = 'https://www.tapd.cn/123/markdown_wikis/show/#' + id;
+  const oldMarkdown = prefix + inline;
+  const old = '<!-- zan-story-execution/v1 ' + JSON.stringify({ approval, approvalFingerprint,
+    currentSha256: sha256(oldMarkdown) }) + ' -->\n' + oldMarkdown;
+  f.pages.set(id, { id, name: approval.title, workspace_id: scope.workspaceId, parent_wiki_id: scope.parentWikiId, markdown_description: old });
+  f.comments.push({ id: '601', workspace_id: scope.workspaceId, entry_type: 'stories', entry_id: scope.storyId,
+    author: approval.actor, description: '需求开发执行文档：' + wikiUrl + ' ｜ 执行计划版本确认：501:r1:' + approvalFingerprint });
+
+  const legacy = await f.exec('READ', { wikiUrl });
+  assert.equal(legacy.executionRecord.wikiId, null);
+  assert.equal(legacy.executionRecord.progress[0].evidence, '原分支和验证回执');
+  assert.deepEqual(f.writes, []);
+  const event = { ...scope, progressAuthorized: true, expectedPageSha256: legacy.pageSha256,
+    expectedApprovalFingerprint: approvalFingerprint, receiptId: 'new.pause', executor: '执行人',
+    entry: '等待联验', evidence: '原测试回执有效', nextStep: '确认测试租户' };
+  f.hooks.deny = 'update_wiki';
+  await assert.rejects(f.exec('PROGRESS', event), { code: 'WRITE_REJECTED' });
+  assert.equal(f.pages.get(id).markdown_description, old);
+  const journal = [...f.pages.values()].find(page => page.parent_wiki_id === id && page.name === '执行与变更记录');
+  assert.match(journal.markdown_description, /原分支和验证回执/);
+  delete f.hooks.deny;
+  const migrated = await f.exec('PROGRESS', event);
+  assert.equal(migrated.revision, 1);
+  assert.equal(migrated.approvalFingerprint, approvalFingerprint);
+  assert.equal(migrated.planSha256, approval.planSha256);
+  assert.equal(migrated.executionRecord.wikiId, journal.id);
+  assert.deepEqual(migrated.executionRecord.progress.map(row => row.id), ['old.review', 'new.pause']);
+  assert.equal(migrated.executionRecord.progress[0].executor, null);
+  assert.equal(migrated.executionRecord.progress[0].time, null);
+  assert.doesNotMatch(f.pages.get(id).markdown_description.split('\n').slice(1).join('\n'), /## 执行记录|两项本地评审通过/);
+  assert.deepEqual(await f.exec('PROGRESS', event), migrated);
+  await assert.rejects(f.exec('PROGRESS', { ...event, receiptId: 'late' }), /基版已变化/);
+  assert.deepEqual(await f.exec('READ', { wikiUrl }), migrated);
+  assert.equal(f.comments.length, 1);
+});
+
+test('带旧交付选项的计划确认转换后完整迁移旧周期回执', async () => {
+  const f = fixture();
+  const initial = await f.exec('SAVE', await f.confirmed());
+  const legacy = await f.exec('PROGRESS', { ...scope, receiptId: 'old.start', progressAuthorized: true,
+    expectedApprovalFingerprint: initial.approvalFingerprint, expectedPageSha256: initial.pageSha256,
+    entry: '原计划已经开工', evidence: '原分支和代码回执', executionStatus: '开发中' });
+  const approved = await f.confirmed({ ...frontendInput, expectedPageSha256: legacy.pageSha256 });
+  const saved = await f.exec('SAVE', approved);
+  assert.equal(saved.wikiId, initial.wikiId);
+  assert.equal(saved.revision, 2);
+  assert.deepEqual(saved.executionRecord.progress.map(row => [row.id, row.result, row.evidence]),
+    [['old.start', '原计划已经开工', '原分支和代码回执｜执行状态 开发中']]);
+  assert.doesNotMatch(f.pages.get(saved.wikiId).markdown_description, /原计划已经开工/);
+  assert.equal((await f.exec('READ', { wikiUrl: saved.wikiUrl })).delivery, null);
+});
+
+test('待确认变更保留提出时间和人员，生效回填中断后复用确认与归档', async () => {
+  const f = fixture();
+  const initial = await f.exec('SAVE', await f.confirmed(frontendInput));
+  const rawMain = f.pages.get(initial.wikiId).markdown_description;
+  const change = { id: 'list.export', title: '门店导出调整', proposer: '产品同事', occurredAt: '2026-11-24 17:10',
+    detail: '按当前筛选条件导出门店明细', impact: '列表筛选与导出按同一输入验收' };
+  const update = { ...scope, expectedApprovalFingerprint: initial.approvalFingerprint, progressAuthorized: true,
+    expectedPageSha256: initial.pageSha256, expectedRecordPageSha256: initial.executionRecord.pageSha256 };
+  await assert.rejects(f.exec('CHANGE', { ...update, change, progressAuthorized: false }), /需要授权/);
+  const proposed = await f.exec('CHANGE', { ...update, change });
+  assert.equal(proposed.executionRecord.changes[0].confirmation, null);
+  assert.equal(f.pages.get(initial.wikiId).markdown_description, rawMain);
+  assert.deepEqual(await f.exec('CHANGE', { ...update, change }), proposed);
+  await assert.rejects(f.exec('CHANGE', { ...update, change: { ...change, detail: '另一个方案' } }), /已有不同内容/);
+  f.hooks.now = new Date('2026-11-25T07:40:00Z');
+  const revised = { ...frontendInput, markdown: frontend.replace('显示营业状态', '支持导出筛选结果'),
+    expectedPageSha256: proposed.pageSha256, changeId: change.id };
+  const request = await f.confirmed(revised);
+  assert.equal(request.approval.change.proposer, change.proposer);
+  f.hooks.before = (tool, opts) => {
+    if (tool === 'update_wiki' && opts.id === initial.executionRecord.wikiId) {
+      f.hooks.deny = opts.markdown_description.includes('工作项确认评论') ? 'update_wiki' : undefined;
+    }
+  };
+  await assert.rejects(f.exec('SAVE', request), { code: 'WRITE_REJECTED' });
+  assert.equal((await f.exec('CHECK', request)).state, 'WIKI_VERIFIED_RECORD_PENDING');
+  assert.match(f.pages.get(initial.executionRecord.wikiId).markdown_description, /已确认，待核实生效/);
+  delete f.hooks.before;
+  delete f.hooks.deny;
+  f.hooks.now = new Date('2026-11-27T08:00:00Z');
+  const saved = await f.exec('SAVE', request);
+  const [row] = saved.executionRecord.changes;
+  assert.equal(saved.revision, 2);
+  assert.equal(row.id, change.id);
+  assert.equal(row.occurredAt, change.occurredAt);
+  assert.equal(row.confirmation.at, '2026-11-25 15:40');
+  assert.equal(row.confirmation.actor, input.actor);
+  assert.equal(row.confirmation.commentId, saved.approvalCommentId);
+  assert.equal(row.confirmation.revision, 2);
+  const archives = [...f.pages.values()].filter(page => page.name.startsWith('第 1 版归档 · '));
+  assert.deepEqual(archives.map(page => page.name), ['第 1 版归档 · 2026-11-25 15:40']);
+  assert.match(f.pages.get(initial.executionRecord.wikiId).markdown_description, /\*\*做到哪\*\* 第 2 版计划已确认/);
+  const delivered = await f.exec('PROGRESS', { ...scope, progressAuthorized: true, expectedPageSha256: saved.pageSha256,
+    expectedApprovalFingerprint: saved.approvalFingerprint, expectedRecordPageSha256: saved.executionRecord.pageSha256,
+    receiptId: 'export.verified', changeId: change.id, executor: '执行同事', entry: '导出按筛选条件验收通过', evidence: '测试结果链接' });
+  assert.equal(delivered.executionRecord.progress[0].changeId, change.id);
+  assert.match(f.pages.get(initial.executionRecord.wikiId).markdown_description, /关联变更.*#change-list\.export/);
+  assert.equal((await f.exec('CHECK', request)).state, 'CONFIRMED');
 });
 
 test('已有旧式同条目草稿在确认后归档原文，原 Wiki 链接继续用于新会话', async () => {
@@ -449,7 +650,7 @@ test('已上线范围修订后开启新的状态周期，归档保留完整旧�
   assert.equal(revised.revision, 2);
   assert.equal(revised.markdown, preview.markdown);
   assert.equal((await f.exec('SAVE', request)).approvalFingerprint, revised.approvalFingerprint);
-  assert.ok([...f.pages.values()].some(w => w.name.startsWith('历史 r1') && w.markdown_description.includes('- [live]')));
+  assert.ok([...f.pages.values()].some(w => w.name.startsWith('第 1 版归档 · ') && w.markdown_description.includes('- [live]')));
   const active = await f.exec('PROGRESS', { ...scope, expectedApprovalFingerprint: revised.approvalFingerprint, expectedPageSha256: revised.pageSha256,
     progressAuthorized: true, executionStatus: '开发中', receiptId: 'start', entry: '新版开工', evidence: 'r2 分支回执' });
   assert.match(active.markdown, /执行状态 \| 开发中/);

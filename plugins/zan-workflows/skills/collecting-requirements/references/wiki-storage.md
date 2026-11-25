@@ -11,24 +11,39 @@
 1. 在对话中审完范围和完整正文。取得工作项所在空间 `workspaceId`、完整 `storyId` 或 `bugId`（二选一）、用户选择的执行文档目录 `parentWikiId`、已核实的 TAPD 操作者 `actor`。一律从本次需求取值。
 2. 调用 `node <技能目录>/scripts/story-execution-wiki.mjs PLAN`，新版 Story 输入 `{schema:4, workspaceId, storyId, parentWikiId, actor, markdown}`，Bug 用 `bugId` 替代 `storyId`。此模式验证正文、工作项、父目录、正式页和评论，返回 `operations`、`action`、`approval`、`fingerprint`、`wikiTitle`、当前 Wiki ID 及回链状态。新正式页使用 `MM-DD: 中文描述`，日期取首次保存预览时的北京时间，描述使用已读回的 TAPD 工作项标题。页名随预览确认，跨日保存沿用原日期。`ADOPT` 展示原草稿、差异、归档和改名动作，确认后原位转正。已有正式页按原页名和版本续接。
 3. 向用户展示实际父目录、页名、新建或修订、版本和指纹（可展示可区分的前缀），以及本次确认的完整稿或相对原版的变更和完整稿入口。用户确认这一版和写入目标后，调用 `SAVE`，正文使用 PLAN 返回的 `markdown`。在原 PLAN 输入中附上原样的 `approval` 对象以及 `confirmedFingerprint`（PLAN 返回的完整 `fingerprint`）。原审阅后发生内容、父目录、身份或基版变化须重新预览。若 PLAN 已返回 `CONFIRMED/REUSE`，直接使用已读回的版本。
-4. 成功后使用返回的 `wikiUrl` 和 `revision`。页内标记保存工作项类型、完整 ID、版本和确认指纹。日期格式页的 Wiki 备注提供固定工作项定位，供回链尚未写入时找回页面。已有回链则按 Wiki ID 核实归属。Story 回链使用 `需求开发执行文档：`，Bug 使用 `Bug 修复执行文档：`，后面紧跟准确 Wiki URL。首次在同一条评论附上 ` ｜ 执行计划版本确认：<wikiId>:r<版本>:<完整fingerprint>`，更版另行追加只有版本确认的纯文本评论。读回核对唯一的本版确认评论 ID、实际作者、Wiki ID 和指纹。Bug 修复记录及提测 Wiki 由各自交付流程维护。
-5. 内容更版按[同步实施正文](#同步实施正文)执行。覆盖前在当前页下归档上版**包含全部当时进度**的原文，按版本和完整页 SHA-256 命名。归档读回后更新固定入口，原链接继续有效。
+4. 成功后使用返回的 `wikiUrl` 和 `revision`。页内标记保存工作项类型、完整 ID、版本和确认指纹。日期格式页的 Wiki 备注提供固定工作项定位，供回链尚未写入时找回页面。Story 回链使用 `需求开发执行文档：`，Bug 使用 `Bug 修复执行文档：`，后接与提测 Wiki 相同格式的 Markdown 链接。链接文字和跳转目标都使用同一个完整 `wikiUrl`。新建回链时读回核实 Markdown 链接或富文本锚点。已有纯 URL 回链可按 Wiki ID 复用。首次在同一条评论附上 ` ｜ 执行计划版本确认：<wikiId>:r<版本>:<完整fingerprint>`，更版另行追加版本确认评论。读回核对本版确认评论的唯一 ID、实际作者、Wiki ID 和指纹。Bug 修复记录及提测 Wiki 由各自交付流程维护。
+5. 首次保存现行计划时，创建固定子 Wiki「执行与变更记录」，页首添加互相回链。记录页初始化为「计划已保存，待开工」。内容更版按[同步实施正文](#同步实施正文)执行。覆盖前归档并核对上版原文，新增归档的标题使用「第 1 版归档 · 2026-11-25 15:30」格式。实际归档时间为北京时间，完整页 SHA-256 记在归档备注中用于恢复。
 
-初次保存使用空执行记录。已有进展时核验实际源码、测试和交付证据，再由 `PROGRESS` 追加。修订后的执行者按当前版本和证据判断可复用成果。已经上线的旧版若进入新的实施周期，沿用原归档规则保留已交付的证据。
+仍带文末执行记录的现行计划可以直接读回。首次获准回填进度、登记变更或保存新版时，先将旧回执及原证据完整复制到子页并读回，随后用入口链接替换主计划内的记录。旧回执未提供精确时间或人员时标待核实。有顶部执行状态和固定交付选项的旧式格式可用原契约续接，确认转为现行格式时按同一流程迁移原回执。
 
 ## 同步实施正文
 
-后续需求或实现方案变化时，从同一正式页 `READ` 的完整 Markdown 起草，更新受影响的功能、接口、步骤和验收，保留执行记录。新版修订 `PLAN` 增加 `expectedPageSha256`，值取起草时 `READ` 的 `pageSha256`。遇到基版变化时重新读回并与最新正文合并，再预览差异。
+后续需求或实现方案变化时，从 `READ.markdown` 起草，更新受影响的功能、接口、步骤和验收。修订 `PLAN` 增加 `expectedPageSha256`，值取起草时 `READ` 的主计划指纹。基版变化时读回最新正文并合并，再预览差异。
 
-按当前确认使用 `PLAN → SAVE → READ`，沿用原工作项和 Wiki。用读回的新 revision 和 approvalFingerprint 生成续接的 `START` 上下文，复用仍覆盖本轮动作的启动授权及有效回执。`PROGRESS` 用于追加已经发生的执行结果。
+获得记录回填授权后，在将明确变更提交确认时可以调用 `CHANGE`，其余绑定字段与 `PROGRESS` 相同，用下方的 `change` 对象登记待确认条目。使用实际提出人、变更内容及需补验的用例。时间按起因的实际北京时间到分。直接提交确认稿时，可把完整 `change` 交给 `PLAN`。已登记时给 `PLAN` 传对应 `changeId`。
+
+```json
+{
+  "change": {
+    "id": "P1.list.export",
+    "title": "新增门店明细导出",
+    "proposer": "已核实的提出人",
+    "occurredAt": "2026-11-25 15:30",
+    "detail": "按列表的当前筛选条件导出门店明细",
+    "impact": "补验 P1-M1-F1-TC1 的同条件导出"
+  }
+}
+```
+
+确认后用 `PLAN → SAVE → READ` 保存在原主计划。SAVE 在原变更条目记确认人和时间，核实正文及工作项确认评论后再回填生效版本与上一版归档。用读回的新版本和确认指纹生成 `START` 上下文，复用仍覆盖本轮动作的启动授权及有效回执。涉及该变更的执行结果通过 `PROGRESS.changeId` 关联。
 
 ## 从正式页面开工
 
-`READ` 输入 `{workspaceId, storyId, parentWikiId}` 或 `{workspaceId, bugId, parentWikiId}`。新会话也可以直接传 `{"wikiUrl":"<正式 Wiki 链接>"}`。脚本核实工作项、父目录、正式页与独立确认评论。`state: "CONFIRMED"` 表示确认版已读回。新版 `delivery` 为 `null`，需要在开工时提供选项。已完成的动作读 Markdown 执行记录，返回还包含页链接、版本、确认及正文指纹和功能范围。
+`READ` 输入 `{workspaceId, storyId, parentWikiId}` 或 `{workspaceId, bugId, parentWikiId}`。新会话也可以直接传 `{"wikiUrl":"<主计划链接>"}`。脚本核实工作项、父目录、主计划、独立确认评论及记录页归属。`state: "CONFIRMED"` 表示确认版已读回。现行格式的 `delivery` 为 `null`，在开工时提供选项。
 
 - `bodySha256` 是用户确认时完整 Markdown 的 SHA-256。
-- `planSha256` 绑定实施正文，文末执行记录属于可追加区域。旧版沿用顶部状态的原归一化算法。
-- `pageSha256` 绑定读回的全页实际字节，包含版本元数据和现有进度。PROGRESS 使用这个值防止覆盖其他改动。
+- `planSha256` 绑定实施正文。旧格式的主计划校验使用原归一化算法。
+- `pageSha256` 绑定主计划全页。现行格式的 `executionRecord` 提供子页链接、子页 `pageSha256`、执行回执 `progress` 及变更 `changes`。迁移前从原页提取回执，子页链接和指纹为空。
 
 ## 立即和手动开工
 
@@ -36,7 +51,7 @@
 
 ## 进度回填
 
-开工授权涵盖回填时，取得真实实施或交付回执后用 `PROGRESS` 追加执行记录。开发收尾通过后在交付前回填该轮结果。交付返回部分结果或用户要求暂停时，汇总已经核实的动作和下次续接所需的证据。回填暂不可用时，在会话中报告对应的证据引用和缺口，已获准的后续动作按各自前提推进。
+开工授权涵盖回填时，在实际开工、完成可交接阶段、取得交付回执，以及阻塞、暂停或交接时调用 `PROGRESS`。进入提测前先回填开发收尾回执。连续动作可归为一条。子页按时间倒序显示执行人与结果、证据及后续步骤，并刷新页首「做到哪」和「下一步」。回填暂不可用时，在会话中报告可核实的证据和缺口。
 
 ```json
 {
@@ -45,14 +60,19 @@
   "parentWikiId": "111230010000201",
   "expectedApprovalFingerprint": "<READ 返回的完整 approvalFingerprint>",
   "expectedPageSha256": "<READ 返回的完整 pageSha256>",
+  "expectedRecordPageSha256": "<有子页时，传 executionRecord.pageSha256>",
   "progressAuthorized": true,
   "receiptId": "P1.F1.review.01",
+  "title": "门店筛选开发评审通过",
+  "executor": "<实际执行人>",
+  "occurredAt": "2026-11-25 15:40",
   "entry": "P1-M1-F1 开发收尾通过，覆盖本功能验收",
-  "evidence": "本次源码 SHA、适用的未提交差异指纹、验收编号及结果、独立评审的可读来源"
+  "evidence": "本次源码 SHA、适用的差异指纹、验收编号及结果、独立评审的可读来源",
+  "nextStep": "交接给测试环境联验"
 }
 ```
 
-`entry` 和 `evidence` 各占一行。按实际取得的结果选取以下内容。使用新会话能定位的脱敏引用，例如原会话的具体结果、GitLab MR 或 Jenkins Job 与队列 ID。
+`entry`、`evidence` 和可选的 `nextStep` 各占一行。已确认变更用 `changeId` 关联。按实际取得的结果选取以下内容。使用新会话能定位的脱敏引用，例如原会话的具体结果、GitLab MR 或 Jenkins Job 与队列 ID。
 
 | 回执 | 足以续接的依据 |
 | --- | --- |
@@ -65,6 +85,6 @@
 
 ## 未知写入和并发
 
-- SAVE 中断后，将原 SAVE 输入用于只读 `CHECK`。它返回 `CONFIRMED`、`WIKI_VERIFIED_LINK_PENDING` 或 `UNVERIFIED`。已确认则完成；正文已核实但缺回链或独立确认评论，使用原 SAVE 恢复。未核实先检查同名页、准确父级、已有回链和原页内容。PROGRESS 中断则 READ 并核验同一 receiptId 的完整记录。
+- SAVE 中断后，将原 SAVE 输入用于只读 `CHECK`。它返回 `CONFIRMED`、`WIKI_VERIFIED_LINK_PENDING`、`WIKI_VERIFIED_RECORD_PENDING` 或 `UNVERIFIED`。正文已核实但缺回链、确认评论、子页或变更生效记录时，使用原 SAVE 恢复。未核实先检查页面身份和原页内容。PROGRESS/CHANGE 中断则 READ 并核验同一编号的完整记录。
 - 为防止超时或进程退出后重复发起写入，脚本在首次发送前将无正文、无凭据的操作键写入 `${XDG_STATE_HOME:-~/.local/state}/zan-workflows/story-execution-writes/`。明确的 TAPD 权限或参数拒绝返回 `WRITE_REJECTED` 并释放本次占用，修正后可重试。超时或含义不明的失败保留原占用。在同一状态目录复跑时，脚本优先采用远端读回；已发送、结果仍不明确的步骤返回 `UNKNOWN_WRITE`。保留状态目录，待服务端确认结果。跨机器恢复先做只读核验；其他机器没有原本的发起记录。
 - TAPD 的整页更新不提供原子条件写入。脚本在写前复读完整原页、写后再复读结果。在多用户或多机器同时编辑时，应串行保存。若发现指纹不一致或重复页/评论，保留所有现有记录，重新核对后继续。

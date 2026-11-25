@@ -106,6 +106,8 @@ by Wiki URL and readback-bound progress, run
 Both examples use synthetic data. The Wiki suite uses an in-memory TAPD service
 and covers Shanghai-date titles, same-title work items, legacy titles and
 recovery before a backlink exists.
+That suite also checks execution-record child Wiki creation, inline receipt
+migration, revision and progress recovery, and concurrent record drift.
 Project-local Plan files and TAPD Task creation are retired. Historical Task fixtures
 cover the read-only helper that existing-work continuation still consumes.
 
