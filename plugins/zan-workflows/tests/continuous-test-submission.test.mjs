@@ -142,7 +142,8 @@ async function fixture(t, options = {}) {
     }
     if (name === 'get_comments') return tapd('Comment', (comments.get(o.entry_id) || []).filter(row => !o.id || row.id === o.id)
       .map(row => ({ workspace_id: '123', entry_id: o.entry_id, entry_type: o.entry_type, author: 'developer', ...row })));
-    if (name === 'get_wiki') return tapd('Wiki', (o.name ? [...pages.values()].filter(page => page.name === o.name) : [pages.get(o.id)])
+    if (name === 'get_wiki') return tapd('Wiki', (o.id ? [pages.get(o.id)] : [...pages.values()]
+      .filter(page => o.note ? page.note === o.note : page.name === o.name))
       .filter(Boolean).map(page => ({ workspace_id: '123', ...page })));
     if (name === 'create_wiki') {
       const page = { id: String(700 + pages.size), workspace_id: '123', ...o };

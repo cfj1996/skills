@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { runStoryWiki } from '../skills/collecting-requirements/scripts/story-execution-wiki.mjs';
+import { sha256, stableJson } from '../scripts/workflow-runtime.mjs';
 
 const markdown = await readFile(new URL('../skills/collecting-requirements/assets/example-plan.md', import.meta.url), 'utf8');
 const scope = { workspaceId: '123', storyId: '111230010000101', parentWikiId: '111230010000201' };
@@ -9,30 +10,33 @@ const input = { ...scope, actor: '示例用户', markdown, schema: 3 };
 const proposal = markdown.replace('门店候选查询和活动表单下拉选择', '支持授权区域内的门店候选查询与活动表单选择');
 const wrap = (data) => ({ content: [{ type: 'text', text: JSON.stringify({ status: 1, data }) }] });
 
-function fixture({ bugId } = {}) {
+function fixture({ bugId, storyIds = [scope.storyId] } = {}) {
   const pages = new Map([[scope.parentWikiId, { id: scope.parentWikiId, name: '执行文件', workspace_id: '123' }]]);
   const comments = [], calls = [], writes = [], claimed = new Set();
-  let nextId = 900, hooks = {};
+  let nextId = 900;
+  const hooks = { now: new Date('2026-11-24T16:15:00Z') };
   const run = async (tool, { workspace_id, options: opts }) => {
     assert.equal(workspace_id, 123);
     calls.push(tool);
     if (hooks.before) await hooks.before(tool, opts);
     if (tool === 'get_stories_or_tasks') {
       assert.equal(opts.entity_type, 'stories');
-      return wrap(opts.id === scope.storyId ? [{ Story: { workspace_id, id: scope.storyId, name: hooks.storyName || '选择门店' } }] : []);
+      return wrap(storyIds.includes(opts.id) ? [{ Story: { workspace_id, id: opts.id, name: hooks.storyName || '选择门店' } }] : []);
     }
     if (tool === 'get_bug') {
       return wrap(opts.id === bugId ? [{ Bug: { workspace_id, id: bugId, title: '修复门店选择' } }] : []);
     }
     if (tool === 'get_comments') {
       assert.ok(['stories', 'bug'].includes(opts.entry_type));
-      assert.equal(opts.entry_id, opts.entry_type === 'bug' ? bugId : scope.storyId);
-      return wrap(comments.filter(comment => !comment.entry_type || comment.entry_type === opts.entry_type)
+      assert.ok((opts.entry_type === 'bug' ? [bugId] : storyIds).includes(opts.entry_id));
+      return wrap(comments.filter(comment => (!comment.entry_type || comment.entry_type === opts.entry_type) &&
+        (!comment.entry_id || comment.entry_id === opts.entry_id))
         .map(Comment => ({ Comment })));
     }
     if (tool === 'get_wiki') {
-      assert.ok(opts.id || opts.name);
-      return wrap([...pages.values()].filter(w => opts.id ? w.id === opts.id : w.name === opts.name).map(Wiki => ({ Wiki })));
+      assert.ok(opts.id || opts.name || opts.note);
+      return wrap([...pages.values()].filter(w => opts.id ? w.id === opts.id : opts.note ? w.note === opts.note : w.name === opts.name)
+        .map(Wiki => ({ Wiki })));
     }
     writes.push(tool);
     if (tool === 'create_wiki' && hooks.refusal) return hooks.refusal;
@@ -56,7 +60,7 @@ function fixture({ bugId } = {}) {
     claimed.add(encoded);
     return () => claimed.delete(encoded);
   };
-  const exec = (mode, params) => runStoryWiki(mode, params, run, claim);
+  const exec = (mode, params) => runStoryWiki(mode, params, run, claim, hooks.now);
   const confirmed = async (params = input) => {
     const { approval, fingerprint } = await exec('PLAN', params);
     return { ...params, approval, confirmedFingerprint: fingerprint };
@@ -68,16 +72,23 @@ test('只读 PLAN，确认固定目标和精确原文；SAVE 读回且只回链�
   const f = fixture();
   f.comments.push({ id: '700', description: '提测wiki：https://www.tapd.cn/123/markdown_wikis/show/#700' });
   const request = await f.confirmed();
+  assert.equal(request.approval.title, '11-25: 选择门店');
   assert.deepEqual(f.writes, []);
   await assert.rejects(f.exec('SAVE', { ...request, markdown: proposal }), /确认/);
   await assert.rejects(f.exec('SAVE', { ...request, confirmedFingerprint: '0'.repeat(64) }), /确认/);
   await assert.rejects(f.exec('SAVE', { ...request, approval: { ...request.approval, actor: '其他人' } }), /确认/);
+  f.hooks.storyName = '预览后改了需求标题';
+  await assert.rejects(f.exec('SAVE', request), /标题已变化/);
+  delete f.hooks.storyName;
   assert.equal((await f.exec('CHECK', request)).state, 'UNVERIFIED');
   assert.deepEqual(f.writes, []);
+  f.hooks.now = new Date('2026-11-26T00:00:00Z');
   f.hooks.lostAck = 'create_wiki';
   const completed = await f.exec('SAVE', request);
   assert.deepEqual(f.writes, ['create_wiki', 'create_comments']);
   assert.equal(completed.markdown, markdown);
+  assert.equal(completed.wikiTitle, request.approval.title);
+  assert.equal(f.pages.get(completed.wikiId).name, completed.wikiTitle);
   assert.equal(completed.revision, 1);
   assert.deepEqual(await f.exec('READ', scope), completed);
   assert.equal((await f.exec('SAVE', request)).wikiId, completed.wikiId);
@@ -85,16 +96,54 @@ test('只读 PLAN，确认固定目标和精确原文；SAVE 读回且只回链�
   assert.equal(f.writes.length, 2);
 });
 
+test('同一天的同名需求按工作项 ID、独立回链和 Wiki ID 各自保存和读回', async () => {
+  const secondId = '111230010000102';
+  const f = fixture({ storyIds: [scope.storyId, secondId] });
+  const secondScope = { ...scope, storyId: secondId };
+  const first = await f.exec('SAVE', await f.confirmed());
+  const second = await f.exec('SAVE', await f.confirmed({
+    ...input, ...secondScope, markdown: markdown.replaceAll(scope.storyId, secondId),
+  }));
+  assert.equal(first.wikiTitle, second.wikiTitle);
+  assert.notEqual(first.wikiId, second.wikiId);
+  assert.equal((await f.exec('READ', { wikiUrl: first.wikiUrl })).storyId, scope.storyId);
+  assert.equal((await f.exec('READ', { wikiUrl: second.wikiUrl })).storyId, secondId);
+  await assert.rejects(f.exec('READ', { wikiUrl: first.wikiUrl, storyId: secondId }), /工作项/);
+  assert.deepEqual(f.writes, ['create_wiki', 'create_comments', 'create_wiki', 'create_comments']);
+});
+
+test('旧版确认稿和固定 ID 页名仍可在原 Wiki 上保存、开工和修订', async () => {
+  const f = fixture();
+  const approved = await f.confirmed();
+  const legacyTitle = '需求执行计划 · ' + scope.storyId;
+  const approval = { ...approved.approval, title: legacyTitle };
+  const legacyRequest = { ...approved, approval, confirmedFingerprint: sha256(stableJson(approval)) };
+  const saved = await f.exec('SAVE', legacyRequest);
+  assert.equal(saved.wikiTitle, legacyTitle);
+  assert.deepEqual(await f.exec('READ', { wikiUrl: saved.wikiUrl }), saved);
+  const start = await f.exec('START', { wikiUrl: saved.wikiUrl, startMode: 'MANUAL', limit: 'IMPLEMENT_ONLY' });
+  assert.equal(start.wikiId, saved.wikiId);
+  const revised = await f.exec('SAVE', await f.confirmed({ ...input, markdown: proposal }));
+  assert.equal(revised.wikiTitle, legacyTitle);
+  assert.equal(revised.wikiId, saved.wikiId);
+  assert.equal(revised.revision, 2);
+});
+
 test('正文写入且回读一时失败，只读 CHECK 识别缺失回链并补写', async () => {
   const f = fixture(), request = await f.confirmed();
   let interrupted = false;
   f.hooks.before = (tool, opts) => {
-    if (!interrupted && f.writes.length && tool === 'get_wiki' && opts.name) {
+    if (!interrupted && f.writes.length && tool === 'get_wiki' && opts.note) {
       interrupted = true; throw new Error('temporary outage');
     }
   };
   await assert.rejects(f.exec('SAVE', request), { code: 'UNKNOWN_WRITE' });
   assert.deepEqual(f.writes, ['create_wiki']);
+  f.hooks.now = new Date('2026-11-27T00:00:00Z');
+  f.hooks.storyName = '更新后的需求标题';
+  const pending = await f.exec('PLAN', input);
+  assert.equal(pending.wikiTitle, request.approval.title);
+  assert.equal(pending.action, 'REUSE');
   assert.equal((await f.exec('CHECK', request)).state, 'WIKI_VERIFIED_LINK_PENDING');
   f.hooks.lostAck = 'create_comments';
   assert.equal((await f.exec('SAVE', request)).state, 'CONFIRMED');
@@ -114,7 +163,10 @@ test('未能证明结果的写操作保留已发标记，复跑不能盲目重�
 test('更版保留原完整快照和回链，归档后发生的人工修改阻止覆盖', async () => {
   const f = fixture(), previous = await f.exec('SAVE', await f.confirmed());
   const old = f.pages.get(previous.wikiId).markdown_description;
+  f.hooks.now = new Date('2026-11-28T00:00:00Z');
+  f.hooks.storyName = '修订后的需求标题';
   const next = await f.confirmed({ ...input, markdown: proposal });
+  assert.equal(next.approval.title, previous.wikiTitle);
   f.hooks.after = tool => {
     if (tool === 'create_wiki') f.pages.get(previous.wikiId).markdown_description += '\n人工补充';
   };
@@ -197,7 +249,7 @@ test('Bug 与相同编号的 Story 使用独立目标、审批及回链，不能
   assert.equal(bugResult.state, 'CONFIRMED');
   assert.equal(bugResult.bugId, bug.bugId);
   assert.notEqual(bugResult.wikiId, storyResult.wikiId);
-  assert.equal(f.pages.get(bugResult.wikiId).name, 'Bug 修复计划 · ' + bug.bugId);
+  assert.equal(f.pages.get(bugResult.wikiId).name, '11-25: 修复门店选择');
   assert.deepEqual(f.comments.map(c => [c.entry_type, c.description.split(' ｜ ')[0]]), [
     ['stories', '需求开发执行文档：' + storyResult.wikiUrl], ['bug', 'Bug 修复执行文档：' + bugResult.wikiUrl],
   ]);
@@ -354,6 +406,7 @@ test('已有旧式同条目草稿在确认后归档原文，原 Wiki 链接继�
   f.pages.set(id, { ...draft });
   const preview = await f.exec('PLAN', input);
   assert.equal(preview.action, 'ADOPT');
+  assert.equal(preview.wikiTitle, '11-25: 选择门店');
   assert.deepEqual(preview.operations, ['ARCHIVE_DRAFT', 'ADOPT_WIKI', 'ADD_LINK_AND_APPROVAL_RECEIPT']);
   assert.equal(preview.wikiId, id);
   assert.deepEqual(f.writes, []);

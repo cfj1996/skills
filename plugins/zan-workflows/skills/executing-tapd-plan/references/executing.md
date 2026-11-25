@@ -4,7 +4,7 @@
 
 ## 从链接还原范围
 
-1. 从 Wiki URL 取空间与页面 ID，通过 TAPD 读取正式标题中的工作项类型及完整 ID、页面和父目录。若给的是工作项链接，则用“需求开发执行文档”定位 Story 执行页，用“Bug 修复执行文档”定位 Bug 执行页。按本技能的目录配置核对实际父目录和归属。即使 Bug 关联同名 Story，仍以 Bug 自己的页面和回链为准。
+1. 从 Wiki URL 取空间与页面 ID，读取页内版本记录里的工作项类型、完整 ID 和父目录。若给的是工作项链接，则用“需求开发执行文档”定位 Story 执行页，用“Bug 修复执行文档”定位 Bug 执行页。按目录配置、原工作项回链和版本确认记录核对实际归属。同名 Story 或 Bug 按各自的 ID 定位。
 2. 按 [Wiki 存取契约](../../collecting-requirements/references/wiki-storage.md) 用正式 Wiki 链接调用 `READ`，也可用准确空间、`storyId` 或 `bugId`、目录读回。要求返回 `CONFIRMED`，核对原链接、实际工作项、唯一回链、正式页 ID，以及工作项确认评论 `approvalCommentId` 绑定的版本和 `approvalFingerprint`。首次保存时同一条工作项评论可同时承载回链和版本确认，修订后读取最新版本的确认评论。归档页、复制的 Markdown、其他工作项同名页或提测 Wiki 都不能作为开工入口。`READ` 已用 [Markdown 校验器](../../collecting-requirements/scripts/validate-plan.mjs) 检查索引、父子关系与引用。执行记录中的文字不参与决定范围。
 3. 从正式正文选择本轮授权的 P/M/F、关联的项目级 D、UI/TC、实施顺序、依赖和跨项目验收。用户限定某个 F 时，只核验前置产物，额外需要开发的前置 F 必须已有授权。用户仅要求评审、展示或重新确认时，返回只读结果。
 4. 用各 P 固定的仓库地址、分支动作、基线 ref/SHA、入口文件或符号及规范来源，读回当前 Git 根目录、origin、HEAD、refs、工作区差异与项目规则。对照 D 的依据核实当期契约、配置及环境。记录写入前基线，续接时按下节核对已完成的效果。

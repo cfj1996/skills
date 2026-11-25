@@ -103,7 +103,9 @@ For Story/Bug collection in chat, confirmed TAPD Plan storage, new-session execu
 by Wiki URL and readback-bound progress, run
 `node --test plugins/zan-workflows/tests/story-execution-plan.test.mjs plugins/zan-workflows/tests/story-execution-wiki.test.mjs` and
 `python3 -m unittest discover -s plugins/zan-workflows/tests -p 'test_execution_plan_routing.py'`.
-Both examples use synthetic data. The Wiki suite uses an in-memory TAPD service.
+Both examples use synthetic data. The Wiki suite uses an in-memory TAPD service
+and covers Shanghai-date titles, same-title work items, legacy titles and
+recovery before a backlink exists.
 Project-local Plan files and TAPD Task creation are retired. Historical Task fixtures
 cover the read-only helper that existing-work continuation still consumes.
 

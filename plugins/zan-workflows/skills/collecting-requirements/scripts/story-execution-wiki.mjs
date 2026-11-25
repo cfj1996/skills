@@ -7,13 +7,14 @@ import { fileURLToPath } from 'node:url';
 import { StdioMcpClient } from '../../../scripts/mcp-client.mjs';
 import { apiData } from '../../../scripts/register-test-submission.mjs';
 import { stableJson, repositoryKey, rejectedWrite } from '../../../scripts/workflow-runtime.mjs';
-import { listAllComments, totalCount } from '../../submitting-for-test/scripts/ensure-test-wiki.mjs';
+import { chinaDate, listAllComments, totalCount } from '../../submitting-for-test/scripts/ensure-test-wiki.mjs';
 import { validatePlan, planLines, itemLinkMatches, deliveryRoute, startupDelivery, readAcceptanceReview } from './validate-plan.mjs';
 
 const hash = text => createHash('sha256').update(text, 'utf8').digest('hex');
 const digitId = value => typeof value === 'string' && /^[1-9]\d*$/.test(value);
 const sha = value => typeof value === 'string' && /^[\da-f]{64}$/.test(value);
 const oneLine = value => typeof value === 'string' && value.trim() && !/[\r\n\u2028\u2029]/u.test(value);
+const datedTitle = /^(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01]): (.+)$/u;
 const link = (workspace, id) => `https://www.tapd.cn/${workspace}/markdown_wikis/show/#${id}`;
 const wikiUrlPattern = /^https:\/\/www\.tapd\.cn\/(\d+)\/markdown_wikis\/show\/(\d+)?(?:#|%23)(\d+)$/;
 const must = (test, message) => { if (!test) throw new Error(message); };
@@ -33,8 +34,12 @@ function scopeOf(input) {
 
 function owner(scope) {
   return scope.bugId
-    ? { type: 'bug', id: scope.bugId, title: `Bug 修复计划 · ${scope.bugId}`, marker: 'Bug 修复执行文档：' }
-    : { type: 'stories', id: scope.storyId, title: `需求执行计划 · ${scope.storyId}`, marker: '需求开发执行文档：' };
+    ? { type: 'bug', id: scope.bugId, legacyTitle: `Bug 修复计划 · ${scope.bugId}`, marker: 'Bug 修复执行文档：' }
+    : { type: 'stories', id: scope.storyId, legacyTitle: `需求执行计划 · ${scope.storyId}`, marker: '需求开发执行文档：' };
+}
+
+function validTitle(title, item) {
+  return title === item.legacyTitle || oneLine(title) && datedTitle.test(title);
 }
 
 function parts(markdown) {
@@ -80,20 +85,26 @@ function pack(approval, markdown) {
   return `<!-- zan-story-execution/v1 ${meta} -->\n${markdown}`;
 }
 
-function unpack(page, scope) {
+function readMetadata(page) {
   const raw = page.markdown_description;
   must(typeof raw === 'string', 'Wiki 正文不可读');
   const end = raw.indexOf('\n');
   const line = raw.slice(0, end).match(/^<!-- zan-story-execution\/v1 (\{.*\}) -->$/);
-  must(line, '同名 Wiki 缺少执行计划身份，须人工核实');
-  const { approval, currentSha256, approvalFingerprint } = JSON.parse(line[1]);
-  const markdown = raw.slice(end + 1);
-  must(same(approval.scope, scope) && approval.title === owner(scope).title && digest(approval) === approvalFingerprint
+  must(line, 'Wiki 缺少执行计划身份，须核实正式页');
+  const meta = JSON.parse(line[1]);
+  must(meta?.approval?.scope, 'Wiki 缺少工作项归属记录');
+  return { ...meta, markdown: raw.slice(end + 1) };
+}
+
+function unpack(page, scope) {
+  const { approval, currentSha256, approvalFingerprint, markdown } = readMetadata(page);
+  must(same(approval.scope, scope) && validTitle(approval.title, owner(scope)) && page.name === approval.title
+    && digest(approval) === approvalFingerprint
     && Number.isSafeInteger(approval.revision) && approval.revision > 0 && sha(approval.bodySha256)
     && hash(markdown) === currentSha256 && planHash(markdown, approval.schema) === approval.planSha256, 'Wiki 归属、确认指纹或正文与记录不一致，须重新核查');
   must(approval.previousWikiId === null || approval.previousWikiId === asId(page.id), '确认版本绑定了其他 Wiki');
   const { delivery, featureIds, featureProjects, executionStatus } = validatePlan(markdown, scope, approval.schema);
-  return { approval, approvalFingerprint, markdown, delivery, featureIds, featureProjects, executionStatus, pageSha256: hash(raw) };
+  return { approval, approvalFingerprint, markdown, delivery, featureIds, featureProjects, executionStatus, pageSha256: hash(page.markdown_description) };
 }
 
 async function localClaim(key) {
@@ -143,7 +154,7 @@ function storage(call, scope) {
     return rows;
   }
   async function byId(id) {
-    const found = await list('get_wiki', { id, limit: 1, fields: 'id,workspace_id,name,parent_wiki_id,markdown_description' }, 'Wiki');
+    const found = await list('get_wiki', { id, limit: 1, fields: 'id,workspace_id,name,parent_wiki_id,note,markdown_description' }, 'Wiki');
     must(found.length === 1 && asId(found[0].id) === id, `Wiki ${id} 读回不唯一或不存在`);
     return found[0];
   }
@@ -154,6 +165,17 @@ function storage(call, scope) {
     if (!matches.length) return null;
     const page = await byId(asId(matches[0].id));
     must(page.name === name && asId(page.parent_wiki_id) === parent, 'Wiki 标题或父目录读回变化');
+    return page;
+  }
+  async function byNote() {
+    // The note carries the work item identity while the display title can collide or change with the date.
+    const note = item.legacyTitle;
+    const rows = await list('get_wiki', { note, limit: 100, fields: 'id,workspace_id,note' }, 'Wiki');
+    const matches = rows.filter(row => row.note === note);
+    must(matches.length <= 1, '工作项存在多个执行 Wiki，须核对页面归属');
+    if (!matches.length) return null;
+    const page = await byId(asId(matches[0].id));
+    must(page.note === note && asId(page.parent_wiki_id) === parentWikiId, '执行 Wiki 备注或所在目录与工作项不符');
     return page;
   }
   async function notices() {
@@ -186,35 +208,44 @@ function storage(call, scope) {
     return { linkedId: matches[0] ?? null, receipts };
   }
   async function load() {
-    const [items, parent, official, { linkedId, receipts }] = await Promise.all([
+    const [items, parent, { linkedId, receipts }] = await Promise.all([
       item.type === 'bug'
         ? list('get_bug', { id: item.id, limit: 1, fields: 'id,title,workspace_id' }, 'Bug')
         : list('get_stories_or_tasks', { entity_type: 'stories', id: item.id, limit: 1, fields: 'id,name,workspace_id' }, 'Story'),
-      byId(parentWikiId), byName(item.title, parentWikiId), notices(),
+      byId(parentWikiId), notices(),
     ]);
     must(items.length === 1 && asId(items[0].id) === item.id && oneLine(parent.name), '未能核实工作项或父 Wiki');
-    let page = official;
-    if (!page && linkedId) {
-      page = await byId(linkedId);
-      must(asId(page.parent_wiki_id) === parentWikiId, '工作项执行文档回链与固定目录冲突');
-      verifyDraft(page, scope);
-    } else if (!page) {
-      const itemName = items[0].name ?? items[0].title;
+    const itemName = items[0].name ?? items[0].title;
+    const referencedId = linkedId ?? receipts[0]?.wikiId;
+    must(receipts.every(row => row.wikiId === referencedId), '确认记录指向其他 Wiki');
+    const referenced = referencedId ? await byId(referencedId) : null;
+    must(!referenced || asId(referenced.parent_wiki_id) === parentWikiId, '工作项执行文档回链与固定目录冲突');
+    const hasVersion = typeof referenced?.markdown_description === 'string' &&
+      referenced.markdown_description.startsWith('<!-- zan-story-execution/');
+    let official = hasVersion || receipts.length || referenced?.name === item.legacyTitle ||
+      referenced?.note === item.legacyTitle ? referenced : null;
+    if (!official) {
+      const [noted, named] = await Promise.all([byNote(), byName(item.legacyTitle, parentWikiId)]);
+      must(!noted || !named || asId(noted.id) === asId(named.id), '工作项存在多个执行 Wiki，须核对页面归属');
+      official = noted ?? named;
+    }
+    let page = official ?? referenced;
+    if (!page) {
       must(oneLine(itemName), '无法核实原条目标题以定位已有草稿');
       const oldTitle = itemName + (scope.bugId ? '｜Bug 修复执行文档' : '｜需求执行文档');
       page = await byName(oldTitle, parentWikiId);
-      if (page) verifyDraft(page, scope);
     }
-    must(!linkedId || linkedId === asId(page?.id), '工作项执行文档回链与固定目录中的页面冲突');
+    must(!referencedId || referencedId === asId(page?.id), '工作项执行文档回链与固定目录中的页面冲突');
+    if (page && !official) verifyDraft(page, scope);
     const current = official ? unpack(official, scope) : null;
     must(receipts.every(row => current && row.wikiId === asId(page?.id) && row.revision <= current.approval.revision),
       '确认记录指向其他 Wiki 或较新版本');
     const approved = receipts.filter(row => row.revision === current?.approval.revision);
     must(approved.length <= 1 && approved.every(row => row.id && row.fingerprint === current.approvalFingerprint && row.author === current.approval.actor),
       '工作项的独立确认记录与 Wiki 中的版本指纹、作者不一致或重复');
-    return { parentName: parent.name, page, linkedId, current, approvalCommentId: approved[0]?.id ?? null };
+    return { parentName: parent.name, itemName, page, linkedId, current, approvalCommentId: approved[0]?.id ?? null };
   }
-  return { run, load, byName, byId };
+  return { run, load, byName, byId, byNote };
 }
 
 async function attempt(claim, key, write, verify) {
@@ -255,6 +286,7 @@ function publicRead(scope, state) {
   const { approval, approvalFingerprint, markdown, pageSha256, executionStatus } = state.current;
   const wikiUrl = link(scope.workspaceId, state.linkedId);
   return { state: 'CONFIRMED', ...(executionStatus === undefined ? {} : { executionStatus }), ...scope, wikiId: state.linkedId, wikiUrl,
+    wikiTitle: approval.title,
     startCommand: manualStartCommand(wikiUrl, approval.revision, state.current.delivery),
     revision: approval.revision, bodySha256: approval.bodySha256, planSha256: approval.planSha256,
     approvalFingerprint, approvalCommentId: state.approvalCommentId, pageSha256, markdown, featureIds: state.current.featureIds, featureProjects: state.current.featureProjects, delivery: state.current.delivery };
@@ -266,16 +298,16 @@ async function readByUrl(input, call) {
   const [, workspaceId, , wikiId] = match;
   must(digitId(workspaceId) && Number.isSafeInteger(Number(workspaceId)) && digitId(wikiId), 'Wiki 链接的空间或页面 ID 无效');
   const response = await call('get_wiki', { workspace_id: Number(workspaceId), options: {
-    id: wikiId, limit: 1, fields: 'id,workspace_id,name,parent_wiki_id',
+    id: wikiId, limit: 1, fields: 'id,workspace_id,name,parent_wiki_id,markdown_description',
   } });
   const data = apiData(response, 'get_wiki');
   const rows = Array.isArray(data) ? data : [data];
   const page = rows[0]?.Wiki;
   must(rows.length === 1 && asId(page?.id) === wikiId && asId(page.workspace_id) === workspaceId, 'Wiki 链接与实际页面不符');
-  const title = page.name?.match(/^(需求执行计划|Bug 修复计划) · ([1-9]\d*)$/);
-  must(title, '该页面不是已确认的 TAPD Plan 正式页，可先在需求收集中查看并确认原稿');
-  const scope = scopeOf({ workspaceId, [title[1] === '需求执行计划' ? 'storyId' : 'bugId']: title[2],
-    parentWikiId: asId(page.parent_wiki_id) });
+  const { approval } = readMetadata(page);
+  const scope = scopeOf(approval.scope);
+  must(scope.workspaceId === workspaceId && scope.parentWikiId === asId(page.parent_wiki_id) && page.name === approval.title,
+    'Wiki 链接与正式页的工作项、标题或目录不符');
   for (const key of ['workspaceId', 'storyId', 'bugId', 'parentWikiId']) {
     must(!Object.hasOwn(input, key) || input[key] === scope[key], 'Wiki 链接与指定的工作项或父目录不符');
   }
@@ -344,7 +376,7 @@ export function executionFromPlan(plan, limit = 'AS_PLANNED', selection = {}) {
   return { ...plan, tapdPlan, startCommand, delivery, submit, build, selectedProjects, selectedFeatures: features, partial, ...route, next };
 }
 
-export async function runStoryWiki(mode, input, call, claim = localClaim) {
+export async function runStoryWiki(mode, input, call, claim = localClaim, now = new Date()) {
   must(['SESSION', 'PLAN', 'SAVE', 'CHECK', 'READ', 'START', 'PROGRESS'].includes(mode), '未知执行计划模式');
   if (mode === 'SESSION') {
     must(typeof input.markdown === 'string' && input.markdown.trim(), '会话输出需要评审正文');
@@ -387,7 +419,7 @@ export async function runStoryWiki(mode, input, call, claim = localClaim) {
   }
   const state = await store.load();
   if (mode === 'READ') return publicRead(scope, state);
-  const { current, page, parentName } = state;
+  const { current, page, parentName, itemName } = state;
   const wikiId = asId(page?.id);
   if (mode === 'PROGRESS') {
     publicRead(scope, state);
@@ -435,7 +467,7 @@ export async function runStoryWiki(mode, input, call, claim = localClaim) {
       (!draft.history.trim() && (!status || status.actual === '待执行')), '新版开始前须保留可归档的原记录或使用确认稿');
     markdown = (status?.text ?? draft.plan) + '\n';
   }
-  const makeApproval = (schema = draftSchema) => {
+  const makeApproval = (schema, title) => {
     if (current && current.markdown === markdown) return current.approval;
     const { executionStatus: status } = validatePlan(markdown, scope, schema);
     const next = parts(markdown);
@@ -446,7 +478,7 @@ export async function runStoryWiki(mode, input, call, claim = localClaim) {
         '修订执行范围时须保留完整现有执行记录与顶部状态，单独使用 PROGRESS 回填');
       must(planHash(markdown, schema) !== current.approval.planSha256, '只有进度/受管状态变化时请使用 PROGRESS');
     } else must((schema === 4 || status === '待执行') && !next.history.trim(), '初版须使用空执行记录，核实实际证据后再回填');
-    return { schema, scope, parentName, title: item.title, actor, ...(restart ? { restartsExecution: true } : {}), revision: (current?.approval.revision ?? 0) + 1,
+    return { schema, scope, parentName, title: current?.approval.title ?? title, actor, ...(restart ? { restartsExecution: true } : {}), revision: (current?.approval.revision ?? 0) + 1,
       previousWikiId: wikiId, previousPageSha256: page ? hash(page.markdown_description) : null,
       ...(page && !current ? { previousDraftTitle: page.name } : {}),
       bodySha256: hash(markdown), planSha256: planHash(markdown, schema) };
@@ -458,7 +490,9 @@ export async function runStoryWiki(mode, input, call, claim = localClaim) {
     if (draftSchema === 4 && current && current.markdown !== markdown) {
       must(input.expectedPageSha256 === current.pageSha256, '同页修订须绑定最新 READ 的全页指纹，请基于当前正文和执行记录调整');
     }
-    const approval = makeApproval();
+    must(current || oneLine(itemName), '无法核实工作项标题以生成执行 Wiki 页名');
+    const title = current?.approval.title ?? `${chinaDate(now).day}: ${itemName.trim()}`;
+    const approval = makeApproval(draftSchema, title);
     const changed = current?.markdown !== markdown;
     const operations = !page ? ['CREATE_WIKI'] : !current ? ['ARCHIVE_DRAFT', 'ADOPT_WIKI']
       : changed ? ['ARCHIVE_PREVIOUS', 'UPDATE_WIKI'] : [];
@@ -467,11 +501,11 @@ export async function runStoryWiki(mode, input, call, claim = localClaim) {
     if (needReceipt) operations.push(combine ? 'ADD_LINK_AND_APPROVAL_RECEIPT' : 'ADD_APPROVAL_RECEIPT');
     if (!combine && !state.linkedId) operations.push('ADD_LINK');
     return { state: 'PREVIEW', action: !page ? 'CREATE' : !current ? 'ADOPT' : changed ? 'UPDATE' : 'REUSE',
-      operations, approval, markdown, fingerprint: digest(approval), wikiId, wikiUrl: wikiId ? link(workspaceId, wikiId) : null,
+      operations, approval, markdown, fingerprint: digest(approval), wikiTitle: approval.title, wikiId, wikiUrl: wikiId ? link(workspaceId, wikiId) : null,
       linked: !!state.linkedId, ...(acceptanceReview && { acceptanceReview }) };
   }
   const { approval, confirmedFingerprint } = input;
-  must(approval && [1, 2, 3, 4].includes(approval.schema) && same(approval.scope, scope) && approval.title === item.title
+  must(approval && [1, 2, 3, 4].includes(approval.schema) && same(approval.scope, scope) && validTitle(approval.title, item)
     && approval.parentName === parentName && oneLine(approval.actor) && approval.actor === actor && sha(confirmedFingerprint)
     && digest(approval) === confirmedFingerprint && approval.bodySha256 === hash(markdown) && approval.planSha256 === planHash(markdown, approval.schema),
     '必须携带同一正文、目标和操作者的完整已确认 PLAN 指纹');
@@ -479,9 +513,16 @@ export async function runStoryWiki(mode, input, call, claim = localClaim) {
   if (mode === 'CHECK') return { state: !applied ? 'UNVERIFIED' :
     state.linkedId && state.approvalCommentId ? 'CONFIRMED' : 'WIKI_VERIFIED_LINK_PENDING',
     wikiId, linked: !!state.linkedId, approvalCommentId: state.approvalCommentId, approvalFingerprint: confirmedFingerprint };
-  if (!applied) must(same(makeApproval(approval.schema), approval), '目标或原正文已变化，请重新预览并确认');
+  if (!applied) {
+    if (!current && approval.title !== item.legacyTitle) {
+      must(oneLine(itemName) && datedTitle.exec(approval.title)[1] === itemName.trim(), '工作项标题已变化，请重新预览并确认页名');
+    }
+    must(same(makeApproval(approval.schema, approval.title), approval), '目标或原正文已变化，请重新预览并确认');
+  }
   let savedId = wikiId;
   const body = pack(approval, markdown);
+  const { title } = approval;
+  const naming = title === item.legacyTitle ? { name: title } : { name: title, note: item.legacyTitle };
   if (!applied && page) {
     const baseline = approval.previousPageSha256;
     const archiveTitle = `历史 ${current ? 'r' + current.approval.revision : '草稿'} · ${baseline}`;
@@ -494,12 +535,18 @@ export async function runStoryWiki(mode, input, call, claim = localClaim) {
     must(latest.name === page.name && asId(latest.parent_wiki_id) === parentWikiId &&
       latest.markdown_description === page.markdown_description, '归档后 Wiki 已变化，保留人工改动并重新确认');
     await attempt(claim, [scope, 'replace', wikiId, baseline],
-      () => store.run('update_wiki', { id: wikiId, ...(!current ? { name: item.title } : {}), markdown_description: body }),
-      async () => (await store.byId(wikiId)).markdown_description === body);
+      () => store.run('update_wiki', { id: wikiId, ...(!current ? naming : {}), markdown_description: body }),
+      async () => {
+        const found = await store.byId(wikiId);
+        return found.name === title && asId(found.parent_wiki_id) === parentWikiId && found.markdown_description === body;
+      });
   } else if (!applied) {
     const saved = await attempt(claim, [scope, 'create'],
-      () => store.run('create_wiki', { name: item.title, parent_wiki_id: parentWikiId, creator: actor, markdown_description: body }),
-      async () => { const found = await store.byName(item.title, parentWikiId); return found?.markdown_description === body && found; });
+      () => store.run('create_wiki', { ...naming, parent_wiki_id: parentWikiId, creator: actor, markdown_description: body }),
+      async () => {
+        const found = naming.note ? await store.byNote() : await store.byName(title, parentWikiId);
+        return found?.name === title && found.markdown_description === body && found;
+      });
     savedId = asId(saved.id);
   }
   let verified = await store.load();
