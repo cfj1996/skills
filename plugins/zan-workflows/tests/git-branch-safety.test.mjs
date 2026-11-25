@@ -57,7 +57,7 @@ test('ordinary local deletion is classified separately from branch creation', ()
 });
 
 test('baseline and currently checked-out branches cannot be deleted even in a mixed list', () => {
-  for (const name of ['main', 'master', 'develop', 'dev', current]) {
+  for (const name of ['main', 'master', 'develop', 'dev', 'test', current]) {
     for (const flag of ['-d', '--delete']) {
       const command = `git branch ${flag} -- feature/completed ${name}`;
       assert.equal(denied(command), true, command);
@@ -93,13 +93,43 @@ test('existing creation and cross-base rebase restrictions remain effective', ()
     'git checkout -b fixbug/new origin/master',
     'git worktree add -b feature/new /fixture/workspace/.worktrees/new origin/develop',
     'git rebase origin/develop',
-  ]) assert.equal(denied(command), true, command);
+  ]) assert.equal(evaluate(command, { mainBranch: 'master' })?.hookSpecificOutput?.permissionDecision, 'deny', command);
   for (const command of [
     'git branch --no-track feature/new origin/master',
     'git branch -f --no-track feature/new origin/master',
     'git switch --no-track -c feature/new origin/master',
     'git checkout --no-track -b fixbug/new origin/master',
-  ]) assert.equal(denied(command), false, command);
+  ]) assert.equal(evaluate(command, { mainBranch: 'master' }), undefined, command);
+});
+
+test('a verified main ref controls branch creation and baseline protection in the selected repository', () => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'zan-hook-roles-'));
+  try {
+    for (const mainBranch of ['master', 'main', 'release/trunk']) {
+      const repository = path.join(directory, mainBranch);
+      const git = (...args) => execFileSync('git', ['-C', repository, ...args], { stdio: 'ignore' });
+      execFileSync('git', ['init', '-b', mainBranch, repository], { stdio: 'ignore' });
+      git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', 'commit', '--allow-empty', '-qm', 'initial');
+      git('update-ref', `refs/remotes/origin/${mainBranch}`, 'HEAD');
+      git('symbolic-ref', 'refs/remotes/origin/HEAD', `refs/remotes/origin/${mainBranch}`);
+      const check = command => evaluateHookInput({ tool_name: 'Bash', cwd: directory,
+        tool_input: { command: `git -C '${repository}' ${command}` } }, { workspaceRoot: directory });
+      assert.equal(check('switch feature/existing'), undefined);
+      assert.equal(check(`switch --no-track -c feature/new origin/${mainBranch}`), undefined);
+      assert.equal(check('switch --no-track -c feature/new origin/HEAD'), undefined);
+      assert.equal(check(`switch -c feature/new origin/${mainBranch}`)?.hookSpecificOutput?.permissionDecision, 'deny');
+      assert.equal(check('switch --no-track -c feature/new origin/unrelated')?.hookSpecificOutput?.permissionDecision, 'deny');
+      assert.equal(check('branch -d test')?.hookSpecificOutput?.permissionDecision, 'deny');
+      git('config', '--local', '--add', 'zan-workflows.testBranch', 'qa/integration');
+      assert.equal(check('branch -d qa/integration')?.hookSpecificOutput?.permissionDecision, 'deny');
+      assert.equal(check(`rebase --onto origin/${mainBranch} origin/qa/integration`)?.hookSpecificOutput?.permissionDecision, 'deny');
+      assert.equal(check('switch --no-track -c feature/new origin/qa/integration')?.hookSpecificOutput?.permissionDecision, 'deny');
+      git('symbolic-ref', '--delete', 'refs/remotes/origin/HEAD');
+      assert.equal(check(`switch --no-track -c feature/new origin/${mainBranch}`)?.hookSpecificOutput?.permissionDecision, 'deny');
+      git('remote', 'add', 'origin', repository);
+      assert.equal(check(`switch --no-track -c feature/new origin/${mainBranch}`), undefined);
+    }
+  } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
 test('current-branch checks follow git -C rather than the tool working directory', () => {

@@ -2,6 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isBranchName, isTestBranch } from '../../../scripts/branch-roles.mjs';
 import { repositoryKey, stableJson } from '../../../scripts/workflow-runtime.mjs';
 
 const indexPattern = /^P[1-9]\d*(?:-D[1-9]\d*|-M[1-9]\d*(?:-F[1-9]\d*(?:-(?:UI|TC)[1-9]\d*)?)?)?$/;
@@ -379,7 +380,7 @@ function deliveryContext(projectNodes, infoFields, submit, build, schema) {
     if (git !== '跳过') gaps.submit.push(...common);
     if (job !== '跳过') gaps.build.push(...common);
     const target = git === '跳过' ? null : fact(node, '提测目标分支', gaps.submit);
-    requireFact(!target || ['dev', 'develop'].includes(target), node.id + ' 须使用真实测试目标分支');
+    requireFact(!target || isBranchName(target), node.id + ' 须使用真实测试目标分支');
     let conflict = null;
     if (target && git !== '仅核验已交付') {
       const branch = node.fields.get('冲突中转分支');
@@ -398,7 +399,7 @@ function deliveryContext(projectNodes, infoFields, submit, build, schema) {
       requireFact(['应用部署', '金丝雀发包'].includes(kind), node.id + ' 构建类型须为测试部署或明确的金丝雀发包');
       const ref = fact(node, '构建来源', gaps.build);
       if (kind === '应用部署') {
-        requireFact(!ref || (target ? ref === target : [source, 'dev', 'develop'].includes(ref)), node.id + ' 构建来源与测试交付范围不符');
+        requireFact(!ref || (target ? ref === target : ref === source || isTestBranch(ref)), node.id + ' 构建来源与测试交付范围不符');
       } else {
         // A verified canary job can read a separately selected tag/default
         // branch. Its run never grants an MR to that ref.

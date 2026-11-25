@@ -296,7 +296,7 @@ export class WorkflowSession {
         repositoryKey(p.repository) === repositoryKey(receipt.originUrl || receipt.sourceRepository));
       const verified = await mergeReviewedBranch(call('gitlab-mcp'), { projectId: receipt.projectId, repositoryPath: receipt.repositoryPath,
         originUrl: receipt.originUrl || receipt.sourceRepository,
-        sourceBranch: p.source, targetBranch: p.target, purpose: p.purpose, sourceSha: receipt.sourceSha,
+        sourceBranch: p.source, targetBranch: p.target, testBranch: p.target, purpose: p.purpose, sourceSha: receipt.sourceSha,
         expectedDeliveredSha: receipt.deliveredSha, pipelineRequired: receipt.pipelineRequired === true,
         reviewPassed: true, execute: false, mergeMode: receipt.mrIid ? 'VERIFY_ONLY' : 'CONTAINMENT_ONLY', mrIid: receipt.mrIid || undefined }, io);
       if (!['MERGED', 'VERIFIED'].includes(verified.state) || verified.containment !== true ||
@@ -402,8 +402,10 @@ export class WorkflowSession {
     if (action === 'repair-record' && (!input.tapdPlan || !input.repairRecord || input.registration?.entryType !== 'bug')) throw new Error('逐项修复记录须绑定正式 Bug Plan、登记及已审草稿');
     const context = Object.hasOwn(input, 'tapdPlan') ? await readExecutionPlan(input.tapdPlan, call('tapd-mcp')) : null;
     if (context && ['merge', 'wiki', 'registration', 'repair-record'].includes(action)) {
-      if (action === 'merge') checkPlanMerge(context, input);
-      else if (action === 'repair-record') checkPlanItem(context, input.registration, 'registration');
+      if (action === 'merge') {
+        checkPlanMerge(context, input);
+        input = { ...input, testBranch: input.targetBranch };
+      } else if (action === 'repair-record') checkPlanItem(context, input.registration, 'registration');
       else checkPlanItem(context, input, action);
       if (execute && action !== 'merge') {
         const prepared = await this.#planCloseout(context, action, input, { call, reader, io });

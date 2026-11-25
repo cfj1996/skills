@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { ensureTestWiki } from '../skills/submitting-for-test/scripts/ensure-test-wiki.mjs';
 import { runStoryWiki, executionFromPlan } from '../skills/collecting-requirements/scripts/story-execution-wiki.mjs';
+import { isTestDelivery } from './branch-roles.mjs';
 import { repositoryKey, gitScopeKey, sha256, stableJson } from './workflow-runtime.mjs';
 
 // The caller maps the human's start instruction. This readback proves the
@@ -144,7 +145,9 @@ export function checkPlanMerge(plan, merge, localGit) {
     (p.git !== '仅合并已有 MR' || Boolean(merge.mrIid) || merge.mergeMode === 'CONTAINMENT_ONLY') &&
     (!localGit?.push || ['提交推送并合并 MR', '仅推送并合并 MR'].includes(p.git)) &&
     (!localGit?.commit || p.git === '提交推送并合并 MR'));
-  if (!matches) throw new Error('Git 仓库、源/目标分支、提交推送或合并操作与执行 Plan 不一致');
+  if (!matches || merge.testBranch !== undefined && merge.testBranch !== merge.targetBranch) {
+    throw new Error('Git 仓库、源/目标分支、提交推送或合并操作与执行 Plan 不一致');
+  }
   for (const p of allowed) checkSelectedFeatures(plan, p, merge.reviewedFeatures);
 }
 
@@ -229,7 +232,7 @@ export function planGitCoverage(plan, receipts) {
   for (const receipt of receipts) {
     const key = gitScopeKey(receipt);
     if (!expected.has(key) || seen.has(key)) throw new Error('Git 回执超出本轮项目/分支范围或重复');
-    if (!['MERGED', 'VERIFIED'].includes(receipt.state) || receipt.containment !== true ||
+    if (!['MERGED', 'VERIFIED'].includes(receipt.state) || receipt.containment !== true || !isTestDelivery(receipt) ||
         !commit(receipt.sourceSha) || !commit(receipt.deliveredSha)) throw new Error('Git 回执缺少已审源码、交付 SHA 或包含关系');
     seen.add(key);
   }

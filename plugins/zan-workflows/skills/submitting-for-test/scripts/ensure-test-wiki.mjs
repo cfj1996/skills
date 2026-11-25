@@ -9,6 +9,7 @@ import { StdioMcpClient } from '../../../scripts/mcp-client.mjs';
 import { assertWikiEntryUpdate, findWikiEntry, renderWikiEntries, wikiEntry } from '../../../scripts/wiki-entry.mjs';
 import { repositoryKey } from '../../../scripts/workflow-runtime.mjs';
 import { checkMockSafetySet, mockSafetyPreview } from '../../../scripts/mock-safety.mjs';
+import { COMMON_MAIN_BRANCHES, isMainDelivery, isTestDelivery } from '../../../scripts/branch-roles.mjs';
 export { StdioMcpClient } from '../../../scripts/mcp-client.mjs';
 const DEFAULT_ROOT_WIKI_ID = '1150372234001008260';
 const DEFAULT_WORKSPACE_ID = 50372234;
@@ -699,8 +700,11 @@ export async function ensureTestWiki(call, input, now = new Date(), io = {}) {
     monthWikiId: plan.monthWikiId, wikiState: child ? 'UNCHANGED' : 'NOT_CREATED',
     commentState: mode === 'update' ? 'SKIPPED' : commentOperation === 'NONE' ? 'ALREADY_LINKED' : 'NOT_LINKED', writes: 0,
   };
-  const productionWiki = ['master', 'main'].includes(input.targetBranch) || input.targetEnvironment === 'production' ||
-    (input.gitDeliveryReceipts || input.prerequisites?.gitReceipts || []).some(row => ['master', 'main'].includes(row.targetBranch));
+  const deliveries = input.gitDeliveryReceipts || input.prerequisites?.gitReceipts || [];
+  const productionWiki = input.targetEnvironment === 'production' ||
+    deliveries.some(row => isMainDelivery(row) || COMMON_MAIN_BRANCHES.includes(row.targetBranch) && !isTestDelivery(row)) ||
+    COMMON_MAIN_BRANCHES.includes(input.targetBranch) &&
+      !deliveries.some(row => row.targetBranch === input.targetBranch && isTestDelivery(row));
   // Linking an already verified Wiki changes only its exact item comment. It
   // neither introduces a delivery nor claims a new Mock verification result.
   if (!noWrite && mode !== 'link') await checkMockSafetySet(input, { operation: productionWiki ? 'production-wiki' : 'test-wiki', purpose: input.purpose,

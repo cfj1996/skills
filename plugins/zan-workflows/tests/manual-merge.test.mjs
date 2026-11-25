@@ -92,8 +92,8 @@ test('default target is refreshed after waiting and approval checks before the m
   }
 });
 
-test('unchanged actual master and main targets still merge and verify containment', async () => {
-  for (const targetBranch of ['master', 'main']) {
+test('a verified default target of any name can merge and verify containment', async () => {
+  for (const targetBranch of ['master', 'main', 'release/trunk']) {
     const fake = fixture({ targetBranch, defaultBranch: targetBranch });
     const result = await mergeReviewedBranch(fake.call, { ...input(), targetBranch, mrIid: '7' }, fake.io);
     assert.equal(result.state, 'MERGED');

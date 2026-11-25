@@ -30,12 +30,13 @@ async function fixture(t, options = {}) {
   }
   replaceWiki(wikiId, oldBody);
   await writeFile(bodyFile, oldBody + entry);
+  const targetBranch = options.targetBranch || 'develop';
   const merge = { projectId: '9', repositoryPath: dir, originUrl: repo, purpose: '单页字段提测', title: '展示设置',
-    sourceBranch: branch, targetBranch: 'develop', sourceSha: source, targetSha: target, reviewPassed: true, pipelineRequired: false };
+    sourceBranch: branch, targetBranch, sourceSha: source, targetSha: target, reviewPassed: true, pipelineRequired: false };
   merge.mockSafety = noMockFixture(merge);
   const release = { targetProject: 'factory', releaseTarget: 'factory', jobName: 'factory-test', jobUrl, sourceRepository: repo,
-    releaseRef: 'develop', releaseChannel: 'canary', releaseKind: 'deployment', targetEnvironment: 'test',
-    refParameter: 'branch', params: { branch: 'develop' }, jobAdapter: 'explicit-v1', jenkinsProfile: 'fixture' };
+    releaseRef: targetBranch, releaseChannel: 'canary', releaseKind: 'deployment', targetEnvironment: 'test',
+    refParameter: 'branch', params: { branch: targetBranch }, jobAdapter: 'explicit-v1', jenkinsProfile: 'fixture' };
   const parameters = [{ name: 'branch' }];
   if (options.environmentParameter) parameters.push({ name: 'RELEASE_TYPE', choices: ['release:canary', 'release:prod'] });
   const readback = targetBranch => [{ parameters: [
@@ -63,12 +64,13 @@ async function fixture(t, options = {}) {
   const models = [first];
   let second;
   if (options.batch) {
+    const secondTarget = options.secondTargetBranch || 'dev';
     const secondMerge = { ...merge, projectId: options.sameRepo ? merge.projectId : '10', originUrl: options.sameRepo ? repo : secondRepo,
-      sourceBranch: options.sameRepo ? 'fixbug/test.mobile' : branch, targetBranch: 'dev',
+      sourceBranch: options.sameRepo ? 'fixbug/test.mobile' : branch, targetBranch: secondTarget,
       sourceSha: 'd'.repeat(40), targetSha: 'e'.repeat(40) };
     secondMerge.mockSafety = noMockFixture(secondMerge);
     const secondRelease = { ...release, targetProject: 'mobile', releaseTarget: 'mobile', jobName: 'mobile-test',
-      jobUrl: ci + '/job/mobile-test/', sourceRepository: secondMerge.originUrl, releaseRef: 'dev', params: { branch: 'dev' } };
+      jobUrl: ci + '/job/mobile-test/', sourceRepository: secondMerge.originUrl, releaseRef: secondTarget, params: { branch: secondTarget } };
     second = { merge: secondMerge, release: secondRelease, delivered: secondDelivered, queueId: 43, mrIid: 6 };
     models.push(second);
     input.repositories = [{ merge, release }, { merge: secondMerge, release: options.skipSecond ? null : secondRelease }];
@@ -106,7 +108,7 @@ async function fixture(t, options = {}) {
       const model = otherBranch ? second : byProject(args.project_id), row = model.merge, id = Number(row.projectId);
       if (name === 'get_branch') return { commit: { id: args.branch_name === row.sourceBranch ? row.sourceSha
         : liveTarget(model) } };
-      if (name === 'get_project') return { id, default_branch: 'main', http_url_to_repo: row.originUrl };
+      if (name === 'get_project') return { id, default_branch: options.defaultBranch || 'main', http_url_to_repo: row.originUrl };
       if (name === 'list_merge_requests') return model.mr && !model.merged ? [model.mr] : [];
       if (name === 'create_merge_request') return model.mr = { iid: model.mrIid, source_project_id: id, target_project_id: id,
         sha: row.sourceSha, source_branch: row.sourceBranch, target_branch: row.targetBranch, state: 'opened',
@@ -330,6 +332,22 @@ test('a batch reports independent preflight failures before any merge or build',
     return true;
   });
   assert.equal(f.calls.filter(name => /^(create_|merge_merge_|jenkins_trigger|update_)/.test(name)).length, 0);
+});
+
+test('exact test and custom targets are carried through Git, test builds and Bug registration', async t => {
+  const f = await fixture(t, { batch: true, bug: true, targetBranch: 'test', secondTargetBranch: 'qa/integration' });
+  const result = await f.run(await f.request('PLAN', f.input));
+  assert.equal(result.state, 'SUBMITTED');
+  assert.equal(result.receipts.registration.state, 'REGISTERED');
+  assert.deepEqual(result.receipts.repositories.map(({ git, release }) =>
+    [git.targetBranch, git.testTargetVerified, release.releaseRef]),
+    [['test', true, 'test'], ['qa/integration', true, 'qa/integration']]);
+});
+
+test('a branch called test is rejected as a test target when it is the repository default', async t => {
+  const f = await fixture(t, { targetBranch: 'test', defaultBranch: 'test' });
+  await assert.rejects(f.request('PLAN', f.input), /远端默认分支不能作为提测目标/);
+  assert.equal(f.calls.some(name => /^(create_|merge_merge_|jenkins_trigger|update_)/.test(name)), false);
 });
 
 test('a second repository awaiting manual merge continues the exact batch plan without replaying the first delivery', async t => {
@@ -830,6 +848,29 @@ test('stateless Wiki selects delivery at startup and binds that choice through s
   assert.equal(completed.state, 'SUBMITTED');
   assert.equal(completed.receipts.release.queueId, 42);
   assert.deepEqual(await f.planWiki('READ', { wikiUrl: saved.wikiUrl }), saved);
+});
+
+test('a Plan binds the actual test branch and rejects it when GitLab identifies it as the default', async t => {
+  const custom = await fixture(t, { bug: true, targetBranch: 'qa/integration' });
+  const { start } = await startBoundPlan(custom, 'IMMEDIATE', body => body
+    .replace(/^- \*\*冲突中转分支\*\* .+$/m, '- **冲突中转分支** 未授权')
+    .replaceAll(/\bdevelop\b/g, 'qa/integration')
+    .replace(/^- \*\*构建参数指纹\*\* [a-f0-9]{64}$/m,
+      '- **构建参数指纹** ' + sha256(JSON.stringify(custom.input.release.params))));
+  const bound = { ...custom.input.merge, tapdPlan: start.tapdPlan };
+  const preview = await custom.step('merge', 'PLAN', bound);
+  assert.equal(preview.testBranch, 'qa/integration');
+  const delivered = await custom.run(await custom.request('PLAN', custom.input));
+  assert.equal(delivered.state, 'SUBMITTED');
+  assert.equal(delivered.receipts.git.testTargetVerified, true);
+  assert.equal(delivered.receipts.git.targetBranch, 'qa/integration');
+
+  const defaultTarget = await fixture(t, { bug: true, defaultBranch: 'develop' });
+  const startup = await startBoundPlan(defaultTarget, 'IMMEDIATE');
+  await assert.rejects(defaultTarget.step('merge', 'EXECUTE', {
+    ...defaultTarget.input.merge, tapdPlan: startup.start.tapdPlan, confirmed: true,
+  }), /远端默认分支不能作为提测目标/);
+  assert.ok(!defaultTarget.calls.includes('create_merge_request'));
 });
 
 for (const mode of ['IMMEDIATE', 'MANUAL']) {

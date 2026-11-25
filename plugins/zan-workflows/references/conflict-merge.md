@@ -1,8 +1,8 @@
 # A → C → B conflict handoff and cleanup
 
 Use for an actual conflict in the user's own reviewed development delivery.
-`A` is the original feature/fixbug branch, `B` the verified target (dev/develop
-or actual default master/main), and `C=merge/<source-slug>-to-<target-slug>` the
+`A` is the original feature/fixbug branch, `B` the verified test-submission
+or remote default branch, and `C=merge/<source-slug>-to-<target-slug>` the
 one-time conflict branch. Keep A as the business source in every handoff.
 Reviewing another author's MR alone does not authorize conflict repair.
 
@@ -101,7 +101,7 @@ instruction first and keep merge/cleanup outcomes separate.
 
 - Verify C's own MR target and full current local/remote tip containment in
   refreshed B; dev-only integration commits need not be in master. Completed
-  C → dev/develop cleanup does not require master go-live. Do not fabricate a
+  Cleanup after C merges to the verified test target can proceed on that delivery evidence. Do not fabricate a
   master result to invoke the master-only check-local-closeout executor.
 - Reuse the checklist and ordinary commands in
   [local-closeout.md](../skills/going-live/references/local-closeout.md#confirmed-cleanup)

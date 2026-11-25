@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { clientFor } from './mcp-client.mjs';
 import { verifyMergeApprovals } from './gitlab-approvals.mjs';
 import { checkMockSafetySet, mockSafetyPreview } from './mock-safety.mjs';
+import { deliveryTargetKind, isBranchName, isTestBranch } from './branch-roles.mjs';
 import { pollState, progressToStderr, readCliPlan, readTool, repositoryKey, requireText, toolData, validateWait, runScopedCommand } from './workflow-runtime.mjs';
 
 const SHA = /^[a-f\d]{40}(?:[a-f\d]{24})?$/i;
@@ -64,6 +65,7 @@ async function testTargetReceipt(input, targetSha, io) {
   return { state: 'VERIFIED', operation: 'VERIFY_CONTAINMENT_ONLY', projectId: input.projectId,
     repositoryPath: input.repositoryPath, originUrl: input.originUrl,
     sourceBranch: input.sourceBranch, targetBranch: input.targetBranch, sourceSha: input.sourceSha,
+    defaultBranch: input.defaultBranch, defaultTargetVerified: false, testTargetVerified: true,
     targetSha, observedTargetSha: targetSha, deliveredSha, containment: true,
     mrIid: null, mrUrl: null, mergeReadback: false, mergeCommitSha: null, writes: 0 };
 }
@@ -119,7 +121,7 @@ function mergeMode(input) {
     throw new Error('人工合并核验必须只读并绑定原 MR IID 和 source SHA');
   }
   if (mode === 'CONTAINMENT_ONLY' && (input.execute || input.mrIid ||
-      !['dev', 'develop'].includes(input.targetBranch) || !SHA.test(input.sourceSha || ''))) {
+      !isTestBranch(input.targetBranch, input.testBranch) || !SHA.test(input.sourceSha || ''))) {
     throw new Error('只读包含关系核验必须绑定测试分支和已评审 source SHA，不能执行 MR 写入');
   }
   if (input.expectedDeliveredSha !== undefined &&
@@ -129,9 +131,9 @@ function mergeMode(input) {
   return mode;
 }
 
-function checkDefaultTarget(project, input) {
-  if (['master', 'main'].includes(input.targetBranch) && project.default_branch !== input.targetBranch) {
-    throw new Error(`${input.targetBranch} 未验证为实际默认分支，需要更新清单`);
+function verifyDefaultBranch(project, expected) {
+  if (expected !== undefined && project.default_branch !== expected) {
+    throw new Error(`未验证为实际默认分支 ${expected}，远端默认分支已变化，需要更新清单`);
   }
 }
 
@@ -167,7 +169,7 @@ function awaitingMerge(result, plan, mr, reason) {
   const readiness = mergeState(mr, plan);
   if (readiness.error) throw new Error(readiness.error);
   requireText(mr.web_url, '待人工合并 MR 链接');
-  const resumePrompt = ['master', 'main'].includes(plan.targetBranch) ? '已合并，继续上线' : '已合并，继续交付';
+  const resumePrompt = plan.targetBranch === plan.defaultBranch ? '已合并，继续上线' : '已合并，继续交付';
   const explanation = reason === 'MERGE_PERMISSION_DENIED' ? '当前账号没有合并权限。'
     : reason === 'MANUAL_MERGE_PENDING' ? 'MR 仍未合并。' : '本次采用人工合并。';
   return { ...result, state: 'AWAITING_MERGE', phase: 'WAIT_MANUAL_MERGE', mrUrl: mr.web_url,
@@ -197,8 +199,9 @@ export async function mergeReviewedBranch(call, input, io = {}) {
   validateWait(io);
   const mode = mergeMode(input);
   for (const key of ['projectId', 'repositoryPath', 'originUrl', 'sourceBranch', 'targetBranch', 'purpose']) requireText(input[key], key);
-  if (!/^(feature|fixbug)\/[^\s]+$/.test(input.sourceBranch) || !['develop', 'dev', 'master', 'main'].includes(input.targetBranch)) {
-    throw new Error('只能合并原始 feature/fixbug 分支；禁止 develop/dev 到 master 或替代分支');
+  if (!/^(feature|fixbug)\//.test(input.sourceBranch) || !isBranchName(input.sourceBranch) || !isBranchName(input.targetBranch) ||
+      input.sourceBranch === input.targetBranch || isTestBranch(input.sourceBranch, input.testBranch)) {
+    throw new Error('合并需绑定原始 feature/fixbug 源分支和准确目标分支，提测分支不能作为原始开发分支');
   }
   if (input.reviewPassed !== true || typeof input.pipelineRequired !== 'boolean') throw new Error('缺少当前变更评审或 CI 策略');
   if (input.execute && (input.confirmed !== true || !SHA.test(input.sourceSha || '') || !SHA.test(input.targetSha || ''))) {
@@ -214,16 +217,22 @@ export async function mergeReviewedBranch(call, input, io = {}) {
       : readTool(call, 'list_merge_requests', { ...projectArgs, source_branch: input.sourceBranch,
         target_branch: input.targetBranch, state: 'opened', per_page: 2, page: 1 }),
   ]);
-  if (!SHA.test(target?.commit?.id || '') || !Array.isArray(candidates)) {
+  if (!SHA.test(target?.commit?.id || '') || (target.name !== undefined && target.name !== input.targetBranch) ||
+      !Array.isArray(candidates)) {
     throw new Error('分支或 MR 查询不可识别');
   }
   if (![project?.ssh_url_to_repo, project?.http_url_to_repo].filter(Boolean).some(url => repositoryKey(url) === repositoryKey(input.originUrl))) {
     throw new Error('GitLab 项目与确认的源码仓库不一致');
   }
-  checkDefaultTarget(project, input);
+  verifyDefaultBranch(project, input.defaultBranch);
+  const defaultBranch = project.default_branch;
+  const targetKind = deliveryTargetKind(input, defaultBranch);
+  const production = targetKind === 'production';
+  if (input.sourceBranch === defaultBranch) throw new Error('远端默认分支不能作为原始开发分支');
   if (mode === 'CONTAINMENT_ONLY') {
+    if (production) throw new Error('只读包含关系核验必须绑定提测分支');
     if (input.targetSha && input.targetSha !== target.commit.id) throw new Error('目标分支 SHA 已变化');
-    const receipt = await testTargetReceipt(input, target.commit.id, io);
+    const receipt = await testTargetReceipt({ ...input, defaultBranch }, target.commit.id, io);
     if (!receipt) throw new Error('测试分支尚未包含已评审变更；本轮未授权合并，不执行其他交付');
     return receipt;
   }
@@ -237,30 +246,31 @@ export async function mergeReviewedBranch(call, input, io = {}) {
   // fetched target containment remain verifiable without that branch.
   const source = mode === 'VERIFY_ONLY' || mr?.state === 'merged' ? null
     : await readTool(call, 'get_branch', { ...projectArgs, branch_name: input.sourceBranch });
-  const plan = { ...input, mergeMode: mode,
+  const plan = { ...input, mergeMode: mode, defaultBranch,
     pipelineRequired: input.pipelineRequired || project.only_allow_merge_if_pipeline_succeeds === true,
     sourceSha: input.sourceSha || source?.commit?.id, targetSha: input.targetSha || target.commit.id };
   if (!SHA.test(plan.sourceSha || '') || (source && source.commit?.id !== plan.sourceSha)) throw new Error('源分支 SHA 已变化或不可识别');
   if (mr) bindMr(mr, plan);
   if (mode === 'VERIFY_ONLY' && !mr) throw new Error('原 MR 未能读回；不会重新创建');
   if (mode !== 'VERIFY_ONLY' && target.commit.id !== plan.targetSha && mr?.state !== 'merged') throw new Error('目标分支 SHA 已变化');
-  if (!mr && ['dev', 'develop'].includes(input.targetBranch)) {
+  if (!mr && !production) {
     const receipt = await testTargetReceipt(plan, target.commit.id, io);
     if (receipt) return receipt;
   }
-  const mockContext = { operation: 'git-delivery', purpose: input.purpose, environmentKind: ['master', 'main'].includes(input.targetBranch) ? 'production' : 'test',
-    targetEnvironment: ['master', 'main'].includes(input.targetBranch) ? 'production' : (input.targetEnvironment || 'test'),
+  const mockContext = { operation: 'git-delivery', purpose: input.purpose, environmentKind: targetKind,
+    targetEnvironment: production ? 'production' : (input.targetEnvironment || 'test'),
     targetBranch: input.targetBranch, sourceRepository: input.originUrl, sourceSha: plan.sourceSha, requireCommitted: true };
   const mockSafetyReceipts = input.execute && mode !== 'VERIFY_ONLY' ? await checkMockSafetySet(input, mockContext, io) : null;
   if (!mr) requireText(input.title, '新 MR 标题');
   if (!input.execute && mode !== 'VERIFY_ONLY') return {
-    ...plan, ...mockSafetyPreview(input, ['master', 'main'].includes(input.targetBranch)), execute: false, confirmed: false, state: 'AWAITING_CONFIRMATION',
+    ...plan, ...mockSafetyPreview(input, production), execute: false, confirmed: false, state: 'AWAITING_CONFIRMATION',
     mrIid: mr ? String(mr.iid) : null, mrUrl: mr?.web_url || null,
     operation: mode === 'MANUAL' ? (mr ? 'REUSE_FOR_MANUAL_MERGE' : 'CREATE_FOR_MANUAL_MERGE')
       : mr ? 'REUSE_AND_MERGE' : 'CREATE_AND_MERGE', writes: 0,
   };
   const result = { state: 'BLOCKED', projectId: input.projectId, repositoryPath: input.repositoryPath,
     originUrl: input.originUrl, sourceBranch: input.sourceBranch,
+    defaultBranch, defaultTargetVerified: production, testTargetVerified: !production,
     mockSafetyReceipts, targetBranch: input.targetBranch, sourceSha: plan.sourceSha, mrIid: mr ? String(mr.iid) : null,
     mrUrl: mr?.web_url || null, mergeReadback: false, containment: false, writes: 0 };
   let phase = 'CREATE_MR';
@@ -291,9 +301,9 @@ export async function mergeReviewedBranch(call, input, io = {}) {
         readTool(call, 'get_branch', { ...projectArgs, branch_name: input.sourceBranch }),
         readTool(call, 'get_branch', { ...projectArgs, branch_name: input.targetBranch }),
         readTool(call, 'get_merge_request', mrArgs),
-        ['master', 'main'].includes(input.targetBranch) ? readTool(call, 'get_project', projectArgs) : project,
+        readTool(call, 'get_project', projectArgs),
       ]);
-      checkDefaultTarget(freshProject, input);
+      verifyDefaultBranch(freshProject, defaultBranch);
       if (freshSource?.commit?.id !== plan.sourceSha || freshTarget?.commit?.id !== plan.targetSha) {
         throw new Error('合并前 source/target SHA 已变化，需要更新清单');
       }
@@ -333,7 +343,6 @@ export async function mergeReviewedBranch(call, input, io = {}) {
     if (proof?.contained !== true || !SHA.test(proof.targetSha || '')) throw new Error('源提交未验证包含在目标分支');
     result.containment = true;
     return { ...result, state: 'MERGED', observedTargetSha: proof.targetSha,
-      defaultBranch: project.default_branch, defaultTargetVerified: project.default_branch === input.targetBranch,
       deliveredSha, mergeCommitSha: merged.merge_commit_sha || null };
   } catch (error) {
     error.result = { ...result, phase, error: error.message };

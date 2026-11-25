@@ -38,14 +38,13 @@ Mock、范围/影响/文档、适用治理和实时 GitLab 门禁，也不伪造
 每次 approve 和 merge 前读取：
 
 - 当前执行账号、准确项目/MR、仍为 open 且非 draft/WIP 的状态；
-- 源分支、目标分支和最新 source/target SHA；目标仅 `master` 或 `main`；
+- 源分支、目标分支和最新 source/target SHA，以及 GitLab 项目读回的 `default_branch`，目标必须是该主分支；
 - 当前账号对受保护目标的有效 merge 能力；approve 写入还须核实独立 approve 能力；
 - mergeability/conflict、项目要求的 pipeline、approval、未解决讨论与适用规则；
 - 审核版本、实际范围依据、适用文档条目指纹及当前完整 Mock 清查。
 
-`develop` 同时包含工作区约定的 `dev` 别名，核实真实 ref 和历史。
-禁止 develop/dev 作为源分支合并到任何目标；禁止提交历史包含来自 develop/dev 的
-合并记录。发现时阻断 `safety` 并给出具体历史证据，不仅凭分支名称搜索或 MR 标题判断。
+按仓库交付配置或本次已核实目标查明实际提测分支、ref 和历史。
+提测分支作为源分支或提交历史包含其合并记录时，阻断 `safety` 并给出具体历史证据。
 安全违规可使审核停在未完成；已有充分代码结论仍保留，不仅凭历史判代码不通过。
 
 source SHA 与审核记录不一致时暂缓该 MR，审核当前增量并刷新受影响证据；
@@ -75,8 +74,10 @@ pipeline 按统一规则阻断。若需要等待 pipeline，写前再次读取 r
 已证明仅用于开发且排除生产运行/构建的 fixture 可保留 MOCK-* / MOCK_ONLY 标识。
 源码检查不冒充未来制品检查；实际发布仍走 Jenkins 先检后发和当次制品门禁。
 
-构造 `currentChange`：准确 `sourceSha/targetSha`、`sourceRepository`、`targetBranch`、
-操作 `purpose`、当前完整清查的 `scopeFingerprint`，以及范围文档/条目的指纹。
+在 `currentChange` 中传入实际 `sourceBranch`、`targetBranch`、GitLab 项目读回的
+`defaultBranch`，以及已核实的 `testBranch`（若存在）。同时绑定准确的
+`sourceSha/targetSha`、`sourceRepository`、操作 `purpose`、当前完整清查的
+`scopeFingerprint` 及范围文档/条目指纹。
 `mockSafety` 或单项 `mockSafeties` 的 `baseSha` 必须等于当前 target SHA，
 范围指纹必须匹配。连同 reviewer 的 `changeReview`、当前 `mergePermission` 和其他门禁
 传给 `scripts/review-policy.mjs evaluate-merge`；批准操作改用 `evaluate-approve`，
@@ -86,7 +87,7 @@ pipeline 按统一规则阻断。若需要等待 pipeline，写前再次读取 r
 统一 `checkMockSafetySet`，重新核实
 来源版本/内容、完整范围和实际配置；必须等待真实返回。缺项、fail、unknown、版本变化
 或 `mock-safety` 阻断都不放行。手填 pass、空列表、旧回执、confirmed=true 或 Promise
-不能代替实际结果。测试 Mock 授权不能放行本技能的 master/main 生产目标。
+不能代替实际结果。已核实的主分支始终适用生产 Mock 门禁。
 
 只有对应操作的统一门禁通过，且当前操作另有准确授权/能力，才执行相应写入。
 approve 后仍需重新读取审批和门禁；成功批准不是已经合并。

@@ -16,7 +16,7 @@ complete `SubmissionPlan` for internal review or a requested preview, bound-fact
 | Repository | expected/actual path, Git root, origin, verification result |
 | Authorization | current human submission instruction with its established context or matching startup confirmation, comparison to the exact operations and targets, allowed derivations and any uncovered decisions |
 | Mock safety | per-repository current source/diff-bound inspection and same Plan/brief inventory; explicit evidenced no-Mock or exact MOCK-* scope and matching human test authorization for target environment/branch/Job, purpose and selected writes; stale/missing evidence blocks; preserve real acceptance gaps in result/Wiki |
-| Git delivery | per repository: original source branch/SHA, verified confirmed test target (`dev` or `develop`), current-round commits, commit/push/MR/merge results, actual-target containment |
+| Git delivery | per repository: original source branch/SHA, exact verified test target and remote default branch, current-round commits, commit/push/MR/merge results, actual-target containment |
 | Conflict handoff | when A → C → B was used, exact ConflictMergeHandoff including original A/B, C MR/revisions/containment, temporary resources, upfront cleanup authority, latest retention policy and per-resource cleanup/deferred outcome; retain it even if C is absent |
 | Deployment | `BUILD_SUBMITTED|DEPLOYED|RELEASED|SKIPPED_BY_INTENT|FAILED|UNKNOWN|NOT_ATTEMPTED`, original Jenkins job/environment/ref/version/channel/purpose and trigger/readback evidence; reused receipts retain current matching/availability proof and their own repository gate |
 | Shared Wiki | `sharedWikiPlan`, `wikiOwner` (workspace/type/ID), owner/Task relationship readback, one target per Story/Bug, repository+branch entry identities, complete combined body/hash, all comment targets and included project gates; same final page ID in every participating result |
@@ -78,11 +78,14 @@ never rerun business implementation or invent a missing READY/REVIEWED handoff.
   cannot establish submission authority. No new runtime state/model is needed.
 
 - `SUBMITTED` requires every necessary repository's matching upstream inputs,
-  exact repository/original source and confirmed test target (`dev` or
-  `develop`), matching authority and verified delivery operations,
+  exact repository/original source and confirmed test target, matching authority
+  and verified delivery operations,
   immediate prerequisite checks/readbacks for every executed write, and containment of all current-round
-  commits in that repository's exact remote target. Never replace an upstream
-  confirmed `dev` with `develop`, or the reverse.
+  commits in that repository's exact remote target. Bind the repository's
+  confirmed target as `testBranch` when calling the standalone merge executor.
+  The executor reads the actual default branch from GitLab and verifies the
+  remote test target. Its successful test receipt records `testTargetVerified`
+  and the verified `defaultBranch`.
 - For one Bug across repositories, normalize the existing singular inputs or
   `work_definitions`/`reviewed_changes` collections into delivery rows; match
   canonical repository/root, origin and fixed branch, never array order.

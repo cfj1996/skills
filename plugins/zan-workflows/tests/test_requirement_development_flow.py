@@ -14,6 +14,8 @@ class RequirementDevelopmentFlowTests(unittest.TestCase):
                      "USER_NAME", "git config user.name", "本机用户名", "Asia/Shanghai",
                      "git check-ref-format --branch", "git switch --no-track -c"]:
             self.assertIn(rule, BRANCH)
+        self.assertIn("已核实的远端默认分支及其最新 SHA", SKILL)
+        self.assertIn("记录准确的远端 ref/SHA", BRANCH)
         self.assertIn("CONTINUE 复用已证实原分支", BRANCH)
         self.assertIn("feature/alice.0918.1080800.供应商分账限制", BRANCH)
         self.assertNotIn("feature/cfj.", SKILL + BRANCH)

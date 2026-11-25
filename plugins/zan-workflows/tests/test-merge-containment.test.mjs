@@ -16,13 +16,14 @@ const input = () => ({ projectId: '1', repositoryPath: '/fixture/demo', originUr
   title: '已评审变更', purpose: '核实已有交付后继续提测', reviewPassed: true,
   pipelineRequired: true, execute: false });
 
-function fixture({ equal = false, contained = true, proofError, proofTarget } = {}) {
+function fixture({ equal = false, contained = true, proofError, proofTarget,
+  targetBranch = 'develop', defaultBranch = 'main' } = {}) {
   const calls = [];
   const tip = equal ? sourceSha : targetSha;
   const call = async (name, args) => {
     calls.push({ name, args });
-    if (name === 'get_project') return { http_url_to_repo: originUrl, default_branch: 'main' };
-    if (name === 'get_branch') return { commit: { id: args.branch_name === 'develop' ? tip : sourceSha } };
+    if (name === 'get_project') return { http_url_to_repo: originUrl, default_branch: defaultBranch };
+    if (name === 'get_branch') return { commit: { id: args.branch_name === targetBranch ? tip : sourceSha } };
     if (name === 'list_merge_requests') return [];
     assert.fail('No MR or other write is permitted: ' + name);
   };
@@ -76,6 +77,21 @@ test('missing containment, unavailable proof and target drift block no-merge del
     const fake = fixture(options);
     await assert.rejects(mergeReviewedBranch(fake.call, { ...input(), mergeMode: 'CONTAINMENT_ONLY' }, fake.io));
     assert.ok(fake.calls.every(row => ['get_branch', 'get_project'].includes(row.name)));
+  }
+});
+
+test('the test name and an explicitly confirmed custom target can produce a verified test receipt', async () => {
+  for (const targetBranch of ['test', 'qa/integration']) {
+    const fake = fixture({ targetBranch, defaultBranch: 'release/trunk' });
+    const plan = { ...input(), targetBranch, mergeMode: 'CONTAINMENT_ONLY',
+      ...(targetBranch === 'test' ? {} : { testBranch: targetBranch }) };
+    const result = await mergeReviewedBranch(fake.call, plan, fake.io);
+    assert.equal(result.testTargetVerified, true);
+    assert.equal(result.defaultBranch, 'release/trunk');
+    assert.equal(result.defaultTargetVerified, false);
+    assert.equal(result.writes, 0);
+    const main = fixture({ targetBranch, defaultBranch: targetBranch });
+    await assert.rejects(mergeReviewedBranch(main.call, plan, main.io), /提测|测试分支/);
   }
 });
 

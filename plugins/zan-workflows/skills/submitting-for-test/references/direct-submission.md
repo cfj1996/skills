@@ -62,7 +62,7 @@ Task/Plan 操作仍按原规则执行，不把所有 TAPD 写入误归为提测�
    也不在提测前复核或返工途中发表评论。
    不把无关改动混入提交，不在直接提测中自动修复业务代码。缺少材料或
    检查失败时停止受影响交付，并说明所需证据/修复；保留已完成效果。
-3. 准备准确只读 `SubmissionPlan`，核实实际 dev/develop、所选 Wiki 正文/
+3. 准备准确只读 `SubmissionPlan`，核实实际提测分支、所选 Wiki 正文/
    最小补丁、Jenkins Job/参数及最终登记。默认合并、Wiki 和构建均需要；
    当前明确关闭某项时才跳过。先前 IMPLEMENT 的不交付选择属于上一轮，
    本次明确要求直接提测后重新解析本轮选择；本轮明确的 NO_WIKI/SKIP 仍保留。
@@ -71,7 +71,7 @@ Task/Plan 操作仍按原规则执行，不把所有 TAPD 写入误归为提测�
    才发表/复用唯一修复记录并准确读回，再登记 TAPD；失败保留实际效果并停止。
 5. 已有提交、推送、MR 或 Wiki 逐项核实后复用，只完成缺少的已授权操作。
    已手动交付或明确本轮不合并时，调用 merge 的只读 `CONTAINMENT_ONLY`
-   核实准确 dev/develop 包含已评审源码。其 `VERIFIED`、`containment=true`、
+   核实仓库的实际提测分支包含已评审源码。其 `VERIFIED`、`containment=true`、
    `writes=0` 回执可通过提测 Git 门禁；绑定回执的 `deliveredSha` 作为本次
    测试目标版本，不虚构 MR 或合并成功。未包含或证据不明时停止，不擅自合并。
    先确认本轮已审查改动均已进入该 source SHA；仍有未提交的待交付增量时
